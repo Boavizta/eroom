@@ -13,9 +13,13 @@ Le dossier doit contenir :
   - cwv.json (optionnel)
 """
 
+import base64
 import json
 import re
+import subprocess
 import sys
+import tempfile
+import urllib.request
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -156,6 +160,77 @@ def coverage_summary(entries):
         return {"total_kb": round(total, 1), "unused_kb": round(unused, 1), "pct": pct}
 
     return {"js": _agg(js), "css": _agg(css), "all": _agg(entries)}
+
+
+# ── Images : compression AVIF + intégration base64 ───────────────────────────
+
+def embed_image(source, alt="", max_dim=500):
+    """
+    Compresse une image (URL ou chemin local) en AVIF 500×500 max et retourne
+    le bloc HTML <figure> avec le base64 inline.
+
+    Retourne une chaîne HTML vide si vipsthumbnail n'est pas disponible ou si
+    la source est inaccessible.
+    """
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig = Path(tmpdir) / "orig"
+            avif = Path(tmpdir) / "out.avif"
+
+            # Téléchargement ou copie
+            src = str(source)
+            if src.startswith("http://") or src.startswith("https://"):
+                urllib.request.urlretrieve(src, orig)
+            else:
+                orig = Path(source)
+                if not orig.exists():
+                    return ""
+
+            # Dimensions originales
+            r = subprocess.run(
+                ["vipsheader", "-f", "width", str(orig), "-f", "height", str(orig)],
+                capture_output=True, text=True
+            )
+            if r.returncode != 0:
+                return ""
+            dims = r.stdout.strip().split()
+            orig_w, orig_h = (int(dims[0]), int(dims[1])) if len(dims) == 2 else (0, 0)
+
+            # Compression AVIF
+            size_arg = f"{max_dim}x{max_dim}>"
+            r2 = subprocess.run(
+                ["vipsthumbnail", str(orig), "--size", size_arg,
+                 "-o", f"{avif}[Q=60,effort=9,keep=none]"],
+                capture_output=True
+            )
+            if r2.returncode != 0 or not avif.exists():
+                return ""
+
+            # Dimensions compressées
+            r3 = subprocess.run(
+                ["vipsheader", "-f", "width", str(avif), "-f", "height", str(avif)],
+                capture_output=True, text=True
+            )
+            dims2 = r3.stdout.strip().split()
+            comp_w, comp_h = (int(dims2[0]), int(dims2[1])) if len(dims2) == 2 else (orig_w, orig_h)
+
+            b64 = base64.b64encode(avif.read_bytes()).decode()
+
+        resized = (orig_w != comp_w or orig_h != comp_h) and orig_w > 0
+        caption = (
+            f"(Pour ce rapport image redimensionnée : {orig_w}×{orig_h} → {comp_w}×{comp_h} px et version allègement du fichier au format AVIF)"
+            if resized else
+            "(Pour ce rapport : version allègement du fichier au format AVIF)"
+        )
+        return (
+            f'<figure style="margin:0.75rem 0; text-align:center;">'
+            f'<img src="data:image/avif;base64,{b64}" alt="{alt}" '
+            f'style="max-width:100%; max-height:{max_dim}px; border:1px solid #e0e0e0; border-radius:4px;">'
+            f'<figcaption style="font-size:0.78rem; color:#9e9e9e; margin-top:0.3rem;">{caption}</figcaption>'
+            f'</figure>'
+        )
+    except Exception:
+        return ""
 
 
 # ── HTML helpers ──────────────────────────────────────────────────────────────
@@ -405,6 +480,198 @@ def _section_cwv(page_metrics, cwv):
 </section>"""
 
 
+GREENIT_RULES = {
+    "AddExpiresOrCacheControlHeaders": {
+        "name": "Ajouter des expires ou cache-control headers (>= 95%)",
+        "description": "Configurez les headers pour que CSS, JS et images soient mis en cache le plus longtemps possible.",
+    },
+    "CompressHttp": {
+        "name": "Compresser les ressources (>= 95%)",
+        "description": "Activez gzip/Deflate. Pré-compressez les ressources statiques ; la compression à la volée convient pour le HTML dynamique.",
+    },
+    "DomainsNumber": {
+        "name": "Limiter le nombre de domaines (< 3)",
+        "description": "Moins de domaines = moins de connexions HTTP. Exception : un domaine séparé sans cookie pour les ressources statiques.",
+    },
+    "DontResizeImageInBrowser": {
+        "name": "Ne pas retailler les images dans le navigateur",
+        "description": "Redimensionner via HTML gaspille la bande passante : un PNG 350×300 px pèse 41 Ko même affiché en 70×60 px.",
+    },
+    "EmptySrcTag": {
+        "name": "Eviter les tags SRC vides",
+        "description": "Un attribut src vide déclenche des requêtes HTTP inutiles vers le répertoire de la page.",
+    },
+    "ExternalizeCss": {
+        "name": "Externaliser les css",
+        "description": "Le CSS inline est renvoyé à chaque requête de page ; les fichiers externes peuvent être mis en cache.",
+    },
+    "ExternalizeJs": {
+        "name": "Externaliser les js",
+        "description": "Même principe que le CSS : les fichiers JS séparés permettent la mise en cache navigateur.",
+    },
+    "HttpError": {
+        "name": "Eviter les requêtes en erreur",
+        "description": "Les réponses en erreur consomment des ressources inutilement.",
+    },
+    "HttpRequests": {
+        "name": "Limiter le nombre de requêtes HTTP (< 27)",
+        "description": "Moins de requêtes par page allègent la charge serveur et réduisent l'impact environnemental.",
+    },
+    "ImageDownloadedNotDisplayed": {
+        "name": "Ne pas télécharger des images inutilement",
+        "description": "Les images chargées mais affichées seulement après interaction utilisateur gaspillent des ressources.",
+    },
+    "JsValidate": {
+        "name": "Valider le javascript",
+        "description": "JSLint garantit la conformité syntaxique cross-navigateur et permet une exécution plus rapide de l'interpréteur.",
+    },
+    "MaxCookiesLength": {
+        "name": "Taille maximum des cookies par domaine (< 512 octets)",
+        "description": "Les cookies sont envoyés à chaque requête : les garder courts économise de la bande passante.",
+    },
+    "MinifiedCss": {
+        "name": "Minifier les css (>= 95%)",
+        "description": "Utilisez YUI Compressor ou mod_pagespeed pour supprimer espaces et sauts de ligne.",
+    },
+    "MinifiedJs": {
+        "name": "Minifier les js (>= 95%)",
+        "description": "Supprimez les espaces, sauts de ligne, points-virgules inutiles et raccourcissez les noms de variables locales.",
+    },
+    "NoCookieForStaticRessources": {
+        "name": "Pas de cookie pour les ressources statiques",
+        "description": "Les cookies sur les ressources statiques gaspillent de la bande passante. Utilisez un domaine séparé ou limitez la portée des cookies.",
+    },
+    "NoRedirect": {
+        "name": "Eviter les redirections",
+        "description": "Les redirections ralentissent les temps de réponse et consomment des ressources inutilement.",
+    },
+    "OptimizeBitmapImages": {
+        "name": "Optimiser les images bitmap",
+        "description": "Les bitmaps représentent généralement la majorité des octets téléchargés : leur optimisation a un fort impact.",
+    },
+    "OptimizeSvg": {
+        "name": "Optimiser les images svg",
+        "description": "Bien que plus légères que les bitmaps, les SVG peuvent être minifiés avec des outils comme svgo.",
+    },
+    "Plugins": {
+        "name": "Ne pas utiliser de plugins",
+        "description": "Flash, Java, Silverlight imposent une charge CPU/RAM importante. Préférez HTML5 et ECMAScript.",
+    },
+    "PrintStyleSheet": {
+        "name": "Fournir une print css",
+        "description": "Une feuille de style d'impression réduit le nombre de pages imprimées ; masquez menus, en-têtes et images non essentielles.",
+    },
+    "SocialNetworkButton": {
+        "name": "N'utilisez pas les boutons standards des réseaux sociaux",
+        "description": "Les plugins officiels (Facebook, Twitter…) chargent des ressources inutiles ; utilisez des liens directs.",
+    },
+    "StyleSheets": {
+        "name": "Limiter le nombre de fichiers css (< 3)",
+        "description": "Concaténez les feuilles de style en un seul fichier pour réduire les requêtes HTTP.",
+    },
+    "UseETags": {
+        "name": "Utiliser des ETags (>= 95%)",
+        "description": "Les ETags permettent la réutilisation des ressources en cache quand la signature serveur correspond.",
+    },
+    "UseStandardTypefaces": {
+        "name": "Utiliser des polices de caractères standards",
+        "description": "Les polices standard sont déjà présentes sur l'appareil de l'utilisateur : aucun téléchargement nécessaire.",
+    },
+}
+
+COMPLIANCE_COLORS = {"A": "#28a745", "B": "#5cb85c", "C": "#fd7e14", "NA": "#aaa"}
+COMPLIANCE_ORDER  = {"A": 0, "B": 1, "C": 2, "NA": 3}
+
+
+def load_greenit(audit_dir):
+    """
+    Charge le fichier greenit.json si présent.
+    Formats acceptés :
+      - CLI GreenIT-Analysis-cli : liste de pages {"url":..., "bestPractices":{...}}
+      - EcoSonar export          : {"ecodesign": {"RuleName": {"compliance":..., "auditedMetric":..., "averageScore":..., "description":...}}}
+    Retourne un dict {"pages": [...], "aggregated": {"RuleName": {...}}} ou None.
+    """
+    path = Path(audit_dir) / "greenit.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Format EcoSonar
+    if isinstance(data, dict) and "ecodesign" in data:
+        aggregated = {}
+        for key, val in data["ecodesign"].items():
+            aggregated[key] = {
+                "complianceLevel": val.get("compliance", "NA"),
+                "comment":         str(val.get("auditedMetric", "")),
+                "detailComment":   val.get("description", ""),
+            }
+        return {"pages": [], "aggregated": aggregated}
+
+    # Format CLI : liste de pages
+    pages = data if isinstance(data, list) else [data]
+    aggregated = {}
+    for page in pages:
+        for key, bp in page.get("bestPractices", {}).items():
+            level = bp.get("complianceLevel", "NA")
+            if key not in aggregated:
+                aggregated[key] = {"complianceLevel": level, "comment": bp.get("comment", ""), "detailComment": bp.get("detailComment", ""), "_levels": []}
+            aggregated[key]["_levels"].append(level)
+
+    # Compliance globale = pire niveau parmi les pages
+    for key, val in aggregated.items():
+        levels = val.pop("_levels", [])
+        worst = sorted(levels, key=lambda x: COMPLIANCE_ORDER.get(x, 3))[-1] if levels else "NA"
+        val["complianceLevel"] = worst
+
+    return {"pages": pages, "aggregated": aggregated}
+
+
+def _section_greenit(greenit):
+    if not greenit:
+        return ""
+
+    agg = greenit["aggregated"]
+    # Trier : C en premier, puis B, puis A, puis NA
+    sorted_keys = sorted(agg.keys(), key=lambda k: COMPLIANCE_ORDER.get(agg[k]["complianceLevel"], 3))
+
+    rows = ""
+    for key in sorted_keys:
+        bp    = agg[key]
+        rule  = GREENIT_RULES.get(key, {"name": key, "description": ""})
+        level = bp["complianceLevel"]
+        color = COMPLIANCE_COLORS.get(level, "#aaa")
+        badge = f'<span class="badge" style="background:{color};min-width:28px">{level}</span>'
+        detail = bp.get("comment") or bp.get("detailComment") or ""
+        detail_html = f'<br><span style="font-size:11px;color:#666">{detail}</span>' if detail else ""
+        rows += f"""<tr>
+      <td style="text-align:center;width:48px">{badge}</td>
+      <td><b>{rule['name']}</b>{detail_html}</td>
+      <td style="font-size:12px;color:#555">{rule['description']}</td>
+    </tr>"""
+
+    nb_c  = sum(1 for k in agg if agg[k]["complianceLevel"] == "C")
+    nb_b  = sum(1 for k in agg if agg[k]["complianceLevel"] == "B")
+    nb_a  = sum(1 for k in agg if agg[k]["complianceLevel"] == "A")
+    nb_na = sum(1 for k in agg if agg[k]["complianceLevel"] == "NA")
+
+    summary = (
+        f'<span style="background:#dc3545;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_c}</b> C</span>'
+        f'<span style="background:#fd7e14;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_b}</b> B</span>'
+        f'<span style="background:#28a745;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_a}</b> A</span>'
+        f'<span style="background:#aaa;color:white;padding:2px 8px;border-radius:4px"><b>{nb_na}</b> N.A</span>'
+    )
+
+    return f"""<section id="greenit">
+  <h2>Bonnes pratiques GreenIT-Analysis</h2>
+  <div style="margin-bottom:14px">{summary}</div>
+  <table>
+    <thead><tr><th style="width:48px">Niveau</th><th>Bonne pratique</th><th>Description</th></tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+</section>"""
+
+
 def _section_recommendations(page_metrics, traffic, coverage_by_page):
     prio1, prio2, prio3 = [], [], []
 
@@ -467,14 +734,18 @@ def generate(audit_dir, output_path=None):
     cov_files = sorted(audit_dir.glob("Coverage-*.json")) or sorted(audit_dir.glob("*coverage*.json"))
     cwv_path  = audit_dir / "cwv.json"
 
+    greenit_path = audit_dir / "greenit.json"
+
     print(f"HAR      : {har_path.name}")
     print(f"Coverage : {len(cov_files)} fichier(s)")
     print(f"CWV      : {'oui' if cwv_path.exists() else 'non (timings HAR utilisés)'}")
+    print(f"GreenIT  : {'oui' if greenit_path.exists() else 'non'}")
 
     har_data     = parse_har(har_path)
     page_metrics = extract_page_metrics(har_data)
     traffic      = har_traffic_analysis(har_data)
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
+    greenit      = load_greenit(audit_dir)
 
     coverage_by_page = {}
     for cf in cov_files:
@@ -507,6 +778,7 @@ def generate(audit_dir, output_path=None):
     html += _section_traffic(traffic)
     html += _section_coverage(coverage_by_page)
     html += _section_cwv(page_metrics, cwv)
+    html += _section_greenit(greenit)
     html += _section_recommendations(page_metrics, traffic, coverage_by_page)
 
     html += "</main>\n"
