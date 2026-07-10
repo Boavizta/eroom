@@ -741,6 +741,102 @@ def _section_cwv(page_metrics, cwv):
 </section>"""
 
 
+CWV_ACTIONS = {
+    "lcp_bad":  "optimiser le chargement de l'image/bloc principal (preload, formats modernes, lazy loading désactivé sur hero)",
+    "lcp_warn": "vérifier la priorité de chargement de l'élément principal",
+    "inp_bad":  "réduire le travail JS sur le thread principal (long tasks, event handlers lourds)",
+    "inp_warn": "optimiser les gestionnaires d'événements et éviter les rendus bloquants",
+    "cls_bad":  "définir des dimensions explicites sur images et iframes, éviter les injections DOM tardives",
+    "cls_warn": "vérifier les éléments sans taille réservée (fonts, images, publicités)",
+}
+
+
+def _section_cwv_analyse(page_metrics, cwv):
+    if not cwv:
+        return ""
+
+    from urllib.parse import urlparse
+
+    deduped = _dedup_page_metrics(page_metrics)
+
+    sources = {c.get("source") for c in cwv.values() if c}
+    is_lighthouse = "lighthouse" in sources
+    if is_lighthouse:
+        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+      <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
+      Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
+      <ul style="margin:6px 0 0 16px;padding:0">
+        <li><strong>Réseau :</strong> "Slow 4G" simulé - 10 Mbps, latence 40 ms RTT</li>
+        <li><strong>CPU :</strong> ralenti 4x (simule un appareil mobile bas de gamme)</li>
+        <li><strong>Viewport :</strong> 360 x 640 px (mobile)</li>
+        <li><strong>Session :</strong> Chrome headless sans cookies, sans cache, anonyme</li>
+      </ul>
+      <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain sont généralement meilleures, surtout sur desktop et connexion rapide.</span>
+    </div>"""
+    else:
+        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+      <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
+      Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights).
+    </div>"""
+
+    legend = """<div style="font-size:11px;margin-top:16px;display:flex;gap:16px;align-items:center">
+    <span style="font-weight:bold;color:#555">Légende :</span>
+    <span style="color:#0cce6b">● Bon</span>
+    <span style="color:#ffa400">● A améliorer</span>
+    <span style="color:#ff4e42">● Mauvais</span>
+    <span style="color:#aaa">— Non mesuré</span>
+  </div>"""
+
+    def _metric_row(label, val, unit, thresholds, key_bad, key_warn):
+        if not isinstance(val, (int, float)):
+            return f'<div style="margin:4px 0;font-size:13px"><b>{label}</b> : <span style="color:#aaa">— Non mesuré</span></div>'
+        if val > thresholds[1]:
+            color = "#ff4e42"
+            status = "mauvais"
+            action = CWV_ACTIONS[key_bad]
+        elif val > thresholds[0]:
+            color = "#ffa400"
+            status = "à améliorer"
+            action = CWV_ACTIONS[key_warn]
+        else:
+            color = "#0cce6b"
+            status = "bon"
+            action = ""
+        action_html = f' <span style="color:#555;font-size:12px">- {action}</span>' if action else ""
+        return f'<div style="margin:4px 0;font-size:13px"><b>{label}</b> : <span style="color:{color};font-weight:bold">{val} {unit}</span> <span style="color:{color}">({status})</span>{action_html}</div>'
+
+    blocks = ""
+    for m in deduped:
+        c = _cwv_for_page(m, cwv)
+        url = m["title"]
+        parsed = urlparse(url)
+        short = parsed.path.rstrip("/") or "/"
+        num = m.get("page_num", "")
+        lcp = c.get("lcp") if c else None
+        inp = c.get("inp") if c else None
+        cls_ = c.get("cls") if c else None
+
+        lcp_row = _metric_row("LCP", lcp, "s",  (1.8, 2.5),  "lcp_bad",  "lcp_warn")
+        inp_row = _metric_row("INP", inp, "ms", (200, 500),  "inp_bad",  "inp_warn")
+        cls_row = _metric_row("CLS", cls_, "",  (0.1, 0.25), "cls_bad",  "cls_warn")
+
+        blocks += f"""<div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 18px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
+      <span style="color:#888;font-size:11px;margin-right:6px">P{num}</span><a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>
+    </div>
+    {lcp_row}
+    {inp_row}
+    {cls_row}
+  </div>"""
+
+    return f"""<section id="cwv-analyse">
+  <h2>Analyse Core Web Vitals</h2>
+  {methodo_note}
+  {blocks}
+  {legend}
+</section>"""
+
+
 GREENIT_RULES = {
     "AddExpiresOrCacheControlHeaders": {
         "name": "Ajouter des expires ou cache-control headers (>= 95%)",
@@ -1452,33 +1548,44 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
 
-    # CWV — LCP, INP, CLS par page
+    # CWV — 1 item synthétique par page (détail dans #cwv-analyse)
     for m in deduped:
         c = _cwv_for_page(m, cwv)
         if not c:
             continue
         num = m.get("page_num", "")
         url = m["title"]
-        short = url.rstrip("/").split("/")[-1] or "/"
+        from urllib.parse import urlparse
+        short = urlparse(url).path.rstrip("/") or "/"
         label = f'<a href="{url}" target="_blank" rel="noopener">P{num} {short}</a>'
         lcp = c.get("lcp")
         inp = c.get("inp")
         cls_ = c.get("cls")
+
+        bad_parts = []
+        warn_parts = []
         if isinstance(lcp, (int, float)):
             if lcp > 2.5:
-                prio1.append(f"<b>{label}</b> : LCP {lcp} s (mauvais) - optimiser le chargement de l'image/bloc principal (preload, formats modernes, lazy loading désactivé sur hero)")
+                bad_parts.append(f"LCP {lcp} s (mauvais)")
             elif lcp > 1.8:
-                prio2.append(f"<b>{label}</b> : LCP {lcp} s (à améliorer) - vérifier la priorité de chargement de l'élément principal")
+                warn_parts.append(f"LCP {lcp} s (à améliorer)")
         if isinstance(inp, (int, float)):
             if inp > 500:
-                prio1.append(f"<b>{label}</b> : INP {inp} ms (mauvais) - réduire le travail JS sur le thread principal (long tasks, event handlers lourds)")
+                bad_parts.append(f"INP {inp} ms (mauvais)")
             elif inp > 200:
-                prio2.append(f"<b>{label}</b> : INP {inp} ms (à améliorer) - optimiser les gestionnaires d'événements et éviter les rendus bloquants")
+                warn_parts.append(f"INP {inp} ms (à améliorer)")
         if isinstance(cls_, (int, float)):
             if cls_ > 0.25:
-                prio1.append(f"<b>{label}</b> : CLS {cls_} (mauvais) - définir des dimensions explicites sur images et iframes, éviter les injections DOM tardives")
+                bad_parts.append(f"CLS {cls_} (mauvais)")
             elif cls_ > 0.1:
-                prio2.append(f"<b>{label}</b> : CLS {cls_} (à améliorer) - vérifier les éléments sans taille réservée (fonts, images, publicités)")
+                warn_parts.append(f"CLS {cls_} (à améliorer)")
+
+        if bad_parts:
+            metrics_str = ", ".join(bad_parts + [p for p in warn_parts if p not in bad_parts])
+            prio1.append(f"<b>{label}</b> : {metrics_str}")
+        elif warn_parts:
+            metrics_str = ", ".join(warn_parts)
+            prio2.append(f"<b>{label}</b> : {metrics_str}")
 
     # EcoIndex < 40 → priorité 1
     for m in page_metrics:
@@ -1535,7 +1642,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
   <div class="prio prio-1">
     <b>PRIORITÉ 1 - Impact fort</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio1)}</ul>
-    {_see_also(prio1, ("dashboard", "A.1 Tableau de bord EcoIndex"), ("cwv", "A.4 Core Web Vitals"), ("coverage", "A.3 Code mort (Coverage)"))}
+    {_see_also(prio1, ("dashboard", "A.1 Tableau de bord EcoIndex"), ("cwv-analyse", "Analyse CWV"), ("coverage", "A.3 Code mort (Coverage)"))}
   </div>
   <div class="prio prio-2">
     <b>PRIORITÉ 2 - Impact moyen</b>
@@ -1665,24 +1772,19 @@ def generate(audit_dir, output_path=None):
     if cwv:
         annexe_sections.append(("cwv", "Core Web Vitals"))
 
-    annexe_sections = [
-        ("dashboard", "Tableau de bord EcoIndex"),
-        ("trafic",    "Trafic réseau"),
-        ("coverage",  "Code mort (Coverage)"),
-    ]
-    if cwv:
-        annexe_sections.append(("cwv", "Core Web Vitals"))
-
     letters = "abcdefgh"
     annexe_inline = " &nbsp;·&nbsp; ".join(
         f'<a href="#{sid}">3.{letters[i]} {slabel}</a>'
         for i, (sid, slabel) in enumerate(annexe_sections)
     )
+    cwv_nav = f'<li><a href="#cwv-analyse">3. Analyse Core Web Vitals</a></li>' if cwv else ""
+    annexes_num = 4 if cwv else 3
     nav_items = (
         f'<li><a href="#recommandations">1. Recommandations</a></li>'
         f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
+        f'{cwv_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
-        f'<a href="#annexes">3. Annexes</a>'
+        f'<a href="#annexes">{annexes_num}. Annexes</a>'
         f'<span style="font-size:11px;opacity:.75;padding-left:4px">{annexe_inline}</span>'
         f'</li>'
         f'<li><a href="#couts">&#9658; Couts de generation</a></li>'
@@ -1707,6 +1809,8 @@ def generate(audit_dir, output_path=None):
 """
     html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv)
     html += _section_greenit(greenit)
+    if cwv:
+        html += _section_cwv_analyse(page_metrics, cwv)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
