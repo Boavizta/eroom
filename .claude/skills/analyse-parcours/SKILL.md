@@ -66,6 +66,18 @@ Extraire du HAR :
 
 ---
 
+## Étape 25 — Orchestration DISPATCH
+
+→ Voir `skill-steps/25_dispatch-orchestration.md`
+
+Les étapes 20 (analyse HAR) et 30 (analyse Coverage) sont orchestrées en parallèle
+via le mécanisme DISPATCH. Si les sous-agents sont disponibles (Claude Code), elles
+s'exécutent dans des contextes isolés simultanément. Sinon, elles s'enchaînent inline.
+
+Les sorties produites : `har-analysis.json` et `coverage-analysis.json` dans le dossier audit.
+
+---
+
 ## Étape 30 — Analyse des fichiers de couverture
 
 → Voir `skill-steps/30_analyse-coverage.md`
