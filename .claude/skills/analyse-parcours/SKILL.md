@@ -99,7 +99,7 @@ Calcul automatique depuis le HAR (formule officielle) :
 - Score 0-100 + grade A-G avec code couleur
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/ecoindex_utils.py <fichier.har> [cwv.json]
+python3 .claude/skills/analyse-parcours/scripts/har_metrics.py <fichier.har> [cwv.json]
 ```
 
 ---

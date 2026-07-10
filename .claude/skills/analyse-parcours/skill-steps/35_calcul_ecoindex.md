@@ -9,12 +9,12 @@ L'EcoIndex est calculé entièrement depuis le HAR, sans saisie manuelle :
 - **Poids** : somme `response.content.size` par page
 - **DOM** : compté en parsant le corps HTML de la première réponse `text/html` de chaque page (`response.content.text`)
 
-La formule officielle (cnumr/ecoindex_reference) avec quantiles est implémentée dans `scripts/ecoindex_utils.py`.
+La formule officielle (cnumr/ecoindex_reference) avec quantiles est implémentée dans `scripts/har_metrics.py`.
 
 ## Exécution
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/ecoindex_utils.py <fichier.har> [cwv.json]
+python3 .claude/skills/analyse-parcours/scripts/har_metrics.py <fichier.har> [cwv.json]
 ```
 
 Le script affiche un tableau par page et valide automatiquement sur les valeurs ANTS connues

@@ -25,7 +25,7 @@ open <dossier-audit>/rapport-parcours-YYYY-MM-DD.html
 
 ### Tableau de bord EcoIndex
 Tableau par page avec : grade coloré (A-G), score /100, requêtes, poids (Ko), DOM, LCP/onLoad, INP, CLS
-- Source : `ecoindex_utils.py` (étape 35)
+- Source : `har_metrics.py` (étape 35)
 - Si `cwv.json` absent : LCP affiché = onLoad HAR avec note explicite
 
 ### Section 1 — Trafic réseau

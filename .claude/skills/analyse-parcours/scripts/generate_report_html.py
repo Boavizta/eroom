@@ -46,7 +46,7 @@ TYPE_COLORS = {
 
 # ── Imports EcoIndex ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from ecoindex_utils import extract_page_metrics, load_cwv
+from har_metrics import extract_page_metrics, load_cwv
 
 
 # ── Parsing HAR ───────────────────────────────────────────────────────────────
@@ -367,22 +367,35 @@ def _bar(used_pct):
 
 
 def _dedup_page_metrics(page_metrics):
-    """Déduplique par URL canonique : garde la ligne avec DOM non-zéro, sinon la plus lourde."""
+    """Déduplique par URL canonique : garde la ligne avec DOM non-zéro, sinon la plus lourde.
+    Ajoute un champ page_num (1-indexé) dans l'ordre de première apparition."""
     seen = {}
+    order = []
     for m in page_metrics:
         url = m["title"].split("?")[0].rstrip("/") or m["title"]
         prev = seen.get(url)
         if prev is None:
             seen[url] = m
+            order.append(url)
         else:
-            # Préférer : DOM non-zéro > plus de requêtes
             if m["dom"] > 0 and prev["dom"] == 0:
                 seen[url] = m
             elif m["dom"] > 0 and prev["dom"] > 0 and m["req"] > prev["req"]:
                 seen[url] = m
             elif m["dom"] == 0 and prev["dom"] == 0 and m["req"] > prev["req"]:
                 seen[url] = m
-    return list(seen.values())
+    result = []
+    for i, url in enumerate(order, 1):
+        m = dict(seen[url])
+        m["page_num"] = i
+        result.append(m)
+    return result
+
+
+def _cwv_for_page(m, cwv):
+    """Cherche les données CWV d'abord par URL (normaliser) puis par page_id."""
+    url = m.get("title", "").rstrip("/")
+    return cwv.get(url) or cwv.get(m["page_id"], {})
 
 
 def _section_dashboard(page_metrics, cwv):
@@ -391,12 +404,12 @@ def _section_dashboard(page_metrics, cwv):
     for m in deduped:
         badge = _badge(m["grade"], m["grade_color"])
         url = m["title"]
-        # Affichage : chemin seul comme label, URL complète en title + href
         from urllib.parse import urlparse
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
-        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}">{short}</a>'
-        cwv_data = cwv.get(m["page_id"], {})
+        num = m.get("page_num", "")
+        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:11px;margin-right:4px">P{num}</span>{short}</a>'
+        cwv_data = _cwv_for_page(m, cwv)
 
         def _cwv_cell(val, unit, thresholds):
             # thresholds = (good_max, needs_improvement_max)
@@ -651,21 +664,26 @@ def _section_cwv(page_metrics, cwv):
     if not cwv:
         return ""
 
+    deduped = _dedup_page_metrics(page_metrics)
     rows = ""
-    for m in page_metrics:
-        c = cwv.get(m["page_id"], {})
-        if not c:
-            continue
+    for m in deduped:
+        c = _cwv_for_page(m, cwv)
         from urllib.parse import urlparse
         url = m["title"]
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
-        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}">{short}</a>'
+        num = m.get("page_num", "")
+        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:11px;margin-right:4px">P{num}</span>{short}</a>'
+        if c:
+            lcp_cell = _cwv_colored(c.get("lcp"), "s", (1.8, 2.5))
+            inp_cell = _cwv_colored(c.get("inp"), "ms", (200, 500))
+            cls_cell = _cwv_colored(c.get("cls"), "", (0.1, 0.25))
+        else:
+            na = '<td style="text-align:right;color:#aaa">—</td>'
+            lcp_cell = inp_cell = cls_cell = na
         rows += f"""<tr>
       <td>{page_cell}</td>
-      {_cwv_colored(c.get("lcp"), "s", (1.8, 2.5))}
-      {_cwv_colored(c.get("inp"), "ms", (200, 500))}
-      {_cwv_colored(c.get("cls"), "", (0.1, 0.25))}
+      {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
     legend = """<div style="font-size:11px;margin-top:8px;display:flex;gap:16px;align-items:center">
@@ -689,11 +707,32 @@ def _section_cwv(page_metrics, cwv):
     </tbody>
   </table>"""
 
+    # Détecter si les données viennent de Lighthouse ou d'une mesure manuelle
+    sources = {c.get("source") for c in cwv.values() if c}
+    is_lighthouse = "lighthouse" in sources
+    is_manual = sources - {"lighthouse"}
+
+    if is_lighthouse:
+        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+      <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
+      Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
+      <ul style="margin:6px 0 0 16px;padding:0">
+        <li><strong>Réseau :</strong> "Slow 4G" simulé - 10 Mbps, latence 40 ms RTT</li>
+        <li><strong>CPU :</strong> ralenti 4x (simule un appareil mobile bas de gamme)</li>
+        <li><strong>Viewport :</strong> 360 x 640 px (mobile)</li>
+        <li><strong>Session :</strong> Chrome headless sans cookies, sans cache, anonyme</li>
+      </ul>
+      <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain (mesurées sur de vrais utilisateurs via CrUX ou PageSpeed Insights) sont généralement meilleures, surtout sur desktop et connexion rapide. Les pages nécessitant une authentification sont analysées sans session : les métriques reflètent alors la page de login, pas la page cible.</span>
+    </div>"""
+    else:
+        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+      <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
+      Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights). Elles reflètent les conditions réelles de l'utilisateur.
+    </div>"""
+
     return f"""<section id="cwv">
   <h2>Core Web Vitals</h2>
-  <p style="font-size:12px;color:#666;margin-bottom:10px">
-    Données terrain (source : cwv.json). INP et CLS ne peuvent pas être estimés depuis un HAR : ils nécessitent de vraies interactions utilisateur et un rendu navigateur complet.
-  </p>
+  {methodo_note}
   <table>
     <thead><tr><th>Page</th><th>LCP</th><th>INP</th><th>CLS</th></tr></thead>
     <tbody>{rows}</tbody>
@@ -1408,8 +1447,38 @@ def _section_couts(page_metrics):
 </section>"""
 
 
-def _section_recommendations(page_metrics, traffic, coverage_by_page):
+def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     prio1, prio2, prio3 = [], [], []
+    cwv = cwv or {}
+    deduped = _dedup_page_metrics(page_metrics)
+
+    # CWV — LCP, INP, CLS par page
+    for m in deduped:
+        c = _cwv_for_page(m, cwv)
+        if not c:
+            continue
+        num = m.get("page_num", "")
+        url = m["title"]
+        short = url.rstrip("/").split("/")[-1] or "/"
+        label = f'<a href="{url}" target="_blank" rel="noopener">P{num} {short}</a>'
+        lcp = c.get("lcp")
+        inp = c.get("inp")
+        cls_ = c.get("cls")
+        if isinstance(lcp, (int, float)):
+            if lcp > 2.5:
+                prio1.append(f"<b>{label}</b> : LCP {lcp} s (mauvais) - optimiser le chargement de l'image/bloc principal (preload, formats modernes, lazy loading désactivé sur hero)")
+            elif lcp > 1.8:
+                prio2.append(f"<b>{label}</b> : LCP {lcp} s (à améliorer) - vérifier la priorité de chargement de l'élément principal")
+        if isinstance(inp, (int, float)):
+            if inp > 500:
+                prio1.append(f"<b>{label}</b> : INP {inp} ms (mauvais) - réduire le travail JS sur le thread principal (long tasks, event handlers lourds)")
+            elif inp > 200:
+                prio2.append(f"<b>{label}</b> : INP {inp} ms (à améliorer) - optimiser les gestionnaires d'événements et éviter les rendus bloquants")
+        if isinstance(cls_, (int, float)):
+            if cls_ > 0.25:
+                prio1.append(f"<b>{label}</b> : CLS {cls_} (mauvais) - définir des dimensions explicites sur images et iframes, éviter les injections DOM tardives")
+            elif cls_ > 0.1:
+                prio2.append(f"<b>{label}</b> : CLS {cls_} (à améliorer) - vérifier les éléments sans taille réservée (fonts, images, publicités)")
 
     # EcoIndex < 40 → priorité 1
     for m in page_metrics:
@@ -1452,7 +1521,9 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page):
     def _items(lst):
         return "".join(f"<li>{i}</li>" for i in lst) if lst else "<li>Aucun constat critique.</li>"
 
-    def _see_also(*links):
+    def _see_also(items_list, *links):
+        if not items_list:
+            return ""
         parts = " &nbsp;·&nbsp; ".join(
             f'<a href="#{sid}" style="color:inherit;text-decoration:underline;font-size:12px">{label}</a>'
             for sid, label in links
@@ -1462,19 +1533,19 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page):
     return f"""<section id="recommandations">
   <h2>Recommandations</h2>
   <div class="prio prio-1">
-    <b>PRIORITÉ 1 - Impact fort (&lt; 1 semaine)</b>
+    <b>PRIORITÉ 1 - Impact fort</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio1)}</ul>
-    {_see_also(("dashboard", "A.1 Tableau de bord EcoIndex"), ("coverage", "A.3 Code mort (Coverage)"))}
+    {_see_also(prio1, ("dashboard", "A.1 Tableau de bord EcoIndex"), ("cwv", "A.4 Core Web Vitals"), ("coverage", "A.3 Code mort (Coverage)"))}
   </div>
   <div class="prio prio-2">
-    <b>PRIORITÉ 2 - Impact moyen (sprint)</b>
+    <b>PRIORITÉ 2 - Impact moyen</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio2)}</ul>
-    {_see_also(("trafic", "A.2 Trafic réseau"), ("dashboard", "A.1 Tableau de bord EcoIndex"))}
+    {_see_also(prio2, ("trafic", "A.2 Trafic réseau"), ("dashboard", "A.1 Tableau de bord EcoIndex"))}
   </div>
   <div class="prio prio-3">
     <b>PRIORITÉ 3 - Amélioration continue</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio3)}</ul>
-    {_see_also(("trafic", "A.2 Trafic réseau"), ("greenit", "2. Bonnes pratiques GreenIT"))}
+    {_see_also(prio3, ("trafic", "A.2 Trafic réseau"), ("greenit", "2. Bonnes pratiques GreenIT"))}
   </div>
 </section>"""
 
@@ -1634,7 +1705,7 @@ def generate(audit_dir, output_path=None):
 </nav>
 <main id="contenu">
 """
-    html += _section_recommendations(page_metrics, traffic, coverage_by_page)
+    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv)
     html += _section_greenit(greenit)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)

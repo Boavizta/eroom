@@ -164,7 +164,7 @@ skinparam responseMessageBelowArrow true
 actor "Utilisateur" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
 participant "Sous-agents\n(HAR / Coverage)" as SA #C8E6C9
-participant "ecoindex_utils.py" as EI #DBDDE5
+participant "har_metrics.py" as EI #DBDDE5
 database "dossier-audit/" as FS #9BD0DD
 
 == Étape 25 — Détection capacités DISPATCH ==
@@ -204,7 +204,7 @@ FS -> C : Données code mort JS/CSS
 
 == Étape 35 — Calcul EcoIndex (contexte principal) ==
 
-C -> EI : python3 ecoindex_utils.py <har> [cwv.json]
+C -> EI : python3 har_metrics.py <har> [cwv.json]
 EI -> EI : Extraire DOM HTML depuis\nresponse.content.text
 EI -> EI : Compter requêtes + poids\npar page (pageref)
 EI -> C : Tableau : score/grade/req/Ko/DOM\npar page + onLoad
@@ -383,7 +383,7 @@ end note
 
 partition "**Merge + suite** (contexte principal)" {
   :Lire har-analysis.json + coverage-analysis.json;
-  :Étape 35 — ecoindex_utils.py
+  :Étape 35 — har_metrics.py
   Calcul score/grade A-G par page
   (formule officielle cnumr/ecoindex);
 

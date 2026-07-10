@@ -8,13 +8,13 @@
 
 ### Cas 1 : cwv.json absent
 
-1. Extraire les URLs des pages depuis le HAR : `log.pages[].title` (une URL par page)
-2. Construire la commande et l'exécuter via Bash :
+1. Lancer le script sans URLs : il extrait lui-même toutes les URLs uniques depuis le HAR.
 
 ```bash
-bash .claude/skills/analyse-parcours/scripts/run_lighthouse.sh <dossier-audit> \
-  "<url-page-1>" "<url-page-2>" ...
+bash .claude/skills/analyse-parcours/scripts/run_lighthouse.sh <dossier-audit>
 ```
+
+Le script déduplique les URLs (`log.pages[].title`) avant de lancer Lighthouse, donc chaque page n'est analysée qu'une seule fois même si elle apparaît plusieurs fois dans le parcours.
 
 3. Afficher la progression :
 ```

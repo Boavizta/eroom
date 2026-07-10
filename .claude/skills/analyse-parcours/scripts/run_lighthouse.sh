@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Génère cwv.json depuis Lighthouse CLI pour un dossier d'audit.
-# Usage : run_lighthouse.sh <dossier-audit> <url-page1> [url-page2 ...]
+# Usage : run_lighthouse.sh <dossier-audit> [url-page1 url-page2 ...]
+#   Sans URLs : extrait automatiquement toutes les URLs uniques du .har dans <dossier-audit>.
 # Sortie : <dossier-audit>/cwv.json (format attendu par generate_report_html.py)
 #
 # Prérequis : Node.js installé.
@@ -13,13 +14,35 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_BIN="${SCRIPT_DIR}/node_modules/.bin/lighthouse"
 
-AUDIT_DIR="${1:?Usage: $0 <dossier-audit> <url-page1> [url-page2 ...]}"
+AUDIT_DIR="${1:?Usage: $0 <dossier-audit> [url-page1 url-page2 ...]}"
 shift
 URLS=("$@")
 
+# Auto-extraction des URLs depuis le HAR si aucune URL fournie
 if [[ ${#URLS[@]} -eq 0 ]]; then
-    echo "Erreur : au moins une URL requise." >&2
-    exit 1
+    HAR_FILE=$(find "$AUDIT_DIR" -maxdepth 1 -name "*.har" | head -1)
+    if [[ -z "$HAR_FILE" ]]; then
+        echo "Erreur : aucun fichier .har dans $AUDIT_DIR et aucune URL fournie." >&2
+        exit 1
+    fi
+    echo "[ Lighthouse ] Extraction automatique des URLs depuis $(basename "$HAR_FILE")..."
+    mapfile -t URLS < <(python3 - "$HAR_FILE" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    har = json.load(f)
+seen = {}
+for p in har["log"]["pages"]:
+    url = p["title"].rstrip("/")
+    if url and url not in seen:
+        seen[url] = True
+        print(url)
+PYEOF
+)
+    if [[ ${#URLS[@]} -eq 0 ]]; then
+        echo "Erreur : aucune URL extraite du HAR." >&2
+        exit 1
+    fi
+    echo "[ Lighthouse ] ${#URLS[@]} URL(s) extraite(s) du HAR."
 fi
 
 # Sélection du binaire Lighthouse
