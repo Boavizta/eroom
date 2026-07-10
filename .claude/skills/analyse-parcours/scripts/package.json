@@ -1,0 +1,8 @@
+{
+  "name": "analyse-parcours-tools",
+  "private": true,
+  "description": "Outils CLI locaux pour le skill analyse-parcours",
+  "dependencies": {
+    "lighthouse": "^12.0.0"
+  }
+}

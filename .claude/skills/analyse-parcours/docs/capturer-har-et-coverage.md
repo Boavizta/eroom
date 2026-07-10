@@ -19,6 +19,14 @@ pour une analyse d'écoresponsabilité et de performance.
   - [Étape 4 - Répéter pour chaque page](#étape-4---répéter-pour-chaque-page)
   - [Étape 5 - Vérifier les fichiers Coverage](#étape-5---vérifier-les-fichiers-coverage)
 
+## Table des matières (étendue)
+
+- [Partie 3 - Obtenir les Core Web Vitals (optionnel)](#partie-3---obtenir-les-core-web-vitals-optionnel)
+  - [Option A - Lighthouse automatique (recommandé)](#option-a---lighthouse-automatique-recommandé)
+  - [Option B - cwv.json manuel (RUM / PageSpeed)](#option-b---cwvjson-manuel-rum--pagespeed)
+
+-----
+
 ## Prérequis
 
 - Navigateur Chrome ou Chromium (Brave, Edge...) avec DevTools disponible
@@ -195,3 +203,29 @@ Le taux de code inutilisé se calcule ainsi :
 inutilise = longueur(text) - somme(range.end - range.start)
 taux (%)  = inutilise / longueur(text) x 100
 ```
+
+-----
+
+## Partie 3 - Core Web Vitals
+
+Les Core Web Vitals (LCP, INP, CLS) ne sont pas dans le HAR.
+
+**Automatique :** `/analyse-parcours` lance Lighthouse via `npx` automatiquement si `cwv.json`
+est absent. Prérequis : Node.js installé (`node -v` doit répondre). Pages publiques uniquement
+(Chrome headless, pas d'authentification).
+
+Pour forcer un re-run : dire "relance Lighthouse" à Claude.
+
+**Données terrain réelles (optionnel) :** si vous avez des données RUM ou PageSpeed Insights,
+créer `cwv.json` manuellement dans le dossier d'audit. Le skill détecte le fichier et skippa
+Lighthouse.
+
+Format :
+```json
+[
+  {"page": "page_1", "lcp": 0.76, "inp": 8,  "cls": 0.06},
+  {"page": "page_2", "lcp": 1.9,  "inp": 16, "cls": 0.66}
+]
+```
+- `page` : ID HAR (`page_1`, `page_2`...)
+- `lcp` : secondes, `inp` : millisecondes, `cls` : sans unité

@@ -104,6 +104,17 @@ python3 .claude/skills/analyse-parcours/scripts/ecoindex_utils.py <fichier.har> 
 
 ---
 
+## Étape 37 — CWV via Lighthouse
+
+→ Voir `skill-steps/37_lighthouse.md`
+
+Si `cwv.json` est absent : lancer automatiquement Lighthouse CLI via `npx` en extrayant
+les URLs du HAR. Génère `cwv.json` avec LCP, INP, CLS mesurés en mode lab.
+Si déjà présent : skippé. Si échec : warning et rapport sans CWV.
+L'utilisateur peut forcer un re-run en disant "relance Lighthouse".
+
+---
+
 ## Étape 40 — Rapport HTML
 
 → Voir `skill-steps/40_rapport.md`
@@ -115,6 +126,33 @@ python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <dossier
 ```
 
 Sections : EcoIndex | Trafic réseau | Code mort | CWV (si cwv.json) | Recommandations
+
+---
+
+## Maintenance des outils CLI
+
+→ Voir `scripts/README-outils.md`
+
+### Install initiale de Lighthouse (une seule fois)
+
+```bash
+npm install --prefix .claude/skills/analyse-parcours/scripts/
+```
+
+### Vérifier si Lighthouse est à jour
+
+```bash
+npm outdated --prefix .claude/skills/analyse-parcours/scripts/
+```
+
+### Mettre à jour Lighthouse
+
+```bash
+npm update lighthouse --prefix .claude/skills/analyse-parcours/scripts/
+```
+
+L'utilisateur peut dire à Claude "vérifie si Lighthouse est à jour" ou "mets à jour Lighthouse".
+Claude exécute `npm outdated`, lit la sortie et propose ou exécute `npm update`.
 
 ---
 

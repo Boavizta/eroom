@@ -570,7 +570,7 @@ def _section_traffic(traffic):
                 f'</details>'
             )
 
-        dup_section = f'<h3>Requêtes dupliquées ({len(dups)} URL(s))</h3>{dup_kpis}{dup_tables}'
+        dup_section = f'<h3 id="trafic-doublons">Requêtes dupliquées ({len(dups)} URL(s))</h3>{dup_kpis}{dup_tables}'
 
     return f"""<section id="trafic">
   <h2>Trafic réseau</h2>
@@ -1427,7 +1427,10 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page):
 
     # Doublons
     if traffic["duplicates"]:
-        prio2.append(f"{len(traffic['duplicates'])} ressources chargées en double - configurer le cache navigateur")
+        prio2.append(
+            f"{len(traffic['duplicates'])} ressources chargées en double - configurer le cache navigateur"
+            f' <a href="#trafic-doublons" style="color:inherit;text-decoration:underline;font-size:12px">&#8594; voir le d&eacute;tail</a>'
+        )
 
     # Code mort > 70%
     for page_name, page_data in coverage_by_page.items():
