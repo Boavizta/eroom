@@ -5,7 +5,7 @@ description: >
   "analyser la couverture Chrome", "code mort JS/CSS",
   "coverage DevTools", "analyser le trafic d'un parcours",
   ou mentionne des fichiers .har ou Coverage-*.json issus de Chrome DevTools.
-version: 1.0.0
+version: 1.0.2
 ---
 
 # Analyse de parcours web (HAR + Coverage)
