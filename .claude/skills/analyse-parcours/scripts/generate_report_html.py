@@ -1548,44 +1548,101 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
 
-    # CWV — 1 item synthétique par page (détail dans #cwv-analyse)
+    # CWV — groupé par métrique (LCP, INP, CLS), une recommandation par problème
+    from urllib.parse import urlparse
+
+    # Vérifier si du code mort JS > 60% est présent (pour enrichir la reco LCP)
+    _has_heavy_js = any(
+        coverage_summary(pd["entries"] if isinstance(pd, dict) else pd)["js"]["pct"] > 60
+        for pd in coverage_by_page.values()
+    ) if coverage_by_page else False
+
+    lcp_bad, lcp_warn = [], []
+    inp_bad, inp_warn = [], []
+    cls_bad, cls_warn = [], []
+
     for m in deduped:
         c = _cwv_for_page(m, cwv)
         if not c:
             continue
         num = m.get("page_num", "")
         url = m["title"]
-        from urllib.parse import urlparse
         short = urlparse(url).path.rstrip("/") or "/"
         label = f'<a href="{url}" target="_blank" rel="noopener">P{num} {short}</a>'
-        lcp = c.get("lcp")
-        inp = c.get("inp")
+        lcp  = c.get("lcp")
+        inp  = c.get("inp")
         cls_ = c.get("cls")
-
-        bad_parts = []
-        warn_parts = []
         if isinstance(lcp, (int, float)):
-            if lcp > 2.5:
-                bad_parts.append(f"LCP {lcp} s (mauvais)")
-            elif lcp > 1.8:
-                warn_parts.append(f"LCP {lcp} s (à améliorer)")
+            if lcp > 2.5:   lcp_bad.append((lcp, label))
+            elif lcp > 1.8: lcp_warn.append((lcp, label))
         if isinstance(inp, (int, float)):
-            if inp > 500:
-                bad_parts.append(f"INP {inp} ms (mauvais)")
-            elif inp > 200:
-                warn_parts.append(f"INP {inp} ms (à améliorer)")
+            if inp > 500:   inp_bad.append((inp, label))
+            elif inp > 200: inp_warn.append((inp, label))
         if isinstance(cls_, (int, float)):
-            if cls_ > 0.25:
-                bad_parts.append(f"CLS {cls_} (mauvais)")
-            elif cls_ > 0.1:
-                warn_parts.append(f"CLS {cls_} (à améliorer)")
+            if cls_ > 0.25: cls_bad.append((cls_, label))
+            elif cls_ > 0.1: cls_warn.append((cls_, label))
 
-        if bad_parts:
-            metrics_str = ", ".join(bad_parts + [p for p in warn_parts if p not in bad_parts])
-            prio1.append(f"<b>{label}</b> : {metrics_str}")
-        elif warn_parts:
-            metrics_str = ", ".join(warn_parts)
-            prio2.append(f"<b>{label}</b> : {metrics_str}")
+    def _pages_str(items):
+        return ", ".join(lbl for _, lbl in items)
+
+    def _lcp_item(items, severity):
+        vals = [v for v, _ in items]
+        range_str = f"{min(vals):.1f} s" if len(vals) == 1 else f"entre {min(vals):.1f} s et {max(vals):.1f} s"
+        n = len(items)
+        js_note = " (code mort JS > 60 % identifié)" if _has_heavy_js else ""
+        return (
+            f"<strong>Réduire le LCP</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f'<span style="color:#555;font-size:0.9em">'
+            f"Causes probables : image hero non préchargée, JS bloquant le rendu{js_note}, TTFB élevé.<br>"
+            f"Actions : ajouter <code>&lt;link rel=\"preload\"&gt;</code> sur l'image hero &middot; "
+            f"passer le JS non critique en <code>defer</code>/<code>async</code> &middot; "
+            f"analyser le TTFB avec WebPageTest.<br>"
+            f"Pages : {_pages_str(items)}"
+            f"</span>"
+        )
+
+    def _inp_item(items, severity):
+        vals = [v for v, _ in items]
+        range_str = f"{int(min(vals))} ms" if len(vals) == 1 else f"entre {int(min(vals))} ms et {int(max(vals))} ms"
+        n = len(items)
+        return (
+            f"<strong>Réduire l'INP</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f'<span style="color:#555;font-size:0.9em">'
+            f"Causes probables : long tasks JS, thread principal saturé lors des interactions.<br>"
+            f"Actions : découper les tâches longues (&gt; 50 ms) &middot; "
+            f"utiliser <code>scheduler.yield()</code> &middot; lazy-loader les composants non visibles.<br>"
+            f"Pages : {_pages_str(items)}"
+            f"</span>"
+        )
+
+    def _cls_item(items, severity):
+        vals = [v for v, _ in items]
+        range_str = f"{min(vals):.2f}" if len(vals) == 1 else f"entre {min(vals):.2f} et {max(vals):.2f}"
+        n = len(items)
+        return (
+            f"<strong>Corriger les décalages de mise en page (CLS)</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f'<span style="color:#555;font-size:0.9em">'
+            f"Causes probables : images ou iframes sans dimensions explicites, polices web sans size-adjust.<br>"
+            f"Actions : définir <code>width</code>/<code>height</code> sur les médias &middot; "
+            f"utiliser <code>font-display: optional</code> ou <code>size-adjust</code>.<br>"
+            f"Pages : {_pages_str(items)}"
+            f"</span>"
+        )
+
+    if lcp_bad:
+        prio1.append(_lcp_item(lcp_bad, "mauvais"))
+    elif lcp_warn:
+        prio2.append(_lcp_item(lcp_warn, "à améliorer"))
+
+    if inp_bad:
+        prio1.append(_inp_item(inp_bad, "mauvais"))
+    elif inp_warn:
+        prio2.append(_inp_item(inp_warn, "à améliorer"))
+
+    if cls_bad:
+        prio1.append(_cls_item(cls_bad, "mauvais"))
+    elif cls_warn:
+        prio2.append(_cls_item(cls_warn, "à améliorer"))
 
     # EcoIndex < 40 → priorité 1
     for m in page_metrics:
@@ -1824,14 +1881,18 @@ def generate(audit_dir, output_path=None):
     html += '</section>\n'
 
     html += "</main>\n"
-    html += f"""<div id="couts" style="background:#f0f4f8;border-top:1px solid #ccc;padding:16px 40px">
-  <details style="padding:10px 14px;background:white;border:1px solid #ccc;border-radius:4px;max-width:700px">
-    <summary style="cursor:pointer;font-weight:bold;font-size:13px">Coûts de génération</summary>
-    <p style="margin:10px 0 6px;font-size:12px;font-style:italic;color:#555">Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. Durée et tokens peuvent inclure des échanges hors analyse. Coût aux tarifs API Anthropic publics ; sous AWS Bedrock, consulter AWS Cost Explorer.</p>
-    <p style="margin:3px 0;font-size:13px"><strong>Modèle :</strong> Claude Sonnet (Agent EROOM)</p>
-    <p style="margin:3px 0;font-size:13px"><strong>Tokens :</strong> voir session Claude Code</p>
-    <p style="margin:3px 0;font-size:13px"><strong>Fichiers sources :</strong> {har_path.name}, {len(cov_files)} fichier(s) Coverage</p>
-  </details>
+    html += f"""<div class="cost-info" style="background:#f0f4f8;border-top:1px solid #ccc;padding:1.5rem 0;">
+  <div style="max-width:700px;margin:0 auto 0 40px">
+    <details style="padding:0.75rem 1rem;background:white;border:1px solid #ccc;border-radius:4px;">
+      <summary style="cursor:pointer;font-weight:600;">Coûts de génération (<span data-cost-field="cout">—</span> [*])</summary>
+      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. Durée et tokens peuvent inclure des échanges hors analyse.</p>
+      <p style="margin:0.3rem 0;"><strong>Modèle :</strong> <span data-cost-field="modele">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>Effort :</strong> <span data-cost-field="effort">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>Durée :</strong> <span data-cost-field="duree">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>Tokens :</strong> <span data-cost-field="tokens">—</span></p>
+      <p style="margin:0.3rem 0;font-size:0.85rem;color:#888;"><strong>Fichiers sources :</strong> {har_path.name}, {len(cov_files)} fichier(s) Coverage</p>
+    </details>
+  </div>
 </div>
 <footer>Rapport généré le {today} - Outil analyse-parcours (OCTO Technology)</footer>
 """
@@ -1842,6 +1903,14 @@ def generate(audit_dir, output_path=None):
     output_path = Path(output_path)
     output_path.write_text(html, encoding="utf-8")
     print(f"\nRapport HTML généré : {output_path}")
+
+    import subprocess
+    patch_script = Path.home() / ".claude/scripts/patch-audit-cost.sh"
+    if patch_script.exists():
+        subprocess.run(["bash", str(patch_script), str(output_path)], check=False)
+    else:
+        print(f"[coûts] patch-audit-cost.sh introuvable ({patch_script}) — section coûts non patchée")
+
     return output_path
 
 

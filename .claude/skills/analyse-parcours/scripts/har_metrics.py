@@ -8,6 +8,7 @@ Usage autonome :
 """
 
 import json
+from pathlib import Path
 import math
 import re
 import sys
@@ -156,6 +157,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     har_path = sys.argv[1]
+
+    # Borne de début pour le calcul des coûts (lue par patch-audit-cost.sh)
+    import time as _t
+    _start_file = Path(har_path).parent / ".analysis_start"
+    if not _start_file.exists():
+        _start_file.write_text(str(int(_t.time())), encoding="utf-8")
+
     with open(har_path, encoding="utf-8") as f:
         har = json.load(f)
 
