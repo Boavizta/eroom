@@ -49,7 +49,7 @@ Pour chaque diagramme modifié :
 
 | Fichier | Participants | Étapes couvertes |
 |---------|--------------|-----------------|
-| `analyse-parcours-p1.puml` | U, C, FS | Étape 10 — Localisation |
+| `analyse-parcours-p1.puml` | U, C, FS | Étapes 10+15 — Localisation + Capture sessionId |
 | `analyse-parcours-p2.puml` | U, C, SA, EI, FS | Étapes 25+35 — DISPATCH + EcoIndex |
 | `analyse-parcours-p3.puml` | U, C, GR, FS | Étape 40 — Rapport HTML |
 
@@ -74,7 +74,7 @@ open diagramme/analyse-parcours-workflow.pdf
 
 ```plantuml
 @startuml analyse-parcours-p1
-title Workflow Analyse de parcours web — Page 1/3 : Étape 10 Localisation
+title Workflow Analyse de parcours web — Page 1/3 : Étapes 10+15 Localisation + SessionId
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -129,6 +129,17 @@ note over C, FS
   Ne jamais afficher credentials ni tokens en clair.
   Masquer : {"password":"***"}, token=****...abc
   Tronquer les UIDs : uid=8116...92
+end note
+
+== Étape 15 — Capture sessionId (silencieux) ==
+
+C -> FS : mkdir -p <HAR_DIR>/analyse-interne-agent
+C -> FS : cp ~/.claude/.current_session_id\nanalyse-interne-agent/.session_id
+
+note over C, FS
+  Utilisé par patch-audit-cost.sh (Étape 40)
+  pour calculer le coût exact de la session
+  au lieu d'une estimation par fenêtre temporelle.
 end note
 
 @enduml

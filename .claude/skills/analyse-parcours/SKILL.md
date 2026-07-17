@@ -56,6 +56,21 @@ Si aucun argument fourni : demander le chemin à l'utilisateur.
 
 ---
 
+## Étape 15 — Capture du sessionId
+
+Immédiatement après avoir déterminé le dossier audit (HAR_DIR), capturer le sessionId pour le calcul de coût du rapport :
+
+```bash
+mkdir -p "<HAR_DIR>/analyse-interne-agent"
+if [ -f "$HOME/.claude/.current_session_id" ]; then
+  cp "$HOME/.claude/.current_session_id" "<HAR_DIR>/analyse-interne-agent/.session_id"
+fi
+```
+
+Ce fichier sera lu par `patch-audit-cost.sh` (appelé en fin d'étape 40) pour calculer le coût exact de la session au lieu d'une estimation par fenêtre temporelle.
+
+---
+
 ## Étape 20 — Analyse du fichier HAR
 
 → Voir `skill-steps/20_analyse-har.md`
@@ -177,6 +192,7 @@ Si le HAR contient des credentials ou tokens :
 Afficher une ligne de progression à chaque étape :
 ```
 ▶ Étape 10 — Localisation des fichiers
+▶ Étape 15 — Capture sessionId (silencieux)
 ▶ Étape 20 — Analyse HAR ([N] requêtes)
 ▶ Étape 30 — Analyse Coverage ([N] pages)
 ▶ Étape 40 — Rapport de synthèse
