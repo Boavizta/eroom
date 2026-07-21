@@ -24,9 +24,10 @@ Quel que soit le mode, les sorties disque sont identiques.
 ### Substitution des variables
 
 **Avant tout dispatch**, substituer dans le texte du bloc :
-- `{{AUDIT_DIR}}` par le chemin absolu du dossier d'audit courant
-- `{{HAR_FILE}}` par le chemin absolu du fichier `.har`
-- `{{COVERAGE_FILES}}` par la liste des chemins de fichiers `Coverage-*.json`
+- `{{SOURCE_DIR}}` par le chemin absolu du dossier source (là où vivent HAR et Coverage)
+- `{{AUDIT_DIR}}` par le chemin absolu du dossier d'audit (`SOURCE_DIR/audit/`)
+- `{{HAR_FILE}}` par le chemin absolu du fichier `.har` (dans `SOURCE_DIR`)
+- `{{COVERAGE_FILES}}` par la liste des chemins de fichiers `Coverage-*.json` (dans `SOURCE_DIR`)
 
 ### Condition de réussite d'un bloc DISPATCH
 
@@ -46,6 +47,7 @@ Vérifier que les fichiers identifiés sont accessibles :
 ```
 ls -lh {{HAR_FILE}}
 ls -lh {{COVERAGE_FILES}}
+ls -d {{AUDIT_DIR}}
 ```
 
 → Afficher : `✅ Wave 0 terminée — lancement Wave 1 (analyse HAR + Coverage)`

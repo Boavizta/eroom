@@ -22,7 +22,10 @@ URLS=("$@")
 if [[ ${#URLS[@]} -eq 0 ]]; then
     HAR_FILE=$(find "$AUDIT_DIR" -maxdepth 1 -name "*.har" | head -1)
     if [[ -z "$HAR_FILE" ]]; then
-        echo "Erreur : aucun fichier .har dans $AUDIT_DIR et aucune URL fournie." >&2
+        HAR_FILE=$(find "$AUDIT_DIR/.." -maxdepth 1 -name "*.har" | head -1)
+    fi
+    if [[ -z "$HAR_FILE" ]]; then
+        echo "Erreur : aucun fichier .har dans $AUDIT_DIR ni dans $(dirname "$AUDIT_DIR") et aucune URL fournie." >&2
         exit 1
     fi
     echo "[ Lighthouse ] Extraction automatique des URLs depuis $(basename "$HAR_FILE")..."

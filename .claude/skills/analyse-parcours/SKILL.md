@@ -58,12 +58,13 @@ Si aucun argument fourni : demander le chemin à l'utilisateur.
 
 ## Étape 15 — Capture du sessionId
 
-Immédiatement après avoir déterminé le dossier audit (HAR_DIR), capturer le sessionId pour le calcul de coût du rapport :
+Immédiatement après avoir déterminé SOURCE_DIR et AUDIT_DIR (étape 10), capturer le sessionId pour le calcul de coût du rapport :
 
 ```bash
-mkdir -p "<HAR_DIR>/analyse-interne-agent"
+AUDIT_DIR="<SOURCE_DIR>/audit"
+mkdir -p "$AUDIT_DIR/analyse-cout-agent"
 if [ -f "$HOME/.claude/.current_session_id" ]; then
-  cp "$HOME/.claude/.current_session_id" "<HAR_DIR>/analyse-interne-agent/.session_id"
+  cp "$HOME/.claude/.current_session_id" "$AUDIT_DIR/analyse-cout-agent/.cost-session-id"
 fi
 ```
 

@@ -1719,14 +1719,21 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
 def generate(audit_dir, output_path=None):
     audit_dir = Path(audit_dir)
 
-    # Localisation des fichiers
+    # Localisation des fichiers — chercher dans audit_dir, sinon dans le dossier parent (SOURCE_DIR)
     har_files = list(audit_dir.glob("*.har"))
+    source_dir = audit_dir
+    if not har_files and audit_dir.parent != audit_dir:
+        har_files = list(audit_dir.parent.glob("*.har"))
+        if har_files:
+            source_dir = audit_dir.parent
     if not har_files:
-        raise FileNotFoundError(f"Aucun fichier .har dans {audit_dir}")
+        raise FileNotFoundError(f"Aucun fichier .har dans {audit_dir} ni dans {audit_dir.parent}")
     har_path = har_files[0]
 
-    cov_files = sorted(audit_dir.glob("Coverage-*.json")) or sorted(audit_dir.glob("*coverage*.json"))
+    cov_files = sorted(source_dir.glob("Coverage-*.json")) or sorted(source_dir.glob("*coverage*.json"))
     cwv_path  = audit_dir / "cwv.json"
+    if not cwv_path.exists():
+        cwv_path = source_dir / "cwv.json"
 
     greenit_path = audit_dir / "greenit.json"
 
