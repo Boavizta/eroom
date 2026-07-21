@@ -306,46 +306,46 @@ def _html_head(title):
     --octo-grey:  {OCTO_GREY};
   }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: Arial, sans-serif; font-size: 14px; color: #222; background: #f9f9f9; }}
+  body {{ font-family: Arial, sans-serif; font-size: 18px; color: #222; background: #f9f9f9; }}
   header {{ background: var(--octo-dark); color: white; padding: 32px 40px 24px; }}
-  header h1 {{ font-size: 24px; font-weight: bold; margin-bottom: 6px; }}
-  header .meta {{ font-size: 12px; opacity: .75; margin-top: 8px; }}
+  header h1 {{ font-size: 28px; font-weight: bold; margin-bottom: 6px; }}
+  header .meta {{ font-size: 16px; opacity: .75; margin-top: 8px; }}
   nav[role="navigation"] {{ background: var(--octo-pale); border-bottom: 2px solid var(--octo-blue);
     padding: 14px 40px; }}
-  nav[role="navigation"] h2 {{ font-size: 13px; font-weight: bold; color: var(--octo-dark);
+  nav[role="navigation"] h2 {{ font-size: 17px; font-weight: bold; color: var(--octo-dark);
     margin-bottom: 8px; border: none; padding: 0; }}
   nav[role="navigation"] ul {{ display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 20px; padding: 0;
-    margin: 0; font-size: 13px; list-style: none; }}
+    margin: 0; font-size: 17px; list-style: none; }}
   nav[role="navigation"] a {{ color: var(--octo-dark); text-decoration: none; }}
   nav[role="navigation"] a:hover {{ text-decoration: underline; }}
   main {{ max-width: 1100px; margin: 0 auto; padding: 32px 20px; }}
   section {{ margin-bottom: 40px; }}
-  h2 {{ font-size: 18px; color: var(--octo-dark); border-left: 4px solid var(--octo-blue);
+  h2 {{ font-size: 22px; color: var(--octo-dark); border-left: 4px solid var(--octo-blue);
         padding-left: 12px; margin-bottom: 16px; margin-top: 4px; }}
-  h3 {{ font-size: 14px; color: var(--octo-dark); margin: 16px 0 8px; font-weight: bold; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }}
-  th {{ background: var(--octo-dark); color: white; padding: 7px 10px; text-align: left; font-size: 12px; }}
+  h3 {{ font-size: 18px; color: var(--octo-dark); margin: 16px 0 8px; font-weight: bold; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 17px; margin-bottom: 12px; }}
+  th {{ background: var(--octo-dark); color: white; padding: 7px 10px; text-align: left; font-size: 16px; }}
   td {{ padding: 6px 10px; border-bottom: 1px solid #ddd; }}
   tr:nth-child(even) td {{ background: var(--octo-pale); }}
   tr.alert td {{ background: #ffe0e0; }}
   tr.bold td {{ background: #dde8f0; font-weight: bold; }}
   .badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-weight: bold; font-size: 13px; color: white; min-width: 32px; text-align: center; }}
+            font-weight: bold; font-size: 17px; color: white; min-width: 32px; text-align: center; }}
   .bar-wrap {{ display: flex; height: 16px; border-radius: 3px; overflow: hidden; width: 120px; }}
   .bar-used   {{ background: #50b450; }}
   .bar-unused {{ background: #dc5050; }}
   .kpi-grid {{ display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }}
   .kpi {{ background: var(--octo-pale); border: 1px solid var(--octo-blue); border-radius: 6px;
           padding: 14px 20px; min-width: 140px; }}
-  .kpi .val {{ font-size: 22px; font-weight: bold; color: var(--octo-dark); }}
-  .kpi .lbl {{ font-size: 11px; color: #555; margin-top: 2px; }}
-  .prio {{ margin: 6px 0; padding: 10px 14px; border-radius: 4px; font-size: 13px; }}
+  .kpi .val {{ font-size: 26px; font-weight: bold; color: var(--octo-dark); }}
+  .kpi .lbl {{ font-size: 15px; color: #555; margin-top: 2px; }}
+  .prio {{ margin: 6px 0; padding: 10px 14px; border-radius: 4px; font-size: 17px; }}
   .prio-1 {{ background: #ffe0e0; border-left: 4px solid #dc3545; }}
   .prio-2 {{ background: #fff3cd; border-left: 4px solid #fd7e14; }}
   .prio-3 {{ background: #d4edda; border-left: 4px solid #28a745; }}
   .domain-tag {{ display: inline-block; background: var(--octo-grey); border-radius: 3px;
-                 padding: 1px 6px; font-size: 11px; margin: 2px; }}
-  footer {{ text-align: center; padding: 20px; font-size: 11px; color: #888;
+                 padding: 1px 6px; font-size: 15px; margin: 2px; }}
+  footer {{ text-align: center; padding: 20px; font-size: 15px; color: #888;
             border-top: 1px solid #ddd; margin-top: 40px; }}
   @media print {{ body {{ background: white; }} header {{ -webkit-print-color-adjust: exact; }} }}
 </style>
@@ -408,7 +408,7 @@ def _section_dashboard(page_metrics, cwv):
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
-        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:11px;margin-right:4px">P{num}</span>{short}</a>'
+        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
         cwv_data = _cwv_for_page(m, cwv)
 
         def _cwv_cell(val, unit, thresholds):
@@ -445,14 +445,14 @@ def _section_dashboard(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    cwv_legend = """<div style="font-size:11px;margin-top:8px;display:flex;gap:16px;align-items:center">
+    cwv_legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende CWV :</span>
     <span style="color:#0cce6b">● Bon</span>
     <span style="color:#ffa400">● A améliorer</span>
     <span style="color:#ff4e42">● Mauvais</span>
     <span style="color:#aaa;font-style:italic">— Données terrain non disponibles (fournir cwv.json)</span>
   </div>"""
-    cwv_note = "" if cwv else '<p style="font-size:11px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP et CLS nécessitent des données terrain (API PageSpeed ou cwv.json).</p>'
+    cwv_note = "" if cwv else '<p style="font-size:15px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP et CLS nécessitent des données terrain (API PageSpeed ou cwv.json).</p>'
 
     return f"""<section id="dashboard">
   <h2>Tableau de bord EcoIndex et CWV (Core Web Vitals)</h2>
@@ -498,7 +498,7 @@ def _section_traffic(traffic):
             f'<td><b style="color:{color}">{k}</b></td>'
             f'<td style="text-align:right"><b>{v}</b></td>'
             f'<td>{label}</td>'
-            f'<td style="color:#555;font-size:12px">{desc}</td>'
+            f'<td style="color:#555;font-size:16px">{desc}</td>'
             f'</tr>'
         )
     codes_html = f"""<table style="border-collapse:collapse;width:100%">
@@ -519,7 +519,7 @@ def _section_traffic(traffic):
       <td><a href="{r['url']}" target="_blank" rel="noopener" title="{r['url']}">{fname}</a></td>
       <td><span style="color:{color}">{_classify_type(r['mime'], r['url'])}</span></td>
       <td style="text-align:right">{round(r['size']/1024, 1)} Ko</td>
-      <td style="color:#555;font-size:11px">{r['host']}</td>
+      <td style="color:#555;font-size:15px">{r['host']}</td>
     </tr>"""
 
     # Catégories de doublons : couleur + libellé court
@@ -546,7 +546,7 @@ def _section_traffic(traffic):
         nb_font        = sum(1 for d in dups if d.get("category") == "font")
 
         dup_kpis = (
-            f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:12px">'
+            f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:16px">'
             f'<span style="background:#dc3545;color:white;padding:2px 8px;border-radius:4px"><b>{nb_problematic}</b> à corriger (sans cache)</span>'
             f'<span style="background:#6f42c1;color:white;padding:2px 8px;border-radius:4px"><b>{nb_tracker}</b> trackers (normal)</span>'
             f'<span style="background:#d9534f;color:white;padding:2px 8px;border-radius:4px"><b>{nb_font}</b> polices externes</span>'
@@ -572,9 +572,9 @@ def _section_traffic(traffic):
                 )
             dup_tables += (
                 f'<details style="margin-bottom:8px" {"open" if cat == "static_no_cache" else ""}>'
-                f'<summary style="cursor:pointer;font-weight:bold;font-size:13px;padding:6px 0">'
-                f'<span style="background:{cat_color};color:white;padding:1px 7px;border-radius:4px;font-size:12px;margin-right:6px">{cat_label}</span>'
-                f'{len(items)} URL(s) — <span style="font-weight:normal;color:#555;font-size:12px">{cause}</span>'
+                f'<summary style="cursor:pointer;font-weight:bold;font-size:17px;padding:6px 0">'
+                f'<span style="background:{cat_color};color:white;padding:1px 7px;border-radius:4px;font-size:16px;margin-right:6px">{cat_label}</span>'
+                f'{len(items)} URL(s) — <span style="font-weight:normal;color:#555;font-size:16px">{cause}</span>'
                 f'</summary>'
                 f'<table style="margin-top:6px">'
                 f'<thead><tr><th>Fichier</th><th style="width:50px">Nb</th></tr></thead>'
@@ -622,8 +622,8 @@ def _section_coverage(coverage_by_page):
         js_used = 100 - summ["js"]["pct"] if summ["js"]["total_kb"] else 0
         css_used = 100 - summ["css"]["pct"] if summ["css"]["total_kb"] else 0
         html += f"""  <div style="display:flex;gap:24px;margin-bottom:10px;align-items:center">
-    <div>JS {_bar(js_used)} <span style="font-size:12px">{summ['js']['unused_kb']} Ko non utilisés ({summ['js']['pct']}%)</span></div>
-    <div>CSS {_bar(css_used)} <span style="font-size:12px">{summ['css']['unused_kb']} Ko non utilisés ({summ['css']['pct']}%)</span></div>
+    <div>JS {_bar(js_used)} <span style="font-size:16px">{summ['js']['unused_kb']} Ko non utilisés ({summ['js']['pct']}%)</span></div>
+    <div>CSS {_bar(css_used)} <span style="font-size:16px">{summ['css']['unused_kb']} Ko non utilisés ({summ['css']['pct']}%)</span></div>
   </div>\n"""
 
         # Top fichiers
@@ -673,7 +673,7 @@ def _section_cwv(page_metrics, cwv):
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
-        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:11px;margin-right:4px">P{num}</span>{short}</a>'
+        page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
         if c:
             lcp_cell = _cwv_colored(c.get("lcp"), "s", (1.8, 2.5))
             inp_cell = _cwv_colored(c.get("inp"), "ms", (200, 500))
@@ -686,13 +686,13 @@ def _section_cwv(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    legend = """<div style="font-size:11px;margin-top:8px;display:flex;gap:16px;align-items:center">
+    legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende :</span>
     <span style="color:#0cce6b">● Bon</span>
     <span style="color:#ffa400">● A améliorer</span>
     <span style="color:#ff4e42">● Mauvais</span>
   </div>
-  <table style="margin-top:10px;font-size:11px;border:none;width:auto">
+  <table style="margin-top:10px;font-size:15px;border:none;width:auto">
     <thead><tr style="background:none">
       <th style="border:none;text-align:left">Métrique</th>
       <th style="border:none;color:#0cce6b">Bon</th>
@@ -713,7 +713,7 @@ def _section_cwv(page_metrics, cwv):
     is_manual = sources - {"lighthouse"}
 
     if is_lighthouse:
-        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
       <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
       Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
       <ul style="margin:6px 0 0 16px;padding:0">
@@ -725,7 +725,7 @@ def _section_cwv(page_metrics, cwv):
       <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain (mesurées sur de vrais utilisateurs via CrUX ou PageSpeed Insights) sont généralement meilleures, surtout sur desktop et connexion rapide. Les pages nécessitant une authentification sont analysées sans session : les métriques reflètent alors la page de login, pas la page cible.</span>
     </div>"""
     else:
-        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
       <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
       Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights). Elles reflètent les conditions réelles de l'utilisateur.
     </div>"""
@@ -762,7 +762,7 @@ def _section_cwv_analyse(page_metrics, cwv):
     sources = {c.get("source") for c in cwv.values() if c}
     is_lighthouse = "lighthouse" in sources
     if is_lighthouse:
-        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
       <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
       Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
       <ul style="margin:6px 0 0 16px;padding:0">
@@ -774,12 +774,12 @@ def _section_cwv_analyse(page_metrics, cwv):
       <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain sont généralement meilleures, surtout sur desktop et connexion rapide.</span>
     </div>"""
     else:
-        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#555;border-radius:0 4px 4px 0">
+        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
       <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
       Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights).
     </div>"""
 
-    legend = """<div style="font-size:11px;margin-top:16px;display:flex;gap:16px;align-items:center">
+    legend = """<div style="font-size:15px;margin-top:16px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende :</span>
     <span style="color:#0cce6b">● Bon</span>
     <span style="color:#ffa400">● A améliorer</span>
@@ -789,7 +789,7 @@ def _section_cwv_analyse(page_metrics, cwv):
 
     def _metric_row(label, val, unit, thresholds, key_bad, key_warn):
         if not isinstance(val, (int, float)):
-            return f'<div style="margin:4px 0;font-size:13px"><b>{label}</b> : <span style="color:#aaa">— Non mesuré</span></div>'
+            return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:#aaa">— Non mesuré</span></div>'
         if val > thresholds[1]:
             color = "#ff4e42"
             status = "mauvais"
@@ -802,8 +802,8 @@ def _section_cwv_analyse(page_metrics, cwv):
             color = "#0cce6b"
             status = "bon"
             action = ""
-        action_html = f' <span style="color:#555;font-size:12px">- {action}</span>' if action else ""
-        return f'<div style="margin:4px 0;font-size:13px"><b>{label}</b> : <span style="color:{color};font-weight:bold">{val} {unit}</span> <span style="color:{color}">({status})</span>{action_html}</div>'
+        action_html = f' <span style="color:#555;font-size:16px">- {action}</span>' if action else ""
+        return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:{color};font-weight:bold">{val} {unit}</span> <span style="color:{color}">({status})</span>{action_html}</div>'
 
     blocks = ""
     for m in deduped:
@@ -821,8 +821,8 @@ def _section_cwv_analyse(page_metrics, cwv):
         cls_row = _metric_row("CLS", cls_, "",  (0.1, 0.25), "cls_bad",  "cls_warn")
 
         blocks += f"""<div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 18px;margin-bottom:14px">
-    <div style="font-size:13px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
-      <span style="color:#888;font-size:11px;margin-right:6px">P{num}</span><a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>
+    <div style="font-size:17px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
+      <span style="color:#888;font-size:15px;margin-right:6px">P{num}</span><a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>
     </div>
     {lcp_row}
     {inp_row}
@@ -1404,7 +1404,7 @@ def _section_greenit(greenit):
                         f'<a href="{url}" target="_blank" rel="noopener">'
                         f'{thumb}'
                         f'</a>'
-                        f'<div style="font-size:10px;color:#555;max-width:60px;word-break:break-all">'
+                        f'<div style="font-size:14px;color:#555;max-width:60px;word-break:break-all">'
                         f'{fname}<br><b>{size_kb} Ko</b></div>'
                         f'</div>'
                     )
@@ -1412,14 +1412,14 @@ def _section_greenit(greenit):
                 else:
                     # Fallback : lien texte si vipsthumbnail absent
                     thumbs.append(
-                        f'<div style="display:inline-block;margin:4px;font-size:11px;vertical-align:top">'
+                        f'<div style="display:inline-block;margin:4px;font-size:15px;vertical-align:top">'
                         f'<a href="{url}" target="_blank" rel="noopener">{fname}</a>'
                         f'<br><b>{size_kb} Ko</b></div>'
                     )
             if thumbs:
                 thumbs_html = (
                     f'<div style="margin-top:6px;padding:6px;background:#f8f8f8;border-radius:4px">'
-                    f'<div style="font-size:11px;color:#555;margin-bottom:4px">Top {len(thumbs)} image(s) les plus lourdes :</div>'
+                    f'<div style="font-size:15px;color:#555;margin-bottom:4px">Top {len(thumbs)} image(s) les plus lourdes :</div>'
                     f'{"".join(thumbs)}'
                     f'</div>'
                 )
@@ -1429,7 +1429,7 @@ def _section_greenit(greenit):
             nb = len(evidence_images)
             details_html = (
                 f'<details style="margin-top:4px">'
-                f'<summary style="cursor:pointer;font-size:11px;color:#555">'
+                f'<summary style="cursor:pointer;font-size:15px;color:#555">'
                 f'Aperçu ({nb} image(s))</summary>'
                 f'{thumbs_html}'
                 f'</details>'
@@ -1437,15 +1437,15 @@ def _section_greenit(greenit):
         elif evidence:
             # Autres règles : liste texte simple
             ev_items = "".join(
-                f'<li style="font-size:11px;word-break:break-all;margin:2px 0">'
+                f'<li style="font-size:15px;word-break:break-all;margin:2px 0">'
                 f'<a href="{item}" target="_blank" rel="noopener">{item}</a></li>'
                 if str(item).startswith("http")
-                else f'<li style="font-size:11px;margin:2px 0">{item}</li>'
+                else f'<li style="font-size:15px;margin:2px 0">{item}</li>'
                 for item in evidence
             )
             details_html = (
                 f'<details style="margin-top:4px">'
-                f'<summary style="cursor:pointer;font-size:11px;color:#555">'
+                f'<summary style="cursor:pointer;font-size:15px;color:#555">'
                 f'Détail ({len(evidence)} élément(s))</summary>'
                 f'<ul style="margin:4px 0 0 12px;padding:0">{ev_items}</ul>'
                 f'</details>'
@@ -1453,11 +1453,11 @@ def _section_greenit(greenit):
         else:
             details_html = ""
 
-        detail_html = f'<span style="font-size:11px;color:#666">{detail}</span>' if detail else ""
+        detail_html = f'<span style="font-size:15px;color:#666">{detail}</span>' if detail else ""
         rows += f"""<tr>
       <td style="text-align:center;width:48px;vertical-align:top;padding-top:10px">{badge}</td>
       <td><b>{rule['name']}</b><br>{detail_html}{details_html}</td>
-      <td style="font-size:12px;color:#555;vertical-align:top">{rule['description']}</td>
+      <td style="font-size:16px;color:#555;vertical-align:top">{rule['description']}</td>
     </tr>"""
 
     nb_c  = sum(1 for k in agg if agg[k]["complianceLevel"] == "C")
@@ -1473,7 +1473,7 @@ def _section_greenit(greenit):
     )
 
     legend = (
-        '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;font-size:12px">'
+        '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;font-size:16px">'
         '<span><span class="badge" style="background:#dc3545">C</span> &nbsp;<b>Non conforme</b> - action corrective requise</span>'
         '<span><span class="badge" style="background:#fd7e14">B</span> &nbsp;<b>Partiellement conforme</b> - amélioration possible</span>'
         '<span><span class="badge" style="background:#28a745">A</span> &nbsp;<b>Conforme</b> - bonne pratique respectée</span>'
@@ -1481,7 +1481,7 @@ def _section_greenit(greenit):
         '</div>'
     )
 
-    source_note = ' <span style="font-size:12px;font-weight:normal;color:#888">(calculé depuis HAR)</span>' if greenit.get("_source") == "har" else ""
+    source_note = ' <span style="font-size:16px;font-weight:normal;color:#888">(calculé depuis HAR)</span>' if greenit.get("_source") == "har" else ""
     return f"""<section id="greenit">
   <h2>Bonnes pratiques GreenIT-Analysis{source_note}</h2>
   <div style="margin-bottom:8px">{summary}</div>
@@ -1518,7 +1518,7 @@ def _section_couts(page_metrics):
         )
     return f"""<section id="couts">
   <h2>Couts de generation</h2>
-  <p style="font-size:12px;color:#666;margin-bottom:12px">
+  <p style="font-size:16px;color:#666;margin-bottom:12px">
     Estimation par visite, basee sur le score EcoIndex (formule cnumr/ecoindex_reference).
     1 visite = transfert reseau + rendu navigateur + serveur.
   </p>
@@ -1537,7 +1537,7 @@ def _section_couts(page_metrics):
       <td style="text-align:right">{total_energy:.3f} Wh</td>
     </tr></tfoot>
   </table>
-  <p style="font-size:11px;color:#999;margin-top:8px">
+  <p style="font-size:15px;color:#999;margin-top:8px">
     Pour reference : un email envoye = ~4 gCO2e ; une recherche Google = ~0.2 gCO2e.
   </p>
 </section>"""
@@ -1662,7 +1662,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     if traffic["duplicates"]:
         prio2.append(
             f"{len(traffic['duplicates'])} ressources chargées en double - configurer le cache navigateur"
-            f' <a href="#trafic-doublons" style="color:inherit;text-decoration:underline;font-size:12px">&#8594; voir le d&eacute;tail</a>'
+            f' <a href="#trafic-doublons" style="color:inherit;text-decoration:underline;font-size:16px">&#8594; voir le d&eacute;tail</a>'
         )
 
     # Code mort > 70%
@@ -1689,7 +1689,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
         if not items_list:
             return ""
         parts = " &nbsp;·&nbsp; ".join(
-            f'<a href="#{sid}" style="color:inherit;text-decoration:underline;font-size:12px">{label}</a>'
+            f'<a href="#{sid}" style="color:inherit;text-decoration:underline;font-size:16px">{label}</a>'
             for sid, label in links
         )
         return f'<div style="margin-top:8px;opacity:.8">&#8594; Voir : {parts}</div>'
@@ -1830,19 +1830,19 @@ def generate(audit_dir, output_path=None):
         annexe_sections.append(("cwv", "Core Web Vitals"))
 
     letters = "abcdefgh"
+    annexes_num = 4 if cwv else 3
     annexe_inline = " &nbsp;·&nbsp; ".join(
-        f'<a href="#{sid}">3.{letters[i]} {slabel}</a>'
+        f'<a href="#{sid}">{annexes_num}.{letters[i]} {slabel}</a>'
         for i, (sid, slabel) in enumerate(annexe_sections)
     )
     cwv_nav = f'<li><a href="#cwv-analyse">3. Analyse Core Web Vitals</a></li>' if cwv else ""
-    annexes_num = 4 if cwv else 3
     nav_items = (
         f'<li><a href="#recommandations">1. Recommandations</a></li>'
         f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
         f'{cwv_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
         f'<a href="#annexes">{annexes_num}. Annexes</a>'
-        f'<span style="font-size:11px;opacity:.75;padding-left:4px">{annexe_inline}</span>'
+        f'<span style="font-size:15px;opacity:.75;padding-left:4px">{annexe_inline}</span>'
         f'</li>'
         f'<li><a href="#couts">&#9658; Couts de generation</a></li>'
     )
@@ -1850,7 +1850,7 @@ def generate(audit_dir, output_path=None):
     html = _html_head(title)
     html += f"""<header>
   <h1>Audit d'écoresponsabilité web</h1>
-  <div style="font-size:14px;margin-top:6px;opacity:.9">{domains}</div>
+  <div style="font-size:18px;margin-top:6px;opacity:.9">{domains}</div>
   <div class="meta">
     Date : {today} &nbsp;|&nbsp;
     {nb_pages} page(s) analysée(s) &nbsp;|&nbsp;
@@ -1872,7 +1872,7 @@ def generate(audit_dir, output_path=None):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
     html += '<section id="annexes" style="background:#f4f6fa;border:2px solid var(--octo-blue);border-radius:6px;padding:24px 24px 8px;margin-bottom:40px">\n'
-    html += '<h2 style="border-left:none;padding-left:0;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:20px">Annexes</h2>\n'
+    html += '<h2 style="border-left:none;padding-left:0;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:20px">Annexes</h2>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_dashboard(page_metrics, cwv), "A.1")}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_traffic(traffic), "A.2")}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), "A.3")}</div>\n'
