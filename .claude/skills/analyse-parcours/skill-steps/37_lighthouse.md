@@ -1,6 +1,19 @@
-# Étape 37 — CWV via Lighthouse
+# Étape 37 — CWV via Lighthouse ou PageSpeed Insights
 
 **Quand :** après l'étape 35, avant l'étape 40.
+
+## Choix de la source CWV
+
+| Source | Commande | Données | Avantages |
+|--------|----------|---------|-----------|
+| PageSpeed + CrUX | `collect_cwv_pagespeed.py` | Terrain P75 réels | Reflète les vrais utilisateurs ; nécessite `GOOGLE_API_KEY` |
+| Lighthouse (fallback) | `run_lighthouse.sh` | Lab (simulation) | Fonctionne sans clé API, même sur pages auth |
+
+`collect_cwv_pagespeed.py` est le point d'entrée principal. Il déclenche automatiquement le fallback Lighthouse dans deux cas :
+- `GOOGLE_API_KEY` absente du `.env`
+- Aucune métrique collectée via l'API (quota dépassé, réseau, URLs inconnues de CrUX)
+
+-----
 
 ---
 
@@ -61,4 +74,37 @@ Causes possibles :
 - Pages derrière login non supportées
 - Résultats peuvent différer du terrain selon la connexion
 
-Pour des données terrain réelles, fournir un `cwv.json` manuel (voir docs/capturer-har-et-coverage.md).
+Pour des données terrain réelles, utiliser `collect_cwv_pagespeed.py` (voir section ci-dessus) ou fournir un `cwv.json` manuel (voir docs/capturer-har-et-coverage.md).
+
+-----
+
+## PageSpeed Insights + CrUX (données terrain)
+
+### Prérequis
+
+- `GOOGLE_API_KEY` dans `.env` à la racine du projet (voir `documentation/setup/setup_api_keys.md`)
+- APIs activées sur Google Cloud : PageSpeed Insights API + Chrome UX Report API
+
+### Vérifier la clé API
+
+```bash
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit> --check
+```
+
+### Collecter les CWV
+
+```bash
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit>
+```
+
+Par défaut : stratégie `mobile`. Ajouter `--strategy desktop` pour les métriques desktop.
+
+### Résultats dans cwv.json
+
+- `"source": "crux"` : données terrain CrUX P75 (réels utilisateurs) - prioritaire
+- `"source": "pagespeed_lab"` : données lab Lighthouse via API (si CrUX absent pour cette URL)
+- `"crux_category"` : `"FAST"` / `"AVERAGE"` / `"SLOW"` (classification globale CrUX)
+
+### Note méthodologique
+
+Les données CrUX sont des percentiles P75 sur les 28 derniers jours d'utilisation réelle. Elles ne sont disponibles que pour les URLs avec suffisamment de trafic dans la base CrUX Google. Pour les pages peu visitées ou les pages derrière authentification, le script retombe automatiquement sur les données lab.

@@ -39,3 +39,28 @@ de lancer `npm install` pour fixer la version.
 La version utilisée est affichée dans les logs :
 
     [Étape 37] Lighthouse 12.3.0 (install locale)
+
+-----
+
+## PageSpeed Insights + CrUX (données terrain)
+
+Alternative à Lighthouse pour obtenir des données **terrain réelles** (CrUX P75).
+Nécessite `GOOGLE_API_KEY` dans `.env` à la racine du projet.
+
+### Vérifier la clé API
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit> --check
+
+### Collecter les CWV terrain
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit>
+
+Options :
+- `--strategy desktop` : métriques desktop (défaut : mobile)
+- `--urls https://... https://...` : URLs explicites (sinon extraites du .har)
+
+### Obtenir la clé API
+
+Voir `documentation/setup/setup_api_keys.md`.
+APIs à activer sur Google Cloud : PageSpeed Insights API + Chrome UX Report API.
+Quota gratuit : 25 000 req/jour (PageSpeed), pas de limite journalière (CrUX).
