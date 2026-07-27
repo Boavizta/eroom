@@ -1,0 +1,109 @@
+@startuml analyse-parcours-dispatch-activite
+title Mécanisme DISPATCH — Flux des vagues d'analyse de parcours
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+  DiamondBackgroundColor #E0F0F4
+  DiamondBorderColor #5BA1BC
+}
+skinparam ArrowColor #5BA1BC
+skinparam ActivityBarColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam PartitionBackgroundColor #ECECF2
+skinparam PartitionBorderColor #5BA1BC
+
+|#E0F0F4| Contexte principal |
+start
+
+:SKILL.md -> lit 25_dispatch-orchestration.md;
+
+note right
+  Détection plateforme :
+  - Claude Code -> sous-agents isolés (parallèle)
+  - Autres -> exécution séquentielle inline
+end note
+
+partition "**Wave 0 — Localisation** (contexte principal)" {
+  :Lire args : dossier ou fichiers directs;
+  :Identifier .har + Coverage-*.json + cwv.json (optionnel);
+  :Vérifier existence + taille HAR\n(lecture sélective si > 5 Mo);
+}
+
+note right #C8E6C9
+  ✅ Wave 0 terminée — fichiers prêts
+  Les dispatches suivants lisent les fichiers disque.
+end note
+
+partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
+  fork
+    :Dispatch A — Analyse HAR
+    (20_analyse-har.md)
+    20a — trafic (requêtes, domaines,
+    codes HTTP, volume Mo)
+    20b — performance (cache,
+    doublons, ressources bloquantes)
+    -> har-analysis.json;
+  fork again
+    :Dispatch B — Analyse Coverage
+    (30_analyse-coverage.md)
+    Format A ou B détecté
+    Métriques JS/CSS par page
+    (total Ko, inutilisé Ko, %)
+    Top 5 JS + Top 3 CSS inutilisés
+    Synthèse multi-pages + outliers
+    -> coverage-analysis.json;
+  end fork
+}
+
+note right
+  Condition de réussite :
+  har-analysis.json et coverage-analysis.json
+  doivent exister avec données valides.
+  Sinon : relancer le dispatch une fois.
+end note
+
+partition "**Merge + suite** (contexte principal)" {
+  :Lire har-analysis.json + coverage-analysis.json;
+  :Étape 35 — har_metrics.py
+  Calcul score/grade A-G par page
+  (formule officielle cnumr/ecoindex);
+
+  note right
+    Limites :
+    DOM=0 si HAR sans corps HTML
+    SPA : DOM = état initial seulement
+    -> documenté dans le rapport
+  end note
+
+  if (cwv.json présent ?) then (oui)
+    :Étape 37 — Lighthouse skippé;
+  else (non)
+    fork
+      :run_lighthouse.sh
+      Extraire URLs du HAR
+      Lighthouse CLI par page (mode lab)
+      -> cwv.json {lcp, inp, cls};
+    fork again
+      note right #FFECB3
+        Si Lighthouse indisponible :
+        warning, rapport sans CWV
+      end note
+    end fork
+  endif
+
+  :Étape 40 — generate_report_html.py
+  Sections : EcoIndex, Trafic réseau,
+  Code mort, CWV (si cwv.json),
+  Recommandations P1/P2/P3
+  -> rapport-parcours-YYYY-MM-DD.html;
+
+  :livrer chemin rapport à l'utilisateur;
+}
+
+stop
+
+@enduml

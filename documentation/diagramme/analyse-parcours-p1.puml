@@ -1,0 +1,70 @@
+@startuml analyse-parcours-p1
+title Workflow Analyse de parcours web — Page 1/3 : Étape 10 Localisation
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+database "dossier-audit/" as FS #9BD0DD
+
+== Étape 10 — Localisation des fichiers ==
+
+U -> C : /analyse-parcours <dossier> ou <fichier.har> [coverage.json ...]
+C -> C : Extraire chemin(s) du prompt
+
+alt Dossier fourni
+  C -> FS : Lister contenu
+  FS -> C : Fichiers trouvés
+  C -> C : Identifier .har + Coverage-*.json + cwv.json (optionnel)
+  alt Plusieurs .har trouvés
+    C -> U : Lequel utiliser ?
+    U -> C : Choix
+  end
+else Fichiers directs fournis
+  C -> FS : Vérifier existence de chaque fichier
+  FS -> C : OK / erreur
+else Aucun argument
+  C -> U : Quel dossier ou fichiers HAR/Coverage analyser ?
+  U -> C : Chemin(s)
+end
+
+C -> U : Synthèse fichiers identifiés :\n- HAR : <nom> ([N] Ko)\n- Coverage : [N] fichier(s)\n- cwv.json : présent / absent
+
+note over C, FS
+  Sécurité HAR :
+  Ne jamais afficher credentials ni tokens en clair.
+  Masquer : {"password":"***"}, token=****...abc
+  Tronquer les UIDs : uid=8116...92
+end note
+
+== Étape 15 — Capture sessionId (silencieux) ==
+
+C -> FS : mkdir -p <HAR_DIR>/analyse-interne-agent
+C -> FS : cp ~/.claude/.current_session_id\nanalyse-interne-agent/.session_id
+
+note over C, FS
+  Utilisé par patch-audit-cost.sh (Étape 40)
+  pour calculer le coût exact de la session
+  au lieu d'une estimation par fenêtre temporelle.
+end note
+
+@enduml

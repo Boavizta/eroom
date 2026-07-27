@@ -1,0 +1,94 @@
+@startuml analyse-parcours-p2
+title Workflow Analyse de parcours web — Page 2/3 : DISPATCH + EcoIndex
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+participant "Sous-agents\n(HAR / Coverage)" as SA #C8E6C9
+participant "har_metrics.py" as EI #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+== Étape 25 — Détection capacités DISPATCH ==
+
+C -> C : Sous-agents disponibles ?\n(Claude Code -> OUI, autres -> séquentiel)
+
+== Wave 1 — Analyse HAR + Coverage (en parallèle) ==
+
+par
+  C -> SA : :::dispatch analyse-har\n(20_analyse-har.md)
+  SA -> FS : Lire .har\n(par lots si > 5 Mo)
+  SA -> SA : 20a — trafic (requêtes, domaines,\ncodes HTTP, volume)
+  SA -> SA : 20b — performance (cache,\ndoublons, ressources bloquantes)
+  SA -> FS : har-analysis.json
+else
+  C -> SA : :::dispatch analyse-coverage\n(30_analyse-coverage.md)
+  SA -> FS : Lire Coverage-*.json
+  SA -> SA : Détecter format A ou B
+  SA -> SA : Métriques JS/CSS par page\n(total, inutilisé, %)
+  SA -> SA : Synthèse multi-pages + outliers
+  SA -> FS : coverage-analysis.json
+end
+
+note over C, SA
+  Mode plateforme :
+  Claude Code -> sous-agents natifs (fenêtres contexte isolées)
+  Autres plateformes -> exécution séquentielle inline
+  Résultat disque identique dans les deux cas
+end note
+
+== Merge Wave 1 ==
+
+C -> FS : Lire har-analysis.json
+FS -> C : Données trafic réseau
+C -> FS : Lire coverage-analysis.json
+FS -> C : Données code mort JS/CSS
+
+== Étape 35 — Calcul EcoIndex (contexte principal) ==
+
+C -> EI : python3 har_metrics.py <har> [cwv.json]
+EI -> EI : Extraire DOM HTML depuis\nresponse.content.text
+EI -> EI : Compter requêtes + poids\npar page (pageref)
+EI -> C : Tableau : score/grade/req/Ko/DOM\npar page + onLoad
+
+note over C, EI
+  Limites :
+  - DOM=0 si HAR sans corps HTML\n    (response.content.text absent)
+  - SPA : DOM = état initial seulement\n    (pas après hydratation JS)
+  Ces cas sont documentés dans le rapport.
+end note
+
+== Étape 37 — CWV via Lighthouse ==
+
+alt cwv.json absent
+  C -> C : Extraire URLs depuis HAR\n(log.pages[].title)
+  C -> EI : run_lighthouse.sh <audit-dir> <url1> <url2> ...
+  EI -> EI : Lighthouse CLI (npx ou install locale)\npar page en mode lab
+  EI -> FS : cwv.json\n{lcp, inp, cls, source: "lighthouse"}
+  FS -> C : cwv.json prêt
+else cwv.json déjà présent
+  C -> C : Lighthouse skippé
+else Lighthouse indisponible
+  C -> C : Warning : rapport sans CWV
+end
+
+@enduml

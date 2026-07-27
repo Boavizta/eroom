@@ -25,14 +25,14 @@ version: 1.0.0
 | Workflow principal (3 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` | SKILL.md change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 
-Tous les fichiers `.puml` et les sorties se trouvent dans `diagramme/` à la racine du projet.
+Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
 
 -----
 
 ## Procédure générale de régénération
 
 Pour chaque diagramme modifié :
-1. Modifier le `.puml` dans `diagramme/` en cohérence avec la source de vérité
+1. Modifier le `.puml` dans `documentation/diagramme/` en cohérence avec la source de vérité
 2. Générer le SVG : `plantuml -tsvg <fichier>.puml`
 3. Convertir en PDF via `rsvg-convert`
 4. Vérifier + ouvrir
@@ -59,15 +59,15 @@ Découpage en 3 fichiers séparés : chaque page n'affiche que les participants 
 ### Commandes
 
 ```bash
-plantuml -tsvg diagramme/analyse-parcours-p1.puml \
-         diagramme/analyse-parcours-p2.puml \
-         diagramme/analyse-parcours-p3.puml
-rsvg-convert -f pdf -o diagramme/analyse-parcours-workflow.pdf \
-  diagramme/analyse-parcours-p1.svg \
-  diagramme/analyse-parcours-p2.svg \
-  diagramme/analyse-parcours-p3.svg
-ls -lh diagramme/analyse-parcours-workflow.pdf
-open diagramme/analyse-parcours-workflow.pdf
+plantuml -tsvg documentation/diagramme/analyse-parcours-p1.puml \
+         documentation/diagramme/analyse-parcours-p2.puml \
+         documentation/diagramme/analyse-parcours-p3.puml
+rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-workflow.pdf \
+  documentation/diagramme/analyse-parcours-p1.svg \
+  documentation/diagramme/analyse-parcours-p2.svg \
+  documentation/diagramme/analyse-parcours-p3.svg
+ls -lh documentation/diagramme/analyse-parcours-workflow.pdf
+open documentation/diagramme/analyse-parcours-workflow.pdf
 ```
 
 ### Contenu de référence — analyse-parcours-p1.puml
@@ -313,11 +313,11 @@ Suite   — Étape 35 EcoIndex + Étape 40 Rapport HTML (contexte principal)
 ### Commandes
 
 ```bash
-plantuml -tsvg diagramme/analyse-parcours-dispatch-activite.puml
-rsvg-convert -f pdf -o diagramme/analyse-parcours-dispatch-activite.pdf \
-  diagramme/analyse-parcours-dispatch-activite.svg
-ls -lh diagramme/analyse-parcours-dispatch-activite.pdf
-open diagramme/analyse-parcours-dispatch-activite.pdf
+plantuml -tsvg documentation/diagramme/analyse-parcours-dispatch-activite.puml
+rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-dispatch-activite.pdf \
+  documentation/diagramme/analyse-parcours-dispatch-activite.svg
+ls -lh documentation/diagramme/analyse-parcours-dispatch-activite.pdf
+open documentation/diagramme/analyse-parcours-dispatch-activite.pdf
 ```
 
 ### Contenu de référence — analyse-parcours-dispatch-activite.puml
@@ -470,4 +470,4 @@ skinparam responseMessageBelowArrow true
 - `alt` / `loop` / `note` / `partition` en français.
 - **Interdire les doubles tirets `--` dans les labels.** PlantUML interprète `--texte--`
   comme du texte barré. Utiliser un seul tiret `-`.
-  Vérifier : `grep "\-\-" diagramme/*.puml` doit retourner 0 occurrence dans les lignes `-> ... :`.
+  Vérifier : `grep "\-\-" documentation/diagramme/*.puml` doit retourner 0 occurrence dans les lignes `-> ... :`.

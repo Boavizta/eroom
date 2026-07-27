@@ -1502,6 +1502,205 @@ def _section_greenit(greenit):
 </section>"""
 
 
+def _confidence_badge(conf):
+    """Rend un petit badge coloré pour un niveau de confiance."""
+    mapping = {
+        "high":    ("#28a745", "collecté"),
+        "medium":  ("#5bc0de", "estimé"),
+        "low":     ("#fd7e14", "supposé"),
+        "default": ("#aaa",    "défaut lib"),
+    }
+    color, label = mapping.get(conf, ("#aaa", conf or "?"))
+    return (
+        f'<span style="background:{color};color:white;padding:1px 8px;'
+        f'border-radius:4px;font-size:13px;white-space:nowrap">{label}</span>'
+    )
+
+
+def load_efootprint_results(audit_dir):
+    """Cherche efootprint-results.json dans audit_dir ou son parent (source_dir)."""
+    audit_dir = Path(audit_dir)
+    for candidate in [audit_dir / "efootprint-results.json",
+                       audit_dir.parent / "efootprint-results.json"]:
+        if candidate.exists():
+            with open(candidate, encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def _section_efootprint(results):
+    """Section 'Impact environnemental (estimation hypothétique)' - CO2e depuis e-footprint."""
+    if not results:
+        return ""
+
+    totals = results.get("totals", {})
+    hyp = results.get("hypotheses", {})
+    visits = results.get("visits_per_year", 0)
+
+    total_kg = totals.get("total_kg_co2e_per_year", 0)
+    per_visit_g = totals.get("per_visit_g_co2e", 0)
+    fab = totals.get("fabrication_kg_co2e_per_year", {})
+    ener = totals.get("energy_kg_co2e_per_year", {})
+
+    fab_total = sum(fab.values())
+    ener_total = sum(ener.values())
+
+    # KPIs en tête
+    kpi_style = (
+        "flex:1;min-width:180px;background:white;border:1px solid #ddd;"
+        "border-radius:6px;padding:16px;text-align:center"
+    )
+    kpis = (
+        f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
+        f'  <div style="{kpi_style}">'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Total annuel</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">~{total_kg:.1f} kg CO2e</div>'
+        f'    <div style="font-size:14px;color:#888">pour {visits:,} visites/an (hypothèse)</div>'
+        f'  </div>'
+        f'  <div style="{kpi_style}">'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Par visite</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">~{per_visit_g:.2f} g CO2e</div>'
+        f'    <div style="font-size:14px;color:#888">ordre de grandeur (hypothèse)</div>'
+        f'  </div>'
+        f'  <div style="{kpi_style}">'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Fabrication / Énergie</div>'
+        f'    <div style="font-size:24px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">'
+        f'{fab_total:.1f} / {ener_total:.1f} kg</div>'
+        f'    <div style="font-size:14px;color:#888">amortie / usage annuel</div>'
+        f'  </div>'
+        f'</div>'
+    )
+
+    # Breakdown : barres empilées simples pour fabrication et énergie
+    def _breakdown_rows(d, decimals=2):
+        total = sum(d.values()) or 1e-9
+        rows = ""
+        for cat, kg in sorted(d.items(), key=lambda x: -x[1]):
+            if kg <= 0:
+                continue
+            pct = kg / total * 100
+            bar = (
+                f'<div style="background:#eee;border-radius:3px;height:14px;position:relative;overflow:hidden">'
+                f'  <div style="background:{OCTO_BLUE};height:100%;width:{pct:.1f}%"></div>'
+                f'</div>'
+            )
+            rows += (
+                f'<tr>'
+                f'<td style="padding:6px 8px">{cat}</td>'
+                f'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'
+                f'{kg:.{decimals}f} kg</td>'
+                f'<td style="padding:6px 8px;text-align:right;color:#666;font-variant-numeric:tabular-nums">'
+                f'{pct:.1f} %</td>'
+                f'<td style="padding:6px 8px;width:180px">{bar}</td>'
+                f'</tr>'
+            )
+        return rows
+
+    fab_table = f"""<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Poste (fabrication)</th>
+      <th style="padding:6px 8px;text-align:right">kg CO2e/an</th>
+      <th style="padding:6px 8px;text-align:right">Part</th>
+      <th style="padding:6px 8px">Répartition</th>
+    </tr></thead>
+    <tbody>{_breakdown_rows(fab, 2)}</tbody>
+  </table>"""
+
+    ener_table = f"""<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Poste (énergie)</th>
+      <th style="padding:6px 8px;text-align:right">kg CO2e/an</th>
+      <th style="padding:6px 8px;text-align:right">Part</th>
+      <th style="padding:6px 8px">Répartition</th>
+    </tr></thead>
+    <tbody>{_breakdown_rows(ener, 4)}</tbody>
+  </table>"""
+
+    # Tableau des hypothèses
+    hyp_rows = [
+        ("Poids de page (représentative)", f'{hyp.get("page_weight_kb", "?")} kB',       hyp.get("confidence_page_weight")),
+        ("Durée chargement",                f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration")),
+        ("Pays hébergement",                hyp.get("country", "?"),                     hyp.get("confidence_country")),
+        ("Intensité carbone électricité",   f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
+        ("Provider hébergeur",              hyp.get("provider", "?"),                    hyp.get("confidence_provider")),
+        ("Instance type",                   hyp.get("instance_type", "?"),               "paramètre"),
+        ("Mix device (phone / desktop)",    f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
+        ("Mix réseau (wifi / mobile)",      f'{hyp.get("wifi_fraction", 0):.0%} / {hyp.get("mobile_fraction", 0):.0%}', hyp.get("confidence_network_mix")),
+        ("Trafic annuel estimé",            f'{visits:,} visites',                       "paramètre"),
+        ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default"),
+    ]
+    hyp_html = "".join(
+        f'<tr>'
+        f'<td style="padding:6px 8px">{label}</td>'
+        f'<td style="padding:6px 8px"><b>{value}</b></td>'
+        f'<td style="padding:6px 8px">{_confidence_badge(conf)}</td>'
+        f'</tr>'
+        for label, value, conf in hyp_rows
+    )
+
+    warning = (
+        f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
+        f'padding:12px 16px;margin:16px 0;border-radius:4px">'
+        f'<b>&#9888; Estimation hypothétique</b><br>'
+        f'Ces valeurs sont des <b>ordres de grandeur</b> calculés à partir de données '
+        f'collectées automatiquement (HAR, CrUX, géoloc IP) et de nombreuses hypothèses '
+        f'par défaut. Elles <b>ne constituent pas une mesure réelle</b>. Elles servent '
+        f'à comparer des scénarios et identifier les postes dominants.'
+        f'</div>'
+    )
+
+    dominant_fab = max(fab, key=fab.get) if fab else "?"
+    dominant_ener = max(ener, key=ener.get) if ener else "?"
+
+    return f"""<section id="efootprint">
+  <h2>Impact environnemental (estimation CO2e)</h2>
+  <p style="font-size:16px;color:#555;margin-bottom:8px">
+    Estimation via la librairie <a href="https://github.com/Boavizta/e-footprint" target="_blank" rel="noopener">e-footprint</a> (Boavizta).
+    Poste dominant en fabrication : <b>{dominant_fab}</b> ({fab.get(dominant_fab, 0):.1f} kg CO2e/an).
+    Poste dominant en énergie : <b>{dominant_ener}</b> ({ener.get(dominant_ener, 0):.3f} kg CO2e/an).
+  </p>
+  {warning}
+  {kpis}
+
+  <h3 style="margin-top:24px">Décomposition par poste</h3>
+  <div style="display:grid;grid-template-columns:1fr;gap:20px">
+    <div>
+      <h4 style="margin:0 0 8px">Fabrication (amortie sur la durée de vie)</h4>
+      {fab_table}
+    </div>
+    <div>
+      <h4 style="margin:0 0 8px">Énergie (usage annuel)</h4>
+      {ener_table}
+    </div>
+  </div>
+
+  <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
+  <p style="font-size:15px;color:#666">
+    Niveau de confiance : <span style="background:#28a745;color:white;padding:1px 6px;border-radius:3px;font-size:13px">collecté</span> API/HAR
+    &nbsp;·&nbsp;
+    <span style="background:#5bc0de;color:white;padding:1px 6px;border-radius:3px;font-size:13px">estimé</span> inféré
+    &nbsp;·&nbsp;
+    <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:13px">supposé</span> valeur type
+    &nbsp;·&nbsp;
+    <span style="background:#aaa;color:white;padding:1px 6px;border-radius:3px;font-size:13px">défaut lib</span> valeur par défaut e-footprint
+  </p>
+  <table style="width:100%;border-collapse:collapse;margin-top:8px">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Paramètre</th>
+      <th style="padding:6px 8px;text-align:left">Valeur retenue</th>
+      <th style="padding:6px 8px;text-align:left">Source</th>
+    </tr></thead>
+    <tbody>{hyp_html}</tbody>
+  </table>
+
+  <p style="font-size:14px;color:#888;margin-top:12px">
+    Pour recalculer avec d'autres hypothèses :
+    <code>python3 run_efootprint.py &lt;source_dir&gt; --visits N --instance TYPE</code>
+    puis régénérer le rapport.
+  </p>
+</section>"""
+
+
 def _section_couts(page_metrics):
     # Formule EcoIndex officielle : 1 visite = (1.8 - score/100 * 1.8) gCO2e (approx cnumr)
     # Source : https://www.ecoindex.fr/comment-ca-marche
@@ -1756,6 +1955,7 @@ def generate(audit_dir, output_path=None):
     traffic      = har_traffic_analysis(har_data)
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
+    efootprint_results = load_efootprint_results(audit_dir)
 
     coverage_by_page = {}
     _asset_exts = re.compile(r'\.(js|css|webp|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|otf|eot|json|map)(\?.*)?$', re.I)
@@ -1846,16 +2046,25 @@ def generate(audit_dir, output_path=None):
         annexe_sections.append(("cwv", "Core Web Vitals"))
 
     letters = "abcdefgh"
-    annexes_num = 4 if cwv else 3
+    n = 3  # 1=Recommandations, 2=GreenIT, puis suit
+    cwv_nav = ""
+    if cwv:
+        cwv_nav = f'<li><a href="#cwv-analyse">{n}. Analyse Core Web Vitals</a></li>'
+        n += 1
+    efootprint_nav = ""
+    if efootprint_results:
+        efootprint_nav = f'<li><a href="#efootprint">{n}. Impact environnemental (CO2e)</a></li>'
+        n += 1
+    annexes_num = n
     annexe_inline = " &nbsp;·&nbsp; ".join(
         f'<a href="#{sid}">{annexes_num}.{letters[i]} {slabel}</a>'
         for i, (sid, slabel) in enumerate(annexe_sections)
     )
-    cwv_nav = f'<li><a href="#cwv-analyse">3. Analyse Core Web Vitals</a></li>' if cwv else ""
     nav_items = (
         f'<li><a href="#recommandations">1. Recommandations</a></li>'
         f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
         f'{cwv_nav}'
+        f'{efootprint_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
         f'<span style="display:flex;flex-direction:row;align-items:baseline;gap:12px">'
         f'<a href="#annexes">{annexes_num}. Annexes</a>'
@@ -1886,6 +2095,8 @@ def generate(audit_dir, output_path=None):
     html += _section_greenit(greenit)
     if cwv:
         html += _section_cwv_analyse(page_metrics, cwv)
+    if efootprint_results:
+        html += _section_efootprint(efootprint_results)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 

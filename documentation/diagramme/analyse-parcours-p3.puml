@@ -1,0 +1,75 @@
+@startuml analyse-parcours-p3
+title Workflow Analyse de parcours web — Page 3/3 : CWV Lighthouse + Rapport HTML
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+participant "run_lighthouse.sh" as LH #C8E6C9
+participant "generate_report_html.py" as GR #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+== Étape 37 — CWV via Lighthouse ==
+
+alt cwv.json déjà présent
+  C -> C : [Étape 37] cwv.json présent - Lighthouse skippé
+else cwv.json absent
+  C -> LH : bash run_lighthouse.sh <dossier-audit>
+  LH -> FS : Extraire URLs depuis .har\n(log.pages[].title, dédupliqué)
+  LH -> LH : npx lighthouse <url> par page\n(mode lab, simulation réseau)
+  LH -> FS : cwv.json {lcp, inp, cls par page}
+  FS -> C : cwv.json généré
+  note over LH
+    Si Lighthouse indisponible :
+    warning + rapport sans CWV.
+    Relance : "relance Lighthouse".
+  end note
+end
+
+== Étape 40 — Rapport HTML ==
+
+C -> GR : python3 generate_report_html.py <dossier-audit>
+GR -> FS : Lire .har
+FS -> GR : Trafic réseau brut
+GR -> FS : Lire coverage-analysis.json
+FS -> GR : Métriques code mort JS/CSS
+GR -> FS : Lire cwv.json (si présent)
+FS -> GR : LCP / INP / CLS par page
+GR -> FS : Lire efootprint-results.json (si présent)
+FS -> GR : Totaux CO2e + hypothèses
+
+note over GR, FS
+  Sections du rapport (dans l'ordre) :
+  1. En-tête : date, domaines, nb pages, fichiers source
+  2. Recommandations priorisées (P1 rouge / P2 orange / P3 vert)
+  3. Bonnes pratiques GreenIT
+  4. Core Web Vitals (si cwv.json - LCP/INP/CLS avec seuils Google)
+  5. Impact environnemental CO2e (si efootprint-results.json - skill /efootprint)
+  6. Annexes : Tableau de bord EcoIndex, Trafic réseau, Code mort, CWV détaillé
+  Si cwv.json absent : LCP affiche onLoad HAR avec note explicite.
+  Section CO2e omise si efootprint-results.json absent.
+end note
+
+GR -> C : rapport-parcours-YYYY-MM-DD.html
+C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
+
+@enduml

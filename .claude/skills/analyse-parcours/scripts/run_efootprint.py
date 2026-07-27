@@ -313,13 +313,13 @@ def _fmt_energy_dict(d):
     return lines
 
 
-def print_results(system, visits):
+def extract_results(system):
+    """Extrait un dict structuré (kg CO2e/an par catégorie fab + énergie) depuis le System."""
     import re
 
     fab_sum = system.total_fabrication_footprint_sum_over_period
     energy_sum = system.total_energy_footprint_sum_over_period
 
-    # Extraire les totaux depuis les dicts de somme (format : "Servers: 2.66 kg, Storage: 26.6 kg, ...")
     def parse_sum_dict(obj):
         rows = {}
         s = str(obj)
@@ -332,10 +332,16 @@ def print_results(system, visits):
     fab_rows = parse_sum_dict(fab_sum)
     energy_rows = parse_sum_dict(energy_sum)
 
-    # Total général
-    total_g = sum(_to_g_co2(v, u) for v, u in fab_rows.values())
-    total_g += sum(_to_g_co2(v, u) for v, u in energy_rows.values())
-    total_kg = total_g / 1000
+    fab_kg = {cat: _to_g_co2(val, unit) / 1000 for cat, (val, unit) in fab_rows.items()}
+    energy_kg = {cat: _to_g_co2(val, unit) / 1000 for cat, (val, unit) in energy_rows.items()}
+
+    return fab_kg, energy_kg
+
+
+def print_results(system, visits):
+    fab_kg, energy_kg = extract_results(system)
+    total_kg = sum(fab_kg.values()) + sum(energy_kg.values())
+    total_g = total_kg * 1000
 
     print()
     print("=" * 65)
@@ -349,23 +355,21 @@ def print_results(system, visits):
     print()
 
     print("  Fabrication (amortie sur durée de vie) :")
-    fab_total_g = 0.0
-    for cat, (val, unit) in fab_rows.items():
-        val_g = _to_g_co2(val, unit)
-        fab_total_g += val_g
-        if val_g > 0:
-            print(f"    {cat:<14} {val_g/1000:>8.2f} kg CO2e/an  (hypothèse)")
-    print(f"    {'TOTAL':<14} {fab_total_g/1000:>8.2f} kg CO2e/an")
+    fab_total_kg = 0.0
+    for cat, kg in fab_kg.items():
+        fab_total_kg += kg
+        if kg > 0:
+            print(f"    {cat:<14} {kg:>8.2f} kg CO2e/an  (hypothèse)")
+    print(f"    {'TOTAL':<14} {fab_total_kg:>8.2f} kg CO2e/an")
     print()
 
     print("  Énergie (usage annuel) :")
-    energy_total_g = 0.0
-    for cat, (val, unit) in energy_rows.items():
-        val_g = _to_g_co2(val, unit)
-        energy_total_g += val_g
-        if val_g > 0:
-            print(f"    {cat:<14} {val_g/1000:>8.4f} kg CO2e/an  (hypothèse)")
-    print(f"    {'TOTAL':<14} {energy_total_g/1000:>8.4f} kg CO2e/an")
+    energy_total_kg = 0.0
+    for cat, kg in energy_kg.items():
+        energy_total_kg += kg
+        if kg > 0:
+            print(f"    {cat:<14} {kg:>8.4f} kg CO2e/an  (hypothèse)")
+    print(f"    {'TOTAL':<14} {energy_total_kg:>8.4f} kg CO2e/an")
     print()
 
     print("  Ces valeurs sont des ordres de grandeur hypothétiques.")
@@ -380,8 +384,55 @@ def print_results(system, visits):
 def save_model(system, source_dir):
     from efootprint.api_utils.system_to_json import system_to_json
     out_path = source_dir / "efootprint-model.json"
-    system_to_json(system, str(out_path))
+    system_to_json(system, save_calculated_attributes=False, output_filepath=str(out_path))
     print(f"  Modèle sérialisé : {out_path}")
+
+
+def save_results(system, source_dir, env_data, visits, instance_type):
+    """Écrit un JSON léger (totaux + hypothèses) pour consommation par le rapport HTML."""
+    fab_kg, energy_kg = extract_results(system)
+    total_kg = sum(fab_kg.values()) + sum(energy_kg.values())
+
+    job = env_data.get("job", {})
+    server = env_data.get("server", {})
+    device = env_data.get("device_mix", {})
+    network = env_data.get("network_mix", {})
+
+    results = {
+        "generated_at": env_data.get("collected_at"),
+        "visits_per_year": visits,
+        "totals": {
+            "total_kg_co2e_per_year": round(total_kg, 3),
+            "per_visit_g_co2e": round(total_kg * 1000 / visits, 3) if visits > 0 else None,
+            "fabrication_kg_co2e_per_year": {k: round(v, 3) for k, v in fab_kg.items()},
+            "energy_kg_co2e_per_year": {k: round(v, 4) for k, v in energy_kg.items()},
+        },
+        "hypotheses": {
+            "page_weight_kb": job.get("data_transferred_bytes", 0) // 1024,
+            "confidence_page_weight": job.get("confidence_data_transferred", "default"),
+            "request_duration_ms": job.get("request_duration_ms", 0),
+            "confidence_request_duration": job.get("confidence_request_duration", "default"),
+            "country": server.get("efootprint_country", "?"),
+            "confidence_country": server.get("confidence_country", "default"),
+            "carbon_intensity_g_kwh": server.get("carbon_intensity_g_kwh", None),
+            "confidence_carbon_intensity": server.get("confidence_carbon_intensity", "default"),
+            "provider": server.get("detected_provider") or "inconnu",
+            "confidence_provider": server.get("confidence_provider", "default"),
+            "instance_type": instance_type,
+            "phone_fraction": device.get("phone_fraction", 0.6),
+            "desktop_fraction": device.get("desktop_fraction", 0.4),
+            "confidence_device_mix": device.get("confidence", "default"),
+            "wifi_fraction": network.get("wifi_fraction", 0.4),
+            "mobile_fraction": network.get("mobile_fraction", 0.6),
+            "confidence_network_mix": network.get("confidence", "default"),
+            "storage_gb": 50,
+        },
+    }
+
+    out_path = source_dir / "efootprint-results.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    print(f"  Résultats sérialisés : {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -426,9 +477,10 @@ def main():
     # Résultats
     print_results(system, args.visits)
 
-    # Sauvegarde modèle
+    # Sauvegarde modèle + résultats légers
     print("[e-footprint] Sérialisation du modèle...")
     save_model(system, source_dir)
+    save_results(system, source_dir, env_data, args.visits, args.instance)
     print()
     print("Pour relancer avec d'autres hypothèses :")
     print(f"  python3 {Path(__file__).name} {source_dir} --visits 500000 --instance t3.large")

@@ -3,3 +3,24 @@ __pycache__/
 *.pyo
 .DS_Store
 .claude/settings.local.json
+
+# Python virtualenv
+.venv/
+
+# Clés API et données sensibles
+.env
+env-data.json
+
+# Outputs e-footprint (générés, non versionnés)
+efootprint-results.json
+efootprint-model.json
+
+# Rapports HTML générés
+rapport-parcours-*.html
+
+# Fichiers internes analyse
+.analysis_start
+.cost-start-ts
+
+# Fichier settings Claude Code avec espace dans le nom
+.claude/ .json
