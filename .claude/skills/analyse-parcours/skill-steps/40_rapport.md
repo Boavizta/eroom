@@ -13,11 +13,6 @@ python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <dossier
 Le script lit le `.har`, les `Coverage-*.json` et le `cwv.json` optionnel depuis le dossier.
 Il produit `rapport-parcours-YYYY-MM-DD.html` dans ce même dossier.
 
-Ouvrir dans le navigateur pour vérifier le rendu :
-```bash
-open <dossier-audit>/rapport-parcours-YYYY-MM-DD.html
-```
-
 ## Structure du rapport HTML (sections dans l'ordre)
 
 ### En-tête (couverture)

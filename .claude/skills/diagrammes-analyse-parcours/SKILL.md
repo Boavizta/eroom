@@ -284,7 +284,6 @@ note over GR, FS
 end note
 
 GR -> C : rapport-parcours-YYYY-MM-DD.html
-C -> C : open rapport-parcours-YYYY-MM-DD.html
 C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
 
 @enduml
@@ -411,7 +410,7 @@ partition "**Merge + suite** (contexte principal)" {
   Recommandations P1/P2/P3
   -> rapport-parcours-YYYY-MM-DD.html;
 
-  :open rapport + livrer chemin à l'utilisateur;
+  :livrer chemin rapport à l'utilisateur;
 }
 
 stop

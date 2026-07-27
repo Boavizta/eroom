@@ -44,6 +44,15 @@ TYPE_COLORS = {
 }
 
 
+# ── Version Agent EROOM (source de vérité : SKILL.md) ────────────────────────
+_skill_md = Path(__file__).parent.parent / "SKILL.md"
+AGENT_VERSION = "?.?.?"
+if _skill_md.exists():
+    for _line in _skill_md.read_text(encoding="utf-8").splitlines():
+        if _line.startswith("version:"):
+            AGENT_VERSION = _line.split(":", 1)[1].strip()
+            break
+
 # ── Imports EcoIndex ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from har_metrics import extract_page_metrics, load_cwv
@@ -1848,15 +1857,17 @@ def generate(audit_dir, output_path=None):
         f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
         f'{cwv_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
+        f'<span style="display:flex;flex-direction:row;align-items:baseline;gap:12px">'
         f'<a href="#annexes">{annexes_num}. Annexes</a>'
+        f'<a href="#couts">&#9658; Couts de generation</a>'
+        f'</span>'
         f'<span style="font-size:15px;opacity:.75;padding-left:4px">{annexe_inline}</span>'
         f'</li>'
-        f'<li><a href="#couts">&#9658; Couts de generation</a></li>'
     )
 
     html = _html_head(title)
     html += f"""<header>
-  <h1>Audit d'écoresponsabilité web</h1>
+  <h1>Audit EROOM Version {AGENT_VERSION}</h1>
   <div style="font-size:18px;margin-top:6px;opacity:.9">{domains}</div>
   <div class="meta">
     Date : {today} &nbsp;|&nbsp;
@@ -1888,11 +1899,11 @@ def generate(audit_dir, output_path=None):
     html += '</section>\n'
 
     html += "</main>\n"
-    html += f"""<div class="cost-info" style="background:#f0f4f8;border-top:1px solid #ccc;padding:1.5rem 0;">
+    html += f"""<div id="couts" class="cost-info" style="background:#f0f4f8;border-top:1px solid #ccc;padding:1.5rem 0;">
   <div style="max-width:700px;margin:0 auto 0 40px">
     <details style="padding:0.75rem 1rem;background:white;border:1px solid #ccc;border-radius:4px;">
       <summary style="cursor:pointer;font-weight:600;">Coûts de génération (<span data-cost-field="cout">—</span> [*])</summary>
-      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. Durée et tokens peuvent inclure des échanges hors analyse.</p>
+      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. Durée et tokens peuvent inclure des échanges hors analyse. Coût aux tarifs API Anthropic publics ; sous AWS Bedrock, consulter AWS Cost Explorer.</p>
       <p style="margin:0.3rem 0;"><strong>Modèle :</strong> <span data-cost-field="modele">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Effort :</strong> <span data-cost-field="effort">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Durée :</strong> <span data-cost-field="duree">—</span></p>
@@ -1901,7 +1912,7 @@ def generate(audit_dir, output_path=None):
     </details>
   </div>
 </div>
-<footer>Rapport généré le {today} - Outil analyse-parcours (OCTO Technology)</footer>
+<footer>Rapport généré le {today} - Agent EROOM v{AGENT_VERSION}</footer>
 """
     html += "</body>\n</html>\n"
 

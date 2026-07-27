@@ -65,10 +65,11 @@ AUDIT_DIR="<SOURCE_DIR>/audit"
 mkdir -p "$AUDIT_DIR/analyse-cout-agent"
 if [ -f "$HOME/.claude/.current_session_id" ]; then
   cp "$HOME/.claude/.current_session_id" "$AUDIT_DIR/analyse-cout-agent/.cost-session-id"
+  date +%s > "$AUDIT_DIR/analyse-cout-agent/.cost-start-ts"
 fi
 ```
 
-Ce fichier sera lu par `patch-audit-cost.sh` (appelé en fin d'étape 40) pour calculer le coût exact de la session au lieu d'une estimation par fenêtre temporelle.
+Ces fichiers seront lus par `patch-audit-cost.sh` (appelé en fin d'étape 40) : `.cost-session-id` pour identifier la session, `.cost-start-ts` pour borner la durée au début réel de l'analyse (et non au début de la session complète).
 
 ---
 
