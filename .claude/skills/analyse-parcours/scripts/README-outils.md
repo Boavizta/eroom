@@ -55,8 +55,10 @@ Nécessite `GOOGLE_API_KEY` dans `.env` à la racine du projet.
 
     .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit>
 
+Par défaut : collecte **mobile ET desktop** (`--strategy both`), conservés côte à côte.
+
 Options :
-- `--strategy desktop` : métriques desktop (défaut : mobile)
+- `--strategy mobile` | `desktop` | `both` : restreindre à un appareil (défaut : `both`)
 - `--urls https://... https://...` : URLs explicites (sinon extraites du .har)
 
 ### Obtenir la clé API

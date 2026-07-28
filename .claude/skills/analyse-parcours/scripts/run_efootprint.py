@@ -202,53 +202,61 @@ def build_efootprint_model(env_data, visits, instance_type):
         data_stored=SourceValue(0 * u.kB_stored)
     )
 
-    step = UsageJourneyStep.from_defaults("Visite page", jobs=[page_job])
-    journey = UsageJourney("Parcours visiteur", uj_steps=[step])
-
-    # --- Devices ---
-    phone_frac = device_data.get("phone_fraction", 0.6)
-    desktop_frac = device_data.get("desktop_fraction", 0.4)
-    # On passe une liste - la lib pondère par le temps occupé (fraction_of_usage_time)
-    # Pour représenter le mix, on crée 2 patterns séparés ou on utilise les 2 devices
-    # L'API prend une liste, chaque device contribue proportionnellement à son usage_time
-    # Approche simple : 2 devices dans la liste, proportions dans l'affichage seulement
-    devices = [Device.smartphone(), Device.laptop()]
-
-    # --- Réseau ---
-    wifi_frac = network_data.get("wifi_fraction", 0.4)
-    # La lib ne supporte pas un mix réseau natif - on choisit le réseau dominant
-    if wifi_frac >= 0.5:
-        network = Network.wifi_network()
-        network_label = f"wifi (dominant à {wifi_frac:.0%})"
-    else:
-        network = Network.mobile_network()
-        network_label = f"mobile (dominant à {1-wifi_frac:.0%})"
-
     # --- Pays ---
     country = map_country(country_name)
 
-    # --- Trafic horaire ---
-    usage_pattern = UsagePattern(
-        f"Visiteurs (hypothèse : {visits:,} visites/an)",
-        journey,
-        devices,
-        network,
-        country,
-        ExplainableHourlyQuantitiesFromFormInputs({
+    # --- Mix appareils : pondération réelle via DEUX UsagePattern ---
+    # La lib efootprint ne pondère PAS l'usage entre les devices d'une même liste :
+    # [smartphone, laptop] dans un seul pattern facturerait 100% du trafic sur CHAQUE
+    # appareil (surcompte). Le seul mécanisme correct est deux UsagePattern distincts,
+    # avec des volumes proportionnels qui s'additionnent (le serveur/job voit bien le
+    # total). Chaque pattern porte aussi son propre réseau (mobile vs wifi), ce qui
+    # corrige au passage l'ancienne limite "réseau dominant unique".
+    # Le mix est déjà corrigé iOS + tablette→mobile en amont (collect_env_data.py).
+    mobile_frac = device_data.get("phone_fraction", 0.6)
+    desktop_frac = device_data.get("desktop_fraction", 0.4)
+    visits_mobile = round(visits * mobile_frac)
+    visits_desktop = visits - visits_mobile  # garantit la somme = visits
+
+    def _hourly_volume(volume):
+        return ExplainableHourlyQuantitiesFromFormInputs({
             "start_date": "2025-01-01",
             "modeling_duration_value": 1,
             "modeling_duration_unit": "year",
-            "initial_volume": visits,
+            "initial_volume": volume,
             "initial_volume_timespan": "year",
             "net_growth_rate_in_percentage": 0,
             "net_growth_rate_timespan": "year",
         }, source=Sources.USER_DATA)
-    )
+
+    usage_patterns = []
+    if visits_mobile > 0:
+        step_mobile = UsageJourneyStep.from_defaults("Visite page (mobile)", jobs=[page_job])
+        journey_mobile = UsageJourney("Parcours visiteur mobile", uj_steps=[step_mobile])
+        usage_patterns.append(UsagePattern(
+            f"Visiteurs mobile ({mobile_frac:.0%} — {visits_mobile:,} visites/an)",
+            journey_mobile,
+            [Device.smartphone()],
+            Network.mobile_network(),
+            country,
+            _hourly_volume(visits_mobile),
+        ))
+    if visits_desktop > 0:
+        step_desktop = UsageJourneyStep.from_defaults("Visite page (desktop)", jobs=[page_job])
+        journey_desktop = UsageJourney("Parcours visiteur desktop", uj_steps=[step_desktop])
+        usage_patterns.append(UsagePattern(
+            f"Visiteurs desktop ({desktop_frac:.0%} — {visits_desktop:,} visites/an)",
+            journey_desktop,
+            [Device.laptop()],
+            Network.wifi_network(),
+            country,
+            _hourly_volume(visits_desktop),
+        ))
 
     from urllib.parse import urlparse
     first_url = env_data.get("pages", [{}])[0].get("url", "") if env_data.get("pages") else ""
     system_name = urlparse(first_url).netloc or "site"
-    return System(f"Estimation CO2e — {system_name} (hypothèse)", [usage_pattern], edge_usage_patterns=[])
+    return System(f"Estimation CO2e — {system_name} (hypothèse)", usage_patterns, edge_usage_patterns=[])
 
 
 # ---------------------------------------------------------------------------
@@ -419,12 +427,30 @@ def save_results(system, source_dir, env_data, visits, instance_type):
             "provider": server.get("detected_provider") or "inconnu",
             "confidence_provider": server.get("confidence_provider", "default"),
             "instance_type": instance_type,
+            # Mix appareils retenu (mobile = phone+tablet, corrigé iOS)
             "phone_fraction": device.get("phone_fraction", 0.6),
             "desktop_fraction": device.get("desktop_fraction", 0.4),
             "confidence_device_mix": device.get("confidence", "default"),
+            # Détail méthodologique du mix (pour l'annexe)
+            "device_mix_source": device.get("source", "default"),
+            "phone_fraction_raw": device.get("phone_fraction_raw"),
+            "desktop_fraction_raw": device.get("desktop_fraction_raw"),
+            "tablet_fraction_raw": device.get("tablet_fraction_raw"),
+            "mobile_fraction_raw": device.get("mobile_fraction_raw"),
+            "tablet_merged_into_mobile": device.get("tablet_merged_into_mobile", False),
+            "ios_share_used": device.get("ios_share_used"),
+            "ios_share_source": device.get("ios_share_source"),
+            "device_scenarios": device.get("scenarios"),
+            "device_mix_note": device.get("note"),
+            # Split du trafic entre patterns mobile/desktop
+            "visits_mobile": round(visits * device.get("phone_fraction", 0.6)),
+            "visits_desktop": visits - round(visits * device.get("phone_fraction", 0.6)),
+            # Réseau (un par pattern : mobile->mobile_network, desktop->wifi)
             "wifi_fraction": network.get("wifi_fraction", 0.4),
             "mobile_fraction": network.get("mobile_fraction", 0.6),
             "confidence_network_mix": network.get("confidence", "default"),
+            "network_note": "Réseau modélisé par pattern : visiteurs mobile -> réseau mobile, "
+                            "visiteurs desktop -> wifi.",
             "storage_gb": 50,
         },
     }

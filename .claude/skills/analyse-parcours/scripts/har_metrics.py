@@ -134,8 +134,12 @@ def extract_page_metrics(har_data):
 
 
 def load_cwv(cwv_path):
-    """Charge cwv.json. Retourne un dict indexé par URL (normaliser) ET par page_id.
-    La correspondance par URL est prioritaire (robuste si les IDs HAR et Lighthouse divergent)."""
+    """Charge cwv.json. Retourne un dict indexé par URL (normalisée) ET par page_id.
+
+    Chaque valeur est un dict groupé par stratégie : {"mobile": row, "desktop": row}.
+    Cela permet de conserver mobile ET desktop côte à côte pour une même page.
+    Les entrées historiques sans champ 'strategy' sont classées 'mobile' (ancien défaut).
+    La correspondance par URL est prioritaire (robuste si les IDs HAR et CWV divergent)."""
     p = Path(cwv_path)
     if not p.exists():
         return {}
@@ -143,9 +147,14 @@ def load_cwv(cwv_path):
         data = json.load(f)
     result = {}
     for row in data:
+        strat = row.get("strategy", "mobile")
+        keys = []
         if "url" in row:
-            result[row["url"].rstrip("/")] = row
-        result[row["page"]] = row
+            keys.append(row["url"].rstrip("/"))
+        if "page" in row:
+            keys.append(row["page"])
+        for key in keys:
+            result.setdefault(key, {})[strat] = row
     return result
 
 

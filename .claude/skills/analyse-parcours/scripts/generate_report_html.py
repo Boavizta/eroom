@@ -402,9 +402,46 @@ def _dedup_page_metrics(page_metrics):
 
 
 def _cwv_for_page(m, cwv):
-    """Cherche les données CWV d'abord par URL (normaliser) puis par page_id."""
+    """Cherche les données CWV d'une page (dict groupé par stratégie).
+
+    Retourne {"mobile": row, "desktop": row} (clés éventuellement absentes),
+    d'abord par URL (normalisée) puis par page_id."""
     url = m.get("title", "").rstrip("/")
     return cwv.get(url) or cwv.get(m["page_id"], {})
+
+
+# Ordre de préférence quand une seule valeur est requise (dashboard, reco) :
+# le mobile prime (trafic dominant + conditions les plus contraignantes).
+_CWV_STRATEGY_PREF = ("mobile", "desktop")
+
+
+def _cwv_pick(by_strategy, prefer=_CWV_STRATEGY_PREF):
+    """Depuis un dict {strategy: row}, retourne (row, strategy) selon la préférence.
+    Retourne (None, None) si vide."""
+    if not by_strategy:
+        return None, None
+    for s in prefer:
+        if by_strategy.get(s):
+            return by_strategy[s], s
+    # fallback : première stratégie disponible
+    s = next(iter(by_strategy))
+    return by_strategy[s], s
+
+
+# Libellés lisibles des sources CWV (distingue terrain / lab API / lab local).
+_CWV_SOURCE_LABELS = {
+    "crux": ("terrain", "#0cce6b", "CrUX terrain (utilisateurs Chrome réels, via PageSpeed)"),
+    "pagespeed_lab": ("lab", "#ffa400", "Lab PageSpeed (simulation via l'API PSI)"),
+    "lighthouse": ("lab local", "#ffa400", "Lab Lighthouse (simulation en local)"),
+}
+
+
+def _cwv_source_badge(source):
+    """Petit badge indiquant la source réelle d'une mesure CWV."""
+    label, color, _ = _CWV_SOURCE_LABELS.get(source, ("?", "#aaa", "Source inconnue"))
+    return (f'<span style="display:inline-block;font-size:13px;padding:1px 7px;'
+            f'border-radius:10px;background:{color}22;color:{color};font-weight:bold">'
+            f'{label}</span>')
 
 
 def _section_dashboard(page_metrics, cwv):
@@ -418,7 +455,7 @@ def _section_dashboard(page_metrics, cwv):
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
         page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
-        cwv_data = _cwv_for_page(m, cwv)
+        cwv_data, _ = _cwv_pick(_cwv_for_page(m, cwv))
 
         def _cwv_cell(val, unit, thresholds):
             # thresholds = (good_max, needs_improvement_max)
@@ -674,24 +711,38 @@ def _section_cwv(page_metrics, cwv):
         return ""
 
     deduped = _dedup_page_metrics(page_metrics)
+    from urllib.parse import urlparse
     rows = ""
     for m in deduped:
-        c = _cwv_for_page(m, cwv)
-        from urllib.parse import urlparse
+        by_strat = _cwv_for_page(m, cwv)
         url = m["title"]
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
         page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
-        if c:
+
+        # Une sous-ligne par appareil disponible (mobile puis desktop)
+        strats = [s for s in ("mobile", "desktop") if by_strat.get(s)]
+        if not strats:
+            na = '<td style="text-align:right;color:#aaa">—</td>'
+            rows += f"""<tr>
+      <td>{page_cell}</td>
+      <td style="color:#aaa">—</td>
+      {na}{na}{na}
+    </tr>"""
+            continue
+        for i, strat in enumerate(strats):
+            c = by_strat[strat]
+            device_label = "📱 Mobile" if strat == "mobile" else "🖥 Desktop"
+            device_cell = f'{device_label} {_cwv_source_badge(c.get("source"))}'
             lcp_cell = _cwv_colored(c.get("lcp"), "s", (1.8, 2.5))
             inp_cell = _cwv_colored(c.get("inp"), "ms", (200, 500))
             cls_cell = _cwv_colored(c.get("cls"), "", (0.1, 0.25))
-        else:
-            na = '<td style="text-align:right;color:#aaa">—</td>'
-            lcp_cell = inp_cell = cls_cell = na
-        rows += f"""<tr>
-      <td>{page_cell}</td>
+            # La cellule "Page" n'est affichée que sur la 1re sous-ligne (rowspan)
+            first_cell = f'<td rowspan="{len(strats)}">{page_cell}</td>' if i == 0 else ""
+            rows += f"""<tr>
+      {first_cell}
+      <td>{device_cell}</td>
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
@@ -716,38 +767,56 @@ def _section_cwv(page_metrics, cwv):
     </tbody>
   </table>"""
 
-    # Détecter si les données viennent de Lighthouse ou d'une mesure manuelle
-    sources = {c.get("source") for c in cwv.values() if c}
-    is_lighthouse = "lighthouse" in sources
-    is_manual = sources - {"lighthouse"}
-
-    if is_lighthouse:
-        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
-      <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
-      Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
-      <ul style="margin:6px 0 0 16px;padding:0">
-        <li><strong>Réseau :</strong> "Slow 4G" simulé - 10 Mbps, latence 40 ms RTT</li>
-        <li><strong>CPU :</strong> ralenti 4x (simule un appareil mobile bas de gamme)</li>
-        <li><strong>Viewport :</strong> 360 x 640 px (mobile)</li>
-        <li><strong>Session :</strong> Chrome headless sans cookies, sans cache, anonyme</li>
-      </ul>
-      <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain (mesurées sur de vrais utilisateurs via CrUX ou PageSpeed Insights) sont généralement meilleures, surtout sur desktop et connexion rapide. Les pages nécessitant une authentification sont analysées sans session : les métriques reflètent alors la page de login, pas la page cible.</span>
-    </div>"""
-    else:
-        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
-      <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
-      Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights). Elles reflètent les conditions réelles de l'utilisateur.
-    </div>"""
+    methodo_note = _cwv_methodo_note(cwv)
 
     return f"""<section id="cwv">
   <h2>Core Web Vitals</h2>
   {methodo_note}
   <table>
-    <thead><tr><th>Page</th><th>LCP</th><th>INP</th><th>CLS</th></tr></thead>
+    <thead><tr><th>Page</th><th>Appareil</th><th>LCP</th><th>INP</th><th>CLS</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
   {legend}
 </section>"""
+
+
+def _cwv_methodo_note(cwv):
+    """Note méthodologique CWV, adaptée aux sources RÉELLEMENT présentes.
+
+    Distingue les 3 sources (crux terrain / pagespeed_lab / lighthouse local) au
+    lieu de confondre crux et pagespeed_lab sous 'terrain manuel'."""
+    sources = {row.get("source")
+               for by_strat in cwv.values() if isinstance(by_strat, dict)
+               for row in by_strat.values() if row}
+    present = [s for s in ("crux", "pagespeed_lab", "lighthouse") if s in sources]
+    src_lines = "".join(
+        f'<li><strong>{_CWV_SOURCE_LABELS[s][0]}</strong> : {_CWV_SOURCE_LABELS[s][2]}</li>'
+        for s in present
+    ) or '<li>Source non renseignée</li>'
+
+    has_lab = bool(sources & {"pagespeed_lab", "lighthouse"})
+    has_field = "crux" in sources
+    color = "#0cce6b" if has_field and not has_lab else "#ffa400"
+    bg = "#e8f5e9" if has_field and not has_lab else "#fff8e1"
+
+    lab_caveat = ""
+    if has_lab:
+        lab_caveat = ('<span style="color:#888;margin-top:6px;display:block">'
+                      'Les mesures lab sont des simulations (réseau/CPU bridés). Les valeurs terrain '
+                      'réelles sont souvent meilleures, surtout sur desktop et connexion rapide. '
+                      'Les pages nécessitant une authentification sont analysées sans session : les '
+                      'métriques reflètent alors la page de login, pas la page cible.</span>')
+    field_caveat = ""
+    if has_field:
+        field_caveat = ('<span style="color:#888;margin-top:6px;display:block">'
+                        'Le terrain CrUX ne couvre que les utilisateurs Chrome : iOS/Safari ne sont '
+                        'pas mesurés (voir annexe méthodologique).</span>')
+
+    return (f'<div style="background:{bg};border-left:3px solid {color};padding:10px 14px;'
+            f'margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">'
+            f'<strong>Note méthodologique - sources des mesures</strong>'
+            f'<ul style="margin:6px 0 0 16px;padding:0">{src_lines}</ul>'
+            f'{field_caveat}{lab_caveat}</div>')
 
 
 CWV_ACTIONS = {
@@ -768,25 +837,7 @@ def _section_cwv_analyse(page_metrics, cwv):
 
     deduped = _dedup_page_metrics(page_metrics)
 
-    sources = {c.get("source") for c in cwv.values() if c}
-    is_lighthouse = "lighthouse" in sources
-    if is_lighthouse:
-        methodo_note = """<div style="background:#fff8e1;border-left:3px solid #ffa400;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
-      <strong>Note méthodologique - Mesures Lighthouse (mode lab)</strong><br>
-      Ces valeurs sont calculées par Lighthouse CLI en mode simulation, dans les conditions suivantes :
-      <ul style="margin:6px 0 0 16px;padding:0">
-        <li><strong>Réseau :</strong> "Slow 4G" simulé - 10 Mbps, latence 40 ms RTT</li>
-        <li><strong>CPU :</strong> ralenti 4x (simule un appareil mobile bas de gamme)</li>
-        <li><strong>Viewport :</strong> 360 x 640 px (mobile)</li>
-        <li><strong>Session :</strong> Chrome headless sans cookies, sans cache, anonyme</li>
-      </ul>
-      <span style="color:#888;margin-top:6px;display:block">Ces conditions sont volontairement pénalisantes. Les valeurs réelles terrain sont généralement meilleures, surtout sur desktop et connexion rapide.</span>
-    </div>"""
-    else:
-        methodo_note = """<div style="background:#e8f5e9;border-left:3px solid #0cce6b;padding:10px 14px;margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">
-      <strong>Note méthodologique - Mesures terrain (cwv.json manuel)</strong><br>
-      Ces valeurs ont été saisies manuellement depuis une mesure terrain (Chrome DevTools, extension Lighthouse connectée, ou API PageSpeed Insights).
-    </div>"""
+    methodo_note = _cwv_methodo_note(cwv)
 
     legend = """<div style="font-size:15px;margin-top:16px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende :</span>
@@ -814,28 +865,35 @@ def _section_cwv_analyse(page_metrics, cwv):
         action_html = f' <span style="color:#555;font-size:16px">- {action}</span>' if action else ""
         return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:{color};font-weight:bold">{val} {unit}</span> <span style="color:{color}">({status})</span>{action_html}</div>'
 
+    def _device_metrics(strat, c):
+        device_label = "📱 Mobile" if strat == "mobile" else "🖥 Desktop"
+        lcp_row = _metric_row("LCP", c.get("lcp"), "s",  (1.8, 2.5),  "lcp_bad",  "lcp_warn")
+        inp_row = _metric_row("INP", c.get("inp"), "ms", (200, 500),  "inp_bad",  "inp_warn")
+        cls_row = _metric_row("CLS", c.get("cls"), "",  (0.1, 0.25), "cls_bad",  "cls_warn")
+        return f"""<div style="margin-top:8px">
+      <div style="font-size:16px;font-weight:bold;color:#555;margin-bottom:2px">{device_label} {_cwv_source_badge(c.get("source"))}</div>
+      {lcp_row}{inp_row}{cls_row}
+    </div>"""
+
     blocks = ""
     for m in deduped:
-        c = _cwv_for_page(m, cwv)
+        by_strat = _cwv_for_page(m, cwv)
         url = m["title"]
         parsed = urlparse(url)
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
-        lcp = c.get("lcp") if c else None
-        inp = c.get("inp") if c else None
-        cls_ = c.get("cls") if c else None
 
-        lcp_row = _metric_row("LCP", lcp, "s",  (1.8, 2.5),  "lcp_bad",  "lcp_warn")
-        inp_row = _metric_row("INP", inp, "ms", (200, 500),  "inp_bad",  "inp_warn")
-        cls_row = _metric_row("CLS", cls_, "",  (0.1, 0.25), "cls_bad",  "cls_warn")
+        strats = [s for s in ("mobile", "desktop") if by_strat.get(s)]
+        if strats:
+            devices_html = "".join(_device_metrics(s, by_strat[s]) for s in strats)
+        else:
+            devices_html = '<div style="margin-top:8px;color:#aaa;font-size:17px">— Non mesuré</div>'
 
         blocks += f"""<div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 18px;margin-bottom:14px">
     <div style="font-size:17px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
       <span style="color:#888;font-size:15px;margin-right:6px">P{num}</span><a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>
     </div>
-    {lcp_row}
-    {inp_row}
-    {cls_row}
+    {devices_html}
   </div>"""
 
     return f"""<section id="cwv-analyse">
@@ -1701,6 +1759,201 @@ def _section_efootprint(results):
 </section>"""
 
 
+def _methodo_table(rows):
+    """Rend un tableau Paramètre / Valeur / Source-confiance pour l'annexe méthodo.
+
+    rows : liste de (label, valeur, confiance|libellé). Si la confiance correspond
+    à un niveau connu (high/medium/low/default), affiche le badge ; sinon texte brut.
+    """
+    body = ""
+    for label, value, conf in rows:
+        if conf in ("high", "medium", "low", "default"):
+            src = _confidence_badge(conf)
+        else:
+            src = f'<span style="font-size:14px;color:#666">{conf}</span>'
+        body += (f'<tr>'
+                 f'<td style="padding:5px 8px">{label}</td>'
+                 f'<td style="padding:5px 8px"><b>{value}</b></td>'
+                 f'<td style="padding:5px 8px">{src}</td>'
+                 f'</tr>')
+    return (f'<table style="width:100%;border-collapse:collapse;margin-top:6px">'
+            f'<thead><tr style="background:{OCTO_PALE}">'
+            f'<th style="padding:6px 8px;text-align:left">Paramètre</th>'
+            f'<th style="padding:6px 8px;text-align:left">Valeur retenue</th>'
+            f'<th style="padding:6px 8px;text-align:left">Source</th>'
+            f'</tr></thead><tbody>{body}</tbody></table>')
+
+
+def _methodo_efootprint(efootprint_results):
+    """Sous-section A : hypothèses ET méthodes du calcul CO2e."""
+    if not efootprint_results:
+        return ""
+    hyp = efootprint_results.get("hypotheses", {})
+    visits = efootprint_results.get("visits_per_year", 0)
+
+    def pct(v):
+        return f'{v:.0%}' if isinstance(v, (int, float)) else "?"
+
+    # --- Tableau des données/hypothèses ---
+    rows = [
+        ("Poids de page (représentative)", f'{hyp.get("page_weight_kb", "?")} kB', hyp.get("confidence_page_weight", "default")),
+        ("Durée de chargement", f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration", "default")),
+        ("Pays d'hébergement", hyp.get("country", "?"), hyp.get("confidence_country", "default")),
+        ("Intensité carbone électricité", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),
+        ("Provider hébergeur", hyp.get("provider", "?"), hyp.get("confidence_provider", "default")),
+        ("Type d'instance", hyp.get("instance_type", "?"), "paramètre"),
+        ("Trafic annuel", f'{visits:,} visites', "hypothèse saisie (--visits)"),
+    ]
+    # Mix appareils : brut CrUX (si dispo) + retenu corrigé
+    mob_raw = hyp.get("mobile_fraction_raw")
+    if mob_raw is not None:
+        rows.append(("Mix brut CrUX (mobile / desktop)",
+                     f'{pct(mob_raw)} / {pct(hyp.get("desktop_fraction_raw"))} '
+                     f'(dont phone {pct(hyp.get("phone_fraction_raw"))}, tablette {pct(hyp.get("tablet_fraction_raw"))})',
+                     hyp.get("device_mix_source", "crux")))
+        rows.append(("Part iOS retenue (correction)",
+                     pct(hyp.get("ios_share_used")),
+                     hyp.get("ios_share_source", "?")))
+    rows.append(("Mix appareils retenu (mobile / desktop)",
+                 f'{pct(hyp.get("phone_fraction"))} / {pct(hyp.get("desktop_fraction"))}',
+                 hyp.get("confidence_device_mix", "default")))
+    rows.append(("Split du trafic (mobile / desktop)",
+                 f'{hyp.get("visits_mobile", "?"):,} / {hyp.get("visits_desktop", "?"):,} visites'
+                 if isinstance(hyp.get("visits_mobile"), int) else "?",
+                 "dérivé du mix"))
+    rows.append(("Réseau (mobile / wifi)",
+                 f'{pct(hyp.get("mobile_fraction"))} mobile / {pct(hyp.get("wifi_fraction"))} wifi',
+                 hyp.get("confidence_network_mix", "default")))
+    rows.append(("Stockage serveur", f'{hyp.get("storage_gb", 50)} GB', "default"))
+    rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default"))
+
+    table = _methodo_table(rows)
+
+    # --- Fourchette de scénarios iOS ---
+    scenarios_html = ""
+    sc = hyp.get("device_scenarios")
+    if sc:
+        sc_rows = ""
+        for key, human in (("conservateur", "Conservateur"), ("central", "Central (retenu)"), ("apple_heavy", "Audience Apple")):
+            s = sc.get(key, {})
+            sc_rows += (f'<tr><td style="padding:5px 8px">{human}</td>'
+                        f'<td style="padding:5px 8px">part iOS {pct(s.get("ios_share"))}</td>'
+                        f'<td style="padding:5px 8px"><b>{pct(s.get("mobile"))}</b> mobile / {pct(s.get("desktop"))} desktop</td></tr>')
+        scenarios_html = (
+            f'<h4 style="margin:14px 0 4px">Fourchette du mix selon la part iOS</h4>'
+            f'<table style="width:100%;border-collapse:collapse">'
+            f'<thead><tr style="background:{OCTO_PALE}">'
+            f'<th style="padding:6px 8px;text-align:left">Scénario</th>'
+            f'<th style="padding:6px 8px;text-align:left">Hypothèse</th>'
+            f'<th style="padding:6px 8px;text-align:left">Mix résultant</th>'
+            f'</tr></thead><tbody>{sc_rows}</tbody></table>')
+
+    # --- Méthodes / formules ---
+    methods = (
+        '<h4 style="margin:14px 0 4px">Méthodes appliquées</h4>'
+        '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
+        '<li><b>Correction iOS.</b> CrUX ne mesure que Chrome : les iPhone/iPad (Safari), '
+        'et même Chrome sur iOS, sont absents. La part mobile brute est regonflée par '
+        '<code>mobile_corrigé = mobile_brut / (1 − part_iOS)</code>, puis renormalisée avec le desktop. '
+        'La part iOS provient d\'une valeur régionale StatCounter (paramétrable). '
+        'Le desktop reste légèrement sous-estimé (Mac/Safari non mesurés) : approximation assumée.</li>'
+        '<li><b>Rattachement tablette.</b> La tablette est comptée avec le mobile '
+        '(logique tactile/portable). Le corps du rapport n\'affiche que mobile/desktop ; '
+        'le détail figure ci-dessus.</li>'
+        '<li><b>Pondération du CO2e.</b> Le trafic est réparti en <b>deux profils d\'usage</b> '
+        '(mobile → smartphone + réseau mobile ; desktop → laptop + wifi), avec des volumes '
+        'proportionnels au mix. Ceci corrige un surcomptage antérieur où chaque visite était '
+        'facturée à 100 % sur smartphone ET laptop.</li>'
+        '<li><b>Nature des chiffres.</b> Ordres de grandeur hypothétiques (données HAR/CrUX/géoloc IP '
+        '+ valeurs par défaut), pas une mesure réelle.</li>'
+        '</ul>'
+    )
+
+    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A — Impact environnemental (CO2e)</h3>'
+            f'{table}{scenarios_html}{methods}')
+
+
+def _methodo_cwv(cwv):
+    """Sous-section B : sources et limites des Core Web Vitals."""
+    if not cwv:
+        return ""
+    sources = {row.get("source")
+               for by_strat in cwv.values() if isinstance(by_strat, dict)
+               for row in by_strat.values() if row}
+    src_items = "".join(
+        f'<li><b>{_CWV_SOURCE_LABELS[s][0]}</b> — {_CWV_SOURCE_LABELS[s][2]}</li>'
+        for s in ("crux", "pagespeed_lab", "lighthouse") if s in sources
+    ) or '<li>Source non renseignée</li>'
+    return (
+        '<h3 id="methodo-cwv" style="margin-top:20px">B — Core Web Vitals</h3>'
+        '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
+        f'<li><b>Sources présentes :</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
+        '<li><b>CrUX = terrain Chrome.</b> Les données "terrain" proviennent du champ '
+        '<code>loadingExperience</code> de la réponse PageSpeed Insights (percentiles P75 '
+        'des utilisateurs Chrome réels) : ce n\'est PAS un appel dédié à l\'API CrUX.</li>'
+        '<li><b>Limite iOS/Safari.</b> Comme le mix appareils, le terrain CrUX ne couvre '
+        'que Chrome ; les utilisateurs iOS/Safari ne sont pas représentés.</li>'
+        '<li><b>Mobile ET desktop.</b> Les deux stratégies PageSpeed sont collectées et '
+        'affichées séparément (LCP < 1,8 s bon / 1,8-2,5 s à améliorer / > 2,5 s mauvais ; '
+        'INP 200/500 ms ; CLS 0,1/0,25).</li>'
+        '<li><b>Lab (simulation).</b> Les sources "lab" (PageSpeed lab ou Lighthouse local) '
+        'sont des simulations à réseau/CPU bridés, généralement plus pessimistes que le terrain.</li>'
+        '</ul>'
+    )
+
+
+def _methodo_ecoindex():
+    """Sous-section C : formule EcoIndex."""
+    return (
+        '<h3 id="methodo-ecoindex" style="margin-top:20px">C — EcoIndex / GreenIT</h3>'
+        '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
+        '<li><b>Formule (cnumr/ecoindex_reference) :</b> '
+        '<code>score = 100 − 5 × (3·q_DOM + 2·q_req + q_poids) / 6</code>, '
+        'où q_x est le rang (0-20) de la valeur dans les quantiles de référence '
+        '(nombre d\'éléments DOM, nombre de requêtes, poids en Ko).</li>'
+        '<li><b>Grades :</b> A ≥ 80, B ≥ 70, C ≥ 55, D ≥ 40, E ≥ 25, F ≥ 10, G sinon.</li>'
+        '<li><b>Entrées :</b> DOM, requêtes et poids sont extraits du HAR de la capture.</li>'
+        '</ul>'
+    )
+
+
+def _methodo_trafic():
+    """Sous-section D : trafic et réseau."""
+    return (
+        '<h3 id="methodo-trafic" style="margin-top:20px">D — Trafic &amp; réseau</h3>'
+        '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
+        '<li><b>Volume de trafic.</b> Le nombre de visites/an est une <b>hypothèse saisie</b> '
+        '(argument <code>--visits</code>) : ni PageSpeed ni CrUX ne fournissent de volume '
+        'd\'audience (l\'API ne renvoie que des distributions, jamais de compteurs).</li>'
+        '<li><b>Volumétrie réseau.</b> Le poids transféré et le nombre de requêtes viennent '
+        'du HAR (mesure réelle de la capture), à ne pas confondre avec un volume d\'audience.</li>'
+        '</ul>'
+    )
+
+
+def _section_methodologie(efootprint_results, cwv):
+    """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic).
+
+    Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
+    et les méthodes/formules appliquées."""
+    parts = [
+        _methodo_efootprint(efootprint_results),
+        _methodo_cwv(cwv),
+        _methodo_ecoindex(),
+        _methodo_trafic(),
+    ]
+    body = "".join(p for p in parts if p)
+    return (
+        '<section id="methodologie">\n'
+        '<h2>Méthodologie &amp; hypothèses</h2>\n'
+        '<p style="font-size:16px;color:#555;margin-bottom:8px">'
+        'Cette annexe recense, par domaine, les données et hypothèses entrant dans '
+        'chaque calcul (valeur, source, niveau de confiance) ainsi que les méthodes appliquées.</p>\n'
+        f'{body}\n'
+        '</section>'
+    )
+
+
 def _section_couts(page_metrics):
     # Formule EcoIndex officielle : 1 visite = (1.8 - score/100 * 1.8) gCO2e (approx cnumr)
     # Source : https://www.ecoindex.fr/comment-ca-marche
@@ -1770,7 +2023,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     cls_bad, cls_warn = [], []
 
     for m in deduped:
-        c = _cwv_for_page(m, cwv)
+        c, _ = _cwv_pick(_cwv_for_page(m, cwv))
         if not c:
             continue
         num = m.get("page_num", "")
@@ -2044,6 +2297,7 @@ def generate(audit_dir, output_path=None):
     ]
     if cwv:
         annexe_sections.append(("cwv", "Core Web Vitals"))
+    annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
 
     letters = "abcdefgh"
     n = 3  # 1=Recommandations, 2=GreenIT, puis suit
@@ -2107,6 +2361,8 @@ def generate(audit_dir, output_path=None):
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), "A.3")}</div>\n'
     if cwv:
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_cwv(page_metrics, cwv), "A.4")}</div>\n'
+    methodo_num = f"A.{len(annexe_sections)}"  # methodologie est le dernier élément d'annexe_sections
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(efootprint_results, cwv), methodo_num)}</div>\n'
     html += '</section>\n'
 
     html += "</main>\n"

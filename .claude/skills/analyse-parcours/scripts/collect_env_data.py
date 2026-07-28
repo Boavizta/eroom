@@ -40,6 +40,48 @@ CONFIDENCE_DEFAULT = "default"  # valeur par défaut de la librairie
 
 
 # ---------------------------------------------------------------------------
+# Correction iOS du mix appareils
+# ---------------------------------------------------------------------------
+# CrUX ne mesure QUE Chrome. Sur mobile, les iPhone/iPad (Safari) ne remontent
+# pas, et même Chrome sur iOS (moteur WebKit imposé par Apple) est absent. La
+# part "phone" de CrUX ne reflète donc quasiment que les Android. On "regonfle"
+# le mobile via la part iOS du parc mobile de la région d'audience.
+#
+# Valeurs = part iOS du parc MOBILE, source StatCounter "Mobile Operating System
+# Market Share" (snapshot indicatif : 2025-06, à rafraîchir périodiquement).
+IOS_MOBILE_SHARE = {
+    "FR": 0.35,   # France
+    "DE": 0.35,   # Allemagne
+    "GB": 0.52,   # Royaume-Uni
+    "US": 0.57,   # États-Unis
+    "default": 0.30,
+}
+IOS_SHARE_SOURCE = "StatCounter Mobile OS Market Share (snapshot 2025-06, indicatif)"
+
+# Bornes de la fourchette de scénarios (part iOS du mobile) affichée en annexe.
+IOS_SCENARIO_LOW = 0.25    # conservateur (peu d'iOS -> faible correction)
+IOS_SCENARIO_HIGH = 0.55   # audience très Apple
+
+
+def correct_mobile_fraction(mobile_raw, desktop_raw, ios_share):
+    """Regonfle la part mobile pour compenser les iOS absents de CrUX (Chrome only).
+
+    mobile_raw / desktop_raw : proportions issues de Chrome (tablette déjà
+    fusionnée dans mobile_raw, somme = 1).
+    ios_share : part iOS du parc mobile régional (0-1).
+    Retourne (mobile_fraction, desktop_fraction) renormalisés (somme = 1).
+    """
+    android_share = 1.0 - ios_share
+    if android_share <= 0:
+        return round(mobile_raw, 3), round(desktop_raw, 3)
+    mobile_corr = mobile_raw / android_share
+    total = mobile_corr + desktop_raw
+    if total <= 0:
+        return round(mobile_raw, 3), round(desktop_raw, 3)
+    return round(mobile_corr / total, 3), round(desktop_raw / total, 3)
+
+
+# ---------------------------------------------------------------------------
 # Chargement .env
 # ---------------------------------------------------------------------------
 
@@ -262,21 +304,6 @@ def collect_device_mix(url, api_key):
     return mix
 
 
-def infer_network_mix(device_mix):
-    """
-    Infère le mix wifi/mobile depuis la répartition device.
-    Hypothèse : phones = mobile network, desktop/tablet = wifi.
-    """
-    if not device_mix:
-        return None
-    mobile_fraction = device_mix.get("phone", 0.6)
-    return {
-        "wifi": round(1 - mobile_fraction, 3),
-        "mobile": round(mobile_fraction, 3),
-        "source": "inferred_from_device_mix",
-    }
-
-
 # ---------------------------------------------------------------------------
 # ipinfo.io : pays + provider depuis IP
 # ---------------------------------------------------------------------------
@@ -416,32 +443,83 @@ def collect_server_info(ip, token=None):
 # Construction env-data.json
 # ---------------------------------------------------------------------------
 
-def build_env_data(har_data, device_mix, server_info):
+def build_env_data(har_data, device_mix, server_info, ios_share=None, ios_share_source=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
+
+    ios_share : part iOS du parc mobile (0-1) pour la correction du mix appareils.
+    Si None, le défaut régional (France) de IOS_MOBILE_SHARE est utilisé.
+    ios_share_source : libellé de provenance de ios_share (pour l'annexe).
     """
     pages, _ = har_data if isinstance(har_data, tuple) else (har_data, None)
     har_metrics = aggregate_page_metrics(pages)
 
     # --- Device mix ---
+    # Décision projet : la tablette est rattachée au mobile (logique tactile /
+    # portable). Le corps du rapport n'affiche que desktop/mobile ; le détail
+    # (fractions brutes phone/tablet, correction iOS, fourchette) va en annexe.
+    if ios_share is None:
+        ios_share = IOS_MOBILE_SHARE["FR"]
+        ios_share_source = f"{IOS_SHARE_SOURCE} — France (défaut régional)"
+    elif ios_share_source is None:
+        ios_share_source = IOS_SHARE_SOURCE
+
     if device_mix:
+        phone_raw = device_mix["phone"]
+        desktop_raw = device_mix["desktop"]
+        tablet_raw = device_mix.get("tablet", 0.0)
+        # Tablette rattachée au mobile
+        mobile_raw = round(phone_raw + tablet_raw, 3)
+        crux_source = device_mix["source"]
+
+        mobile_central, desktop_central = correct_mobile_fraction(mobile_raw, desktop_raw, ios_share)
+        mobile_low, desktop_low = correct_mobile_fraction(mobile_raw, desktop_raw, IOS_SCENARIO_LOW)
+        mobile_high, desktop_high = correct_mobile_fraction(mobile_raw, desktop_raw, IOS_SCENARIO_HIGH)
+
         device_section = {
-            "phone_fraction": device_mix["phone"],
-            "desktop_fraction": device_mix["desktop"],
-            "tablet_fraction": device_mix.get("tablet", 0.0),
-            "source": device_mix["source"],
-            "confidence": CONFIDENCE_HIGH,
+            # Valeurs retenues pour le calcul (mobile = phone+tablet, corrigé iOS)
+            "phone_fraction": mobile_central,
+            "desktop_fraction": desktop_central,
+            "tablet_fraction": 0.0,
+            "tablet_merged_into_mobile": True,
+            "source": crux_source,
+            "confidence": CONFIDENCE_MEDIUM,  # corrigé (estimation iOS) => medium
+            # Brut CrUX (Chrome only, avant fusion tablette et correction iOS)
+            "phone_fraction_raw": phone_raw,
+            "desktop_fraction_raw": desktop_raw,
+            "tablet_fraction_raw": tablet_raw,
+            "mobile_fraction_raw": mobile_raw,
+            # Correction iOS
+            "ios_share_used": round(ios_share, 3),
+            "ios_share_source": ios_share_source,
+            "mobile_fraction_corrected": mobile_central,
+            "desktop_fraction_corrected": desktop_central,
+            # Fourchette pour l'annexe
+            "scenarios": {
+                "conservateur": {"ios_share": IOS_SCENARIO_LOW, "mobile": mobile_low, "desktop": desktop_low},
+                "central": {"ios_share": round(ios_share, 3), "mobile": mobile_central, "desktop": desktop_central},
+                "apple_heavy": {"ios_share": IOS_SCENARIO_HIGH, "mobile": mobile_high, "desktop": desktop_high},
+            },
+            "note": "CrUX = Chrome uniquement (iOS/Safari non mesurés). Mobile regonflé "
+                    "via part iOS régionale ; tablette rattachée au mobile.",
         }
-        network_mix = infer_network_mix(device_mix)
+        # Réseau basé sur le mobile corrigé (phones+tablet = mobile ; desktop = wifi)
+        network_mix = {
+            "wifi": desktop_central,
+            "mobile": mobile_central,
+            "source": "inferred_from_corrected_device_mix",
+        }
     else:
         device_section = {
             "phone_fraction": 0.6,
             "desktop_fraction": 0.4,
             "tablet_fraction": 0.0,
+            "tablet_merged_into_mobile": True,
             "source": "default",
             "confidence": CONFIDENCE_DEFAULT,
-            "note": "CrUX indisponible - valeurs par défaut (60% mobile, 40% desktop)",
+            "note": "CrUX indisponible - valeurs par défaut (60% mobile, 40% desktop). "
+                    "Pas de correction iOS appliquée (aucune donnée à corriger).",
         }
         network_mix = {"wifi": 0.4, "mobile": 0.6, "source": "default"}
 
@@ -512,7 +590,20 @@ def main():
                         help="Recollecte même si env-data.json existe déjà")
     parser.add_argument("--check", action="store_true",
                         help="Vérifie les clés API sans analyser")
+    parser.add_argument("--ios-mobile-share", type=float, default=None,
+                        help="Part iOS du parc mobile (0-1) pour corriger le mix appareils "
+                             "(CrUX = Chrome only). Défaut : valeur régionale France.")
     args = parser.parse_args()
+
+    if args.ios_mobile_share is None:
+        ios_share = IOS_MOBILE_SHARE["FR"]  # défaut régional : France (contexte projet)
+        ios_share_source = f"{IOS_SHARE_SOURCE} — France (défaut régional)"
+    elif not 0.0 <= args.ios_mobile_share < 1.0:
+        print(f"Erreur : --ios-mobile-share doit être dans [0, 1[ (reçu : {args.ios_mobile_share})")
+        sys.exit(1)
+    else:
+        ios_share = args.ios_mobile_share
+        ios_share_source = f"saisie manuelle (--ios-mobile-share {ios_share})"
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
@@ -620,7 +711,8 @@ def main():
         print("  Aucune IP serveur détectée dans le HAR")
 
     # --- Assemblage env-data.json ---
-    env_data = build_env_data((pages, server_ip), device_mix, server_info)
+    env_data = build_env_data((pages, server_ip), device_mix, server_info,
+                              ios_share=ios_share, ios_share_source=ios_share_source)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)
@@ -641,9 +733,13 @@ def main():
           f"[{server.get('confidence_country', '?')}]")
     print(f"  Provider              : {server.get('detected_provider') or 'non détecté'} "
           f"[{server.get('confidence_provider', '?')}]")
-    print(f"  Device phone/desktop  : {device.get('phone_fraction', 0):.0%} / "
+    print(f"  Device mobile/desktop : {device.get('phone_fraction', 0):.0%} / "
           f"{device.get('desktop_fraction', 0):.0%} "
           f"[{device.get('confidence', '?')}]")
+    if device.get("mobile_fraction_raw") is not None:
+        print(f"    (brut CrUX mobile={device.get('mobile_fraction_raw', 0):.0%}, "
+              f"corrigé iOS {device.get('ios_share_used', 0):.0%} "
+              f"-> mobile={device.get('mobile_fraction_corrected', 0):.0%})")
 
 
 if __name__ == "__main__":

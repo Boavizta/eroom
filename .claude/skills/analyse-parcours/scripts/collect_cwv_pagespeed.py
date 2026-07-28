@@ -5,9 +5,12 @@ Source privilégiée : données terrain CrUX (P75 réel utilisateurs).
 Fallback si CrUX absent : données lab Lighthouse retournées par la même API.
 
 Usage :
-    python3 collect_cwv_pagespeed.py <dossier-audit>
-    python3 collect_cwv_pagespeed.py <dossier-audit> --strategy mobile
+    python3 collect_cwv_pagespeed.py <dossier-audit>                    # mobile + desktop (défaut)
+    python3 collect_cwv_pagespeed.py <dossier-audit> --strategy mobile  # mobile seul
     python3 collect_cwv_pagespeed.py <dossier-audit> --urls https://example.com https://example.com/page2
+
+Par défaut (--strategy both), collecte mobile ET desktop pour chaque URL et les
+conserve côte à côte dans cwv.json (une entrée par couple url/stratégie).
 
 Lit GOOGLE_API_KEY depuis .env à la racine du projet.
 Écrit (ou met à jour) <dossier-audit>/cwv.json.
@@ -172,39 +175,49 @@ def extract_lab(data):
     }
 
 
-def collect(audit_dir, urls, api_key, strategy="mobile"):
-    """Collecte les CWV pour chaque URL. Retourne la liste au format cwv.json."""
+def collect(audit_dir, urls, api_key, strategies=("mobile",)):
+    """Collecte les CWV pour chaque URL et chaque stratégie.
+
+    Retourne la liste au format cwv.json : une entrée par couple (url, strategy).
+    """
     results = []
     for page_id, url in urls:
         print(f"  [{page_id}] {url}")
-        data = call_pagespeed(url, api_key, strategy)
-        if data is None:
-            print(f"    -> Aucune réponse API, ignoré.")
-            continue
-
-        crux = extract_crux(data)
-        if crux:
-            entry = {"page": page_id, "url": url, "strategy": strategy}
-            entry.update(crux)
-            print(f"    -> CrUX terrain : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')} [{entry.get('crux_category')}]")
-        else:
-            lab = extract_lab(data)
-            if lab:
-                entry = {"page": page_id, "url": url, "strategy": strategy}
-                entry.update(lab)
-                print(f"    -> Lab (CrUX absent) : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')}")
-            else:
-                print(f"    -> Aucune métrique disponible.")
+        for strategy in strategies:
+            data = call_pagespeed(url, api_key, strategy)
+            if data is None:
+                print(f"    [{strategy}] -> Aucune réponse API, ignoré.")
                 continue
 
-        results.append(entry)
-        time.sleep(0.5)  # Éviter de dépasser le quota par minute
+            crux = extract_crux(data)
+            if crux:
+                entry = {"page": page_id, "url": url, "strategy": strategy}
+                entry.update(crux)
+                print(f"    [{strategy}] -> CrUX terrain : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')} [{entry.get('crux_category')}]")
+            else:
+                lab = extract_lab(data)
+                if lab:
+                    entry = {"page": page_id, "url": url, "strategy": strategy}
+                    entry.update(lab)
+                    print(f"    [{strategy}] -> Lab (CrUX absent) : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')}")
+                else:
+                    print(f"    [{strategy}] -> Aucune métrique disponible.")
+                    continue
+
+            results.append(entry)
+            time.sleep(0.5)  # Éviter de dépasser le quota par minute
 
     return results
 
 
 def merge_with_existing(new_entries, existing_path):
-    """Fusionne avec un cwv.json existant : les nouvelles entrées remplacent les anciennes par URL."""
+    """Fusionne avec un cwv.json existant.
+
+    Les nouvelles entrées remplacent les anciennes par couple (URL, stratégie),
+    afin de conserver côte à côte mobile ET desktop pour une même page (un
+    passage desktop n'écrase plus le mobile). Les entrées historiques sans champ
+    `strategy` sont considérées comme mobile (ancien défaut).
+    """
     if not existing_path.exists():
         return new_entries
 
@@ -214,10 +227,13 @@ def merge_with_existing(new_entries, existing_path):
     def norm(u):
         return u.rstrip("/") if u else u
 
-    new_urls = {norm(e["url"]) for e in new_entries if "url" in e}
-    kept = [e for e in existing if norm(e.get("url", "")) not in new_urls]
+    def key(e):
+        return (norm(e.get("url", "")), e.get("strategy", "mobile"))
+
+    new_keys = {key(e) for e in new_entries if "url" in e}
+    kept = [e for e in existing if key(e) not in new_keys]
     merged = kept + new_entries
-    merged.sort(key=lambda e: e.get("page", ""))
+    merged.sort(key=lambda e: (e.get("page", ""), e.get("strategy", "")))
     return merged
 
 
@@ -243,8 +259,8 @@ def fallback_lighthouse(audit_dir, urls):
 def main():
     parser = argparse.ArgumentParser(description="Collecte CWV via PageSpeed Insights API")
     parser.add_argument("audit_dir", help="Dossier audit (contient cwv.json ou parent du .har)")
-    parser.add_argument("--strategy", default="mobile", choices=["mobile", "desktop"],
-                        help="Stratégie PageSpeed (défaut : mobile)")
+    parser.add_argument("--strategy", default="both", choices=["mobile", "desktop", "both"],
+                        help="Stratégie PageSpeed : mobile, desktop ou both (défaut : both)")
     parser.add_argument("--urls", nargs="+", help="URLs explicites (optionnel, sinon lu depuis .har)")
     parser.add_argument("--check", action="store_true", help="Vérifie la clé API sans analyser")
     args = parser.parse_args()
@@ -301,10 +317,11 @@ def main():
             sys.exit(1)
         print(f"[PageSpeed] {len(urls)} page(s) extraites depuis {har.name}")
 
-    print(f"[PageSpeed] Stratégie : {args.strategy} | {len(urls)} URL(s)")
+    strategies = ["mobile", "desktop"] if args.strategy == "both" else [args.strategy]
+    print(f"[PageSpeed] Stratégie(s) : {', '.join(strategies)} | {len(urls)} URL(s)")
     print()
 
-    entries = collect(audit_dir, urls, api_key, strategy=args.strategy)
+    entries = collect(audit_dir, urls, api_key, strategies=strategies)
 
     if not entries:
         print("\n[PageSpeed] Aucune métrique collectée — fallback Lighthouse.")
@@ -319,11 +336,14 @@ def main():
 
     crux_count = sum(1 for e in entries if e.get("source") == "crux")
     lab_count = len(entries) - crux_count
-    print(f"\n[PageSpeed] cwv.json mis à jour : {len(entries)} page(s)")
+    mobile_count = sum(1 for e in entries if e.get("strategy") == "mobile")
+    desktop_count = sum(1 for e in entries if e.get("strategy") == "desktop")
+    print(f"\n[PageSpeed] cwv.json mis à jour : {len(entries)} entrée(s)")
+    print(f"  - {mobile_count} mobile / {desktop_count} desktop")
     if crux_count:
-        print(f"  - {crux_count} page(s) avec données terrain CrUX")
+        print(f"  - {crux_count} entrée(s) avec données terrain CrUX")
     if lab_count:
-        print(f"  - {lab_count} page(s) avec données lab (CrUX absent)")
+        print(f"  - {lab_count} entrée(s) avec données lab (CrUX absent)")
     print(f"  -> {cwv_path}")
 
 

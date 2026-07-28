@@ -97,13 +97,16 @@ Pour des données terrain réelles, utiliser `collect_cwv_pagespeed.py` (voir se
 .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit>
 ```
 
-Par défaut : stratégie `mobile`. Ajouter `--strategy desktop` pour les métriques desktop.
+Par défaut (`--strategy both`) : collecte **mobile ET desktop** en une seule commande, conservés côte à côte dans `cwv.json` (une entrée par couple url/stratégie). Restreindre au besoin avec `--strategy mobile` ou `--strategy desktop`.
 
 ### Résultats dans cwv.json
 
+- `"strategy"` : `"mobile"` ou `"desktop"` (une entrée par appareil, plus d'écrasement entre passages)
 - `"source": "crux"` : données terrain CrUX P75 (réels utilisateurs) - prioritaire
 - `"source": "pagespeed_lab"` : données lab Lighthouse via API (si CrUX absent pour cette URL)
 - `"crux_category"` : `"FAST"` / `"AVERAGE"` / `"SLOW"` (classification globale CrUX)
+
+Le rapport affiche mobile et desktop séparément, avec un badge de source (terrain / lab / lab local).
 
 ### Note méthodologique
 
