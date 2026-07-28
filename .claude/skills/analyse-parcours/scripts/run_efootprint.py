@@ -151,7 +151,6 @@ def build_efootprint_model(env_data, visits, instance_type):
     job_data = env_data.get("job", {})
     server_data = env_data.get("server", {})
     device_data = env_data.get("device_mix", {})
-    network_data = env_data.get("network_mix", {})
 
     # --- Stockage ---
     storage = Storage.from_defaults(
@@ -234,7 +233,7 @@ def build_efootprint_model(env_data, visits, instance_type):
         step_mobile = UsageJourneyStep.from_defaults("Visite page (mobile)", jobs=[page_job])
         journey_mobile = UsageJourney("Parcours visiteur mobile", uj_steps=[step_mobile])
         usage_patterns.append(UsagePattern(
-            f"Visiteurs mobile ({mobile_frac:.0%} — {visits_mobile:,} visites/an)",
+            f"Visiteurs mobile ({mobile_frac:.0%}, {visits_mobile:,} visites/an)",
             journey_mobile,
             [Device.smartphone()],
             Network.mobile_network(),
@@ -245,7 +244,7 @@ def build_efootprint_model(env_data, visits, instance_type):
         step_desktop = UsageJourneyStep.from_defaults("Visite page (desktop)", jobs=[page_job])
         journey_desktop = UsageJourney("Parcours visiteur desktop", uj_steps=[step_desktop])
         usage_patterns.append(UsagePattern(
-            f"Visiteurs desktop ({desktop_frac:.0%} — {visits_desktop:,} visites/an)",
+            f"Visiteurs desktop ({desktop_frac:.0%}, {visits_desktop:,} visites/an)",
             journey_desktop,
             [Device.laptop()],
             Network.wifi_network(),
@@ -256,7 +255,7 @@ def build_efootprint_model(env_data, visits, instance_type):
     from urllib.parse import urlparse
     first_url = env_data.get("pages", [{}])[0].get("url", "") if env_data.get("pages") else ""
     system_name = urlparse(first_url).netloc or "site"
-    return System(f"Estimation CO2e — {system_name} (hypothèse)", usage_patterns, edge_usage_patterns=[])
+    return System(f"Estimation CO2e : {system_name} (hypothèse)", usage_patterns, edge_usage_patterns=[])
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +404,7 @@ def save_results(system, source_dir, env_data, visits, instance_type):
     server = env_data.get("server", {})
     device = env_data.get("device_mix", {})
     network = env_data.get("network_mix", {})
+    audience = env_data.get("audience", {})
 
     results = {
         "generated_at": env_data.get("collected_at"),
@@ -440,8 +440,18 @@ def save_results(system, source_dir, env_data, visits, instance_type):
             "tablet_merged_into_mobile": device.get("tablet_merged_into_mobile", False),
             "ios_share_used": device.get("ios_share_used"),
             "ios_share_source": device.get("ios_share_source"),
+            "macos_share_used": device.get("macos_share_used"),
+            "macos_share_source": device.get("macos_share_source"),
             "device_scenarios": device.get("scenarios"),
             "device_mix_note": device.get("note"),
+            # Mix pays d'audience (pondération iOS/macOS) — pour l'annexe
+            "audience_mix": audience.get("mix"),
+            "audience_source": audience.get("source"),
+            "audience_confidence": audience.get("confidence"),
+            "audience_per_country": audience.get("per_country"),
+            "audience_ios_weighted": audience.get("ios_share_weighted"),
+            "audience_macos_weighted": audience.get("macos_share_weighted"),
+            "audience_note": audience.get("note"),
             # Split du trafic entre patterns mobile/desktop
             "visits_mobile": round(visits * device.get("phone_fraction", 0.6)),
             "visits_desktop": visits - round(visits * device.get("phone_fraction", 0.6)),

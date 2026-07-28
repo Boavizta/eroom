@@ -40,45 +40,208 @@ CONFIDENCE_DEFAULT = "default"  # valeur par défaut de la librairie
 
 
 # ---------------------------------------------------------------------------
-# Correction iOS du mix appareils
+# Correction du mix appareils : iOS (mobile) ET macOS (desktop) absents de CrUX
 # ---------------------------------------------------------------------------
-# CrUX ne mesure QUE Chrome. Sur mobile, les iPhone/iPad (Safari) ne remontent
-# pas, et même Chrome sur iOS (moteur WebKit imposé par Apple) est absent. La
-# part "phone" de CrUX ne reflète donc quasiment que les Android. On "regonfle"
-# le mobile via la part iOS du parc mobile de la région d'audience.
+# CrUX ne mesure QUE Chrome (moteur Blink). Deux angles morts symétriques :
+#   - MOBILE : les iPhone/iPad (Safari), et même Chrome sur iOS (WebKit imposé
+#     par Apple), ne remontent pas. La part "phone" de CrUX ne reflète donc
+#     quasiment que les Android. On regonfle le mobile via la part iOS du parc.
+#   - DESKTOP : les Mac sous Safari ne remontent pas. On regonfle le desktop via
+#     la part macOS du parc desktop, par symétrie avec la correction iOS.
+# Hypothèse assumée (miroir) : on traite iOS et macOS comme intégralement absents
+# de CrUX. C'est une légère sur-correction (Chrome-sur-Mac est en réalité mesuré),
+# cohérente avec l'hypothèse déjà faite côté mobile.
 #
-# Valeurs = part iOS du parc MOBILE, source StatCounter "Mobile Operating System
+# Valeurs = part iOS du parc MOBILE et part macOS du parc DESKTOP, source
+# StatCounter "Mobile Operating System Market Share" et "Desktop Operating System
 # Market Share" (snapshot indicatif : 2025-06, à rafraîchir périodiquement).
+# Large couverture (Europe + Amériques + Asie + Afrique du Nord/Ouest).
 IOS_MOBILE_SHARE = {
-    "FR": 0.35,   # France
-    "DE": 0.35,   # Allemagne
-    "GB": 0.52,   # Royaume-Uni
-    "US": 0.57,   # États-Unis
+    "FR": 0.35, "DE": 0.35, "GB": 0.52, "IE": 0.55, "NL": 0.55, "BE": 0.45,
+    "CH": 0.55, "AT": 0.35, "ES": 0.30, "IT": 0.30, "PT": 0.30, "PL": 0.25,
+    "SE": 0.55, "NO": 0.60, "DK": 0.65, "FI": 0.50, "RU": 0.30,
+    "US": 0.57, "CA": 0.57, "MX": 0.25, "BR": 0.15,
+    "JP": 0.69, "KR": 0.30, "CN": 0.22, "IN": 0.04, "AU": 0.55,
+    "ZA": 0.18, "SN": 0.10, "TN": 0.15, "MA": 0.15,
     "default": 0.30,
 }
+MACOS_DESKTOP_SHARE = {
+    "FR": 0.17, "DE": 0.15, "GB": 0.28, "IE": 0.25, "NL": 0.13, "BE": 0.13,
+    "CH": 0.28, "AT": 0.13, "ES": 0.12, "IT": 0.13, "PT": 0.12, "PL": 0.08,
+    "SE": 0.25, "NO": 0.28, "DK": 0.25, "FI": 0.20, "RU": 0.10,
+    "US": 0.30, "CA": 0.28, "MX": 0.10, "BR": 0.08,
+    "JP": 0.20, "KR": 0.10, "CN": 0.15, "IN": 0.04, "AU": 0.28,
+    "ZA": 0.12, "SN": 0.06, "TN": 0.08, "MA": 0.08,
+    "default": 0.15,
+}
 IOS_SHARE_SOURCE = "StatCounter Mobile OS Market Share (snapshot 2025-06, indicatif)"
+MACOS_SHARE_SOURCE = "StatCounter Desktop OS Market Share (snapshot 2025-06, indicatif)"
 
 # Bornes de la fourchette de scénarios (part iOS du mobile) affichée en annexe.
 IOS_SCENARIO_LOW = 0.25    # conservateur (peu d'iOS -> faible correction)
 IOS_SCENARIO_HIGH = 0.55   # audience très Apple
 
 
-def correct_mobile_fraction(mobile_raw, desktop_raw, ios_share):
-    """Regonfle la part mobile pour compenser les iOS absents de CrUX (Chrome only).
+def correct_device_mix(mobile_raw, desktop_raw, ios_share, macos_share):
+    """Regonfle mobile (iOS absents de CrUX) ET desktop (macOS/Safari absents),
+    puis renormalise à 1.
 
     mobile_raw / desktop_raw : proportions issues de Chrome (tablette déjà
     fusionnée dans mobile_raw, somme = 1).
-    ios_share : part iOS du parc mobile régional (0-1).
+    ios_share   : part iOS du parc mobile (0-1). La part Android = 1 - ios_share
+                  est seule pleinement visible dans CrUX.
+    macos_share : part macOS du parc desktop (0-1). Symétrique : la part non-macOS
+                  (Windows/Linux/ChromeOS) est seule pleinement visible.
     Retourne (mobile_fraction, desktop_fraction) renormalisés (somme = 1).
     """
     android_share = 1.0 - ios_share
-    if android_share <= 0:
-        return round(mobile_raw, 3), round(desktop_raw, 3)
-    mobile_corr = mobile_raw / android_share
-    total = mobile_corr + desktop_raw
+    non_macos_share = 1.0 - macos_share
+    mobile_corr = mobile_raw / android_share if android_share > 0 else mobile_raw
+    desktop_corr = desktop_raw / non_macos_share if non_macos_share > 0 else desktop_raw
+    total = mobile_corr + desktop_corr
     if total <= 0:
         return round(mobile_raw, 3), round(desktop_raw, 3)
-    return round(mobile_corr / total, 3), round(desktop_raw / total, 3)
+    return round(mobile_corr / total, 3), round(desktop_corr / total, 3)
+
+
+# ---------------------------------------------------------------------------
+# Mix pays d'audience -> pondération iOS / macOS
+# ---------------------------------------------------------------------------
+# CrUX ne connaît pas le pays des visiteurs (aucune dimension géo). Le mix pays
+# d'audience sert UNIQUEMENT à pondérer les parts iOS (mobile) et macOS (desktop)
+# de la correction ci-dessus : une audience très "Apple" (US, JP, UK) regonfle
+# plus fortement mobile+desktop qu'une audience Android-dominante (IN, BR, SN).
+#
+# Provenance possible du mix (ordre de priorité, résolu dans main()) :
+#   1. --audience saisi (analytics client GA/Matomo, le plus fiable) ;
+#   2. audience_mix écrit par l'AGENT dans env-data.json (estimation SimilarWeb,
+#      via WebFetch — le script ne scrape jamais) ;
+#   3. défaut France (100 % FR) + avertissement console.
+
+def parse_audience_spec(spec):
+    """Parse la valeur de --audience. Formats acceptés :
+      - liste pondérée : 'FR:0.7,US:0.3'  -> {'FR': 0.7, 'US': 0.3}
+      - raccourci pays unique : 'FR'      -> {'FR': 1.0}
+    Les poids sont renormalisés pour sommer à 1.
+    Retourne (mix_dict, error_msg) ; mix_dict est None en cas d'erreur."""
+    spec = (spec or "").strip()
+    if not spec:
+        return None, "valeur vide"
+
+    # Raccourci pays unique (ni ':' ni ',')
+    if ":" not in spec and "," not in spec:
+        cc = spec.upper()
+        if not cc.isalpha() or len(cc) != 2:
+            return None, f"code pays invalide : '{spec}' (attendu ISO-2, ex. FR)"
+        return {cc: 1.0}, None
+
+    mix = {}
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" not in part:
+            return None, f"segment invalide : '{part}' (attendu PAYS:poids, ex. FR:0.7)"
+        cc, w = part.split(":", 1)
+        cc = cc.strip().upper()
+        if not cc.isalpha() or len(cc) != 2:
+            return None, f"code pays invalide : '{cc}' (attendu ISO-2)"
+        try:
+            w = float(w.strip())
+        except ValueError:
+            return None, f"poids invalide pour {cc} : '{w.strip()}'"
+        if w < 0:
+            return None, f"poids négatif pour {cc}"
+        mix[cc] = mix.get(cc, 0.0) + w
+
+    total = sum(mix.values())
+    if total <= 0:
+        return None, "somme des poids nulle"
+    return {cc: round(w / total, 4) for cc, w in mix.items()}, None
+
+
+def weighted_os_shares(audience_mix):
+    """Pondère part iOS (mobile) ET part macOS (desktop) par le mix pays.
+
+    audience_mix : {country_code: weight} (somme ≈ 1).
+    Retourne (ios_share, macos_share, per_country_detail) où per_country_detail
+    liste, par pays, le poids et les parts iOS/macOS utilisées (pour l'annexe).
+    Un pays absent des tables retombe sur la valeur 'default'."""
+    ios = 0.0
+    macos = 0.0
+    detail = []
+    for cc, w in audience_mix.items():
+        cc = cc.upper()
+        i = IOS_MOBILE_SHARE.get(cc, IOS_MOBILE_SHARE["default"])
+        mth = MACOS_DESKTOP_SHARE.get(cc, MACOS_DESKTOP_SHARE["default"])
+        known = cc in IOS_MOBILE_SHARE
+        ios += w * i
+        macos += w * mth
+        detail.append({
+            "country": cc,
+            "weight": round(w, 4),
+            "ios_share": i,
+            "macos_share": mth,
+            "in_table": known,
+        })
+    return round(ios, 3), round(macos, 3), detail
+
+
+def resolve_audience(cli_audience, existing_audience, ios_override=None):
+    """Résout le mix pays d'audience selon l'ordre de priorité et calcule les
+    parts iOS/macOS pondérées.
+
+    cli_audience     : valeur brute de --audience (ou None).
+    existing_audience: bloc 'audience' déjà présent dans env-data.json, écrit par
+                       l'agent (SimilarWeb) ou un run précédent (ou None).
+    ios_override     : valeur de --ios-mobile-share (écrase la part iOS calculée).
+
+    Retourne un dict 'audience' prêt à stocker dans env-data.json :
+        {mix, source, ios_share, macos_share, ios_share_source,
+         macos_share_source, per_country, confidence, warning?}
+    """
+    warning = None
+
+    if cli_audience:
+        mix, err = parse_audience_spec(cli_audience)
+        if err:
+            return {"error": f"--audience : {err}"}
+        source = "saisie manuelle"
+        confidence = CONFIDENCE_MEDIUM
+    elif existing_audience and existing_audience.get("mix") \
+            and existing_audience.get("source") not in (None, "default"):
+        mix = {k.upper(): float(v) for k, v in existing_audience["mix"].items()}
+        total = sum(mix.values()) or 1.0
+        mix = {k: round(v / total, 4) for k, v in mix.items()}
+        source = existing_audience.get("source", "SimilarWeb (estimation)")
+        confidence = existing_audience.get("confidence", CONFIDENCE_MEDIUM)
+    else:
+        mix = {"FR": 1.0}
+        source = "default"
+        confidence = CONFIDENCE_DEFAULT
+        warning = ("Aucun mix pays d'audience fourni : France (100 %) par défaut. "
+                   "Fournir --audience \"FR:0.7,US:0.3\" (analytics client) ou laisser "
+                   "l'agent écrire un mix SimilarWeb dans env-data.json.")
+
+    ios_share, macos_share, per_country = weighted_os_shares(mix)
+    ios_share_source = f"pondéré par mix pays ({source}), d'après {IOS_SHARE_SOURCE}"
+    macos_share_source = f"pondéré par mix pays ({source}), d'après {MACOS_SHARE_SOURCE}"
+
+    if ios_override is not None:
+        ios_share = round(ios_override, 3)
+        ios_share_source = f"saisie manuelle (--ios-mobile-share {ios_override})"
+
+    return {
+        "mix": mix,
+        "source": source,
+        "ios_share": ios_share,
+        "macos_share": macos_share,
+        "ios_share_source": ios_share_source,
+        "macos_share_source": macos_share_source,
+        "per_country": per_country,
+        "confidence": confidence,
+        "warning": warning,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -443,28 +606,29 @@ def collect_server_info(ip, token=None):
 # Construction env-data.json
 # ---------------------------------------------------------------------------
 
-def build_env_data(har_data, device_mix, server_info, ios_share=None, ios_share_source=None):
+def build_env_data(har_data, device_mix, server_info, audience=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
 
-    ios_share : part iOS du parc mobile (0-1) pour la correction du mix appareils.
-    Si None, le défaut régional (France) de IOS_MOBILE_SHARE est utilisé.
-    ios_share_source : libellé de provenance de ios_share (pour l'annexe).
+    audience : dict résolu par resolve_audience() portant le mix pays d'audience
+    et les parts iOS/macOS pondérées servant à corriger le mix appareils. Si None,
+    on retombe sur France (100 %) via resolve_audience(None, None).
     """
     pages, _ = har_data if isinstance(har_data, tuple) else (har_data, None)
     har_metrics = aggregate_page_metrics(pages)
 
+    if audience is None:
+        audience = resolve_audience(None, None)
+    ios_share = audience["ios_share"]
+    macos_share = audience["macos_share"]
+    ios_share_source = audience["ios_share_source"]
+    macos_share_source = audience["macos_share_source"]
+
     # --- Device mix ---
     # Décision projet : la tablette est rattachée au mobile (logique tactile /
     # portable). Le corps du rapport n'affiche que desktop/mobile ; le détail
-    # (fractions brutes phone/tablet, correction iOS, fourchette) va en annexe.
-    if ios_share is None:
-        ios_share = IOS_MOBILE_SHARE["FR"]
-        ios_share_source = f"{IOS_SHARE_SOURCE} — France (défaut régional)"
-    elif ios_share_source is None:
-        ios_share_source = IOS_SHARE_SOURCE
-
+    # (fractions brutes phone/tablet, corrections iOS+macOS, fourchette) va en annexe.
     if device_mix:
         phone_raw = device_mix["phone"]
         desktop_raw = device_mix["desktop"]
@@ -473,36 +637,41 @@ def build_env_data(har_data, device_mix, server_info, ios_share=None, ios_share_
         mobile_raw = round(phone_raw + tablet_raw, 3)
         crux_source = device_mix["source"]
 
-        mobile_central, desktop_central = correct_mobile_fraction(mobile_raw, desktop_raw, ios_share)
-        mobile_low, desktop_low = correct_mobile_fraction(mobile_raw, desktop_raw, IOS_SCENARIO_LOW)
-        mobile_high, desktop_high = correct_mobile_fraction(mobile_raw, desktop_raw, IOS_SCENARIO_HIGH)
+        # Correction symétrique : iOS (mobile) ET macOS (desktop). La fourchette
+        # fait varier la part iOS (sensibilité principale) à part macOS constante.
+        mobile_central, desktop_central = correct_device_mix(mobile_raw, desktop_raw, ios_share, macos_share)
+        mobile_low, desktop_low = correct_device_mix(mobile_raw, desktop_raw, IOS_SCENARIO_LOW, macos_share)
+        mobile_high, desktop_high = correct_device_mix(mobile_raw, desktop_raw, IOS_SCENARIO_HIGH, macos_share)
 
         device_section = {
-            # Valeurs retenues pour le calcul (mobile = phone+tablet, corrigé iOS)
+            # Valeurs retenues pour le calcul (mobile = phone+tablet, corrigé iOS+macOS)
             "phone_fraction": mobile_central,
             "desktop_fraction": desktop_central,
             "tablet_fraction": 0.0,
             "tablet_merged_into_mobile": True,
             "source": crux_source,
-            "confidence": CONFIDENCE_MEDIUM,  # corrigé (estimation iOS) => medium
-            # Brut CrUX (Chrome only, avant fusion tablette et correction iOS)
+            "confidence": CONFIDENCE_MEDIUM,  # corrigé (estimations iOS/macOS) => medium
+            # Brut CrUX (Chrome only, avant fusion tablette et corrections)
             "phone_fraction_raw": phone_raw,
             "desktop_fraction_raw": desktop_raw,
             "tablet_fraction_raw": tablet_raw,
             "mobile_fraction_raw": mobile_raw,
-            # Correction iOS
+            # Corrections iOS (mobile) + macOS (desktop)
             "ios_share_used": round(ios_share, 3),
             "ios_share_source": ios_share_source,
+            "macos_share_used": round(macos_share, 3),
+            "macos_share_source": macos_share_source,
             "mobile_fraction_corrected": mobile_central,
             "desktop_fraction_corrected": desktop_central,
-            # Fourchette pour l'annexe
+            # Fourchette pour l'annexe (part iOS variable, part macOS constante)
             "scenarios": {
                 "conservateur": {"ios_share": IOS_SCENARIO_LOW, "mobile": mobile_low, "desktop": desktop_low},
                 "central": {"ios_share": round(ios_share, 3), "mobile": mobile_central, "desktop": desktop_central},
                 "apple_heavy": {"ios_share": IOS_SCENARIO_HIGH, "mobile": mobile_high, "desktop": desktop_high},
             },
-            "note": "CrUX = Chrome uniquement (iOS/Safari non mesurés). Mobile regonflé "
-                    "via part iOS régionale ; tablette rattachée au mobile.",
+            "note": "CrUX = Chrome uniquement (iOS/Safari non mesurés). Mobile regonflé via "
+                    "part iOS, desktop via part macOS (pondérées par le mix pays d'audience) ; "
+                    "tablette rattachée au mobile.",
         }
         # Réseau basé sur le mobile corrigé (phones+tablet = mobile ; desktop = wifi)
         network_mix = {
@@ -519,7 +688,7 @@ def build_env_data(har_data, device_mix, server_info, ios_share=None, ios_share_
             "source": "default",
             "confidence": CONFIDENCE_DEFAULT,
             "note": "CrUX indisponible - valeurs par défaut (60% mobile, 40% desktop). "
-                    "Pas de correction iOS appliquée (aucune donnée à corriger).",
+                    "Pas de correction iOS/macOS appliquée (aucune donnée à corriger).",
         }
         network_mix = {"wifi": 0.4, "mobile": 0.6, "source": "default"}
 
@@ -568,13 +737,29 @@ def build_env_data(har_data, device_mix, server_info, ios_share=None, ios_share_
         "note": "HAR indisponible - valeurs par défaut",
     }
 
+    # --- Audience (mix pays -> pondération iOS/macOS) ---
+    audience_section = {
+        "mix": audience["mix"],
+        "source": audience["source"],
+        "confidence": audience["confidence"],
+        "ios_share_weighted": audience["ios_share"],
+        "macos_share_weighted": audience["macos_share"],
+        "per_country": audience["per_country"],
+        "ios_share_source": IOS_SHARE_SOURCE,
+        "macos_share_source": MACOS_SHARE_SOURCE,
+        "note": "Mix pays d'audience utilisé UNIQUEMENT pour pondérer les parts iOS "
+                "(mobile) et macOS (desktop) de la correction CrUX. CrUX n'a pas de "
+                "dimension géographique ; ce mix ne modifie pas les CWV.",
+    }
+
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
         "network_mix": network_section,
         "server": server_section,
+        "audience": audience_section,
         "job": job_section,
     }
 
@@ -590,20 +775,25 @@ def main():
                         help="Recollecte même si env-data.json existe déjà")
     parser.add_argument("--check", action="store_true",
                         help="Vérifie les clés API sans analyser")
+    parser.add_argument("--audience", default=None,
+                        help="Mix pays d'audience pour pondérer les parts iOS/macOS de la "
+                             "correction CrUX. Formats : liste pondérée 'FR:0.7,US:0.3' ou "
+                             "raccourci pays unique 'FR'. Prioritaire sur le mix SimilarWeb "
+                             "écrit par l'agent dans env-data.json. Défaut : France (100 %%).")
     parser.add_argument("--ios-mobile-share", type=float, default=None,
-                        help="Part iOS du parc mobile (0-1) pour corriger le mix appareils "
-                             "(CrUX = Chrome only). Défaut : valeur régionale France.")
+                        help="Force la part iOS du parc mobile (0-1), écrase la valeur "
+                             "pondérée par --audience. Usage avancé/debug.")
     args = parser.parse_args()
 
-    if args.ios_mobile_share is None:
-        ios_share = IOS_MOBILE_SHARE["FR"]  # défaut régional : France (contexte projet)
-        ios_share_source = f"{IOS_SHARE_SOURCE} — France (défaut régional)"
-    elif not 0.0 <= args.ios_mobile_share < 1.0:
+    # Validation précoce du format --audience (fail fast avant toute collecte réseau)
+    if args.audience is not None:
+        _mix, _err = parse_audience_spec(args.audience)
+        if _err:
+            print(f"Erreur : --audience : {_err}")
+            sys.exit(1)
+    if args.ios_mobile_share is not None and not 0.0 <= args.ios_mobile_share < 1.0:
         print(f"Erreur : --ios-mobile-share doit être dans [0, 1[ (reçu : {args.ios_mobile_share})")
         sys.exit(1)
-    else:
-        ios_share = args.ios_mobile_share
-        ios_share_source = f"saisie manuelle (--ios-mobile-share {ios_share})"
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
@@ -710,9 +900,30 @@ def main():
     else:
         print("  Aucune IP serveur détectée dans le HAR")
 
+    # --- Résolution du mix pays d'audience (points 4a/4b) ---
+    # Ordre : --audience > audience_mix déjà écrit par l'agent (SimilarWeb) > défaut FR.
+    # Sur --refresh on préserve le bloc audience de l'agent s'il existe déjà.
+    print("\n[audience] Résolution du mix pays (pondération iOS/macOS)...")
+    existing_audience = None
+    if env_data_path.exists():
+        try:
+            with open(env_data_path, encoding="utf-8") as f:
+                existing_audience = json.load(f).get("audience")
+        except (json.JSONDecodeError, OSError):
+            existing_audience = None
+    audience = resolve_audience(args.audience, existing_audience, ios_override=args.ios_mobile_share)
+    if audience.get("error"):
+        print(f"  Erreur : {audience['error']}")
+        sys.exit(1)
+    if audience.get("warning"):
+        print(f"  ⚠ {audience['warning']}")
+    mix_str = ", ".join(f"{cc} {w:.0%}" for cc, w in audience["mix"].items())
+    print(f"  Mix pays : {mix_str}  (source : {audience['source']})")
+    print(f"  -> part iOS pondérée {audience['ios_share']:.0%}, "
+          f"macOS pondérée {audience['macos_share']:.0%}")
+
     # --- Assemblage env-data.json ---
-    env_data = build_env_data((pages, server_ip), device_mix, server_info,
-                              ios_share=ios_share, ios_share_source=ios_share_source)
+    env_data = build_env_data((pages, server_ip), device_mix, server_info, audience=audience)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)
@@ -739,6 +950,7 @@ def main():
     if device.get("mobile_fraction_raw") is not None:
         print(f"    (brut CrUX mobile={device.get('mobile_fraction_raw', 0):.0%}, "
               f"corrigé iOS {device.get('ios_share_used', 0):.0%} "
+              f"+ macOS {device.get('macos_share_used', 0):.0%} "
               f"-> mobile={device.get('mobile_fraction_corrected', 0):.0%})")
 
 

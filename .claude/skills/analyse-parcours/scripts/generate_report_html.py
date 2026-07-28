@@ -58,6 +58,29 @@ sys.path.insert(0, str(Path(__file__).parent))
 from har_metrics import extract_page_metrics, load_cwv
 
 
+# ── Noms de pays (affichage) ────────────────────────────────────────────────
+# Correspondance code ISO-2 -> nom français, pour les 30 pays des tables
+# iOS/macOS de collect_env_data.py. Purement cosmétique (le calcul utilise les
+# codes). Un pays absent retombe sur son code brut.
+_COUNTRY_NAMES = {
+    "FR": "France", "DE": "Allemagne", "GB": "Royaume-Uni", "IE": "Irlande",
+    "NL": "Pays-Bas", "BE": "Belgique", "CH": "Suisse", "AT": "Autriche",
+    "ES": "Espagne", "IT": "Italie", "PT": "Portugal", "PL": "Pologne",
+    "SE": "Suède", "NO": "Norvège", "DK": "Danemark", "FI": "Finlande",
+    "RU": "Russie", "US": "États-Unis", "CA": "Canada", "MX": "Mexique",
+    "BR": "Brésil", "JP": "Japon", "KR": "Corée du Sud", "CN": "Chine",
+    "IN": "Inde", "AU": "Australie", "ZA": "Afrique du Sud", "SN": "Sénégal",
+    "TN": "Tunisie", "MA": "Maroc",
+}
+
+
+def _country_label(code):
+    """'BR' -> 'Brésil (BR)'. Code inconnu -> le code seul."""
+    cc = (code or "").upper()
+    name = _COUNTRY_NAMES.get(cc)
+    return f"{name} ({cc})" if name else (cc or "?")
+
+
 # ── Parsing HAR ───────────────────────────────────────────────────────────────
 
 def _classify_type(mime, url):
@@ -410,22 +433,47 @@ def _cwv_for_page(m, cwv):
     return cwv.get(url) or cwv.get(m["page_id"], {})
 
 
-# Ordre de préférence quand une seule valeur est requise (dashboard, reco) :
-# le mobile prime (trafic dominant + conditions les plus contraignantes).
-_CWV_STRATEGY_PREF = ("mobile", "desktop")
+def _cwv_device_marker(strat):
+    """Pictogramme d'appareil pour annoter d'où provient une valeur retenue."""
+    return "📱" if strat == "mobile" else "🖥"
 
 
-def _cwv_pick(by_strategy, prefer=_CWV_STRATEGY_PREF):
-    """Depuis un dict {strategy: row}, retourne (row, strategy) selon la préférence.
-    Retourne (None, None) si vide."""
+def _cwv_worst_per_metric(by_strategy):
+    """Compose un row synthétique en prenant, pour CHAQUE métrique (lcp/inp/cls),
+    la valeur la PIRE parmi les stratégies disponibles (mobile / desktop).
+
+    Pour les trois CWV, "pire" = valeur la plus élevée (LCP/INP/CLS : plus haut =
+    plus mauvais). À valeur égale, le mobile est préféré (trafic dominant + conditions
+    les plus contraignantes).
+
+    Retourne (row, strat_by_metric) où :
+      - row = {"lcp": .., "inp": .., "cls": ..} (clés présentes seulement si mesurées) ;
+      - strat_by_metric = {"lcp": "mobile"|"desktop", ...} indiquant l'appareil retenu
+        pour chaque métrique.
+    Retourne (None, {}) si aucune donnée exploitable."""
     if not by_strategy:
-        return None, None
-    for s in prefer:
-        if by_strategy.get(s):
-            return by_strategy[s], s
-    # fallback : première stratégie disponible
-    s = next(iter(by_strategy))
-    return by_strategy[s], s
+        return None, {}
+    row = {}
+    strat_by_metric = {}
+    for metric in ("lcp", "inp", "cls"):
+        best_strat = None
+        best_val = None
+        for strat in ("mobile", "desktop"):  # mobile d'abord => gagne à égalité
+            r = by_strategy.get(strat)
+            if not r:
+                continue
+            v = r.get(metric)
+            if not isinstance(v, (int, float)):
+                continue
+            if best_val is None or v > best_val:
+                best_val = v
+                best_strat = strat
+        if best_strat is not None:
+            row[metric] = best_val
+            strat_by_metric[metric] = best_strat
+    if not row:
+        return None, {}
+    return row, strat_by_metric
 
 
 # Libellés lisibles des sources CWV (distingue terrain / lab API / lab local).
@@ -455,9 +503,10 @@ def _section_dashboard(page_metrics, cwv):
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
         page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
-        cwv_data, _ = _cwv_pick(_cwv_for_page(m, cwv))
+        # Dashboard = "pire des deux" par métrique (mobile ou desktop, le plus mauvais).
+        cwv_data, worst_strat = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
 
-        def _cwv_cell(val, unit, thresholds):
+        def _cwv_cell(val, unit, thresholds, strat=None):
             # thresholds = (good_max, needs_improvement_max)
             # couleurs officielles Google CWV
             if not isinstance(val, (int, float)):
@@ -468,15 +517,20 @@ def _section_dashboard(page_metrics, cwv):
                 color = "#ffa400"
             else:
                 color = "#ff4e42"
-            return f'<td style="text-align:right;color:{color};font-weight:bold">{val} {unit}</td>'
+            # Pictogramme indiquant l'appareil dont vient la valeur retenue (pire des deux)
+            marker = (f'<span style="color:#999;font-size:12px;margin-right:3px" '
+                      f'title="valeur la plus défavorable : {strat}">{_cwv_device_marker(strat)}</span>'
+                      if strat else "")
+            return (f'<td style="text-align:right;color:{color};font-weight:bold">'
+                    f'{marker}{val} {unit}</td>')
 
         if cwv_data:
             lcp_val = cwv_data.get("lcp")
             inp_val = cwv_data.get("inp")
             cls_num = cwv_data.get("cls")
-            lcp_cell = _cwv_cell(lcp_val, "s", (1.8, 2.5))
-            inp_cell = _cwv_cell(inp_val, "ms", (200, 500))
-            cls_cell = _cwv_cell(cls_num, "", (0.1, 0.25))
+            lcp_cell = _cwv_cell(lcp_val, "s", (1.8, 2.5), worst_strat.get("lcp"))
+            inp_cell = _cwv_cell(inp_val, "ms", (200, 500), worst_strat.get("inp"))
+            cls_cell = _cwv_cell(cls_num, "", (0.1, 0.25), worst_strat.get("cls"))
         else:
             lcp_cell = f'<td style="text-align:right;color:#aaa">{m["on_load_ms"]} ms *</td>'
             inp_cell = '<td style="text-align:right;color:#aaa">—</td>'
@@ -491,11 +545,12 @@ def _section_dashboard(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    cwv_legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
+    cwv_legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
     <span style="font-weight:bold;color:#555">Légende CWV :</span>
     <span style="color:#0cce6b">● Bon</span>
     <span style="color:#ffa400">● A améliorer</span>
     <span style="color:#ff4e42">● Mauvais</span>
+    <span style="color:#999">📱/🖥 appareil de la valeur la plus défavorable (pire des deux par métrique)</span>
     <span style="color:#aaa;font-style:italic">— Données terrain non disponibles (fournir cwv.json)</span>
   </div>"""
     cwv_note = "" if cwv else '<p style="font-size:15px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP et CLS nécessitent des données terrain (API PageSpeed ou cwv.json).</p>'
@@ -844,12 +899,12 @@ def _section_cwv_analyse(page_metrics, cwv):
     <span style="color:#0cce6b">● Bon</span>
     <span style="color:#ffa400">● A améliorer</span>
     <span style="color:#ff4e42">● Mauvais</span>
-    <span style="color:#aaa">— Non mesuré</span>
+    <span style="color:#aaa">○ Non mesuré</span>
   </div>"""
 
     def _metric_row(label, val, unit, thresholds, key_bad, key_warn):
         if not isinstance(val, (int, float)):
-            return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:#aaa">— Non mesuré</span></div>'
+            return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:#aaa">Non mesuré</span></div>'
         if val > thresholds[1]:
             color = "#ff4e42"
             status = "mauvais"
@@ -887,7 +942,7 @@ def _section_cwv_analyse(page_metrics, cwv):
         if strats:
             devices_html = "".join(_device_metrics(s, by_strat[s]) for s in strats)
         else:
-            devices_html = '<div style="margin-top:8px;color:#aaa;font-size:17px">— Non mesuré</div>'
+            devices_html = '<div style="margin-top:8px;color:#aaa;font-size:17px">Non mesuré</div>'
 
         blocks += f"""<div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 18px;margin-bottom:14px">
     <div style="font-size:17px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
@@ -1682,8 +1737,25 @@ def _section_efootprint(results):
         ("Intensité carbone électricité",   f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
         ("Provider hébergeur",              hyp.get("provider", "?"),                    hyp.get("confidence_provider")),
         ("Instance type",                   hyp.get("instance_type", "?"),               "paramètre"),
-        ("Mix device (phone / desktop)",    f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
-        ("Mix réseau (wifi / mobile)",      f'{hyp.get("wifi_fraction", 0):.0%} / {hyp.get("mobile_fraction", 0):.0%}', hyp.get("confidence_network_mix")),
+        ("Mix device (mobile / desktop)",   f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
+    ]
+    audience_mix = hyp.get("audience_mix")
+    if audience_mix:
+        _asrc = hyp.get("audience_source", "default")
+        if _asrc == "default":
+            _asrc_short = "default"
+        elif isinstance(_asrc, str) and "similarweb" in _asrc.lower():
+            _asrc_short = "SimilarWeb (estimé)"
+        elif isinstance(_asrc, str) and _asrc.startswith("saisie"):
+            _asrc_short = "saisie manuelle"
+        else:
+            _asrc_short = "estimé"
+        hyp_rows.append(
+            ("Mix pays d'audience (→ iOS/macOS)",
+             ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items()),
+             _asrc_short))
+    hyp_rows += [
+        ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
         ("Trafic annuel estimé",            f'{visits:,} visites',                       "paramètre"),
         ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default"),
     ]
@@ -1804,6 +1876,11 @@ def _methodo_efootprint(efootprint_results):
         ("Type d'instance", hyp.get("instance_type", "?"), "paramètre"),
         ("Trafic annuel", f'{visits:,} visites', "hypothèse saisie (--visits)"),
     ]
+    # Mix pays d'audience (sert à pondérer iOS/macOS)
+    audience_mix = hyp.get("audience_mix")
+    if audience_mix:
+        mix_str = ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items())
+        rows.append(("Mix pays d'audience", mix_str, hyp.get("audience_source", "default")))
     # Mix appareils : brut CrUX (si dispo) + retenu corrigé
     mob_raw = hyp.get("mobile_fraction_raw")
     if mob_raw is not None:
@@ -1811,9 +1888,12 @@ def _methodo_efootprint(efootprint_results):
                      f'{pct(mob_raw)} / {pct(hyp.get("desktop_fraction_raw"))} '
                      f'(dont phone {pct(hyp.get("phone_fraction_raw"))}, tablette {pct(hyp.get("tablet_fraction_raw"))})',
                      hyp.get("device_mix_source", "crux")))
-        rows.append(("Part iOS retenue (correction)",
+        rows.append(("Part iOS retenue (correction mobile)",
                      pct(hyp.get("ios_share_used")),
                      hyp.get("ios_share_source", "?")))
+        rows.append(("Part macOS retenue (correction desktop)",
+                     pct(hyp.get("macos_share_used")),
+                     hyp.get("macos_share_source", "?")))
     rows.append(("Mix appareils retenu (mobile / desktop)",
                  f'{pct(hyp.get("phone_fraction"))} / {pct(hyp.get("desktop_fraction"))}',
                  hyp.get("confidence_device_mix", "default")))
@@ -1821,9 +1901,9 @@ def _methodo_efootprint(efootprint_results):
                  f'{hyp.get("visits_mobile", "?"):,} / {hyp.get("visits_desktop", "?"):,} visites'
                  if isinstance(hyp.get("visits_mobile"), int) else "?",
                  "dérivé du mix"))
-    rows.append(("Réseau (mobile / wifi)",
-                 f'{pct(hyp.get("mobile_fraction"))} mobile / {pct(hyp.get("wifi_fraction"))} wifi',
-                 hyp.get("confidence_network_mix", "default")))
+    rows.append(("Réseau (déduit du mix appareils)",
+                 "mobile → réseau mobile ; desktop → wifi",
+                 "déduit du mix appareils"))
     rows.append(("Stockage serveur", f'{hyp.get("storage_gb", 50)} GB', "default"))
     rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default"))
 
@@ -1848,15 +1928,64 @@ def _methodo_efootprint(efootprint_results):
             f'<th style="padding:6px 8px;text-align:left">Mix résultant</th>'
             f'</tr></thead><tbody>{sc_rows}</tbody></table>')
 
+    # --- Détail du mix pays d'audience (pondération iOS/macOS) ---
+    audience_html = ""
+    per_country = hyp.get("audience_per_country")
+    if per_country:
+        ac_rows = ""
+        for d in per_country:
+            flag_note = "" if d.get("in_table") else ' <span style="color:#999;font-size:13px">(valeur monde par défaut)</span>'
+            ac_rows += (f'<tr><td style="padding:5px 8px">{_country_label(d.get("country"))}{flag_note}</td>'
+                        f'<td style="padding:5px 8px">{pct(d.get("weight"))}</td>'
+                        f'<td style="padding:5px 8px">{pct(d.get("ios_share"))}</td>'
+                        f'<td style="padding:5px 8px">{pct(d.get("macos_share"))}</td></tr>')
+        ios_w = hyp.get("audience_ios_weighted")
+        mac_w = hyp.get("audience_macos_weighted")
+        ac_foot = (f'<tr style="background:{OCTO_PALE};font-weight:bold">'
+                   f'<td style="padding:5px 8px">Pondéré (retenu)</td>'
+                   f'<td style="padding:5px 8px">100 %</td>'
+                   f'<td style="padding:5px 8px">{pct(ios_w)}</td>'
+                   f'<td style="padding:5px 8px">{pct(mac_w)}</td></tr>')
+        src = hyp.get("audience_source", "default")
+        caveat = ""
+        if isinstance(src, str) and "similarweb" in src.lower():
+            caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
+                      'Mix pays estimé via SimilarWeb (page publique, source non officielle, '
+                      'usage limite CGU, potentiellement indisponible) : ordre de grandeur, '
+                      'à confirmer avec l\'analytics du site (GA/Matomo) via <code>--audience</code>.</p>')
+        elif src == "default":
+            caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
+                      'Aucun mix pays fourni : France (100 %) par défaut. Fournir '
+                      '<code>--audience "FR:0.7,US:0.3"</code> ou laisser l\'agent estimer via SimilarWeb.</p>')
+        audience_html = (
+            f'<h4 style="margin:14px 0 4px">Mix pays d\'audience (pondération iOS / macOS)</h4>'
+            f'<p style="font-size:15px;color:#666;margin:0 0 4px">Source : {src}. '
+            f'Ce mix ne sert QU\'À pondérer les parts iOS/macOS de la correction CrUX '
+            f'(CrUX n\'a pas de dimension pays) ; il ne modifie pas les Core Web Vitals.</p>'
+            f'<table style="width:100%;border-collapse:collapse">'
+            f'<thead><tr style="background:{OCTO_PALE}">'
+            f'<th style="padding:6px 8px;text-align:left">Pays</th>'
+            f'<th style="padding:6px 8px;text-align:left">Poids audience</th>'
+            f'<th style="padding:6px 8px;text-align:left">Part iOS (mobile)</th>'
+            f'<th style="padding:6px 8px;text-align:left">Part macOS (desktop)</th>'
+            f'</tr></thead><tbody>{ac_rows}{ac_foot}</tbody></table>{caveat}')
+
     # --- Méthodes / formules ---
     methods = (
         '<h4 style="margin:14px 0 4px">Méthodes appliquées</h4>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
-        '<li><b>Correction iOS.</b> CrUX ne mesure que Chrome : les iPhone/iPad (Safari), '
-        'et même Chrome sur iOS, sont absents. La part mobile brute est regonflée par '
-        '<code>mobile_corrigé = mobile_brut / (1 − part_iOS)</code>, puis renormalisée avec le desktop. '
-        'La part iOS provient d\'une valeur régionale StatCounter (paramétrable). '
-        'Le desktop reste légèrement sous-estimé (Mac/Safari non mesurés) : approximation assumée.</li>'
+        '<li><b>Correction CrUX symétrique (iOS + macOS).</b> CrUX ne mesure que Chrome : '
+        'côté mobile les iPhone/iPad (Safari, et même Chrome sur iOS) sont absents ; côté '
+        'desktop les Mac sous Safari le sont aussi. On regonfle les <b>deux</b> côtés par '
+        '<code>mobile_corrigé = mobile_brut / (1 − part_iOS)</code> et '
+        '<code>desktop_corrigé = desktop_brut / (1 − part_macOS)</code>, puis on renormalise '
+        'l\'ensemble à 100 %. Corriger aussi le desktop supprime le biais "pro-mobile" de '
+        'l\'ancienne correction unilatérale.</li>'
+        '<li><b>Pondération par mix pays d\'audience.</b> Les parts iOS et macOS dépendent '
+        'du pays. Elles sont donc pondérées par le mix pays d\'audience (voir tableau ci-dessus). '
+        'Ordre de résolution du mix : <code>--audience</code> saisi (analytics client) &gt; '
+        'estimation SimilarWeb écrite par l\'agent &gt; France (100 %) par défaut. CrUX n\'ayant '
+        'aucune dimension géographique, ce mix ne sert QU\'À cette pondération, jamais aux CWV.</li>'
         '<li><b>Rattachement tablette.</b> La tablette est comptée avec le mobile '
         '(logique tactile/portable). Le corps du rapport n\'affiche que mobile/desktop ; '
         'le détail figure ci-dessus.</li>'
@@ -1869,8 +1998,8 @@ def _methodo_efootprint(efootprint_results):
         '</ul>'
     )
 
-    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A — Impact environnemental (CO2e)</h3>'
-            f'{table}{scenarios_html}{methods}')
+    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental (CO2e)</h3>'
+            f'{table}{audience_html}{scenarios_html}{methods}')
 
 
 def _methodo_cwv(cwv):
@@ -1881,11 +2010,11 @@ def _methodo_cwv(cwv):
                for by_strat in cwv.values() if isinstance(by_strat, dict)
                for row in by_strat.values() if row}
     src_items = "".join(
-        f'<li><b>{_CWV_SOURCE_LABELS[s][0]}</b> — {_CWV_SOURCE_LABELS[s][2]}</li>'
+        f'<li><b>{_CWV_SOURCE_LABELS[s][0]}</b> : {_CWV_SOURCE_LABELS[s][2]}</li>'
         for s in ("crux", "pagespeed_lab", "lighthouse") if s in sources
     ) or '<li>Source non renseignée</li>'
     return (
-        '<h3 id="methodo-cwv" style="margin-top:20px">B — Core Web Vitals</h3>'
+        '<h3 id="methodo-cwv" style="margin-top:20px">B. Core Web Vitals</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         f'<li><b>Sources présentes :</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
         '<li><b>CrUX = terrain Chrome.</b> Les données "terrain" proviennent du champ '
@@ -1893,9 +2022,14 @@ def _methodo_cwv(cwv):
         'des utilisateurs Chrome réels) : ce n\'est PAS un appel dédié à l\'API CrUX.</li>'
         '<li><b>Limite iOS/Safari.</b> Comme le mix appareils, le terrain CrUX ne couvre '
         'que Chrome ; les utilisateurs iOS/Safari ne sont pas représentés.</li>'
-        '<li><b>Mobile ET desktop.</b> Les deux stratégies PageSpeed sont collectées et '
-        'affichées séparément (LCP < 1,8 s bon / 1,8-2,5 s à améliorer / > 2,5 s mauvais ; '
-        'INP 200/500 ms ; CLS 0,1/0,25).</li>'
+        '<li><b>Mobile ET desktop, "pire des deux" par métrique.</b> Les deux stratégies '
+        'PageSpeed sont collectées. Dans le tableau de bord et les recommandations, chaque '
+        'métrique (LCP, INP, CLS) retient la valeur la <b>plus défavorable</b> entre mobile '
+        'et desktop, indépendamment métrique par métrique (un pictogramme 📱/🖥 signale '
+        'l\'appareil retenu). Un problème desktop remonte donc dans les recos. Le détail '
+        'mobile + desktop côte à côte reste consultable dans la section "Analyse Core Web '
+        'Vitals". Seuils : LCP &lt; 1,8 s bon / 1,8-2,5 s à améliorer / &gt; 2,5 s mauvais ; '
+        'INP 200/500 ms ; CLS 0,1/0,25.</li>'
         '<li><b>Lab (simulation).</b> Les sources "lab" (PageSpeed lab ou Lighthouse local) '
         'sont des simulations à réseau/CPU bridés, généralement plus pessimistes que le terrain.</li>'
         '</ul>'
@@ -1905,7 +2039,7 @@ def _methodo_cwv(cwv):
 def _methodo_ecoindex():
     """Sous-section C : formule EcoIndex."""
     return (
-        '<h3 id="methodo-ecoindex" style="margin-top:20px">C — EcoIndex / GreenIT</h3>'
+        '<h3 id="methodo-ecoindex" style="margin-top:20px">C. EcoIndex / GreenIT</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Formule (cnumr/ecoindex_reference) :</b> '
         '<code>score = 100 − 5 × (3·q_DOM + 2·q_req + q_poids) / 6</code>, '
@@ -1920,7 +2054,7 @@ def _methodo_ecoindex():
 def _methodo_trafic():
     """Sous-section D : trafic et réseau."""
     return (
-        '<h3 id="methodo-trafic" style="margin-top:20px">D — Trafic &amp; réseau</h3>'
+        '<h3 id="methodo-trafic" style="margin-top:20px">D. Trafic &amp; réseau</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Volume de trafic.</b> Le nombre de visites/an est une <b>hypothèse saisie</b> '
         '(argument <code>--visits</code>) : ni PageSpeed ni CrUX ne fournissent de volume '
@@ -2023,25 +2157,32 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
     cls_bad, cls_warn = [], []
 
     for m in deduped:
-        c, _ = _cwv_pick(_cwv_for_page(m, cwv))
+        # Recos = "pire des deux" par métrique : un problème desktop remonte aussi.
+        c, worst_strat = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
         if not c:
             continue
         num = m.get("page_num", "")
         url = m["title"]
         short = urlparse(url).path.rstrip("/") or "/"
-        label = f'<a href="{url}" target="_blank" rel="noopener">P{num} {short}</a>'
+
+        def _label(metric):
+            # Annote la page avec l'appareil dont vient la valeur la plus défavorable
+            mk = _cwv_device_marker(worst_strat[metric]) if worst_strat.get(metric) else ""
+            mk = f'<span title="pire des deux : {worst_strat.get(metric)}">{mk}</span> ' if mk else ""
+            return f'<a href="{url}" target="_blank" rel="noopener">{mk}P{num} {short}</a>'
+
         lcp  = c.get("lcp")
         inp  = c.get("inp")
         cls_ = c.get("cls")
         if isinstance(lcp, (int, float)):
-            if lcp > 2.5:   lcp_bad.append((lcp, label))
-            elif lcp > 1.8: lcp_warn.append((lcp, label))
+            if lcp > 2.5:   lcp_bad.append((lcp, _label("lcp")))
+            elif lcp > 1.8: lcp_warn.append((lcp, _label("lcp")))
         if isinstance(inp, (int, float)):
-            if inp > 500:   inp_bad.append((inp, label))
-            elif inp > 200: inp_warn.append((inp, label))
+            if inp > 500:   inp_bad.append((inp, _label("inp")))
+            elif inp > 200: inp_warn.append((inp, _label("inp")))
         if isinstance(cls_, (int, float)):
-            if cls_ > 0.25: cls_bad.append((cls_, label))
-            elif cls_ > 0.1: cls_warn.append((cls_, label))
+            if cls_ > 0.25: cls_bad.append((cls_, _label("cls")))
+            elif cls_ > 0.1: cls_warn.append((cls_, _label("cls")))
 
     def _pages_str(items):
         return ", ".join(lbl for _, lbl in items)
