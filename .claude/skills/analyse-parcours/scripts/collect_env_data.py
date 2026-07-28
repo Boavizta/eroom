@@ -248,6 +248,73 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
 
 
 # ---------------------------------------------------------------------------
+# Volume de trafic annuel (visites/an)
+# ---------------------------------------------------------------------------
+# Ni PageSpeed ni CrUX ne fournissent de volume d'audience (leurs API ne
+# renvoient que des distributions, jamais de compteurs de visites). Le trafic
+# est donc soit saisi (analytics client), soit estimé par une source tierce
+# (SimilarWeb) que l'AGENT écrit dans env-data.json via WebFetch — le script ne
+# scrape jamais. À défaut : baseline 100 000 visites/an + avertissement.
+#
+# Provenance possible (ordre de priorité, résolu dans run_efootprint.py) :
+#   1. --visits saisi (analytics client GA/Matomo, le plus fiable) ;
+#   2. bloc 'traffic' écrit par l'agent dans env-data.json (estimation SimilarWeb) ;
+#   3. défaut 100 000 visites/an + avertissement.
+
+DEFAULT_VISITS_PER_YEAR = 100_000
+
+
+def resolve_traffic(existing_traffic):
+    """Résout le bloc 'traffic' à stocker dans env-data.json.
+
+    existing_traffic : bloc 'traffic' déjà présent dans env-data.json, écrit par
+                       l'agent (SimilarWeb) ou un run précédent (ou None).
+
+    Le script ne collecte JAMAIS le trafic lui-même (aucune API publique fiable) :
+    il ne fait que valider et normaliser le bloc écrit par l'agent, ou poser un
+    défaut explicite. La saisie manuelle passe par --visits dans run_efootprint.py.
+
+    Retourne un dict prêt à stocker : {visits_per_year, monthly_visits?, source,
+    source_url, snapshot?, confidence, note, warning?}.
+    """
+    if existing_traffic and existing_traffic.get("visits_per_year") \
+            and existing_traffic.get("source") not in (None, "default"):
+        try:
+            visits = int(round(float(existing_traffic["visits_per_year"])))
+        except (TypeError, ValueError):
+            visits = None
+        if visits and visits > 0:
+            monthly = existing_traffic.get("monthly_visits")
+            return {
+                "visits_per_year": visits,
+                "monthly_visits": int(round(float(monthly))) if monthly else None,
+                "source": existing_traffic.get("source", "SimilarWeb (estimation)"),
+                "source_url": existing_traffic.get("source_url"),
+                "snapshot": existing_traffic.get("snapshot"),
+                "confidence": existing_traffic.get("confidence", CONFIDENCE_MEDIUM),
+                "note": existing_traffic.get(
+                    "note",
+                    "Volume d'audience estimé par une source tierce (marge large). "
+                    "Le CO2e total croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) ; le CO2e/visite diminue quand le trafic augmente."),
+                "warning": None,
+            }
+
+    return {
+        "visits_per_year": DEFAULT_VISITS_PER_YEAR,
+        "monthly_visits": None,
+        "source": "default",
+        "source_url": None,
+        "snapshot": None,
+        "confidence": CONFIDENCE_DEFAULT,
+        "note": "Aucune source de trafic fournie : baseline 100 000 visites/an. "
+                "Le CO2e total croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) ; le CO2e/visite diminue quand le trafic augmente.",
+        "warning": ("Aucun volume de trafic fourni : baseline 100 000 visites/an par défaut. "
+                    "Fournir --visits (analytics client) ou laisser l'agent écrire un bloc "
+                    "'traffic' SimilarWeb dans env-data.json."),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Chargement .env
 # ---------------------------------------------------------------------------
 
@@ -609,7 +676,7 @@ def collect_server_info(ip, token=None):
 # Construction env-data.json
 # ---------------------------------------------------------------------------
 
-def build_env_data(har_data, device_mix, server_info, audience=None):
+def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
@@ -617,12 +684,17 @@ def build_env_data(har_data, device_mix, server_info, audience=None):
     audience : dict résolu par resolve_audience() portant le mix pays d'audience
     et les parts iOS/macOS pondérées servant à corriger le mix appareils. Si None,
     on retombe sur France (100 %) via resolve_audience(None, None).
+
+    traffic : dict résolu par resolve_traffic() portant le volume d'audience annuel
+    et sa provenance (SimilarWeb / saisie / défaut). Si None, baseline 100 000/an.
     """
     pages, _ = har_data if isinstance(har_data, tuple) else (har_data, None)
     har_metrics = aggregate_page_metrics(pages)
 
     if audience is None:
         audience = resolve_audience(None, None)
+    if traffic is None:
+        traffic = resolve_traffic(None)
     ios_share = audience["ios_share"]
     macos_share = audience["macos_share"]
     ios_share_source = audience["ios_share_source"]
@@ -756,14 +828,26 @@ def build_env_data(har_data, device_mix, server_info, audience=None):
                 "dimension géographique ; ce mix ne modifie pas les CWV.",
     }
 
+    # --- Trafic (volume d'audience annuel) ---
+    traffic_section = {
+        "visits_per_year": traffic["visits_per_year"],
+        "monthly_visits": traffic.get("monthly_visits"),
+        "source": traffic["source"],
+        "source_url": traffic.get("source_url"),
+        "snapshot": traffic.get("snapshot"),
+        "confidence": traffic["confidence"],
+        "note": traffic.get("note"),
+    }
+
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
         "network_mix": network_section,
         "server": server_section,
         "audience": audience_section,
+        "traffic": traffic_section,
         "job": job_section,
     }
 
@@ -909,12 +993,16 @@ def main():
     # Sur --refresh on préserve le bloc audience de l'agent s'il existe déjà.
     print("\n[audience] Résolution du mix pays (pondération iOS/macOS)...")
     existing_audience = None
+    existing_traffic = None
     if env_data_path.exists():
         try:
             with open(env_data_path, encoding="utf-8") as f:
-                existing_audience = json.load(f).get("audience")
+                _prev = json.load(f)
+            existing_audience = _prev.get("audience")
+            existing_traffic = _prev.get("traffic")
         except (json.JSONDecodeError, OSError):
             existing_audience = None
+            existing_traffic = None
     audience = resolve_audience(args.audience, existing_audience, ios_override=args.ios_mobile_share)
     if audience.get("error"):
         print(f"  Erreur : {audience['error']}")
@@ -926,8 +1014,18 @@ def main():
     print(f"  -> part iOS pondérée {audience['ios_share']:.0%}, "
           f"macOS pondérée {audience['macos_share']:.0%}")
 
+    # --- Résolution du volume de trafic (préserve le bloc écrit par l'agent) ---
+    # Le script ne collecte jamais le trafic (aucune API publique fiable) : il
+    # préserve le bloc 'traffic' SimilarWeb écrit par l'agent, ou pose la baseline.
+    print("\n[trafic] Résolution du volume d'audience annuel...")
+    traffic = resolve_traffic(existing_traffic)
+    if traffic.get("warning"):
+        print(f"  ⚠ {traffic['warning']}")
+    print(f"  Trafic : {traffic['visits_per_year']:,} visites/an  (source : {traffic['source']})")
+
     # --- Assemblage env-data.json ---
-    env_data = build_env_data((pages, server_ip), device_mix, server_info, audience=audience)
+    env_data = build_env_data((pages, server_ip), device_mix, server_info,
+                              audience=audience, traffic=traffic)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)

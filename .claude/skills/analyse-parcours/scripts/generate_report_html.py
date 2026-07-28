@@ -1639,6 +1639,30 @@ def _audience_source_label(label, url):
     return label
 
 
+def _traffic_source_label(traffic):
+    """Libellé de provenance du trafic annuel, avec snapshot et lien source.
+
+    traffic : bloc {source, source_url, snapshot, confidence} d'efootprint-results.json.
+    Retourne un libellé lisible ("estimation SimilarWeb, juin 2026 ↗ source",
+    "saisie (analytics client)", "hypothèse par défaut") destiné à la colonne source
+    des tableaux d'hypothèses."""
+    traffic = traffic or {}
+    source = traffic.get("source") or "paramètre"
+    url = traffic.get("source_url")
+    snapshot = traffic.get("snapshot")
+
+    if source == "default":
+        return "hypothèse par défaut (100 000/an)"
+
+    label = source
+    if snapshot:
+        label = f'{label}, {snapshot}'
+    if url:
+        label = (f'{label} (<a href="{url}" target="_blank" rel="noopener">'
+                 f'&#8599;&nbsp;source</a>)')
+    return label
+
+
 def load_efootprint_results(audit_dir):
     """Cherche efootprint-results.json dans audit_dir ou son parent (source_dir)."""
     audit_dir = Path(audit_dir)
@@ -1658,6 +1682,12 @@ def _section_efootprint(results):
     totals = results.get("totals", {})
     hyp = results.get("hypotheses", {})
     visits = results.get("visits_per_year", 0)
+    traffic = results.get("traffic", {})
+    _traffic_is_sourced = traffic.get("source") not in (None, "default", "paramètre")
+    _traffic_kpi_sub = (
+        f'{traffic.get("source")}{", " + traffic["snapshot"] if traffic.get("snapshot") else ""}'
+        if _traffic_is_sourced else "hypothèse"
+    )
 
     total_kg = totals.get("total_kg_co2e_per_year", 0)
     per_visit_g = totals.get("per_visit_g_co2e", 0)
@@ -1677,7 +1707,7 @@ def _section_efootprint(results):
         f'  <div style="{kpi_style}">'
         f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Total annuel</div>'
         f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">~{total_kg:.1f} kg CO2e</div>'
-        f'    <div style="font-size:14px;color:#888">pour {visits:,} visites/an (hypothèse)</div>'
+        f'    <div style="font-size:14px;color:#888">pour {visits:,} visites/an ({_traffic_kpi_sub})</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
         f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Par visite</div>'
@@ -1765,7 +1795,7 @@ def _section_efootprint(results):
              _audience_source_label(_asrc_short, hyp.get("audience_source_url"))))
     hyp_rows += [
         ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
-        ("Trafic annuel estimé",            f'{visits:,} visites',                       "paramètre"),
+        ("Trafic annuel estimé",            f'{visits:,} visites',                       _traffic_source_label(traffic)),
         ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default"),
     ]
     hyp_html = "".join(
@@ -1871,9 +1901,15 @@ def _methodo_efootprint(efootprint_results):
         return ""
     hyp = efootprint_results.get("hypotheses", {})
     visits = efootprint_results.get("visits_per_year", 0)
+    traffic = efootprint_results.get("traffic", {})
 
     def pct(v):
         return f'{v:.0%}' if isinstance(v, (int, float)) else "?"
+
+    # Trafic : valeur mensuelle en note si dispo (ex. 36 700/mois × 12)
+    _monthly = traffic.get("monthly_visits")
+    _visits_val = (f'{visits:,} visites (≈ {_monthly:,}/mois × 12)'
+                   if _monthly else f'{visits:,} visites')
 
     # --- Tableau des données/hypothèses ---
     rows = [
@@ -1883,7 +1919,7 @@ def _methodo_efootprint(efootprint_results):
         ("Intensité carbone électricité", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),
         ("Provider hébergeur", hyp.get("provider", "?"), hyp.get("confidence_provider", "default")),
         ("Type d'instance", hyp.get("instance_type", "?"), "paramètre"),
-        ("Trafic annuel", f'{visits:,} visites', "hypothèse saisie (--visits)"),
+        ("Trafic annuel", _visits_val, _traffic_source_label(traffic)),
     ]
     # Mix pays d'audience (sert à pondérer iOS/macOS)
     audience_mix = hyp.get("audience_mix")
@@ -2064,14 +2100,53 @@ def _methodo_ecoindex():
     )
 
 
-def _methodo_trafic():
-    """Sous-section D : trafic et réseau."""
+def _methodo_trafic(efootprint_results=None):
+    """Sous-section D : trafic et réseau. Décrit la provenance réelle du volume
+    de trafic (saisie analytics, estimation SimilarWeb, ou baseline par défaut)."""
+    traffic = (efootprint_results or {}).get("traffic", {})
+    source = traffic.get("source")
+    url = traffic.get("source_url")
+    snapshot = traffic.get("snapshot")
+    monthly = traffic.get("monthly_visits")
+    visits = (efootprint_results or {}).get("visits_per_year")
+
+    if source and source not in ("default", "paramètre"):
+        src_txt = source
+        if snapshot:
+            src_txt += f', {snapshot}'
+        if url:
+            src_txt += (f' (<a href="{url}" target="_blank" rel="noopener">'
+                        f'&#8599;&nbsp;source</a>)')
+        derivation = ""
+        if monthly and visits:
+            derivation = (f' Dérivation : {monthly:,}/mois × 12 ≈ {visits:,}/an.')
+        volume_li = (
+            f'<li><b>Volume de trafic.</b> Estimation tierce : <b>{src_txt}</b>.{derivation} '
+            'Ni PageSpeed ni CrUX ne fournissent de volume d\'audience (leurs API ne renvoient '
+            'que des distributions, jamais de compteurs) ; les estimateurs tiers restent des '
+            '<b>estimations à marge large</b>, à ne pas prendre pour une mesure. '
+            'Un chiffre exact ne peut venir que des analytics du site (GA4/Matomo/logs).</li>'
+            '<li><b>Sensibilité au volume.</b> Le CO2e <b>total</b> croît avec le trafic, au-dessus '
+            'd\'un <b>socle fixe</b> (fabrication serveur + stockage, amorti quel que soit le trafic) : '
+            'la relation est <b>affine, pas strictement proportionnelle</b>. Le CO2e <b>par visite</b> '
+            '<b>diminue</b> donc quand le trafic augmente (le socle se répartit sur plus de visites). '
+            'Une erreur sur le volume déplace surtout l\'ordre de grandeur du total, moins le par-visite.</li>'
+        )
+    else:
+        volume_li = (
+            '<li><b>Volume de trafic.</b> Le nombre de visites/an est une <b>hypothèse par défaut</b> '
+            '(100 000/an) : ni PageSpeed ni CrUX ne fournissent de volume d\'audience (leurs API ne '
+            'renvoient que des distributions, jamais de compteurs). Pour fiabiliser : saisir les '
+            'analytics du site (<code>--visits</code>) ou une estimation SimilarWeb.</li>'
+            '<li><b>Sensibilité au volume.</b> Le CO2e <b>total</b> croît avec le trafic au-dessus '
+            'd\'un socle fixe (fabrication serveur + stockage) ; le CO2e <b>par visite</b> diminue '
+            'quand le trafic augmente.</li>'
+        )
+
     return (
         '<h3 id="methodo-trafic" style="margin-top:20px">D. Trafic &amp; réseau</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
-        '<li><b>Volume de trafic.</b> Le nombre de visites/an est une <b>hypothèse saisie</b> '
-        '(argument <code>--visits</code>) : ni PageSpeed ni CrUX ne fournissent de volume '
-        'd\'audience (l\'API ne renvoie que des distributions, jamais de compteurs).</li>'
+        f'{volume_li}'
         '<li><b>Volumétrie réseau.</b> Le poids transféré et le nombre de requêtes viennent '
         'du HAR (mesure réelle de la capture), à ne pas confondre avec un volume d\'audience.</li>'
         '</ul>'
@@ -2087,7 +2162,7 @@ def _section_methodologie(efootprint_results, cwv):
         _methodo_efootprint(efootprint_results),
         _methodo_cwv(cwv),
         _methodo_ecoindex(),
-        _methodo_trafic(),
+        _methodo_trafic(efootprint_results),
     ]
     body = "".join(p for p in parts if p)
     return (

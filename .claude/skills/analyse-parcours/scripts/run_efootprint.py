@@ -54,6 +54,55 @@ def ensure_env_data(source_dir, refresh=False):
             sys.exit(1)
 
 
+DEFAULT_VISITS_PER_YEAR = 100_000
+
+
+def resolve_visits(cli_visits, env_data):
+    """Résout le trafic annuel et sa provenance selon l'ordre de priorité :
+      1. --visits saisi en CLI (analytics client, le plus fiable) ;
+      2. bloc 'traffic' d'env-data.json (estimation SimilarWeb écrite par l'agent) ;
+      3. baseline 100 000 visites/an + avertissement.
+
+    Retourne (visits, meta) où meta = {source, source_url, snapshot, confidence,
+    note, warning?} pour la traçabilité (console, JSON, rapport HTML).
+    """
+    traffic = (env_data or {}).get("traffic") or {}
+
+    if cli_visits is not None:
+        return cli_visits, {
+            "source": "saisie manuelle (--visits)",
+            "source_url": None,
+            "snapshot": None,
+            "confidence": "medium",
+            "note": "Trafic saisi en ligne de commande (analytics client ou hypothèse explicite). "
+                    "Le CO2e total croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) ; le CO2e/visite diminue quand le trafic augmente.",
+            "warning": None,
+        }
+
+    visits = traffic.get("visits_per_year")
+    if visits and traffic.get("source") not in (None, "default"):
+        return int(visits), {
+            "source": traffic.get("source", "SimilarWeb (estimation)"),
+            "source_url": traffic.get("source_url"),
+            "snapshot": traffic.get("snapshot"),
+            "confidence": traffic.get("confidence", "medium"),
+            "note": traffic.get("note"),
+            "warning": None,
+        }
+
+    return DEFAULT_VISITS_PER_YEAR, {
+        "source": "default",
+        "source_url": None,
+        "snapshot": None,
+        "confidence": "default",
+        "note": "Aucune source de trafic fournie : baseline 100 000 visites/an. "
+                "Le CO2e total croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) ; le CO2e/visite diminue quand le trafic augmente.",
+        "warning": ("Trafic non fourni : baseline 100 000 visites/an par défaut. "
+                    "Passer --visits (analytics client) ou laisser l'agent écrire un bloc "
+                    "'traffic' SimilarWeb dans env-data.json pour une estimation sourcée."),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Affichage résumé des hypothèses
 # ---------------------------------------------------------------------------
@@ -70,7 +119,7 @@ def fmt_conf(conf):
     return CONFIDENCE_LABELS.get(conf, conf or "?")
 
 
-def print_hypotheses(env_data, visits, instance_type):
+def print_hypotheses(env_data, visits, instance_type, traffic_meta=None):
     job = env_data.get("job", {})
     server = env_data.get("server", {})
     device = env_data.get("device_mix", {})
@@ -109,9 +158,13 @@ def print_hypotheses(env_data, visits, instance_type):
     print(f"  {'Mix réseau (wifi / mobile)':<35} "
           f"{network.get('wifi_fraction', 0):.0%} / {network.get('mobile_fraction', 0):.0%}        "
           f"{fmt_conf(network.get('confidence'))}")
+    traffic_source = (traffic_meta or {}).get("source", "paramètre")
+    _traffic_label = {
+        "default": "défaut     ",
+    }.get(traffic_source, traffic_source[:11].ljust(11))
     print(f"  {'Trafic annuel estimé':<35} "
-          f"{visits:,} visites     "
-          f"{'paramètre '}")
+          f"{visits:,} visites".ljust(20) + " "
+          f"{_traffic_label}")
     print(f"  {'Stockage serveur':<35} "
           f"{'50 GB':<18}"
           f"{'défaut lib'}")
@@ -395,7 +448,7 @@ def save_model(system, source_dir):
     print(f"  Modèle sérialisé : {out_path}")
 
 
-def save_results(system, source_dir, env_data, visits, instance_type):
+def save_results(system, source_dir, env_data, visits, instance_type, traffic_meta=None):
     """Écrit un JSON léger (totaux + hypothèses) pour consommation par le rapport HTML."""
     fab_kg, energy_kg = extract_results(system)
     total_kg = sum(fab_kg.values()) + sum(energy_kg.values())
@@ -406,9 +459,19 @@ def save_results(system, source_dir, env_data, visits, instance_type):
     network = env_data.get("network_mix", {})
     audience = env_data.get("audience", {})
 
+    traffic_meta = traffic_meta or {}
     results = {
         "generated_at": env_data.get("collected_at"),
         "visits_per_year": visits,
+        "traffic": {
+            "visits_per_year": visits,
+            "monthly_visits": (env_data.get("traffic") or {}).get("monthly_visits"),
+            "source": traffic_meta.get("source", "paramètre"),
+            "source_url": traffic_meta.get("source_url"),
+            "snapshot": traffic_meta.get("snapshot"),
+            "confidence": traffic_meta.get("confidence", "default"),
+            "note": traffic_meta.get("note"),
+        },
         "totals": {
             "total_kg_co2e_per_year": round(total_kg, 3),
             "per_visit_g_co2e": round(total_kg * 1000 / visits, 3) if visits > 0 else None,
@@ -482,8 +545,10 @@ def main():
         epilog="IMPORTANT : toutes les valeurs sont des estimations hypothétiques."
     )
     parser.add_argument("source_dir", help="Dossier source contenant env-data.json (ou le .har)")
-    parser.add_argument("--visits", type=int, default=100_000,
-                        help="Trafic annuel estimé (défaut : 100 000 visites/an)")
+    parser.add_argument("--visits", type=int, default=None,
+                        help="Trafic annuel (analytics client). Prioritaire sur le bloc "
+                             "'traffic' SimilarWeb écrit par l'agent dans env-data.json. "
+                             "Défaut : bloc 'traffic' s'il existe, sinon 100 000 visites/an.")
     parser.add_argument("--instance", default="t3.medium",
                         help="Type d'instance cloud (défaut : t3.medium)")
     parser.add_argument("--refresh-data", action="store_true",
@@ -503,22 +568,28 @@ def main():
         print(f"Erreur : env-data.json introuvable dans {source_dir}")
         sys.exit(1)
 
+    # Résolution du trafic : --visits > bloc 'traffic' (SimilarWeb) > baseline 100k
+    visits, traffic_meta = resolve_visits(args.visits, env_data)
+    if traffic_meta.get("warning"):
+        print(f"  ⚠ {traffic_meta['warning']}")
+
     # Résumé des hypothèses
-    print_hypotheses(env_data, args.visits, args.instance)
+    print_hypotheses(env_data, visits, args.instance, traffic_meta=traffic_meta)
 
     # Calcul
     print("[e-footprint] Construction du modèle (hypothétique)...")
-    system = build_efootprint_model(env_data, args.visits, args.instance)
+    system = build_efootprint_model(env_data, visits, args.instance)
     print("[e-footprint] Calcul CO2e...")
 
     # Résultats
-    print_results(system, args.visits)
+    print_results(system, visits)
 
     # Sauvegarde modèle + résultats légers
     print("[e-footprint] Sérialisation du modèle...")
     save_model(system, source_dir)
-    save_results(system, source_dir, env_data, args.visits, args.instance)
+    save_results(system, source_dir, env_data, visits, args.instance, traffic_meta=traffic_meta)
     print()
+    print(f"  Trafic retenu : {visits:,} visites/an (source : {traffic_meta['source']})")
     print("Pour relancer avec d'autres hypothèses :")
     print(f"  python3 {Path(__file__).name} {source_dir} --visits 500000 --instance t3.large")
 
