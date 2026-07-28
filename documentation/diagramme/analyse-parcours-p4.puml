@@ -1,0 +1,141 @@
+@startuml analyse-parcours-p4
+title Workflow Analyse de parcours web — Page 4/4 : e-footprint CO2e (optionnel)
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill /efootprint)" as C #82C1DD
+participant "collect_env_data.py" as CED #DBDDE5
+participant "API ipinfo.io" as IP #C8E6C9
+participant "CrUX Data" as CR #C8E6C9
+participant "run_efootprint.py" as REF #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+note over U, FS
+  Cette étape est OPTIONNELLE - lancée uniquement si l'utilisateur invoque /efootprint
+  après avoir généré un rapport d'analyse de parcours.
+  But : enrichir le rapport HTML avec une section CO2e (fabrication + énergie).
+end note
+
+== Étape E1 - Collecte données environnement ==
+
+U -> C : /efootprint <dossier-audit>
+C -> C : Détecter source_dir depuis arg\nou rapport HTML existant
+
+C -> CED : python3 collect_env_data.py <dossier-audit>
+CED -> FS : Lire .har (poids + durée + IP serveur)
+FS -> CED : Données HAR brutes
+
+alt Mode avec cache existant
+  CED -> FS : Lire env-data.json existant
+  FS -> CED : Données précédentes
+  CED -> CED : [mode cache] skip API calls
+else Mode --refresh ou première collecte
+  CED -> IP : GET /json/<IP> (pays + provider)
+  IP -> CED : {country: "DE", org: "AWS"}
+
+  CED -> CR : CrUX API (mix device desktop/mobile)
+  CR -> CED : {desktop: 60%, mobile: 40%}
+end
+
+CED -> FS : env-data.json\n{page_weight_mb, duration_s,\ncountry, provider, device_mix}
+
+note over CED, FS
+  Données collectées :
+  - Poids page (Mo) : depuis HAR
+  - Durée (s) : depuis HAR
+  - Pays serveur : ipinfo.io (50k req/mois gratuit)
+  - Provider cloud : détecté depuis org
+  - Mix devices : CrUX (desktop/mobile %)
+
+  Mode dégradé :
+  - ipinfo.io échoue -> pays="FR" (défaut)
+  - CrUX absent -> 100% desktop
+  - Pas de HAR -> demander poids manuellement
+end note
+
+== Étape E2 - Questions hypothèses ==
+
+C -> U : AskUserQuestion :\n- Trafic annuel (visites/an) [REQUIS]\n- Instance cloud (si provider supporté) [CONDITIONNEL]
+
+U -> C : Réponses :\n- 100000 visites/an\n- AWS t3.medium
+
+note over C, U
+  Trafic annuel : TOUJOURS demandé (pas de défaut)
+  Instance cloud : demandée UNIQUEMENT si provider
+  détecté est AWS/Azure/GCP dans env-data.json
+
+  Valeurs non stockées en cache -> toujours
+  demander à chaque relance /efootprint
+end note
+
+== Étape E3 - Calcul e-footprint ==
+
+C -> REF : python3 run_efootprint.py <dossier-audit>\n--visits 100000 --instance t3.medium
+
+REF -> FS : Lire env-data.json
+FS -> REF : Données environnement
+
+REF -> REF : Construire modèle Boavizta :\n- Devices (desktop/mobile/tablet mix)\n- Network (country, provider)\n- Server (instance AWS/Azure/GCP ou générique)\n- Storage (fixed 50 GB SSD)
+
+REF -> REF : Calcul impact :\n- Fabrication (devices dominant)\n- Énergie (usage annuel)\n- Total CO2e (kg/an + g/visite)
+
+REF -> FS : efootprint-model.json\n(modèle complet sérialisé)
+REF -> FS : efootprint-results.json\n(totaux + hypothèses + confiance)
+
+note over REF, FS
+  Sortie efootprint-results.json :
+  {
+    "total_co2e_kg": 89.8,
+    "co2e_per_visit_g": 0.90,
+    "breakdown": {
+      "fabrication_kg": 58.9,
+      "energie_kg": 31.0
+    },
+    "hypotheses": {
+      "trafic_annuel": 100000,
+      "instance": "AWS t3.medium",
+      "country": "DE",
+      "device_mix": {"desktop": 60, "mobile": 40},
+      "confidence": {
+        "page_weight": "high",
+        "country": "medium",
+        "device_mix": "low"
+      }
+    }
+  }
+end note
+
+== Étape E4 - Enrichissement rapport HTML ==
+
+alt Rapport HTML déjà généré
+  C -> U : Régénérer le rapport maintenant ?\n(pour intégrer la section CO2e)
+  U -> C : Oui
+  C -> FS : python3 generate_report_html.py <dossier-audit>
+  FS -> C : rapport-parcours-YYYY-MM-DD.html\n(avec section CO2e)
+else Pas encore de rapport
+  C -> U : Données e-footprint prêtes.\nLance /analyse-parcours pour générer\nle rapport complet avec section CO2e.
+end
+
+C -> U : ✅ Impact CO2e calculé :\n- Total : 89.8 kg CO2e/an\n- Par visite : 0.90 g CO2e/visite\n- Fabrication devices domine (66%)\nFichiers : efootprint-results.json + model.json
+
+@enduml
