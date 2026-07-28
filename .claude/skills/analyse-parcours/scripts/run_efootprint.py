@@ -447,6 +447,7 @@ def save_results(system, source_dir, env_data, visits, instance_type):
             # Mix pays d'audience (pondération iOS/macOS) — pour l'annexe
             "audience_mix": audience.get("mix"),
             "audience_source": audience.get("source"),
+            "audience_source_url": audience.get("source_url"),
             "audience_confidence": audience.get("confidence"),
             "audience_per_country": audience.get("per_country"),
             "audience_ios_weighted": audience.get("ios_share_weighted"),

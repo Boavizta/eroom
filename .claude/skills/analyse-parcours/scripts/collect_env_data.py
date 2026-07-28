@@ -201,6 +201,7 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
          macos_share_source, per_country, confidence, warning?}
     """
     warning = None
+    source_url = None
 
     if cli_audience:
         mix, err = parse_audience_spec(cli_audience)
@@ -215,6 +216,7 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
         mix = {k: round(v / total, 4) for k, v in mix.items()}
         source = existing_audience.get("source", "SimilarWeb (estimation)")
         confidence = existing_audience.get("confidence", CONFIDENCE_MEDIUM)
+        source_url = existing_audience.get("source_url")
     else:
         mix = {"FR": 1.0}
         source = "default"
@@ -234,6 +236,7 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
     return {
         "mix": mix,
         "source": source,
+        "source_url": source_url,
         "ios_share": ios_share,
         "macos_share": macos_share,
         "ios_share_source": ios_share_source,
@@ -741,6 +744,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None):
     audience_section = {
         "mix": audience["mix"],
         "source": audience["source"],
+        "source_url": audience.get("source_url"),
         "confidence": audience["confidence"],
         "ios_share_weighted": audience["ios_share"],
         "macos_share_weighted": audience["macos_share"],

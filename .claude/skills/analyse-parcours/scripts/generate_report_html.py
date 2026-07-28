@@ -1630,6 +1630,15 @@ def _confidence_badge(conf):
     )
 
 
+def _audience_source_label(label, url):
+    """Libellé de source du mix pays d'audience, suffixé d'un lien standard
+    ("↗ source") vers l'URL de provenance (ex. page SimilarWeb) si fournie."""
+    if url:
+        return (f'{label} (<a href="{url}" target="_blank" rel="noopener">'
+                f'&#8599;&nbsp;source</a>)')
+    return label
+
+
 def load_efootprint_results(audit_dir):
     """Cherche efootprint-results.json dans audit_dir ou son parent (source_dir)."""
     audit_dir = Path(audit_dir)
@@ -1753,7 +1762,7 @@ def _section_efootprint(results):
         hyp_rows.append(
             ("Mix pays d'audience (→ iOS/macOS)",
              ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items()),
-             _asrc_short))
+             _audience_source_label(_asrc_short, hyp.get("audience_source_url"))))
     hyp_rows += [
         ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
         ("Trafic annuel estimé",            f'{visits:,} visites',                       "paramètre"),
@@ -1880,7 +1889,9 @@ def _methodo_efootprint(efootprint_results):
     audience_mix = hyp.get("audience_mix")
     if audience_mix:
         mix_str = ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items())
-        rows.append(("Mix pays d'audience", mix_str, hyp.get("audience_source", "default")))
+        rows.append(("Mix pays d'audience", mix_str,
+                     _audience_source_label(hyp.get("audience_source", "default"),
+                                            hyp.get("audience_source_url"))))
     # Mix appareils : brut CrUX (si dispo) + retenu corrigé
     mob_raw = hyp.get("mobile_fraction_raw")
     if mob_raw is not None:
@@ -1947,6 +1958,8 @@ def _methodo_efootprint(efootprint_results):
                    f'<td style="padding:5px 8px">{pct(ios_w)}</td>'
                    f'<td style="padding:5px 8px">{pct(mac_w)}</td></tr>')
         src = hyp.get("audience_source", "default")
+        src_url = hyp.get("audience_source_url")
+        _src_link = f' (<a href="{src_url}" target="_blank" rel="noopener">&#8599;&nbsp;source</a>)' if src_url else ""
         caveat = ""
         if isinstance(src, str) and "similarweb" in src.lower():
             caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
@@ -1959,7 +1972,7 @@ def _methodo_efootprint(efootprint_results):
                       '<code>--audience "FR:0.7,US:0.3"</code> ou laisser l\'agent estimer via SimilarWeb.</p>')
         audience_html = (
             f'<h4 style="margin:14px 0 4px">Mix pays d\'audience (pondération iOS / macOS)</h4>'
-            f'<p style="font-size:15px;color:#666;margin:0 0 4px">Source : {src}. '
+            f'<p style="font-size:15px;color:#666;margin:0 0 4px">Source : {src}{_src_link}. '
             f'Ce mix ne sert QU\'À pondérer les parts iOS/macOS de la correction CrUX '
             f'(CrUX n\'a pas de dimension pays) ; il ne modifie pas les Core Web Vitals.</p>'
             f'<table style="width:100%;border-collapse:collapse">'
