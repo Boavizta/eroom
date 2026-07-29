@@ -28,6 +28,14 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Module frère (même dossier) : récupération trafic + mix pays via l'API interne
+# SimilarWeb. Import guardé pour que collect_env_data.py reste utilisable même si
+# le module est absent (on retombe alors sur la saisie assistée / le défaut).
+try:
+    import similarweb_api
+except ImportError:
+    similarweb_api = None
+
 
 CRUX_API = "https://chromeuxreport.googleapis.com/v1/records:queryRecord"
 IPINFO_API = "https://ipinfo.io/{ip}/json"
@@ -312,6 +320,101 @@ def resolve_traffic(existing_traffic):
                     "Fournir --visits (analytics client) ou laisser l'agent écrire un bloc "
                     "'traffic' SimilarWeb dans env-data.json."),
     }
+
+
+# ---------------------------------------------------------------------------
+# Récupération automatique SimilarWeb (API interne)
+# ---------------------------------------------------------------------------
+# Quand un bloc 'audience' ou 'traffic' manque (absent, ou source 'default'), on
+# interroge automatiquement l'API interne SimilarWeb via le module frère
+# similarweb_api.py et on écrit les blocs manquants dans env-data.json AVANT la
+# résolution audience/trafic. C'est la voie principale (remplace l'ancien WebFetch).
+#
+# Garde-fous — l'ordre de priorité existant reste sacré :
+#   - une saisie manuelle (--audience) prime : on n'écrit alors PAS le bloc audience ;
+#   - un bloc déjà présent avec une vraie source n'est JAMAIS écrasé ;
+#   - échec API (403, domaine inconnu, réseau) → message clair, on continue
+#     (l'appelant retombe sur la récupération assistée 20d, puis le défaut).
+
+def _block_missing(block):
+    """Un bloc audience/traffic est 'manquant' s'il est absent, sans mix/visites,
+    ou marqué source 'default'/None (donc à (re)remplir par SimilarWeb)."""
+    if not block:
+        return True
+    if block.get("source") in (None, "default"):
+        return True
+    return not (block.get("mix") or block.get("visits_per_year"))
+
+
+def maybe_fetch_similarweb(source_dir, existing_audience, existing_traffic,
+                           cli_audience=None, sw_domain=None):
+    """Tente de compléter les blocs audience/traffic manquants via l'API SimilarWeb.
+
+    Retourne (audience_block, traffic_block) : les blocs construits pour ce qui
+    manquait, ou les blocs existants inchangés sinon. Ne touche PAS au disque : ces
+    blocs sont ensuite passés à resolve_audience/resolve_traffic puis réécrits en
+    une seule fois par build_env_data. Ne lève jamais : tout échec est loggé et on
+    renvoie les blocs d'origine.
+
+    cli_audience : si fourni, la saisie manuelle prime → on n'écrit pas le mix pays.
+    sw_domain    : force le domaine SimilarWeb (sinon déduit de env-data.json/HAR).
+    """
+    if similarweb_api is None:
+        print("  ⚠ module similarweb_api indisponible — appel automatique ignoré.")
+        return existing_audience, existing_traffic
+
+    # Que manque-t-il ? Le mix pays n'est visé que si aucune saisie manuelle (--audience).
+    need_audience = (not cli_audience) and _block_missing(existing_audience)
+    need_traffic = _block_missing(existing_traffic)
+    if not need_audience and not need_traffic:
+        return existing_audience, existing_traffic
+
+    domain = sw_domain or similarweb_api.infer_domain(source_dir)
+    if not domain:
+        print("  ⚠ SimilarWeb : domaine introuvable (préciser --sw-domain) — appel ignoré.")
+        return existing_audience, existing_traffic
+
+    print(f"  [similarweb] Interrogation de l'API interne pour : {domain} …")
+    data, err = similarweb_api.fetch_domain_data(domain)
+    if err:
+        print(f"  ⚠ SimilarWeb : {err}")
+        print("     Repli attendu : récupération assistée (SKILL.md Étape 20d), puis défaut.")
+        return existing_audience, existing_traffic
+
+    source_url = f"https://www.similarweb.com/website/{domain}/"
+    audience_block = existing_audience
+    traffic_block = existing_traffic
+    got_audience = got_traffic = False
+    if need_audience:
+        built = similarweb_api.build_audience_block(data, source_url)
+        if built:
+            audience_block = built
+            got_audience = True
+            mix_str = ", ".join(f"{cc} {w:.0%}" for cc, w in built["mix"].items())
+            print(f"     Mix pays : {mix_str}")
+    if need_traffic:
+        built = similarweb_api.build_traffic_block(data, source_url)
+        if built:
+            traffic_block = built
+            got_traffic = True
+            snap = built.get("snapshot") or "?"
+            print(f"     Trafic : {built['monthly_visits']:,}/mois ({snap}) "
+                  f"→ {built['visits_per_year']:,}/an")
+
+    # L'API peut répondre 200 sans donnée exploitable (domaine peu/pas suivi par
+    # SimilarWeb : pas de TopCountryShares, visites nulles). On le signale au lieu
+    # de retomber en silence sur les défauts.
+    if (need_audience and not got_audience) or (need_traffic and not got_traffic):
+        manque = []
+        if need_audience and not got_audience:
+            manque.append("mix pays")
+        if need_traffic and not got_traffic:
+            manque.append("trafic")
+        print(f"  ⚠ SimilarWeb : pas de {' ni de '.join(manque)} exploitable pour "
+              f"{domain} (domaine peu suivi ?).")
+        print("     Repli attendu : récupération assistée (SKILL.md Étape 20d), puis défaut.")
+
+    return audience_block, traffic_block
 
 
 # ---------------------------------------------------------------------------
@@ -871,6 +974,12 @@ def main():
     parser.add_argument("--ios-mobile-share", type=float, default=None,
                         help="Force la part iOS du parc mobile (0-1), écrase la valeur "
                              "pondérée par --audience. Usage avancé/debug.")
+    parser.add_argument("--sw-domain", default=None,
+                        help="Force le domaine interrogé sur SimilarWeb (ex. octo.com). "
+                             "Sinon déduit de env-data.json/HAR.")
+    parser.add_argument("--no-similarweb", action="store_true",
+                        help="Désactive l'appel automatique à l'API SimilarWeb "
+                             "(mode hors-ligne / éviter le réseau).")
     args = parser.parse_args()
 
     # Validation précoce du format --audience (fail fast avant toute collecte réseau)
@@ -1003,6 +1112,14 @@ def main():
         except (json.JSONDecodeError, OSError):
             existing_audience = None
             existing_traffic = None
+
+    # Voie principale : compléter les blocs manquants via l'API interne SimilarWeb.
+    # La saisie manuelle (--audience) prime et bloque l'écriture du mix pays.
+    if not args.no_similarweb:
+        existing_audience, existing_traffic = maybe_fetch_similarweb(
+            source_dir, existing_audience, existing_traffic,
+            cli_audience=args.audience, sw_domain=args.sw_domain)
+
     audience = resolve_audience(args.audience, existing_audience, ios_override=args.ios_mobile_share)
     if audience.get("error"):
         print(f"  Erreur : {audience['error']}")

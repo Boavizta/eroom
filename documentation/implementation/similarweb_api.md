@@ -53,32 +53,52 @@ client HTTP.
 
 ## Utilisation
 
-Deux commandes, dans l'ordre :
+L'appel est **intégré à `collect_env_data.py`** : une seule commande suffit. Quand un bloc
+`audience` ou `traffic` manque dans `env-data.json`, le script interroge lui-même l'API interne
+SimilarWeb (via le module frère `similarweb_api.py`), écrit les blocs manquants, puis les normalise
+et les intègre au calcul CO2e.
 
 ```bash
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
 
-# 1. Récupère trafic + mix pays et écrit les blocs audience/traffic dans env-data.json
-python3 .claude/skills/analyse-parcours/scripts/similarweb_api.py <source_dir> [--domain octo.com]
-
-# 2. Normalise ces blocs et les intègre au calcul CO2e
+# Une commande : collecte HAR/CrUX/ipinfo + appel auto SimilarWeb si audience/traffic manquent
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
 ```
 
-Options du premier script :
+Options associées (sur `collect_env_data.py`) :
 
-- `--domain octo.com` : force le domaine. Sinon il est déduit de `env-data.json` (ou du `.har`).
+- `--sw-domain octo.com` : force le domaine interrogé. Sinon déduit de `env-data.json` (ou du `.har`).
+- `--no-similarweb` : désactive l'appel automatique (mode hors-ligne / éviter le réseau).
+- `--audience "FR:0.7,US:0.3"` : saisie manuelle du mix pays ; **prime** sur SimilarWeb (l'API
+  n'écrit alors pas le mix, mais peut toujours compléter le trafic).
+
+Déclenchement et garde-fous :
+
+- L'appel n'a lieu que si le bloc visé **manque** (absent, ou `source` = `default`/`None`).
+- Un bloc déjà présent avec une vraie source n'est **jamais écrasé** (idempotent sur `--refresh`).
+- L'appel écrit uniquement les blocs `audience`/`traffic` manquants ; il ne touche à rien d'autre
+  dans `env-data.json` (HAR, device, serveur préservés).
+
+Le module `similarweb_api.py` reste utilisable **en standalone** pour inspection :
+
+```bash
+python3 .claude/skills/analyse-parcours/scripts/similarweb_api.py <source_dir> [--domain octo.com] [--print-only]
+```
+
+- `--domain octo.com` : force le domaine. Sinon déduit de `env-data.json` (ou du `.har`).
 - `--print-only` : affiche le JSON brut renvoyé par l'API et n'écrit rien (utile pour inspecter).
-
-Le script écrit uniquement les blocs `audience` et `traffic` ; il ne touche à rien d'autre dans
-`env-data.json` (HAR, device, serveur préservés).
 
 -----
 
 ## Repli si l'API échoue
 
-Si l'appel échoue (403 réapparu, domaine inconnu de SimilarWeb, coupure réseau), le script sort
-en code d'erreur `2` avec un message explicite, sans rien écrire ni corrompre le fichier existant.
+Si l'appel échoue (403 réapparu, domaine peu/pas suivi par SimilarWeb, coupure réseau),
+`collect_env_data.py` affiche un message `⚠ SimilarWeb : …` puis **continue sans crasher** : il
+n'écrit pas le bloc concerné et poursuit avec les blocs disponibles ou les défauts.
+
+Note : l'API répond 200 même pour un domaine inconnu (elle fait écho au nom), mais sans
+`TopCountryShares` ni visites exploitables → les blocs ne sont pas construits, avec un message
+explicite (pas de repli silencieux). En standalone, `similarweb_api.py` sort en code `2` dans ce cas.
 
 Dans ce cas, basculer sur la **récupération assistée** (skill efootprint, Étape 20d) : l'agent
 demande à l'utilisatrice d'ouvrir la page SimilarWeb, de passer le captcha et de lui transmettre
@@ -101,8 +121,10 @@ les chiffres (dictée ou capture d'écran).
 - SimilarWeb est une **estimation tierce à marge large**, source non officielle, dont l'usage
   automatisé est à la limite des CGU. Seuls les analytics du site (GA4, Matomo, logs serveur)
   donnent des chiffres exacts ; ils sont prioritaires (`--audience` / `--visits`).
-- Ordre de priorité des sources : analytics client > API interne SimilarWeb > WebFetch de la page
-  > récupération assistée (captcha) > défauts (France 100 %, 100 000 visites/an).
+- Ordre de priorité des sources : analytics client (`--audience`/`--visits`) > API interne
+  SimilarWeb (automatique) > récupération assistée après captcha (Étape 20d) > défauts
+  (France 100 %, 100 000 visites/an). La voie WebFetch de la page publique a été retirée
+  (systématiquement bloquée par le captcha, rendue inutile par l'API interne).
 - Si l'API se remet à renvoyer 403 : vérifier l'absence d'en-tête `Origin`, la présence d'un
   User-Agent navigateur, et revalider la valeur de `EXTENSION_VERSION` (installer/mettre à jour
   l'extension, relever la version courante dans `chrome://extensions`).
