@@ -1925,6 +1925,72 @@ def _section_efootprint(results):
         f'</div>'
     )
 
+    # Composition du poids de la page (documentaire : explique l'input, n'entre pas
+    # dans le calcul CO2e qui repose sur le poids total agrégé de page_weight_kb).
+    weight_by_type = hyp.get("weight_by_type_bytes") or {}
+    weight_composition = ""
+    if weight_by_type:
+        _type_labels = {
+            "html": "HTML", "css": "CSS", "js": "JavaScript",
+            "image": "Images", "font": "Polices", "autre": "Autres",
+        }
+        _wtotal = sum(v for v in weight_by_type.values() if v > 0) or 1e-9
+        comp_rows = ""
+        for typ, nbytes in sorted(weight_by_type.items(), key=lambda x: -x[1]):
+            if nbytes <= 0:
+                continue
+            pct = nbytes / _wtotal * 100
+            kb = nbytes / 1024
+            bar = (
+                f'<div style="background:#eee;border-radius:3px;height:14px;position:relative;overflow:hidden">'
+                f'  <div style="background:{OCTO_BLUE};height:100%;width:{pct:.1f}%"></div>'
+                f'</div>'
+            )
+            comp_rows += (
+                f'<tr>'
+                f'<td style="padding:6px 8px">{_type_labels.get(typ, typ)}</td>'
+                f'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'
+                f'{kb:,.0f} Ko</td>'
+                f'<td style="padding:6px 8px;text-align:right;color:#666;font-variant-numeric:tabular-nums">'
+                f'{pct:.1f} %</td>'
+                f'<td style="padding:6px 8px;width:180px">{bar}</td>'
+                f'</tr>'
+            )
+        req_count = hyp.get("page_request_count")
+        tp_share = hyp.get("third_party_share")
+        tp_requests = hyp.get("third_party_requests")
+        tp_bytes = hyp.get("third_party_bytes")
+        meta_bits = []
+        if req_count is not None:
+            meta_bits.append(f'{req_count} requêtes')
+        if tp_share is not None:
+            _tp_extra = ""
+            if tp_requests is not None and tp_bytes is not None:
+                _tp_extra = f' ({tp_requests} requêtes, {tp_bytes / 1024:,.0f} Ko)'
+            meta_bits.append(
+                f'ressources tierces : <b>{tp_share * 100:.1f} %</b> du poids{_tp_extra}')
+        meta_line = (
+            f'<p style="font-size:14px;color:#666;margin:8px 0 0">{" &nbsp;·&nbsp; ".join(meta_bits)}</p>'
+            if meta_bits else ""
+        )
+        weight_composition = f"""
+  <h3 style="margin-top:24px">Composition du poids de la page représentative</h3>
+  <p style="font-size:14px;color:#888;margin:0 0 8px">
+    Répartition par type de ressource de la page la plus lourde du parcours (celle qui
+    sert de poids de référence au calcul). Documentaire : cette décomposition
+    <b>explique</b> le poids retenu, elle <b>n'entre pas séparément dans le calcul CO2e</b>.
+  </p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Type de ressource</th>
+      <th style="padding:6px 8px;text-align:right">Poids</th>
+      <th style="padding:6px 8px;text-align:right">Part</th>
+      <th style="padding:6px 8px">Répartition</th>
+    </tr></thead>
+    <tbody>{comp_rows}</tbody>
+  </table>
+  {meta_line}"""
+
     dominant_fab = max(fab, key=fab.get) if fab else "?"
     dominant_ener = max(ener, key=ener.get) if ener else "?"
 
@@ -1949,6 +2015,7 @@ def _section_efootprint(results):
       {ener_table}
     </div>
   </div>
+  {weight_composition}
 
   <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
   <p style="font-size:15px;color:#666">
@@ -2333,7 +2400,7 @@ def _section_couts(page_metrics):
 </section>"""
 
 
-def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
+def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None):
     prio1, prio2, prio3 = [], [], []
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
@@ -2473,11 +2540,53 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None):
         if summ["css"]["pct"] > 80:
             prio2.append(f"<b>{page_name}</b> : {summ['css']['pct']}% du CSS non utilisé ({summ['css']['unused_kb']} Ko) - PurgeCSS recommandé")
 
-    prio3 = [
-        "Activer la compression Brotli sur tous les serveurs",
-        "Mettre en place un CDN pour les assets statiques",
-        "Évaluer le remplacement des librairies tierces lourdes (analytics, chatbot) par des alternatives légères",
-    ]
+    # PRIORITÉ 3 — amélioration continue, croisée avec la stack détectée (documentaire).
+    # Les règles lisent les CATÉGORIES détectées, jamais des noms de sites : génériques.
+    prio3 = ["Activer la compression Brotli sur tous les serveurs"]
+
+    _technos = (tech_stack or {}).get("technologies", []) if tech_stack else []
+    _cats = {t.get("category") for t in _technos}
+    _by_cat = defaultdict(list)
+    for _t in _technos:
+        _name = _t.get("name")
+        if _name:
+            _by_cat[_t.get("category")].append(_name)
+
+    # CDN : valoriser s'il est présent, sinon recommander de le mettre en place.
+    if "CDN" in _cats:
+        _cdn_names = ", ".join(dict.fromkeys(_by_cat.get("CDN", [])))
+        prio3.append(
+            f"<b>CDN déjà en place</b> ({_cdn_names}) : bon point, les assets statiques "
+            "sont diffusés au plus près des visiteurs. À maintenir."
+        )
+    else:
+        prio3.append("Mettre en place un CDN pour les assets statiques")
+
+    # Scripts tiers : les nommer s'ils sont détectés, sinon garder la piste générique.
+    _third_labels = []
+    for _cat in ("Analytics", "Balise / Tag manager", "Bibliothèque JS"):
+        for _name in _by_cat.get(_cat, []):
+            _third_labels.append(f"{_name} ({_cat.lower()})")
+    if _third_labels:
+        prio3.append(
+            "Scripts tiers détectés : <b>" + ", ".join(_third_labels) + "</b>. "
+            "Évaluer leur poids réel et leur nécessité ; envisager des alternatives légères "
+            "ou un chargement différé."
+        )
+    else:
+        prio3.append(
+            "Évaluer le remplacement des librairies tierces lourdes (analytics, chatbot) "
+            "par des alternatives légères"
+        )
+
+    # Multiplication des domaines tiers : chaque hôte ajoute DNS + TLS.
+    _tp_hosts = (tech_stack or {}).get("third_party_hosts", []) if tech_stack else []
+    if len(_tp_hosts) >= 8:
+        prio3.append(
+            f"<b>{len(_tp_hosts)} domaines tiers</b> sollicités au chargement : chaque domaine "
+            "ajoute une résolution DNS et une négociation TLS. Regrouper ou auto-héberger "
+            "les ressources critiques réduit la latence et les connexions."
+        )
 
     def _items(lst):
         return "".join(f"<li>{i}</li>" for i in lst) if lst else "<li>Aucun constat critique.</li>"
@@ -2687,7 +2796,7 @@ def generate(audit_dir, output_path=None):
 </nav>
 <main id="contenu">
 """
-    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv)
+    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack)
     html += _section_greenit(greenit)
     if cwv:
         html += _section_cwv_analyse(page_metrics, cwv)
