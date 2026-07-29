@@ -25,10 +25,12 @@ SimilarWeb**, en imitant les requêtes que l'extension fait en arrière-plan. On
 la page web : on rejoue l'appel API en Python.
 
 - Endpoint : `https://data.similarweb.com/api/v1/data?domain=<domaine>` (GET)
-- En-têtes suffisants :
+- En-têtes suffisants (dict de `fetch_domain_data()`) :
   - `Content-Type: application/json`
   - `X-Extension-Version: 6.12.21` (version de l'extension, cf. constante `EXTENSION_VERSION`)
-  - un vrai `User-Agent` de navigateur
+  - un vrai `User-Agent` de navigateur (constante `BROWSER_USER_AGENT`)
+  - `Accept: */*`
+  - PAS d'en-tête `Origin` (voir Diagnostic du 403 ci-dessous)
 
 Point important : **aucun cookie, aucun compte, aucune session** n'est nécessaire. L'API répond
 directement en JSON, d'où on extrait `TopCountryShares` (mix pays), `EstimatedMonthlyVisits`
@@ -77,7 +79,7 @@ et les intègre au calcul CO2e.
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
 
 # Une commande : collecte HAR/CrUX/ipinfo + appel auto SimilarWeb si audience/traffic manquent
-python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
 ```
 
 Options associées (sur `collect_env_data.py`) :
@@ -97,7 +99,7 @@ Déclenchement et garde-fous :
 Le module `similarweb_api.py` reste utilisable **en standalone** pour inspection :
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/similarweb_api.py <source_dir> [--domain octo.com] [--print-only]
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/similarweb_api.py <source_dir> [--domain octo.com] [--print-only]
 ```
 
 - `--domain octo.com` : force le domaine. Sinon déduit de `env-data.json` (ou du `.har`).

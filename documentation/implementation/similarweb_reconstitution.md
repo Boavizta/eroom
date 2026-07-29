@@ -40,14 +40,19 @@ Valeurs relevées et vérifiées le 29/07/2026 :
 - ID de l'extension (Chrome Web Store) : `hoklmmgfnpapgjgcpechhaamimifchmp`
 - Version installée : `6.12.21` (manifest V3)
 - Endpoint : `https://data.similarweb.com/api/v1/data`
-- En-têtes envoyés par l'extension : `Content-Type: application/json`,
-  `X-Extension-Version: <version>`, `redirect: follow`. PAS d'en-tête `Origin`.
+- En-têtes HTTP envoyés par l'extension : `Content-Type: application/json`,
+  `X-Extension-Version: <version>`, `Accept: */*`, plus un vrai `User-Agent`
+  navigateur. PAS d'en-tête `Origin`.
+- `redirect: follow` n'est PAS un en-tête HTTP : c'est une option du `fetch()` JS de
+  l'extension. Côté Python (`urllib`), les redirections sont suivies par défaut, donc
+  rien à reporter dans le dict d'en-têtes pour ce point.
 - Fichier porteur de l'endpoint : `background/background.js` (l'endpoint apparait
   aussi dans options/popup/panel/content, mais l'appel réel part du background).
 
 Ces valeurs vivent dans les constantes de `similarweb_api.py` :
-`DATA_API`, `EXTENSION_VERSION`, `BROWSER_USER_AGENT`, et le dict d'en-têtes de
-`fetch_domain_data()`.
+`DATA_API` (= `https://data.similarweb.com/api/v1/data`), `EXTENSION_VERSION`,
+`BROWSER_USER_AGENT`, et le dict d'en-têtes de `fetch_domain_data()`
+(`Content-Type`, `X-Extension-Version`, `User-Agent`, `Accept`).
 
 
 -----
@@ -117,8 +122,10 @@ Cette session, l'extrait obtenu était :
 
     ...{headers:{"Content-Type":"application/json","X-Extension-Version":n},redirect:"follow"}...
 
-Ce qui confirme : Content-Type json, X-Extension-Version, redirect follow, et
-surtout AUCUN en-tête Origin.
+Ce qui confirme : Content-Type json, X-Extension-Version dans les en-têtes ; `redirect:"follow"`
+est une option de `fetch()` (pas un en-tête) ; et surtout AUCUN en-tête Origin. Le dict Python
+équivalent (`similarweb_api.py`, `fetch_domain_data()`) ajoute en plus `Accept: */*` et un
+`User-Agent` navigateur, tous deux nécessaires côté client HTTP hors navigateur.
 
 
 -----
@@ -195,13 +202,13 @@ Si une valeur a changé, mettre à jour dans `similarweb_api.py` :
 Vérification directe (n'écrit aucun fichier), celle utilisée cette session :
 
     cd .claude/skills/analyse-parcours/scripts
-    python3 -c "import similarweb_api as s; d,e=s.fetch_domain_data('octo.com'); print(e or ('OK', 'EstimatedMonthlyVisits' in d, len(d.get('TopCountryShares') or [])))"
+    ../../../../.venv/bin/python3 -c "import similarweb_api as s; d,e=s.fetch_domain_data('octo.com'); print(e or ('OK', 'EstimatedMonthlyVisits' in d, len(d.get('TopCountryShares') or [])))"
 
 Résultat attendu : `('OK', True, 5)` (200, trafic présent, 5 pays dans le mix).
 
 Alternative sur un dossier existant :
 
-    python3 similarweb_api.py <dossier_avec_env-data> --print-only
+    ../../../../.venv/bin/python3 similarweb_api.py <dossier_avec_env-data> --print-only
 
 
 -----

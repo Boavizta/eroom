@@ -128,8 +128,9 @@ Le résultat (`detect()`) est un dict :
       "request_count": int
     }
 
-Il est écrit tel quel dans `env-data.json` sous la clé `tech_stack`
-(schema_version >= "1.3").
+Il est écrit tel quel dans `env-data.json` sous la clé `tech_stack`. Le code fixe
+`schema_version` à la valeur exacte `"1.3"` (le bloc `tech_stack` est apparu à cette
+version du schéma).
 
 
 -----
@@ -193,7 +194,12 @@ Ajouter ou corriger une règle :
 
 Tester sur le site de contrôle (octo.com) :
 
-    python3 .claude/skills/analyse-parcours/scripts/detect_tech.py octo.com
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/detect_tech.py octo.com
+
+Attention : `octo.com` est ici un **dossier local** (devant contenir `octo.com/octo.com.har`),
+pas un domaine fetché sur le réseau. Le module est 100 % hors-ligne : il relit le HAR déjà
+capturé, il ne fait aucun appel réseau. La commande doit donc être lancée depuis un `cwd`
+contenant le dossier `octo.com/` (typiquement la racine du projet).
 
 Détection attendue sur octo.com (référence de non-régression) : Amazon CloudFront,
 Cloudflare, Fastly, jsDelivr (CDN) ; Google Frontend (serveur) ; Swetrix
@@ -203,7 +209,7 @@ dans le HTML ne doit PAS déclencher un faux positif Vue.js (règle `html` plafo
 
 Vérifier ensuite l'intégration complète :
 
-    python3 collect_env_data.py octo.com --refresh   # bloc tech_stack, schema 1.3
+    .venv/bin/python3 collect_env_data.py octo.com --refresh   # bloc tech_stack, schema 1.3
     # puis régénérer le rapport HTML -> section "Stack technique" en annexe
 
 Si on active un jour l'enrichissement à la volée (section 6a), suivre le format
