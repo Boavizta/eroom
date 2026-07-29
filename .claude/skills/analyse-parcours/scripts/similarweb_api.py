@@ -40,6 +40,8 @@ from pathlib import Path
 
 
 # Endpoint interne de l'extension (cf. background.js décompilé du .crx).
+# Pour refaire la découverte si l'extension change (endpoint/en-tête/version),
+# voir documentation/implementation/similarweb_reconstitution.md
 DATA_API = "https://data.similarweb.com/api/v1/data"
 
 # Version d'extension envoyée dans l'en-tête X-Extension-Version. À revalider si

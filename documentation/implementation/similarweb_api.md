@@ -128,3 +128,6 @@ les chiffres (dictée ou capture d'écran).
 - Si l'API se remet à renvoyer 403 : vérifier l'absence d'en-tête `Origin`, la présence d'un
   User-Agent navigateur, et revalider la valeur de `EXTENSION_VERSION` (installer/mettre à jour
   l'extension, relever la version courante dans `chrome://extensions`).
+- Si une simple revalidation de version ne suffit pas (endpoint ou en-têtes changés), refaire la
+  découverte de zéro : voir le guide de reconstitution `similarweb_reconstitution.md`
+  (récupération de l'extension, extraction de l'endpoint/en-têtes/version, vérification).
