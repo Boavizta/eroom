@@ -137,10 +137,11 @@ l'extension, elle, obtient les chiffres, car elle appelle une API interne sans
 compte. La méthode a donc consisté à OBSERVER l'appel que fait l'extension en
 fonctionnement, puis à le REJOUER en Python.
 
-- L'extension tourne dans le navigateur (installée depuis le Web Store, ou chargée
-  en mode développeur via `chrome://extensions` > "Charger l'extension non
-  empaquetée" à partir de ses fichiers). On la déclenche sur un site pendant que
-  DevTools > Network enregistre.
+- L'extension est en Manifest V3 : son appel réseau part du SERVICE WORKER
+  (`background/background.js`), pas de la page visitée. Il n'apparait donc pas dans
+  le Network de la page ; il faut inspecter le service worker de l'extension via
+  `chrome://extensions` (mode développeur). On déclenche l'extension sur un site
+  pendant que ce service worker enregistre le réseau.
 - La capture HAR (procédure ci-dessous) a révélé trois choses reportées telles
   quelles dans le code : l'URL (`/api/v1/data?domain=...`), les en-têtes à envoyer
   (dont l'absence d'`Origin`), et surtout la FORME de la réponse JSON.
@@ -157,10 +158,25 @@ fonctionnement, puis à le REJOUER en Python.
 Procédure de capture
 -----
 
-1. Extension installée et active. Ouvrir DevTools (onglet Network / Réseau).
-2. Visiter un site, puis cliquer l'icône SimilarWeb dans la barre du navigateur.
-3. Repérer l'appel vers `data.similarweb.com` dans la liste des requêtes.
-4. Exporter en HAR (clic droit sur la requête ou export global) et lire l'entrée :
+Point clé (MV3) : l'appel part du service worker de l'extension, donc on capture le
+réseau DU service worker, pas celui de l'onglet du site. Concrètement :
+
+1. Onglet A : ouvrir le site à analyser (ou la page où l'extension se déclenche).
+2. Onglet B : ouvrir `chrome://extensions` et activer le "Mode développeur"
+   (interrupteur en haut à droite).
+3. Sur la carte de l'extension SimilarWeb, cliquer le lien "service worker"
+   (parfois "inspecter les vues : service worker") : cela ouvre les DevTools DU
+   service worker.
+4. Dans ces DevTools, onglet Network / Réseau : cocher "Preserve log"
+   (conserver le journal) pour ne pas perdre les requêtes, et laisser
+   l'enregistrement actif.
+5. Revenir sur l'onglet A et déclencher l'extension (clic sur son icône / ouverture
+   de son panneau sur le site). L'appel `data.similarweb.com/api/v1/data` part alors
+   depuis le service worker.
+6. Revenir dans les DevTools du service worker (`chrome://extensions`) : la requête
+   `data.similarweb.com` apparait dans le Network.
+7. Exporter en HAR (clic droit dans la liste > "Save all as HAR", ou icône
+   d'export / de téléchargement du panneau Network) et lire l'entrée :
    - URL exacte (doit finir par `/api/v1/data?domain=...`).
    - Request Headers : `X-Extension-Version`, `User-Agent` (vrai navigateur),
      présence ou absence d'`Origin`.
