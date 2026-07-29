@@ -128,6 +128,35 @@ surtout AUCUN en-tête Origin.
 À utiliser si le JS est trop minifié pour être lisible, ou pour confirmer ce que
 l'extension envoie réellement sur le réseau.
 
+Genèse du module (c'est ainsi qu'il a été construit)
+-----
+
+Le module `similarweb_api.py` n'a pas été deviné : il a été bâti par cette voie
+HAR. Le principe : la page web publique SimilarWeb est bloquée par captcha, mais
+l'extension, elle, obtient les chiffres, car elle appelle une API interne sans
+compte. La méthode a donc consisté à OBSERVER l'appel que fait l'extension en
+fonctionnement, puis à le REJOUER en Python.
+
+- L'extension tourne dans le navigateur (installée depuis le Web Store, ou chargée
+  en mode développeur via `chrome://extensions` > "Charger l'extension non
+  empaquetée" à partir de ses fichiers). On la déclenche sur un site pendant que
+  DevTools > Network enregistre.
+- La capture HAR (procédure ci-dessous) a révélé trois choses reportées telles
+  quelles dans le code : l'URL (`/api/v1/data?domain=...`), les en-têtes à envoyer
+  (dont l'absence d'`Origin`), et surtout la FORME de la réponse JSON.
+- Les champs lus dans cette réponse sont exactement ceux que parse le module :
+  `SiteName` (validité), `TopCountryShares` (`CountryCode` + `Value`, le mix pays),
+  `EstimatedMonthlyVisits` (dict daté `YYYY-MM-01`) et `Engagments`
+  (`Visits`/`Month`/`Year`, le trafic). Voir `fetch_domain_data()`,
+  `build_audience_block()` et `build_traffic_block()` dans `similarweb_api.py` :
+  ces fonctions sont la trace directe de ce qu'a montré le HAR.
+- Note d'honnêteté : la session d'origine (juillet 2026) n'a pas été tracée. Cette
+  genèse est reconstituée à partir du code (qui en porte la trace) et de la
+  revérification du 29/07/2026, ce n'est pas un journal pas-à-pas de l'époque.
+
+Procédure de capture
+-----
+
 1. Extension installée et active. Ouvrir DevTools (onglet Network / Réseau).
 2. Visiter un site, puis cliquer l'icône SimilarWeb dans la barre du navigateur.
 3. Repérer l'appel vers `data.similarweb.com` dans la liste des requêtes.

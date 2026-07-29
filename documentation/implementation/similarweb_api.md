@@ -51,6 +51,19 @@ client HTTP.
 
 -----
 
+## Comment ce module a été construit (via HAR)
+
+Le module n'a pas été deviné : il a été bâti en **observant l'extension SimilarWeb en
+fonctionnement** (installée, ou chargée en mode développeur), en capturant son appel réseau
+via DevTools > Network (export HAR), puis en rejouant cette requête en Python. C'est le HAR qui
+a révélé l'URL, les en-têtes (dont l'absence d'`Origin`) et la forme du JSON de réponse, d'où
+sont tirés les champs parsés (`TopCountryShares`, `EstimatedMonthlyVisits`, `Engagments`).
+
+Récit de genèse détaillé + procédure de capture pas-à-pas : voir
+`similarweb_reconstitution.md` (Méthode B - Capture HAR).
+
+-----
+
 ## Utilisation
 
 L'appel est **intégré à `collect_env_data.py`** : une seule commande suffit. Quand un bloc
