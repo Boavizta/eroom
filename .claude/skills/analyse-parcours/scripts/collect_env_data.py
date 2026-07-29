@@ -36,6 +36,13 @@ try:
 except ImportError:
     similarweb_api = None
 
+# Module frère (même dossier) : détection des technologies (stack) par règles
+# maison sur le HAR. Import guardé (le reste fonctionne si le module est absent).
+try:
+    import detect_tech
+except ImportError:
+    detect_tech = None
+
 
 CRUX_API = "https://chromeuxreport.googleapis.com/v1/records:queryRecord"
 IPINFO_API = "https://ipinfo.io/{ip}/json"
@@ -460,10 +467,65 @@ def find_har(source_dir):
     return None
 
 
+def _resource_category(mime, url):
+    """Classe une ressource par type, pour le breakdown de poids (Volet B).
+
+    Combine le mimeType (fiable) et l'extension d'URL (fallback). Catégories :
+    html, css, js, image, font, autre. Mesure directe depuis le HAR (bonne confiance)."""
+    m = (mime or "").lower()
+    u = url.lower().split("?")[0]
+    if "html" in m:
+        return "html"
+    if "css" in m or u.endswith(".css"):
+        return "css"
+    if "javascript" in m or u.endswith(".js") or u.endswith(".mjs"):
+        return "js"
+    if "image" in m or "svg" in m or u.endswith((".png", ".jpg", ".jpeg", ".gif",
+                                                  ".webp", ".svg", ".ico", ".avif")):
+        return "image"
+    if "font" in m or u.endswith((".woff", ".woff2", ".ttf", ".otf", ".eot")):
+        return "font"
+    return "autre"
+
+
+def _page_breakdown(page_entries, page_url):
+    """Décompose le poids d'une page par type de ressource et part tierce (Volet B).
+
+    Métriques documentaires (mesure directe, bonne confiance). N'entrent PAS dans le
+    calcul e-footprint : elles EXPLIQUENT le data_transferred déjà utilisé (poids de
+    la page représentative). Le nombre de requêtes est affiché comme indice, mais le
+    CPU serveur (compute_needed) reste indéductible du HAR côté client.
+
+    part tierce : octets/requêtes vers un host différent de celui de la page.
+    """
+    main_host = urllib.parse.urlparse(page_url).netloc if page_url else ""
+    by_type = {}
+    third_party_bytes = 0
+    third_party_requests = 0
+    for e in page_entries:
+        url = e.get("request", {}).get("url", "")
+        content = e.get("response", {}).get("content", {})
+        size = content.get("size", 0) or 0
+        cat = _resource_category(content.get("mimeType", ""), url)
+        by_type[cat] = by_type.get(cat, 0) + size
+        netloc = urllib.parse.urlparse(url).netloc
+        if main_host and netloc and netloc != main_host:
+            third_party_bytes += size
+            third_party_requests += 1
+    total = sum(by_type.values())
+    return {
+        "by_type_bytes": by_type,
+        "total_bytes": total,
+        "third_party_bytes": third_party_bytes,
+        "third_party_requests": third_party_requests,
+        "third_party_share": round(third_party_bytes / total, 3) if total else 0.0,
+    }
+
+
 def extract_har_data(har_path):
     """
     Extrait depuis le HAR :
-      - pages : liste de {url, size_bytes, on_load_ms}
+      - pages : liste de {url, size_bytes, on_load_ms, breakdown}
       - server_ip : IP du serveur principal (première requête document)
     """
     with open(har_path, encoding="utf-8") as f:
@@ -501,6 +563,7 @@ def extract_har_data(har_path):
             "size_kb": round(size_bytes / 1024, 1),
             "on_load_ms": round(on_load_ms),
             "request_count": len(page_entries),
+            "breakdown": _page_breakdown(page_entries, url),
         })
 
         # IP serveur : depuis la première entrée HTML de cette page
@@ -538,6 +601,12 @@ def aggregate_page_metrics(pages):
     avg_on_load_ms = sum(p["on_load_ms"] for p in pages if p["on_load_ms"] > 0)
     n_with_load = sum(1 for p in pages if p["on_load_ms"] > 0)
 
+    # Breakdown de la page représentative (page la plus lourde = celle utilisée par
+    # data_transferred). Métriques documentaires qui EXPLIQUENT l'input, sans le
+    # modifier. Le nombre de requêtes est un indice ; il ne sert PAS à déduire
+    # compute_needed (le CPU serveur reste indéductible du HAR côté client).
+    breakdown = heaviest.get("breakdown", {})
+
     return {
         "pages_count": len(pages),
         "heaviest_page_url": heaviest["url"],
@@ -551,6 +620,17 @@ def aggregate_page_metrics(pages):
             "request_duration_ms": heaviest["on_load_ms"] or round(avg_on_load_ms / n_with_load) if n_with_load else 1000,
             "confidence_data_transferred": CONFIDENCE_HIGH,
             "confidence_request_duration": CONFIDENCE_HIGH if heaviest["on_load_ms"] > 0 else CONFIDENCE_MEDIUM,
+            # --- Volet B : transparence sur la composition du poids (documentaire) ---
+            "request_count": heaviest.get("request_count", 0),
+            "weight_by_type_bytes": breakdown.get("by_type_bytes", {}),
+            "third_party_bytes": breakdown.get("third_party_bytes", 0),
+            "third_party_requests": breakdown.get("third_party_requests", 0),
+            "third_party_share": breakdown.get("third_party_share", 0.0),
+            "confidence_breakdown": CONFIDENCE_HIGH,  # mesure directe HAR
+            # compute_needed reste figé côté run_efootprint (0.05 cpu_core) : le HAR
+            # ne mesure pas le CPU serveur. Documenté, pas déduit.
+            "compute_needed_note": "CPU serveur indéductible du HAR (signal côté client). "
+                                   "compute_needed reste une valeur type (confiance faible).",
         }
     }
 
@@ -779,7 +859,8 @@ def collect_server_info(ip, token=None):
 # Construction env-data.json
 # ---------------------------------------------------------------------------
 
-def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None):
+def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None,
+                   tech_stack=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
@@ -790,6 +871,10 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
 
     traffic : dict résolu par resolve_traffic() portant le volume d'audience annuel
     et sa provenance (SimilarWeb / saisie / défaut). Si None, baseline 100 000/an.
+
+    tech_stack : dict de détection techno (detect_tech.detect_from_har). Écrit tel
+    quel dans la clé "tech_stack". Si None, la clé vaut None (non-régression : le
+    rapport et le calcul restent valides sans détection).
     """
     pages, _ = har_data if isinstance(har_data, tuple) else (har_data, None)
     har_metrics = aggregate_page_metrics(pages)
@@ -942,8 +1027,24 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
         "note": traffic.get("note"),
     }
 
+    # --- Croisement techno -> serveur (fiabilisation provider CO2e) ---
+    # Si ipinfo n'a pas conclu de provider mais que la détection techno révèle un
+    # CDN/hébergeur cloud, on l'utilise comme signal secondaire pour remonter la
+    # confiance provider. Le CDN n'écrase pas un provider déjà déterminé par ipinfo.
+    if tech_stack and not server_section.get("detected_provider"):
+        _cdn_names = [t["name"] for t in tech_stack.get("technologies", [])
+                      if t["category"] in ("CDN", "Hébergeur")]
+        if _cdn_names:
+            server_section["provider_from_tech"] = _cdn_names
+            if server_section.get("confidence_provider") in (CONFIDENCE_LOW, CONFIDENCE_DEFAULT):
+                server_section["confidence_provider"] = CONFIDENCE_MEDIUM
+            server_section["note_provider"] = (
+                "Provider non conclu par ipinfo ; CDN/hébergeur détecté(s) via la "
+                "stack technique : " + ", ".join(_cdn_names) + "."
+            )
+
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
@@ -952,6 +1053,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
         "audience": audience_section,
         "traffic": traffic_section,
         "job": job_section,
+        "tech_stack": tech_stack,
     }
 
 
@@ -1097,6 +1199,23 @@ def main():
     else:
         print("  Aucune IP serveur détectée dans le HAR")
 
+    # --- Détection de la stack technique (règles maison sur le HAR) ---
+    print("\n[techno] Détection de la stack technique (règles maison)...")
+    tech_stack = None
+    if har_path and detect_tech:
+        tech_stack = detect_tech.detect_from_har(har_path)
+        if tech_stack and tech_stack.get("technologies"):
+            cats = tech_stack.get("categories", {})
+            print(f"  -> {len(tech_stack['technologies'])} technologie(s) "
+                  f"dans {len(cats)} catégorie(s) : "
+                  + ", ".join(f"{c} ({len(names)})" for c, names in cats.items()))
+        else:
+            print("  -> Aucune technologie détectée")
+    elif not detect_tech:
+        print("  Module detect_tech absent — détection ignorée")
+    else:
+        print("  Pas de HAR — détection ignorée")
+
     # --- Résolution du mix pays d'audience (points 4a/4b) ---
     # Ordre : --audience > audience_mix déjà écrit par l'agent (SimilarWeb) > défaut FR.
     # Sur --refresh on préserve le bloc audience de l'agent s'il existe déjà.
@@ -1142,7 +1261,8 @@ def main():
 
     # --- Assemblage env-data.json ---
     env_data = build_env_data((pages, server_ip), device_mix, server_info,
-                              audience=audience, traffic=traffic)
+                              audience=audience, traffic=traffic,
+                              tech_stack=tech_stack)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)

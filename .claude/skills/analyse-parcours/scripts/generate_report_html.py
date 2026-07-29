@@ -1674,6 +1674,113 @@ def load_efootprint_results(audit_dir):
     return None
 
 
+def load_tech_stack(audit_dir):
+    """Cherche le bloc tech_stack dans env-data.json (audit_dir ou parent).
+
+    Même schéma de recherche "audit_dir ou parent" que le HAR / efootprint.
+    Retourne le dict tech_stack (technologies/categories/third_party_hosts) ou None
+    (env-data.json absent, illisible, ou schéma antérieur à 1.3 sans la clé)."""
+    audit_dir = Path(audit_dir)
+    for candidate in [audit_dir / "env-data.json",
+                      audit_dir.parent / "env-data.json"]:
+        if candidate.exists():
+            try:
+                with open(candidate, encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                return None
+            return data.get("tech_stack")
+    return None
+
+
+def _section_tech(tech_stack):
+    """Section 'Stack technique' — technologies détectées (règles maison sur le HAR).
+
+    Rendue en sous-section d'annexe (caractère documentaire). Groupe les
+    technologies par catégorie avec un badge de confiance et l'indice ayant permis
+    la détection. Non-régression : retourne "" si tech_stack absent (ancien
+    env-data.json)."""
+    if not tech_stack:
+        return ""
+
+    technos = tech_stack.get("technologies", [])
+    third_party = tech_stack.get("third_party_hosts", [])
+    req_count = tech_stack.get("request_count", 0)
+
+    if not technos:
+        return ""
+
+    # Groupement par catégorie en préservant l'ordre d'arrivée (déjà trié amont)
+    by_cat = defaultdict(list)
+    for t in technos:
+        by_cat[t.get("category", "Autre")].append(t)
+
+    rows = ""
+    for cat, items in by_cat.items():
+        first = True
+        for t in items:
+            cat_cell = (
+                f'<td style="padding:6px 8px;vertical-align:top;font-weight:600" '
+                f'rowspan="{len(items)}">{cat}</td>' if first else ""
+            )
+            first = False
+            rows += (
+                f'<tr>'
+                f'{cat_cell}'
+                f'<td style="padding:6px 8px">{t.get("name", "?")}</td>'
+                f'<td style="padding:6px 8px">{_confidence_badge(t.get("confidence"))}</td>'
+                f'<td style="padding:6px 8px;color:#666;font-size:14px">{t.get("evidence", "")}</td>'
+                f'</tr>'
+            )
+
+    tp_html = ""
+    if third_party:
+        tp_items = "".join(
+            f'<li style="display:inline-block;background:{OCTO_PALE};border-radius:4px;'
+            f'padding:2px 8px;margin:2px;font-size:14px">{h}</li>'
+            for h in third_party
+        )
+        tp_html = (
+            f'<h4 style="margin:20px 0 8px">Hôtes tiers ({len(third_party)})</h4>'
+            f'<p style="font-size:14px;color:#666;margin:0 0 6px">Domaines distincts '
+            f'du domaine principal sollicités lors du chargement (scripts, polices, '
+            f'analytics, CDN externes).</p>'
+            f'<ul style="list-style:none;padding:0;margin:0">{tp_items}</ul>'
+        )
+
+    return f"""<section id="stack-technique">
+  <h2>Stack technique</h2>
+  <p style="font-size:16px;color:#555;margin-bottom:8px">
+    Technologies détectées par <b>règles maison</b> (pattern-matching hors-ligne sur le
+    HAR : en-têtes de réponse, URLs, HTML, cookies). Aucun appel externe, aucune
+    dépendance. Détection volontairement limitée aux signaux visibles côté client :
+    le backend caché et le type d'instance serveur restent indétectables.
+  </p>
+  <p style="font-size:15px;color:#666">
+    Confiance : <span style="background:#28a745;color:white;padding:1px 6px;border-radius:3px;font-size:13px">collecté</span> signal distinctif
+    &nbsp;·&nbsp;
+    <span style="background:#5bc0de;color:white;padding:1px 6px;border-radius:3px;font-size:13px">estimé</span> signal partagé/indirect
+    &nbsp;·&nbsp;
+    <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:13px">supposé</span> indice faible (HTML)
+  </p>
+  <table style="width:100%;border-collapse:collapse;margin-top:8px">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Catégorie</th>
+      <th style="padding:6px 8px;text-align:left">Technologie</th>
+      <th style="padding:6px 8px;text-align:left">Confiance</th>
+      <th style="padding:6px 8px;text-align:left">Indice</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+  {tp_html}
+  <p style="font-size:14px;color:#888;margin-top:12px">
+    {len(technos)} technologie(s) détectée(s) sur {req_count} requêtes analysées.
+    Pour relancer la détection seule :
+    <code>python3 detect_tech.py &lt;source_dir&gt;</code>
+  </p>
+</section>"""
+
+
 def _section_efootprint(results):
     """Section 'Impact environnemental (estimation hypothétique)' - CO2e depuis e-footprint."""
     if not results:
@@ -2438,6 +2545,7 @@ def generate(audit_dir, output_path=None):
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
     efootprint_results = load_efootprint_results(audit_dir)
+    tech_stack = load_tech_stack(audit_dir)
 
     coverage_by_page = {}
     _asset_exts = re.compile(r'\.(js|css|webp|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|otf|eot|json|map)(\?.*)?$', re.I)
@@ -2518,6 +2626,9 @@ def generate(audit_dir, output_path=None):
     deduped_metrics = _dedup_page_metrics(page_metrics)
     nb_pages = len(deduped_metrics)
 
+    # La section techno n'est rendue que si des technologies ont été détectées
+    has_tech = bool(tech_stack and tech_stack.get("technologies"))
+
     # Sections présentes (pour le sommaire)
     annexe_sections = [
         ("dashboard", "Tableau de bord EcoIndex"),
@@ -2526,6 +2637,8 @@ def generate(audit_dir, output_path=None):
     ]
     if cwv:
         annexe_sections.append(("cwv", "Core Web Vitals"))
+    if has_tech:
+        annexe_sections.append(("stack-technique", "Stack technique"))
     annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
 
     letters = "abcdefgh"
@@ -2590,6 +2703,10 @@ def generate(audit_dir, output_path=None):
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), "A.3")}</div>\n'
     if cwv:
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_cwv(page_metrics, cwv), "A.4")}</div>\n'
+    if has_tech:
+        # Numéro dérivé de la position dans annexe_sections (robuste à la présence de cwv)
+        tech_num = f"A.{[sid for sid, _ in annexe_sections].index('stack-technique') + 1}"
+        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_tech(tech_stack), tech_num)}</div>\n'
     methodo_num = f"A.{len(annexe_sections)}"  # methodologie est le dernier élément d'annexe_sections
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(efootprint_results, cwv), methodo_num)}</div>\n'
     html += '</section>\n'
