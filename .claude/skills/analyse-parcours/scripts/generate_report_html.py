@@ -1940,7 +1940,12 @@ def _section_efootprint(results):
 
     # Composition du poids de la page (documentaire : explique l'input, n'entre pas
     # dans le calcul CO2e qui repose sur le poids total agrégé de page_weight_kb).
-    weight_by_type = hyp.get("weight_by_type_bytes") or {}
+    # LOT 4 : poids TRANSFÉRÉ (réseau réel, LOT 1) en valeur principale si dispo,
+    # décompressé en repère — cohérence avec page_weight_kb ci-dessus.
+    weight_by_type_transfer = hyp.get("weight_by_type_transfer_bytes") or {}
+    weight_by_type_uncompressed = hyp.get("weight_by_type_bytes") or {}
+    weight_by_type = weight_by_type_transfer or weight_by_type_uncompressed
+    _using_transfer = bool(weight_by_type_transfer)
     weight_composition = ""
     if weight_by_type:
         _type_labels = {
@@ -1954,6 +1959,11 @@ def _section_efootprint(results):
                 continue
             pct = nbytes / _wtotal * 100
             kb = nbytes / 1024
+            kb_uncompressed = weight_by_type_uncompressed.get(typ, 0) / 1024
+            repere = (
+                f' <span style="color:#888;font-size:13px">(décompressé : {kb_uncompressed:,.0f} Ko)</span>'
+                if _using_transfer and weight_by_type_uncompressed else ""
+            )
             bar = (
                 f'<div style="background:#eee;border-radius:3px;height:14px;position:relative;overflow:hidden">'
                 f'  <div style="background:{OCTO_BLUE};height:100%;width:{pct:.1f}%"></div>'
@@ -1963,16 +1973,16 @@ def _section_efootprint(results):
                 f'<tr>'
                 f'<td style="padding:6px 8px">{_type_labels.get(typ, typ)}</td>'
                 f'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'
-                f'{kb:,.0f} Ko</td>'
+                f'{kb:,.0f} Ko{repere}</td>'
                 f'<td style="padding:6px 8px;text-align:right;color:#666;font-variant-numeric:tabular-nums">'
                 f'{pct:.1f} %</td>'
                 f'<td style="padding:6px 8px;width:180px">{bar}</td>'
                 f'</tr>'
             )
         req_count = hyp.get("page_request_count")
-        tp_share = hyp.get("third_party_share")
+        tp_share = hyp.get("third_party_transfer_share") if _using_transfer else hyp.get("third_party_share")
         tp_requests = hyp.get("third_party_requests")
-        tp_bytes = hyp.get("third_party_bytes")
+        tp_bytes = hyp.get("third_party_transfer_bytes") if _using_transfer else hyp.get("third_party_bytes")
         meta_bits = []
         if req_count is not None:
             meta_bits.append(f'{req_count} requêtes')
@@ -1986,12 +1996,14 @@ def _section_efootprint(results):
             f'<p style="font-size:14px;color:#666;margin:8px 0 0">{" &nbsp;·&nbsp; ".join(meta_bits)}</p>'
             if meta_bits else ""
         )
+        _poids_label = "poids transféré (réseau réel)" if _using_transfer else "poids décompressé"
         weight_composition = f"""
   <h3 style="margin-top:24px">Composition du poids de la page représentative</h3>
   <p style="font-size:14px;color:#888;margin:0 0 8px">
     Répartition par type de ressource de la page la plus lourde du parcours (celle qui
-    sert de poids de référence au calcul). Documentaire : cette décomposition
-    <b>explique</b> le poids retenu, elle <b>n'entre pas séparément dans le calcul CO2e</b>.
+    sert de poids de référence au calcul), en {_poids_label}. Documentaire : cette
+    décomposition <b>explique</b> le poids retenu, elle <b>n'entre pas séparément dans le
+    calcul CO2e</b>.
   </p>
   <table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
