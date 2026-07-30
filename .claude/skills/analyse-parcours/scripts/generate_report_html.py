@@ -1876,8 +1876,21 @@ def _section_efootprint(results):
   </table>"""
 
     # Tableau des hypothèses
+    # LOT 1 : page_weight_kb = poids TRANSFÉRÉ (réseau réel) si dispo ; on affiche le
+    # décompressé en repère quand les deux diffèrent (env-data >= 1.4).
+    _pw_transferred = hyp.get("page_weight_transferred_kb")
+    _pw_uncompressed = hyp.get("page_weight_uncompressed_kb")
+    if _pw_transferred:
+        _ratio = hyp.get("compression_ratio")
+        _pw_label = "Poids page transféré (réseau réel)"
+        _pw_repere = f' <span style="color:#888">(décompressé : {_pw_uncompressed} kB'
+        _pw_repere += f', ratio {_ratio})</span>' if _ratio else ')</span>'
+        _pw_value = f'{hyp.get("page_weight_kb", "?")} kB{_pw_repere}'
+    else:
+        _pw_label = "Poids de page (représentative)"
+        _pw_value = f'{hyp.get("page_weight_kb", "?")} kB'
     hyp_rows = [
-        ("Poids de page (représentative)", f'{hyp.get("page_weight_kb", "?")} kB',       hyp.get("confidence_page_weight")),
+        (_pw_label, _pw_value,                                                          hyp.get("confidence_page_weight")),
         ("Durée chargement",                f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration")),
         ("Pays hébergement",                hyp.get("country", "?"),                     hyp.get("confidence_country")),
         ("Intensité carbone électricité",   f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
@@ -2086,8 +2099,21 @@ def _methodo_efootprint(efootprint_results):
                    if _monthly else f'{visits:,} visites')
 
     # --- Tableau des données/hypothèses ---
+    # LOT 1 : poids transféré (réseau réel) en valeur ; décompressé en repère si dispo.
+    _pw_transferred_m = hyp.get("page_weight_transferred_kb")
+    if _pw_transferred_m:
+        _ratio_m = hyp.get("compression_ratio")
+        _repere_m = f' <span style="color:#888">(décompressé : {hyp.get("page_weight_uncompressed_kb")} kB'
+        _repere_m += f', ratio {_ratio_m})</span>' if _ratio_m else ')</span>'
+        _pw_row = ("Poids page transféré (réseau réel)",
+                   f'{hyp.get("page_weight_kb", "?")} kB{_repere_m}',
+                   hyp.get("confidence_page_weight", "default"))
+    else:
+        _pw_row = ("Poids de page (représentative)",
+                   f'{hyp.get("page_weight_kb", "?")} kB',
+                   hyp.get("confidence_page_weight", "default"))
     rows = [
-        ("Poids de page (représentative)", f'{hyp.get("page_weight_kb", "?")} kB', hyp.get("confidence_page_weight", "default")),
+        _pw_row,
         ("Durée de chargement", f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration", "default")),
         ("Pays d'hébergement", hyp.get("country", "?"), hyp.get("confidence_country", "default")),
         ("Intensité carbone électricité", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),

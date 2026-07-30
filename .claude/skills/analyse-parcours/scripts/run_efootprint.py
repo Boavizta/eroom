@@ -134,9 +134,18 @@ def print_hypotheses(env_data, visits, instance_type, traffic_meta=None):
     print()
     print(f"  {'Paramètre':<35} {'Valeur':<18} {'Source'}")
     print(f"  {'-'*35} {'-'*18} {'-'*12}")
-    print(f"  {'Poids de page (représentative)':<35} "
-          f"{job.get('data_transferred_bytes', 0) // 1024} kB           "
-          f"{fmt_conf(job.get('confidence_data_transferred'))}")
+    # LOT 1 : poids transféré (réseau réel) = valeur d'entrée ; décompressé en repère.
+    _kb_real = (job.get('data_transferred_bytes_real') or job.get('data_transferred_bytes', 0)) // 1024
+    _conf_real = job.get('confidence_data_transferred_real') or job.get('confidence_data_transferred')
+    print(f"  {'Poids page transféré (réseau réel)':<35} "
+          f"{_kb_real} kB           "
+          f"{fmt_conf(_conf_real)}")
+    if job.get('data_transferred_bytes_real'):
+        _kb_unc = job.get('data_transferred_bytes', 0) // 1024
+        _ratio = job.get('compression_ratio')
+        _ratio_str = f" (ratio {_ratio})" if _ratio else ""
+        print(f"  {'  dont décompressé (repère)':<35} "
+              f"{_kb_unc} kB{_ratio_str}")
     print(f"  {'Durée chargement':<35} "
           f"{job.get('request_duration_ms', 0)} ms            "
           f"{fmt_conf(job.get('confidence_request_duration'))}")
@@ -241,7 +250,11 @@ def build_efootprint_model(env_data, visits, instance_type):
         )
 
     # --- Job ---
-    data_bytes = job_data.get("data_transferred_bytes", 500 * 1024)
+    # LOT 1 : on privilégie le poids TRANSFÉRÉ (réseau réel, compressé) qui pilote
+    # justement l'énergie réseau. Rétro-compat : un env-data.json <1.4 n'a pas ce
+    # champ -> on retombe sur data_transferred_bytes (poids décompressé, historique).
+    data_bytes = job_data.get("data_transferred_bytes_real") \
+        or job_data.get("data_transferred_bytes", 500 * 1024)
     duration_ms = job_data.get("request_duration_ms", 1000)
 
     page_job = Job(
@@ -479,8 +492,18 @@ def save_results(system, source_dir, env_data, visits, instance_type, traffic_me
             "energy_kg_co2e_per_year": {k: round(v, 4) for k, v in energy_kg.items()},
         },
         "hypotheses": {
-            "page_weight_kb": job.get("data_transferred_bytes", 0) // 1024,
-            "confidence_page_weight": job.get("confidence_data_transferred", "default"),
+            # LOT 1 : le poids retenu pour le calcul = transféré (réseau réel) si dispo,
+            # sinon décompressé (rétro-compat). On trace les deux + le ratio pour l'annexe.
+            "page_weight_kb": (job.get("data_transferred_bytes_real")
+                               or job.get("data_transferred_bytes", 0)) // 1024,
+            "confidence_page_weight": (job.get("confidence_data_transferred_real")
+                                       or job.get("confidence_data_transferred", "default")),
+            "page_weight_transferred_kb": (job.get("data_transferred_bytes_real") or 0) // 1024,
+            "page_weight_uncompressed_kb": job.get("data_transferred_bytes", 0) // 1024,
+            "compression_ratio": job.get("compression_ratio"),
+            "weight_by_type_transfer_bytes": job.get("weight_by_type_transfer_bytes"),
+            "third_party_transfer_bytes": job.get("third_party_transfer_bytes"),
+            "third_party_transfer_share": job.get("third_party_transfer_share"),
             "request_duration_ms": job.get("request_duration_ms", 0),
             "confidence_request_duration": job.get("confidence_request_duration", "default"),
             # Volet B : composition du poids de la page représentative (documentaire,

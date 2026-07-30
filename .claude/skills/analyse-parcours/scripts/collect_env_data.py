@@ -467,6 +467,34 @@ def find_har(source_dir):
     return None
 
 
+def _entry_transfer_bytes(entry):
+    """Octets réseau RÉELS (compressés) d'une entrée HAR, pour e-footprint UNIQUEMENT.
+
+    Le vrai octet qui transite sur le réseau est le corps COMPRESSÉ (brotli/gzip),
+    pas le content.size (décompressé). data_transferred pilote l'énergie réseau du
+    calcul CO2e : c'est donc le poids transféré qui doit l'alimenter.
+
+    Chaîne de repli robuste (le champ _transferSize, préfixé _, est une extension
+    Chrome non standardisée ; toujours présent dans notre pipeline Chrome, le repli
+    ne couvre que le cas dégradé d'un HAR appauvri) :
+      1. response._transferSize (mesure directe, en-têtes + corps compressé) ;
+      2. sinon bodySize (+ headersSize si connu) ;
+      3. sinon content.size (dernier recours, DÉCOMPRESSÉ, surestime).
+
+    GARDE-FOU : EcoIndex (har_metrics.py) garde content.size (poids décompressé,
+    exigé par la formule cnumr). Cette fonction ne concerne QUE le chemin e-footprint.
+    """
+    resp = entry.get("response", {})
+    ts = resp.get("_transferSize")
+    if ts is not None and ts >= 0:
+        return ts
+    body = resp.get("bodySize", -1)
+    if body is not None and body >= 0:
+        headers = resp.get("headersSize", -1)
+        return body + (headers if headers and headers > 0 else 0)
+    return resp.get("content", {}).get("size", 0) or 0
+
+
 def _resource_category(mime, url):
     """Classe une ressource par type, pour le breakdown de poids (Volet B).
 
@@ -499,26 +527,37 @@ def _page_breakdown(page_entries, page_url):
     part tierce : octets/requêtes vers un host différent de celui de la page.
     """
     main_host = urllib.parse.urlparse(page_url).netloc if page_url else ""
-    by_type = {}
+    by_type = {}                # octets DÉCOMPRESSÉS (content.size) — documentaire/EcoIndex
+    by_type_transfer = {}       # octets TRANSFÉRÉS (réseau réel) — e-footprint (LOT 1)
     third_party_bytes = 0
+    third_party_transfer_bytes = 0
     third_party_requests = 0
     for e in page_entries:
         url = e.get("request", {}).get("url", "")
         content = e.get("response", {}).get("content", {})
         size = content.get("size", 0) or 0
+        transfer = _entry_transfer_bytes(e)
         cat = _resource_category(content.get("mimeType", ""), url)
         by_type[cat] = by_type.get(cat, 0) + size
+        by_type_transfer[cat] = by_type_transfer.get(cat, 0) + transfer
         netloc = urllib.parse.urlparse(url).netloc
         if main_host and netloc and netloc != main_host:
             third_party_bytes += size
+            third_party_transfer_bytes += transfer
             third_party_requests += 1
     total = sum(by_type.values())
+    total_transfer = sum(by_type_transfer.values())
     return {
         "by_type_bytes": by_type,
         "total_bytes": total,
         "third_party_bytes": third_party_bytes,
         "third_party_requests": third_party_requests,
         "third_party_share": round(third_party_bytes / total, 3) if total else 0.0,
+        # --- LOT 1 : mêmes décomptes en octets réseau RÉELS (compressés) ---
+        "by_type_transfer_bytes": by_type_transfer,
+        "total_transfer_bytes": total_transfer,
+        "third_party_transfer_bytes": third_party_transfer_bytes,
+        "third_party_transfer_share": round(third_party_transfer_bytes / total_transfer, 3) if total_transfer else 0.0,
     }
 
 
@@ -551,16 +590,21 @@ def extract_har_data(har_path):
         on_load_ms = timings.get("onLoad") or 0
 
         page_entries = entries_by_page.get(pid, [])
+        # Poids DÉCOMPRESSÉ (content.size) : documentaire, aligné sur EcoIndex.
         size_bytes = sum(
             e.get("response", {}).get("content", {}).get("size", 0)
             for e in page_entries
         )
+        # Poids TRANSFÉRÉ (réseau réel, compressé) : alimente e-footprint (LOT 1).
+        size_transfer_bytes = sum(_entry_transfer_bytes(e) for e in page_entries)
 
         pages.append({
             "page_id": pid,
             "url": url,
             "size_bytes": size_bytes,
             "size_kb": round(size_bytes / 1024, 1),
+            "size_transfer_bytes": size_transfer_bytes,
+            "size_transfer_kb": round(size_transfer_bytes / 1024, 1),
             "on_load_ms": round(on_load_ms),
             "request_count": len(page_entries),
             "breakdown": _page_breakdown(page_entries, url),
@@ -616,16 +660,30 @@ def aggregate_page_metrics(pages):
         "avg_on_load_ms": round(avg_on_load_ms / n_with_load) if n_with_load else 0,
         # Inputs e-footprint recommandés (page représentative = plus lourde)
         "efootprint": {
+            # Poids DÉCOMPRESSÉ (content.size) : conservé pour rétro-compat et
+            # comparaison ; NE sert plus d'input principal côté run_efootprint.
             "data_transferred_bytes": heaviest["size_bytes"],
+            # Poids TRANSFÉRÉ (réseau réel, compressé) : NOUVEL input e-footprint
+            # (LOT 1). data_transferred pilote l'énergie réseau -> doit être le
+            # poids réellement transmis, pas le décompressé.
+            "data_transferred_bytes_real": heaviest.get("size_transfer_bytes", heaviest["size_bytes"]),
+            "compression_ratio": (
+                round(heaviest["size_transfer_bytes"] / heaviest["size_bytes"], 3)
+                if heaviest.get("size_transfer_bytes") and heaviest["size_bytes"] else None
+            ),
             "request_duration_ms": heaviest["on_load_ms"] or round(avg_on_load_ms / n_with_load) if n_with_load else 1000,
             "confidence_data_transferred": CONFIDENCE_HIGH,
+            "confidence_data_transferred_real": CONFIDENCE_HIGH,  # mesure directe (_transferSize)
             "confidence_request_duration": CONFIDENCE_HIGH if heaviest["on_load_ms"] > 0 else CONFIDENCE_MEDIUM,
             # --- Volet B : transparence sur la composition du poids (documentaire) ---
             "request_count": heaviest.get("request_count", 0),
             "weight_by_type_bytes": breakdown.get("by_type_bytes", {}),
+            "weight_by_type_transfer_bytes": breakdown.get("by_type_transfer_bytes", {}),
             "third_party_bytes": breakdown.get("third_party_bytes", 0),
+            "third_party_transfer_bytes": breakdown.get("third_party_transfer_bytes", 0),
             "third_party_requests": breakdown.get("third_party_requests", 0),
             "third_party_share": breakdown.get("third_party_share", 0.0),
+            "third_party_transfer_share": breakdown.get("third_party_transfer_share", 0.0),
             "confidence_breakdown": CONFIDENCE_HIGH,  # mesure directe HAR
             # compute_needed reste figé côté run_efootprint (0.05 cpu_core) : le HAR
             # ne mesure pas le CPU serveur. Documenté, pas déduit.
@@ -1044,7 +1102,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             )
 
     return {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
