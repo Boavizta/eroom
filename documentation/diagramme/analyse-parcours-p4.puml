@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p4
-title Workflow Analyse de parcours web — Page 4/4 : e-footprint CO2e (optionnel)
+title Workflow Analyse de parcours web — Page 4/5 : e-footprint collecte (optionnel)
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -25,117 +25,86 @@ skinparam responseMessageBelowArrow true
 actor "Utilisateur" as U #82C1DD
 participant "Claude\n(skill /efootprint)" as C #82C1DD
 participant "collect_env_data.py" as CED #DBDDE5
+participant "API SimilarWeb\n(similarweb_api.py)" as SW #C8E6C9
 participant "API ipinfo.io" as IP #C8E6C9
 participant "CrUX Data" as CR #C8E6C9
-participant "run_efootprint.py" as REF #DBDDE5
+participant "detect_tech.py" as DT #DBDDE5
 database "dossier-audit/" as FS #9BD0DD
 
 note over U, FS
-  Cette étape est OPTIONNELLE - lancée uniquement si l'utilisateur invoque /efootprint
-  après avoir généré un rapport d'analyse de parcours.
-  But : enrichir le rapport HTML avec une section CO2e (fabrication + énergie).
+  Étape OPTIONNELLE — lancée si l'utilisateur invoque /efootprint après un
+  rapport d'analyse de parcours. But : enrichir le rapport HTML d'une section
+  CO2e (fabrication + énergie). Toute valeur produite est une ESTIMATION
+  HYPOTHÉTIQUE (rappelée au démarrage, sur chaque paramètre, dans les résultats).
+  Une seule commande : collect_env_data.py appelle lui-même SimilarWeb et detect_tech.
 end note
 
-== Étape E1 - Collecte données environnement ==
+== Étape 10 — Localisation du source_dir ==
 
-U -> C : /efootprint <dossier-audit>
-C -> C : Détecter source_dir depuis arg\nou rapport HTML existant
+U -> C : /efootprint <source_dir>
+C -> C : Résoudre source_dir\n(argument, contexte parcours,\n.har visible, ou demande)
+C -> FS : Vérifier présence .har ou env-data.json
 
-C -> CED : python3 collect_env_data.py <dossier-audit>
-CED -> FS : Lire .har (poids + durée + IP serveur)
-FS -> CED : Données HAR brutes
+== Étape 20 — Collecte env-data.json ==
 
-alt Mode avec cache existant
-  CED -> FS : Lire env-data.json existant
-  FS -> CED : Données précédentes
-  CED -> CED : [mode cache] skip API calls
-else Mode --refresh ou première collecte
-  CED -> IP : GET /json/<IP> (pays + provider)
-  IP -> CED : {country: "DE", org: "AWS"}
+alt env-data.json absent, ou option refresh
+  C -> CED : python3 collect_env_data.py <source_dir>
 
-  CED -> CR : CrUX API (mix device desktop/mobile)
-  CR -> CED : {desktop: 60%, mobile: 40%}
+  CED -> FS : [1/3] Lire .har
+  FS -> CED : requêtes, poids, durée,\nIP serveur principale
+  CED -> CED : Poids par type + part tierce\n(mesure directe HAR)
+
+  CED -> CR : [2/3] CrUX (form_factors)
+  CR -> CED : mix desktop / mobile / tablet
+
+  note over CED, CR
+    Correction CrUX (Chrome only) SYMÉTRIQUE :
+    - tablette rattachée au mobile
+    - mobile regonflé de l'absence d'iOS,
+      desktop de l'absence de macOS/Safari,
+      puis renormalisation
+    Défaut si CrUX absent : 60 % mobile / 40 % desktop
+  end note
+
+  CED -> IP : [3/3] GET /json/<IP>
+  IP -> CED : pays, org, intensité carbone
+
+  note over CED, IP
+    Provider détecté depuis org :
+    aws / gcp / azure / scaleway / ovh
+    Défaut si échec ipinfo : pays FR
+  end note
+
+  CED -> DT : detect_from_har(.har)
+  DT -> CED : stack technique (CDN, hébergeur,\nserveur web, framework, analytics...)
+
+  alt Bloc audience ou traffic manquant (pas de saisie audience manuelle)
+    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domaine>
+    SW -> CED : TopCountryShares\n+ EstimatedMonthlyVisits
+    CED -> CED : Mix pays -> pondère iOS/macOS\nVisites/mois -> annualisées
+  else API bloquée (captcha / WAF) ou domaine non suivi
+    note over CED, SW
+      Repli : récupération assistée (Étape 20d)
+      - dictée en chat, ou capture d'écran déposée
+      Dernier recours : défaut FR 100 % + 100 000 visites/an
+    end note
+  end
+
+  CED -> FS : env-data.json (schema_version 1.3)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
+else Cache existant (option refresh non passée)
+  CED -> FS : Relire env-data.json existant
+  FS -> CED : Données précédentes (inchangées)
 end
 
-CED -> FS : env-data.json\n{page_weight_mb, duration_s,\ncountry, provider, device_mix}
+C -> U : Résumé collecte :\n- poids page + part tierce\n- pays / provider + intensité carbone\n- mix appareils (corrigé iOS/macOS)\n- mix pays + trafic (SimilarWeb)\n- stack technique détectée
 
-note over CED, FS
-  Données collectées :
-  - Poids page (Mo) : depuis HAR
-  - Durée (s) : depuis HAR
-  - Pays serveur : ipinfo.io (50k req/mois gratuit)
-  - Provider cloud : détecté depuis org
-  - Mix devices : CrUX (desktop/mobile %)
-
-  Mode dégradé :
-  - ipinfo.io échoue -> pays="FR" (défaut)
-  - CrUX absent -> 100% desktop
-  - Pas de HAR -> demander poids manuellement
+note over U, C
+  Priorité des sources (mix pays ET trafic) :
+  1. Analytics client (options audience / visits)
+  2. API interne SimilarWeb (voie principale, automatique)
+  3. Récupération assistée (captcha / WAF)
+  4. Défaut FR 100 % + 100 000 visites/an (avec avertissement)
+  Suite du calcul : page 5/5.
 end note
-
-== Étape E2 - Questions hypothèses ==
-
-C -> U : AskUserQuestion :\n- Trafic annuel (visites/an) [REQUIS]\n- Instance cloud (si provider supporté) [CONDITIONNEL]
-
-U -> C : Réponses :\n- 100000 visites/an\n- AWS t3.medium
-
-note over C, U
-  Trafic annuel : TOUJOURS demandé (pas de défaut)
-  Instance cloud : demandée UNIQUEMENT si provider
-  détecté est AWS/Azure/GCP dans env-data.json
-
-  Valeurs non stockées en cache -> toujours
-  demander à chaque relance /efootprint
-end note
-
-== Étape E3 - Calcul e-footprint ==
-
-C -> REF : python3 run_efootprint.py <dossier-audit>\n--visits 100000 --instance t3.medium
-
-REF -> FS : Lire env-data.json
-FS -> REF : Données environnement
-
-REF -> REF : Construire modèle Boavizta :\n- Devices (desktop/mobile/tablet mix)\n- Network (country, provider)\n- Server (instance AWS/Azure/GCP ou générique)\n- Storage (fixed 50 GB SSD)
-
-REF -> REF : Calcul impact :\n- Fabrication (devices dominant)\n- Énergie (usage annuel)\n- Total CO2e (kg/an + g/visite)
-
-REF -> FS : efootprint-model.json\n(modèle complet sérialisé)
-REF -> FS : efootprint-results.json\n(totaux + hypothèses + confiance)
-
-note over REF, FS
-  Sortie efootprint-results.json :
-  {
-    "total_co2e_kg": 89.8,
-    "co2e_per_visit_g": 0.90,
-    "breakdown": {
-      "fabrication_kg": 58.9,
-      "energie_kg": 31.0
-    },
-    "hypotheses": {
-      "trafic_annuel": 100000,
-      "instance": "AWS t3.medium",
-      "country": "DE",
-      "device_mix": {"desktop": 60, "mobile": 40},
-      "confidence": {
-        "page_weight": "high",
-        "country": "medium",
-        "device_mix": "low"
-      }
-    }
-  }
-end note
-
-== Étape E4 - Enrichissement rapport HTML ==
-
-alt Rapport HTML déjà généré
-  C -> U : Régénérer le rapport maintenant ?\n(pour intégrer la section CO2e)
-  U -> C : Oui
-  C -> FS : python3 generate_report_html.py <dossier-audit>
-  FS -> C : rapport-parcours-YYYY-MM-DD.html\n(avec section CO2e)
-else Pas encore de rapport
-  C -> U : Données e-footprint prêtes.\nLance /analyse-parcours pour générer\nle rapport complet avec section CO2e.
-end
-
-C -> U : ✅ Impact CO2e calculé :\n- Total : 89.8 kg CO2e/an\n- Par visite : 0.90 g CO2e/visite\n- Fabrication devices domine (66%)\nFichiers : efootprint-results.json + model.json
 
 @enduml

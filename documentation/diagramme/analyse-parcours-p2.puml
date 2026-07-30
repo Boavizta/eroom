@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p2
-title Workflow Analyse de parcours web — Page 2/3 : DISPATCH + EcoIndex
+title Workflow Analyse de parcours web — Page 2/5 : DISPATCH + EcoIndex
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {

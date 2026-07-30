@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p1
-title Workflow Analyse de parcours web — Page 1/3 : Étape 10 Localisation
+title Workflow Analyse de parcours web — Page 1/5 : Étape 10 Localisation
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {

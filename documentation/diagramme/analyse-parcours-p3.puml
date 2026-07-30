@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p3
-title Workflow Analyse de parcours web — Page 3/3 : CWV Lighthouse + Rapport HTML
+title Workflow Analyse de parcours web — Page 3/5 : CWV Lighthouse + Rapport HTML
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {

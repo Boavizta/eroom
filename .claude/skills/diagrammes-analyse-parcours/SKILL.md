@@ -22,7 +22,7 @@ version: 1.0.0
 
 | Diagramme | Fichiers source (`.puml`) | Fichiers produits | Source de vérité | Régénérer si... |
 |-----------|--------------------------|-------------------|------------------|-----------------|
-| Workflow principal (3 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` | SKILL.md change (étapes, participants) |
+| Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `efootprint/SKILL.md` (p4-p5) | l'un des SKILL.md change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 
 Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
@@ -43,29 +43,40 @@ Pour chaque diagramme modifié :
 
 ## Diagramme 1 — Workflow principal (séquence)
 
-**Source de vérité :** `analyse-parcours/SKILL.md` (sections Étape 10 à Étape 40)
+**Source de vérité :** `analyse-parcours/SKILL.md` (pages 1-3, Étapes 10 à 40) +
+`efootprint/SKILL.md` (pages 4-5, Étapes 10 à 50 du skill /efootprint).
 
-### Structure des 3 fichiers
+Le workflow assemble le parcours de base (p1-p3) ET le module e-footprint optionnel
+(p4-p5). Les titres portent la numérotation globale « Page X/5 ».
+
+### Structure des 5 fichiers
 
 | Fichier | Participants | Étapes couvertes |
 |---------|--------------|-----------------|
 | `analyse-parcours-p1.puml` | U, C, FS | Étapes 10+15 — Localisation + Capture sessionId |
 | `analyse-parcours-p2.puml` | U, C, SA, EI, FS | Étapes 25+35 — DISPATCH + EcoIndex |
-| `analyse-parcours-p3.puml` | U, C, GR, FS | Étape 40 — Rapport HTML |
+| `analyse-parcours-p3.puml` | U, C, GR, FS | Étape 40 — CWV Lighthouse + Rapport HTML |
+| `analyse-parcours-p4.puml` | U, C, CED, SW, IP, CR, DT, FS | e-footprint Étapes 10+20 — Collecte (SimilarWeb, CrUX+correction iOS/macOS, ipinfo, detect_tech) |
+| `analyse-parcours-p5.puml` | U, C, REF, GR, FS | e-footprint Étapes 30+40+50 — Questions, calcul, synthèse, enrichissement rapport |
 
-Découpage en 3 fichiers séparés : chaque page n'affiche que les participants actifs
-(la technique `newpage` dans un mono-fichier ne réduit pas les colonnes).
+Découpage en fichiers séparés : chaque page n'affiche que les participants actifs
+(la technique `newpage` dans un mono-fichier ne réduit pas les colonnes). Les pages
+p4-p5 sont OPTIONNELLES (skill `/efootprint`) mais incluses dans le PDF assemblé.
 
 ### Commandes
 
 ```bash
 plantuml -tsvg documentation/diagramme/analyse-parcours-p1.puml \
          documentation/diagramme/analyse-parcours-p2.puml \
-         documentation/diagramme/analyse-parcours-p3.puml
+         documentation/diagramme/analyse-parcours-p3.puml \
+         documentation/diagramme/analyse-parcours-p4.puml \
+         documentation/diagramme/analyse-parcours-p5.puml
 rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-workflow.pdf \
   documentation/diagramme/analyse-parcours-p1.svg \
   documentation/diagramme/analyse-parcours-p2.svg \
-  documentation/diagramme/analyse-parcours-p3.svg
+  documentation/diagramme/analyse-parcours-p3.svg \
+  documentation/diagramme/analyse-parcours-p4.svg \
+  documentation/diagramme/analyse-parcours-p5.svg
 ls -lh documentation/diagramme/analyse-parcours-workflow.pdf
 open documentation/diagramme/analyse-parcours-workflow.pdf
 ```
@@ -285,6 +296,259 @@ end note
 
 GR -> C : rapport-parcours-YYYY-MM-DD.html
 C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
+
+@enduml
+```
+
+### Contenu de référence — analyse-parcours-p4.puml
+
+**Source de vérité :** `efootprint/SKILL.md` (Étapes 10 et 20, y compris 20b/20c/20e
+SimilarWeb, correction CrUX iOS/macOS) + `collect_env_data.py` (flux réel, défauts,
+providers) + `detect_tech.py`. Points à revérifier si le skill change : défaut mix
+60 % mobile / 40 % desktop (pas 100 % desktop), providers supportés
+`aws / gcp / azure / scaleway / ovh`, `schema_version` d'`env-data.json`, appel
+SimilarWeb automatique intégré à `collect_env_data.py`.
+
+```plantuml
+@startuml analyse-parcours-p4
+title Workflow Analyse de parcours web — Page 4/5 : e-footprint collecte (optionnel)
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill /efootprint)" as C #82C1DD
+participant "collect_env_data.py" as CED #DBDDE5
+participant "API SimilarWeb\n(similarweb_api.py)" as SW #C8E6C9
+participant "API ipinfo.io" as IP #C8E6C9
+participant "CrUX Data" as CR #C8E6C9
+participant "detect_tech.py" as DT #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+note over U, FS
+  Étape OPTIONNELLE — lancée si l'utilisateur invoque /efootprint après un
+  rapport d'analyse de parcours. But : enrichir le rapport HTML d'une section
+  CO2e (fabrication + énergie). Toute valeur produite est une ESTIMATION
+  HYPOTHÉTIQUE (rappelée au démarrage, sur chaque paramètre, dans les résultats).
+  Une seule commande : collect_env_data.py appelle lui-même SimilarWeb et detect_tech.
+end note
+
+== Étape 10 — Localisation du source_dir ==
+
+U -> C : /efootprint <source_dir>
+C -> C : Résoudre source_dir\n(argument, contexte parcours,\n.har visible, ou demande)
+C -> FS : Vérifier présence .har ou env-data.json
+
+== Étape 20 — Collecte env-data.json ==
+
+alt env-data.json absent, ou option refresh
+  C -> CED : python3 collect_env_data.py <source_dir>
+
+  CED -> FS : [1/3] Lire .har
+  FS -> CED : requêtes, poids, durée,\nIP serveur principale
+  CED -> CED : Poids par type + part tierce\n(mesure directe HAR)
+
+  CED -> CR : [2/3] CrUX (form_factors)
+  CR -> CED : mix desktop / mobile / tablet
+
+  note over CED, CR
+    Correction CrUX (Chrome only) SYMÉTRIQUE :
+    - tablette rattachée au mobile
+    - mobile regonflé de l'absence d'iOS,
+      desktop de l'absence de macOS/Safari,
+      puis renormalisation
+    Défaut si CrUX absent : 60 % mobile / 40 % desktop
+  end note
+
+  CED -> IP : [3/3] GET /json/<IP>
+  IP -> CED : pays, org, intensité carbone
+
+  note over CED, IP
+    Provider détecté depuis org :
+    aws / gcp / azure / scaleway / ovh
+    Défaut si échec ipinfo : pays FR
+  end note
+
+  CED -> DT : detect_from_har(.har)
+  DT -> CED : stack technique (CDN, hébergeur,\nserveur web, framework, analytics...)
+
+  alt Bloc audience ou traffic manquant (pas de saisie audience manuelle)
+    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domaine>
+    SW -> CED : TopCountryShares\n+ EstimatedMonthlyVisits
+    CED -> CED : Mix pays -> pondère iOS/macOS\nVisites/mois -> annualisées
+  else API bloquée (captcha / WAF) ou domaine non suivi
+    note over CED, SW
+      Repli : récupération assistée (Étape 20d)
+      - dictée en chat, ou capture d'écran déposée
+      Dernier recours : défaut FR 100 % + 100 000 visites/an
+    end note
+  end
+
+  CED -> FS : env-data.json (schema_version 1.3)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
+else Cache existant (option refresh non passée)
+  CED -> FS : Relire env-data.json existant
+  FS -> CED : Données précédentes (inchangées)
+end
+
+C -> U : Résumé collecte :\n- poids page + part tierce\n- pays / provider + intensité carbone\n- mix appareils (corrigé iOS/macOS)\n- mix pays + trafic (SimilarWeb)\n- stack technique détectée
+
+note over U, C
+  Priorité des sources (mix pays ET trafic) :
+  1. Analytics client (options audience / visits)
+  2. API interne SimilarWeb (voie principale, automatique)
+  3. Récupération assistée (captcha / WAF)
+  4. Défaut FR 100 % + 100 000 visites/an (avec avertissement)
+  Suite du calcul : page 5/5.
+end note
+
+@enduml
+```
+
+### Contenu de référence — analyse-parcours-p5.puml
+
+**Source de vérité :** `efootprint/SKILL.md` (Étapes 30, 40, 50) + `run_efootprint.py`
+(modèle Boavizta, schéma `efootprint-results.json`) + `generate_report_html.py`
+(section CO2e). Points à revérifier si le code change : structure d'`efootprint-results.json`
+(bloc `traffic`, `totals` avec dicts `fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`,
+gros bloc `hypotheses`), position de la section (entre CWV et Annexes), trafic réutilisé
+depuis le bloc `traffic` s'il est déjà résolu.
+
+```plantuml
+@startuml analyse-parcours-p5
+title Workflow Analyse de parcours web — Page 5/5 : e-footprint calcul + rapport (optionnel)
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Utilisateur" as U #82C1DD
+participant "Claude\n(skill /efootprint)" as C #82C1DD
+participant "run_efootprint.py" as REF #DBDDE5
+participant "generate_report_html.py" as GR #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+note over U, FS
+  Suite de la page 4/5 : env-data.json est prêt. On demande les hypothèses non
+  auto-détectables, on calcule, on synthétise, on enrichit le rapport HTML.
+  Rappel : toute valeur reste une ESTIMATION HYPOTHÉTIQUE.
+end note
+
+== Étape 30 — Paramètres utilisateur ==
+
+C -> C : Trafic déjà résolu (bloc traffic\nSimilarWeb ou analytics client) ?
+
+alt Trafic déjà résolu (page 4)
+  note over C : Ne pas reposer la question :\nréutiliser le volume résolu à l'Étape 20c.
+else Aucune source de trafic
+  C -> U : AskUserQuestion — trafic annuel\n(10k / 100k / 500k / 1M, ou libre)
+  U -> C : Trafic retenu (option visits)
+end
+
+alt Provider cloud supporté détecté\n(aws / gcp / azure / scaleway / ovh)
+  C -> U : AskUserQuestion — taille d'instance\n(ex. AWS : t3.medium défaut, t3.large, m5.large...)
+  U -> C : Instance retenue (option instance)
+else Provider inconnu ou non supporté
+  note over C : Pas de question :\nrun_efootprint bascule sur Server générique.
+end
+
+note over C, U
+  Toujours rappeler qu'il s'agit d'hypothèses.
+  Poids, durée, mix appareils, pays : imposés par env-data.json
+  (pour les changer, éditer env-data.json puis relancer).
+end note
+
+== Étape 40 — Calcul e-footprint ==
+
+C -> REF : python3 run_efootprint.py <source_dir>\n[option visits N] [option instance TYPE]
+REF -> FS : Lire env-data.json
+FS -> REF : Données environnement
+
+REF -> REF : Construire modèle Boavizta :\n- Devices (2 profils : mobile / desktop)\n- Network (mobile -> réseau mobile, desktop -> wifi)\n- Server (instance cloud ou générique)\n- Storage (hypothèse 50 GB)
+
+REF -> REF : Calcul impact :\n- Fabrication (dict par poste)\n- Énergie (dict par poste)\n- Total kg/an + g/visite
+
+REF -> FS : efootprint-model.json\n(modèle complet sérialisé)
+REF -> FS : efootprint-results.json\n(totaux + hypothèses, format léger)
+
+note over REF, FS
+  efootprint-results.json (extrait) :
+  {
+    "visits_per_year": ...,
+    "traffic": {source, source_url, snapshot, confidence},
+    "totals": {
+      "total_kg_co2e_per_year": ...,
+      "per_visit_g_co2e": ...,
+      "fabrication_kg_co2e_per_year": {poste: kg},
+      "energy_kg_co2e_per_year": {poste: kg}
+    },
+    "hypotheses": {
+      page_weight_kb, request_duration_ms,
+      weight_by_type_bytes, third_party_share,
+      country, carbon_intensity_g_kwh, provider, instance_type,
+      phone_fraction / desktop_fraction (corrigé iOS/macOS),
+      audience_mix + source, device_scenarios,
+      + niveau de confiance par champ
+    }
+  }
+end note
+
+REF -> C : stdout : tableau hypothèses\n+ résultats CO2e bruts
+
+== Étape 50 — Synthèse et enrichissement rapport ==
+
+C -> U : Synthèse (3 lignes) :\n- ~{total} kg CO2e/an\n- ~{per_visit} g CO2e/visite\n- Poste dominant : devices / server / network / storage
+
+C -> U : AskUserQuestion — et ensuite ?\n- Relancer avec d'autres hypothèses\n- Recollecte (option refresh)\n- Régénérer le rapport HTML\n- Terminer
+
+alt Régénérer le rapport HTML
+  C -> GR : python3 generate_report_html.py <dossier-audit>
+  GR -> FS : Lire efootprint-results.json\n(+ har, coverage, cwv, tech_stack)
+  FS -> GR : Données rapport
+  GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
+  GR -> FS : rapport-parcours-YYYY-MM-DD.html
+  GR -> C : Chemin rapport
+  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A/B/C/D)
+end
+
+note over U, C
+  Boucle humain-dans-la-boucle : aucune itération automatique.
+  Section CO2e omise si efootprint-results.json absent (rapport rétro-compatible).
+end note
 
 @enduml
 ```
