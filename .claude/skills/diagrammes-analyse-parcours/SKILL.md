@@ -304,7 +304,7 @@ C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
 
 **Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 10 et 20, y compris 20b/20c/20e
 SimilarWeb, correction CrUX iOS/macOS) + `collect_env_data.py` (flux réel, défauts,
-providers) + `detect_tech.py`. Points à revérifier si le skill change : défaut mix
+providers) + `detect_tech.py`. Points à revérifier si cette étape change : défaut mix
 60 % mobile / 40 % desktop (pas 100 % desktop), providers supportés
 `aws / gcp / azure / scaleway / ovh`, `schema_version` d'`env-data.json`, appel
 SimilarWeb automatique intégré à `collect_env_data.py`.

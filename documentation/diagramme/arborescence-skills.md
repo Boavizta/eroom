@@ -22,7 +22,7 @@ la taille en Ko est pertinente.
 |-------------------|-------------|------------------|------------------|
 | Skills du projet | `<projet>/.claude/skills/` | les fichiers eux-mêmes | ajout d'un skill/step/script, ou édition notable |
 
-`<projet>` = `/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM`.
+`<projet>` = `~/Documents/missions/MyAIEnv/Agent EROOM`.
 
 Périmètre : ce registre couvre **uniquement les skills du projet**. Les skills globaux
 (`~/.claude/skills/`) sont hors périmètre : ils sont partagés entre tous les projets et
@@ -39,7 +39,7 @@ Lister chaque fichier de skill du projet avec sa taille en Ko et son nombre de l
 avec un total. À relancer puis reporter le résultat dans l'arborescence de la section 3.
 
 ```bash
-ROOT="/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM/.claude/skills"
+ROOT="$HOME/Documents/missions/MyAIEnv/Agent EROOM/.claude/skills"
 find "$ROOT" -type f -not -path '*__pycache__*' -not -name '.DS_Store' -print0 \
 | sort -z | while IFS= read -r -d '' f; do
     b=$(wc -c <"$f"); l=$(wc -l <"$f")
@@ -79,7 +79,7 @@ SKILLS DU PROJET  (Agent EROOM/.claude/skills/)
 │   │   ├── 35_calcul_ecoindex.md ....... 2,2 Ko ·  56 l
 │   │   ├── 37_lighthouse.md ............ 3,9 Ko · 113 l
 │   │   ├── 40_rapport.md ............... 1,8 Ko ·  54 l
-│   │   └── 45_efootprint.md ........... 22,1 Ko · 473 l   (ex-skill efootprint fusionné)
+│   │   └── 45_efootprint.md ........... 22,1 Ko · 473 l
 │   ├── docs/
 │   │   └── capturer-har-et-coverage.md . 8,6 Ko · 231 l
 │   └── scripts/                           [code + config : Ko seul]
@@ -115,8 +115,7 @@ Deux skills de projet.
   scripts et données d'analyse-parcours, il n'avait pas sa place comme skill séparé).
 - `diagrammes-analyse-parcours` : skill outil qui génère les diagrammes PlantUML d'analyse-parcours.
 
-L'étape 45 réutilise les mêmes SCRIPTS que les autres étapes (`collect_env_data.py`,
-`run_efootprint.py`), physiquement rangés sous `analyse-parcours/scripts/`. À l'étape 40,
-`generate_report_html.py` AFFICHE une section CO2e si un `efootprint-results.json` existe
-déjà ; il ne la DÉCLENCHE pas (l'étape 45 reste optionnelle, invoquée via `/efootprint`).
+À l'étape 40, `generate_report_html.py` AFFICHE une section CO2e si un
+`efootprint-results.json` existe déjà ; il ne la DÉCLENCHE pas (l'étape 45 reste
+optionnelle, invoquée via `/efootprint`).
 Voir aussi `documentation/implementation/` pour le détail des scripts.

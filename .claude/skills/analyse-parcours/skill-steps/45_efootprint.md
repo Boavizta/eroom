@@ -45,7 +45,7 @@ Déclencheurs textuels :
 
 -----
 
-## Principe architectural : chaque sous-étape est relançable
+## Principe architectural : chaque étape est relançable
 
 ```
 Étape 10 -> source_dir           (détection ou saisie)
@@ -55,7 +55,7 @@ Déclencheurs textuels :
 Étape 50 -> synthèse + propositions
 ```
 
-Chaque sous-étape peut être relancée indépendamment :
+Chaque étape peut être relancée indépendamment :
 - Relancer étape 20 : passer `--refresh` à `collect_env_data.py`
 - Relancer étape 40 : rappeler `run_efootprint.py` avec d'autres `--visits` ou `--instance`
 
