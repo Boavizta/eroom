@@ -22,7 +22,7 @@ version: 1.0.0
 
 | Diagramme | Fichiers source (`.puml`) | Fichiers produits | Source de vérité | Régénérer si... |
 |-----------|--------------------------|-------------------|------------------|-----------------|
-| Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `efootprint/SKILL.md` (p4-p5) | l'un des SKILL.md change (étapes, participants) |
+| Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 
 Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
@@ -44,7 +44,7 @@ Pour chaque diagramme modifié :
 ## Diagramme 1 — Workflow principal (séquence)
 
 **Source de vérité :** `analyse-parcours/SKILL.md` (pages 1-3, Étapes 10 à 40) +
-`efootprint/SKILL.md` (pages 4-5, Étapes 10 à 50 du skill /efootprint).
+`analyse-parcours/skill-steps/45_efootprint.md` (pages 4-5, Étapes 10 à 50 du skill /efootprint).
 
 Le workflow assemble le parcours de base (p1-p3) ET le module e-footprint optionnel
 (p4-p5). Les titres portent la numérotation globale « Page X/5 ».
@@ -302,7 +302,7 @@ C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
 
 ### Contenu de référence — analyse-parcours-p4.puml
 
-**Source de vérité :** `efootprint/SKILL.md` (Étapes 10 et 20, y compris 20b/20c/20e
+**Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 10 et 20, y compris 20b/20c/20e
 SimilarWeb, correction CrUX iOS/macOS) + `collect_env_data.py` (flux réel, défauts,
 providers) + `detect_tech.py`. Points à revérifier si le skill change : défaut mix
 60 % mobile / 40 % desktop (pas 100 % desktop), providers supportés
@@ -424,7 +424,7 @@ end note
 
 ### Contenu de référence — analyse-parcours-p5.puml
 
-**Source de vérité :** `efootprint/SKILL.md` (Étapes 30, 40, 50) + `run_efootprint.py`
+**Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 30, 40, 50) + `run_efootprint.py`
 (modèle Boavizta, schéma `efootprint-results.json`) + `generate_report_html.py`
 (section CO2e). Points à revérifier si le code change : structure d'`efootprint-results.json`
 (bloc `traffic`, `totals` avec dicts `fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`,

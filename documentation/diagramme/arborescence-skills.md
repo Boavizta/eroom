@@ -62,7 +62,7 @@ Notes de lecture du résultat :
 3. Arborescence de référence (instantané)
 -----
 
-Dernier recalcul : 2026-07-29.
+Dernier recalcul : 2026-07-30.
 
 Convention : `.md` → `Ko · N l` (lignes) ; autres types → `Ko` seul.
 
@@ -70,7 +70,7 @@ Convention : `.md` → `Ko · N l` (lignes) ; autres types → `Ko` seul.
 SKILLS DU PROJET  (Agent EROOM/.claude/skills/)
 │
 ├── analyse-parcours/
-│   ├── SKILL.md ......................... 5,9 Ko · 201 l
+│   ├── SKILL.md ......................... 6,7 Ko · 218 l
 │   ├── skill-steps/                       [tous des .md]
 │   │   ├── 10_localisation.md .......... 2,0 Ko ·  54 l
 │   │   ├── 20_analyse-har.md ........... 0,8 Ko ·  20 l
@@ -78,13 +78,14 @@ SKILLS DU PROJET  (Agent EROOM/.claude/skills/)
 │   │   ├── 30_analyse-coverage.md ...... 2,3 Ko ·  91 l
 │   │   ├── 35_calcul_ecoindex.md ....... 2,2 Ko ·  56 l
 │   │   ├── 37_lighthouse.md ............ 3,9 Ko · 113 l
-│   │   └── 40_rapport.md ............... 1,8 Ko ·  54 l
+│   │   ├── 40_rapport.md ............... 1,8 Ko ·  54 l
+│   │   └── 45_efootprint.md ........... 22,1 Ko · 473 l   (ex-skill efootprint fusionné)
 │   ├── docs/
 │   │   └── capturer-har-et-coverage.md . 8,6 Ko · 231 l
 │   └── scripts/                           [code + config : Ko seul]
-│       ├── generate_report_html.py ... 132,7 Ko  ⚠️ le + gros (~39 % du total)
-│       ├── collect_env_data.py ........ 55,2 Ko
-│       ├── run_efootprint.py .......... 26,0 Ko
+│       ├── generate_report_html.py ... 136,5 Ko  ⚠️ le + gros (~37 % du total)
+│       ├── collect_env_data.py ........ 61,4 Ko
+│       ├── run_efootprint.py .......... 27,9 Ko
 │       ├── detect_tech.py ............. 18,7 Ko
 │       ├── similarweb_api.py .......... 13,1 Ko
 │       ├── collect_cwv_pagespeed.py ... 12,5 Ko
@@ -93,12 +94,11 @@ SKILLS DU PROJET  (Agent EROOM/.claude/skills/)
 │       ├── README-outils.md ........... 2,2 Ko ·  68 l   (.md)
 │       ├── package.json ............... 0,2 Ko
 │       └── .gitignore ................. 0,0 Ko
-│                     └─ sous-total analyse-parcours : 304,3 Ko
+│                     └─ sous-total analyse-parcours : 339,3 Ko
 │
-├── diagrammes-analyse-parcours/SKILL.md . 15,1 Ko · 473 l
-└── efootprint/SKILL.md .................. 22,8 Ko · 494 l
+└── diagrammes-analyse-parcours/SKILL.md . 25,6 Ko · 737 l
 
-TOTAL projet : 342,2 Ko  (hors __pycache__ et .DS_Store)
+TOTAL projet : 364,9 Ko  (hors __pycache__ et .DS_Store)
 ```
 
 
@@ -106,17 +106,17 @@ TOTAL projet : 342,2 Ko  (hors __pycache__ et .DS_Store)
 4. Lecture : comment les skills s'articulent
 -----
 
-Trois skills de projet, un seul point de couplage réel.
+Deux skills de projet.
 
-- `analyse-parcours` : le skill principal. Il a un dossier `skill-steps/` (étapes 10 à 40)
+- `analyse-parcours` : le skill principal. Il a un dossier `skill-steps/` (étapes 10 à 45)
   et un dossier `scripts/` (les outils Python/Bash). C'est lui qui produit le rapport HTML.
+  L'étape 45 (`skill-steps/45_efootprint.md`) porte le calcul CO2e (ex-skill `efootprint`,
+  fusionné le 2026-07-30 : il n'avait pas de script propre et dépendait entièrement des
+  scripts et données d'analyse-parcours, il n'avait pas sa place comme skill séparé).
 - `diagrammes-analyse-parcours` : skill outil qui génère les diagrammes PlantUML d'analyse-parcours.
-- `efootprint` : skill AUTONOME du calcul CO2e. Il n'a PAS de dossier `skill-steps/` :
-  ses étapes (10 à 50) sont inline dans son unique `SKILL.md`.
 
-Point important : `efootprint` n'apparait dans AUCUN fichier de `analyse-parcours/skill-steps/`.
-Il ne réutilise pas les ÉTAPES d'analyse-parcours, il réutilise ses SCRIPTS
-(`collect_env_data.py`, `run_efootprint.py`, physiquement rangés sous `analyse-parcours/scripts/`).
-Le seul contact côté analyse-parcours est passif : à l'étape 40, `generate_report_html.py`
-AFFICHE une section CO2e si un `efootprint-results.json` existe déjà ; il ne la DÉCLENCHE pas.
+L'étape 45 réutilise les mêmes SCRIPTS que les autres étapes (`collect_env_data.py`,
+`run_efootprint.py`), physiquement rangés sous `analyse-parcours/scripts/`. À l'étape 40,
+`generate_report_html.py` AFFICHE une section CO2e si un `efootprint-results.json` existe
+déjà ; il ne la DÉCLENCHE pas (l'étape 45 reste optionnelle, invoquée via `/efootprint`).
 Voir aussi `documentation/implementation/` pour le détail des scripts.

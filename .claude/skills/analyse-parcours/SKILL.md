@@ -5,7 +5,11 @@ description: >
   "analyser la couverture Chrome", "code mort JS/CSS",
   "coverage DevTools", "analyser le trafic d'un parcours",
   ou mentionne des fichiers .har ou Coverage-*.json issus de Chrome DevTools.
-version: 1.0.2
+  S'active aussi pour l'estimation CO2e (e-footprint) : "estime l'empreinte carbone",
+  "impact CO2", "empreinte environnementale", "efootprint",
+  "empreinte écologique du site", "/efootprint", ou mention d'un env-data.json /
+  efootprint-model.json.
+version: 1.1.0
 ---
 
 # Analyse de parcours web (HAR + Coverage)
@@ -38,6 +42,7 @@ Si absent : le rapport affiche `onLoad` HAR comme proxy pour LCP.
 ```
 /analyse-parcours <chemin-dossier>
 /analyse-parcours <fichier.har> <coverage1.json> <coverage2.json> ...
+/efootprint <source_dir>          # étape 45 seule (estimation CO2e)
 ```
 
 Le skill est aussi déclenché automatiquement quand les triggers du `plugin.json` matchent.
@@ -143,6 +148,18 @@ python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <dossier
 ```
 
 Sections : EcoIndex | Trafic réseau | Code mort | CWV (si cwv.json) | Recommandations
+
+---
+
+## Étape 45 — Estimation CO2e (e-footprint)
+
+→ Voir `skill-steps/45_efootprint.md`
+
+Étape **optionnelle**, déclenchée par `/efootprint <source_dir>` ou par des phrases
+comme "estime l'empreinte carbone" / "impact CO2". Réutilise `env-data.json` (HAR +
+CrUX + mix pays/trafic SimilarWeb) pour calculer une estimation CO2e hypothétique via
+la librairie e-footprint (Boavizta), puis insère une section "Impact environnemental"
+dans le rapport HTML (Étape 40) si `efootprint-results.json` est présent.
 
 ---
 
