@@ -514,6 +514,10 @@ def save_results(system, source_dir, env_data, visits, instance_type, traffic_me
             "third_party_requests": job.get("third_party_requests"),
             "third_party_share": job.get("third_party_share"),
             "confidence_breakdown": job.get("confidence_breakdown"),
+            # LOT 2/3 : signaux serveur/réseau factuels annexés (documentaire, mesure
+            # directe HAR). N'entrent pas dans le calcul CO2e.
+            "har_facts": job.get("har_facts"),
+            "confidence_har_facts": job.get("confidence_har_facts"),
             "country": server.get("efootprint_country", "?"),
             "confidence_country": server.get("confidence_country", "default"),
             "carbon_intensity_g_kwh": server.get("carbon_intensity_g_kwh", None),

@@ -2219,6 +2219,33 @@ def _methodo_efootprint(efootprint_results):
             f'<th style="padding:6px 8px;text-align:left">Part macOS (desktop)</th>'
             f'</tr></thead><tbody>{ac_rows}{ac_foot}</tbody></table>{caveat}')
 
+    # --- LOT 2/3 : signaux serveur/réseau factuels annexés (documentaire) ---
+    har_facts_html = ""
+    hf = hyp.get("har_facts")
+    if hf:
+        conf_hf = hyp.get("confidence_har_facts", "high")
+        methods_str = ", ".join(f'{v}×{k}' for k, v in sorted(hf.get("methods", {}).items(), key=lambda kv: -kv[1]))
+        statuses_str = ", ".join(f'{v}×{k}' for k, v in sorted(hf.get("statuses", {}).items(), key=lambda kv: -kv[1]))
+        cache_bytes_kb = round(hf.get("cache_304_uncompressed_bytes", 0) / 1024)
+        hf_rows = [
+            ("Requêtes servies depuis le cache navigateur (304)",
+             f'{hf.get("cache_304_count", 0)} / {hf.get("request_count", 0)} '
+             f'({pct(hf.get("cache_304_share"))}, ≈ {cache_bytes_kb} kB non retéléchargés)',
+             conf_hf),
+            ("Temps d'attente serveur (TTFB, wait)",
+             f'médiane {hf.get("wait_ms_median", "?")} ms, p95 {hf.get("wait_ms_p95", "?")} ms',
+             conf_hf),
+            ("Méthodes HTTP", methods_str or "?", conf_hf),
+            ("Statuts HTTP", statuses_str or "?", conf_hf),
+            ("Version HTTP dominante", hf.get("dominant_http_version", "?"), conf_hf),
+        ]
+        har_facts_html = (
+            f'<h4 style="margin:14px 0 4px">Signaux réseau/serveur factuels (annexe)</h4>'
+            f'<p style="font-size:14px;color:#888;margin:0 0 4px">'
+            f'{hf.get("note", "Documentaire, n\'entre pas dans le calcul CO2e.")}</p>'
+            f'{_methodo_table(hf_rows)}'
+        )
+
     # --- Méthodes / formules ---
     methods = (
         '<h4 style="margin:14px 0 4px">Méthodes appliquées</h4>'
@@ -2248,7 +2275,7 @@ def _methodo_efootprint(efootprint_results):
     )
 
     return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental (CO2e)</h3>'
-            f'{table}{audience_html}{scenarios_html}{methods}')
+            f'{table}{audience_html}{scenarios_html}{har_facts_html}{methods}')
 
 
 def _methodo_cwv(cwv):

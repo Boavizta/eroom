@@ -561,6 +561,78 @@ def _page_breakdown(page_entries, page_url):
     }
 
 
+def _median(values):
+    if not values:
+        return 0
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+def _percentile(values, pct):
+    if not values:
+        return 0
+    s = sorted(values)
+    k = (len(s) - 1) * pct
+    f = int(k)
+    c = min(f + 1, len(s) - 1)
+    if f == c:
+        return s[f]
+    return s[f] + (s[c] - s[f]) * (k - f)
+
+
+def _har_facts(page_entries):
+    """Signaux serveur/réseau factuels annexés (LOT 3, mesure directe HAR).
+
+    Purement documentaire : n'entre PAS dans le calcul e-footprint (compute_needed
+    reste figé, cf. Volet B). Sert à tracer en annexe méthodologique le cache
+    navigateur, les timings serveur, les méthodes/statuts et la version HTTP.
+    """
+    total = len(page_entries)
+    cached = [e for e in page_entries if e.get("response", {}).get("status") == 304]
+    n_cached = len(cached)
+    cached_transfer_bytes = sum(_entry_transfer_bytes(e) for e in cached)
+    cached_uncompressed_bytes = sum(
+        e.get("response", {}).get("content", {}).get("size", 0) or 0 for e in cached
+    )
+
+    waits = [
+        e.get("timings", {}).get("wait", -1)
+        for e in page_entries
+        if e.get("timings", {}).get("wait", -1) is not None and e.get("timings", {}).get("wait", -1) >= 0
+    ]
+
+    methods = {}
+    statuses = {}
+    http_versions = {}
+    for e in page_entries:
+        m = e.get("request", {}).get("method", "?")
+        methods[m] = methods.get(m, 0) + 1
+        s = e.get("response", {}).get("status")
+        if s is not None:
+            statuses[s] = statuses.get(s, 0) + 1
+        v = e.get("response", {}).get("httpVersion", "?")
+        http_versions[v] = http_versions.get(v, 0) + 1
+
+    dominant_http_version = max(http_versions, key=http_versions.get) if http_versions else "?"
+
+    return {
+        "request_count": total,
+        "cache_304_count": n_cached,
+        "cache_304_share": round(n_cached / total, 3) if total else 0.0,
+        "cache_304_transfer_bytes": cached_transfer_bytes,
+        "cache_304_uncompressed_bytes": cached_uncompressed_bytes,
+        "wait_ms_median": round(_median(waits), 1),
+        "wait_ms_p95": round(_percentile(waits, 0.95), 1),
+        "methods": methods,
+        "statuses": statuses,
+        "http_versions": http_versions,
+        "dominant_http_version": dominant_http_version,
+        "note": "Documentaire (mesure directe HAR), n'entre pas dans le calcul e-footprint.",
+    }
+
+
 def extract_har_data(har_path):
     """
     Extrait depuis le HAR :
@@ -608,6 +680,7 @@ def extract_har_data(har_path):
             "on_load_ms": round(on_load_ms),
             "request_count": len(page_entries),
             "breakdown": _page_breakdown(page_entries, url),
+            "har_facts": _har_facts(page_entries),
         })
 
         # IP serveur : depuis la première entrée HTML de cette page
@@ -685,6 +758,9 @@ def aggregate_page_metrics(pages):
             "third_party_share": breakdown.get("third_party_share", 0.0),
             "third_party_transfer_share": breakdown.get("third_party_transfer_share", 0.0),
             "confidence_breakdown": CONFIDENCE_HIGH,  # mesure directe HAR
+            # --- LOT 2/3 : signaux serveur/réseau factuels annexés (documentaire) ---
+            "har_facts": heaviest.get("har_facts", {}),
+            "confidence_har_facts": CONFIDENCE_HIGH,  # mesure directe HAR
             # compute_needed reste figé côté run_efootprint (0.05 cpu_core) : le HAR
             # ne mesure pas le CPU serveur. Documenté, pas déduit.
             "compute_needed_note": "CPU serveur indéductible du HAR (signal côté client). "
@@ -1102,7 +1178,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             )
 
     return {
-        "schema_version": "1.4",
+        "schema_version": "1.5",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,

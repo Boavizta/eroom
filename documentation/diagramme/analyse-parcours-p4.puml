@@ -90,7 +90,7 @@ alt env-data.json absent, ou option refresh
     end note
   end
 
-  CED -> FS : env-data.json (schema_version 1.4)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
+  CED -> FS : env-data.json (schema_version 1.5)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
 else Cache existant (option refresh non passée)
   CED -> FS : Relire env-data.json existant
   FS -> CED : Données précédentes (inchangées)
