@@ -1834,7 +1834,7 @@ def _section_medias(greenit):
 </div>"""
 
     return f"""<section id="medias">
-  <h2>Médias et documents</h2>
+  <h2>Médias et documents à surveiller</h2>
   <p style="font-size:15px;color:#888;margin-bottom:12px">
     Signalement factuel (poids, nombre) : aucun seuil de conformité n'est appliqué ici,
     l'usage attendu d'une vidéo ou d'un PDF variant trop selon le contexte du site pour
@@ -2572,7 +2572,7 @@ def _methodo_ecoindex():
 def _methodo_medias():
     """Sous-section E : limites des règles médias (Lot 4)."""
     return (
-        '<h3 id="methodo-medias" style="margin-top:20px">E. Médias et documents</h3>'
+        '<h3 id="methodo-medias" style="margin-top:20px">E. Médias et documents à surveiller</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Seuils "image bitmap lourde" (200 Ko) et "SVG suspect" (30 Ko).</b> '
         'Heuristiques internes non sourcées (aucun référentiel GreenIT-Analysis/EcoIndex '
@@ -3079,7 +3079,7 @@ def generate(audit_dir, output_path=None):
     n = 3  # 1=Recommandations, 2=GreenIT, puis suit
     medias_nav = ""
     if has_medias:
-        medias_nav = f'<li><a href="#medias">{n}. Médias et documents</a></li>'
+        medias_nav = f'<li><a href="#medias">{n}. Médias et documents à surveiller</a></li>'
         n += 1
     cwv_nav = ""
     if cwv:
