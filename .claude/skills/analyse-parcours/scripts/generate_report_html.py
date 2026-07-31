@@ -964,7 +964,58 @@ def _cwv_fmt_value(metric, val):
     return f"{int(round(val))} {_CWV_UNITS[metric]}"
 
 
-def _section_cwv_analyse(page_metrics, cwv):
+def _cwv_diagnostic_signal(action_key, traffic, greenit, coverage_by_page):
+    """Lot 5 : croise le problème CWV détecté avec des données déjà collectées
+    (trackers, polices externes, ressource la plus lourde, JS non utilisé) pour
+    nommer une cause probable plutôt qu'un message générique. Retourne une
+    phrase additionnelle (vocabulaire prudent : "signal indicatif", pas de
+    certitude) ou une chaîne vide si aucun signal exploitable n'est disponible.
+    """
+    metric = action_key.split("_")[0]
+    agg = (greenit or {}).get("aggregated", {}) or {}
+
+    if metric == "cls":
+        signals = []
+        trackers = (traffic or {}).get("trackers") or {}
+        if trackers.get("count"):
+            signals.append(f"{trackers['count']} requête(s) de trackers/scripts tiers détectée(s)")
+        fonts = agg.get("UseStandardTypefaces", {}).get("evidence") or []
+        if fonts:
+            signals.append(f"police(s) web externe(s) détectée(s) ({', '.join(fonts[:2])})")
+        if signals:
+            return (f"Signal indicatif : {' et '.join(signals)}, susceptibles d'injecter du "
+                    f"contenu tardivement dans la page (widgets, fallback de police) — à vérifier "
+                    f"comme cause possible du décalage.")
+        return ""
+
+    if metric == "lcp":
+        top10 = (traffic or {}).get("top10") or []
+        for r in top10:
+            rtype = _classify_type(r.get("mime", ""), r.get("url", ""))
+            if rtype in ("image", "font"):
+                ko = round(r["size"] / 1024, 1)
+                return (f"Signal indicatif : la ressource la plus lourde du parcours est "
+                        f"un(e) {rtype} de {ko} Ko ({r.get('host', '')}) — à vérifier si elle "
+                        f"correspond à l'élément LCP de la page concernée.")
+        return ""
+
+    if metric == "inp":
+        if coverage_by_page:
+            heavy_pages = [
+                label for label, pd in coverage_by_page.items()
+                if coverage_summary(pd["entries"] if isinstance(pd, dict) else pd)["js"]["pct"] > 60
+            ]
+            if heavy_pages:
+                return (f"Signal indicatif : taux de JS non utilisé &gt; 60 % relevé sur "
+                        f"{len(heavy_pages)} page(s) (voir Coverage en annexe) — cause possible "
+                        f"de surcharge du thread principal, sans certitude sur le JS exécuté "
+                        f"réellement au runtime.")
+        return ""
+
+    return ""
+
+
+def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage_by_page=None):
     if not cwv:
         return ""
 
@@ -1068,8 +1119,12 @@ def _section_cwv_analyse(page_metrics, cwv):
 
     legend_notes = ""
     if problem_order:
+        def _note_html(key):
+            signal = _cwv_diagnostic_signal(key, traffic, greenit, coverage_by_page)
+            extra = f' <span style="color:#888">{signal}</span>' if signal else ""
+            return f"{CWV_ACTIONS[key]}{extra}"
         items = "".join(
-            f'<li><sup style="color:#000">{_CIRCLED_DIGITS[i]}</sup> {CWV_ACTIONS[key]}</li>'
+            f'<li><sup style="color:#000">{_CIRCLED_DIGITS[i]}</sup> {_note_html(key)}</li>'
             for i, key in enumerate(problem_order)
         )
         legend_notes = (
@@ -2550,6 +2605,12 @@ def _methodo_cwv(cwv):
         'INP 200/500 ms ; CLS 0,1/0,25.</li>'
         '<li><b>Lab (simulation).</b> Les sources "lab" (PageSpeed lab ou Lighthouse local) '
         'sont des simulations à réseau/CPU bridés, généralement plus pessimistes que le terrain.</li>'
+        '<li><b>Signaux indicatifs (diagnostic causal).</b> Quand un problème LCP/INP/CLS est '
+        'détecté, le rapport ajoute un signal croisé avec des données déjà collectées (trackers, '
+        'polices web externes, ressource la plus lourde du parcours, taux de JS non utilisé). '
+        'Ce sont des corrélations, pas des causes confirmées : le HAR ne capture ni le JS exécuté '
+        'réellement au runtime, ni le rendu réel de la page (pas de mesure DOM/CSS). À vérifier '
+        'manuellement avant conclusion.</li>'
         '</ul>'
     )
 
@@ -2722,7 +2783,25 @@ def _section_couts(page_metrics):
 </section>"""
 
 
-def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None):
+def _cwv_reco_signal_html(metric, traffic, greenit, coverage_by_page):
+    """Lot 5 (recommandations) : version courte du signal indicatif de
+    _cwv_diagnostic_signal(), avec renvoi vers le détail en section Analyse CWV.
+    Retourne une chaîne vide si aucun signal exploitable (même logique de calcul
+    que la section détaillée, texte raccourci uniquement)."""
+    long_signal = _cwv_diagnostic_signal(f"{metric}_x", traffic, greenit, coverage_by_page)
+    if not long_signal:
+        return ""
+    short = {
+        "cls": "trackers tiers et/ou police(s) web externe(s) détectés",
+        "inp": "JS non utilisé &gt; 60 % relevé",
+    }.get(metric)
+    if not short:
+        return ""
+    return (f'<br><span style="color:#888;font-size:0.85em">Signal : {short} '
+            f'(détail en <a href="#cwv-analyse">section Analyse CWV</a>).</span>')
+
+
+def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None, greenit=None):
     prio1, prio2, prio3 = [], [], []
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
@@ -2791,6 +2870,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         vals = [v for v, _ in items]
         range_str = f"{int(min(vals))} ms" if len(vals) == 1 else f"entre {int(min(vals))} ms et {int(max(vals))} ms"
         n = len(items)
+        signal = _cwv_reco_signal_html("inp", traffic, greenit, coverage_by_page)
         return (
             f"<strong>Réduire l'INP</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
@@ -2798,13 +2878,14 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
             f"Actions : découper les tâches longues (&gt; 50 ms) &middot; "
             f"utiliser <code>scheduler.yield()</code> &middot; lazy-loader les composants non visibles.<br>"
             f"Pages : {_pages_str(items)}"
-            f"</span>"
+            f"</span>{signal}"
         )
 
     def _cls_item(items, severity):
         vals = [v for v, _ in items]
         range_str = f"{min(vals):.2f}" if len(vals) == 1 else f"entre {min(vals):.2f} et {max(vals):.2f}"
         n = len(items)
+        signal = _cwv_reco_signal_html("cls", traffic, greenit, coverage_by_page)
         return (
             f"<strong>Corriger les décalages de mise en page (CLS)</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
@@ -2812,7 +2893,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
             f"Actions : définir <code>width</code>/<code>height</code> sur les médias &middot; "
             f"utiliser <code>font-display: optional</code> ou <code>size-adjust</code>.<br>"
             f"Pages : {_pages_str(items)}"
-            f"</span>"
+            f"</span>{signal}"
         )
 
     if lcp_bad:
@@ -3126,12 +3207,12 @@ def generate(audit_dir, output_path=None):
 </nav>
 <main id="contenu">
 """
-    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack)
+    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack, greenit)
     html += _section_greenit(greenit)
     if has_medias:
         html += _section_medias(greenit)
     if cwv:
-        html += _section_cwv_analyse(page_metrics, cwv)
+        html += _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page)
     if efootprint_results:
         html += _section_efootprint(efootprint_results)
     def _prefix_h2(html_str, prefix):
