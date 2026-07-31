@@ -45,6 +45,41 @@ TYPE_COLORS = {
     "other":      "#95a5a6",
 }
 
+# Palette de statut (bon/moyen/mauvais/neutre), utilisée pour les badges de
+# conformité GreenIT, les niveaux de confiance et les Core Web Vitals. Couleurs
+# choisies pour un contraste >= 4.5:1 (WCAG AA) sur fond blanc (texte coloré) ET
+# sur fond coloré (texte blanc) — les teintes plus claires historiques (ex.
+# #0cce6b, #ffa400, #5bc0de) étaient sous ce seuil. Un emoji accompagne toujours
+# le statut : la couleur seule ne doit jamais porter l'information (accessibilité
+# daltonisme/lecteur d'écran/impression N&B).
+STATUS_GOOD    = "#1e7e34"   # vert foncé — ✅
+STATUS_WARN    = "#9a4d00"   # orange foncé — ⚠️
+STATUS_BAD     = "#c0392b"   # rouge foncé — 🔴
+STATUS_NEUTRAL = "#5a5a5a"   # gris moyen foncé — ➖ (non mesuré / non applicable)
+STATUS_EMOJI = {"good": "✅", "warn": "⚠️", "bad": "🔴", "neutral": "➖"}
+
+# Fonds clairs assortis (style "chip" : fond clair + bordure + texte/emoji coloré),
+# utilisés à la place des anciens badges fond saturé + texte blanc. Un emoji coloré
+# (ex. ✅ vert Unicode, 🔴 rouge Unicode) devient quasi invisible sur un fond saturé
+# de la MÊME couleur (peu de contraste emoji/fond) ; sur fond clair, l'emoji garde
+# sa couleur Unicode propre et reste toujours lisible.
+STATUS_BG = {
+    "good": "#e8f5e9", "warn": "#fff3e0", "bad": "#fdecea", "neutral": "#eeeeee",
+}
+
+
+def _status_chip(status, text, extra_style=""):
+    """Badge style "chip" (fond clair + bordure + texte/emoji coloré) pour un
+    statut good/warn/bad/neutral. Contraste vérifié >= 4.5:1 (texte sur fond clair)
+    ET emoji toujours visible (jamais posé sur un fond de sa propre couleur)."""
+    color = {"good": STATUS_GOOD, "warn": STATUS_WARN, "bad": STATUS_BAD,
+             "neutral": STATUS_NEUTRAL}[status]
+    bg = STATUS_BG[status]
+    emoji = STATUS_EMOJI[status]
+    return (f'<span style="background:{bg};border:1.5px solid {color};color:{color};'
+            f'font-weight:bold;padding:1px 8px;border-radius:4px;font-size:13px;'
+            f'white-space:nowrap;{extra_style}">{emoji} {text}</span>')
+
 # Domaines de trackers/analytics tiers connus (fusion avec les catégories
 # "Analytics"/"Balise / Tag manager" de detect_tech.py — les deux listes
 # visent le même périmètre mais sont maintenues séparément selon leur usage :
@@ -511,18 +546,22 @@ def _cwv_worst_per_metric(by_strategy):
 
 # Libellés lisibles des sources CWV (distingue terrain / lab API / lab local).
 _CWV_SOURCE_LABELS = {
-    "crux": ("terrain", "#0cce6b", "CrUX terrain (utilisateurs Chrome réels, via PageSpeed)"),
-    "pagespeed_lab": ("lab", "#ffa400", "Lab PageSpeed (simulation via l'API PSI)"),
-    "lighthouse": ("lab local", "#ffa400", "Lab Lighthouse (simulation en local)"),
+    "crux": ("terrain", STATUS_GOOD, "CrUX terrain (utilisateurs Chrome réels, via PageSpeed)"),
+    "pagespeed_lab": ("lab", STATUS_WARN, "Lab PageSpeed (simulation via l'API PSI)"),
+    "lighthouse": ("lab local", STATUS_WARN, "Lab Lighthouse (simulation en local)"),
 }
 
 
+_STATUS_BY_COLOR = {STATUS_GOOD: "good", STATUS_WARN: "warn", STATUS_NEUTRAL: "neutral"}
+
+
 def _cwv_source_badge(source):
-    """Petit badge indiquant la source réelle d'une mesure CWV."""
-    label, color, _ = _CWV_SOURCE_LABELS.get(source, ("?", "#aaa", "Source inconnue"))
+    """Petit badge indiquant la source réelle d'une mesure CWV (style "chip")."""
+    label, color, _ = _CWV_SOURCE_LABELS.get(source, ("?", STATUS_NEUTRAL, "Source inconnue"))
+    bg = STATUS_BG[_STATUS_BY_COLOR.get(color, "neutral")]
     return (f'<span style="display:inline-block;font-size:13px;padding:1px 7px;'
-            f'border-radius:10px;background:{color}22;color:{color};font-weight:bold">'
-            f'{label}</span>')
+            f'border-radius:10px;background:{bg};border:1.5px solid {color};'
+            f'color:{color};font-weight:bold">{label}</span>')
 
 
 def _section_dashboard(page_metrics, cwv):
@@ -541,21 +580,20 @@ def _section_dashboard(page_metrics, cwv):
 
         def _cwv_cell(val, unit, thresholds, strat=None):
             # thresholds = (good_max, needs_improvement_max)
-            # couleurs officielles Google CWV
             if not isinstance(val, (int, float)):
-                return f'<td style="text-align:right;color:#aaa">—</td>'
+                return f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
             if val <= thresholds[0]:
-                color = "#0cce6b"
+                color, emoji = STATUS_GOOD, STATUS_EMOJI["good"]
             elif val <= thresholds[1]:
-                color = "#ffa400"
+                color, emoji = STATUS_WARN, STATUS_EMOJI["warn"]
             else:
-                color = "#ff4e42"
+                color, emoji = STATUS_BAD, STATUS_EMOJI["bad"]
             # Pictogramme indiquant l'appareil dont vient la valeur retenue (pire des deux)
             marker = (f'<span style="color:#999;font-size:12px;margin-right:3px" '
                       f'title="valeur la plus défavorable : {strat}">{_cwv_device_marker(strat)}</span>'
                       if strat else "")
             return (f'<td style="text-align:right;color:{color};font-weight:bold">'
-                    f'{marker}{val} {unit}</td>')
+                    f'{emoji} {marker}{val} {unit}</td>')
 
         if cwv_data:
             lcp_val = cwv_data.get("lcp")
@@ -565,9 +603,9 @@ def _section_dashboard(page_metrics, cwv):
             inp_cell = _cwv_cell(inp_val, "ms", (200, 500), worst_strat.get("inp"))
             cls_cell = _cwv_cell(cls_num, "", (0.1, 0.25), worst_strat.get("cls"))
         else:
-            lcp_cell = f'<td style="text-align:right;color:#aaa">{m["on_load_ms"]} ms *</td>'
-            inp_cell = '<td style="text-align:right;color:#aaa">—</td>'
-            cls_cell = '<td style="text-align:right;color:#aaa">—</td>'
+            lcp_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">{m["on_load_ms"]} ms *</td>'
+            inp_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
+            cls_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
 
         rows += f"""<tr>
       <td>{page_cell}</td>
@@ -578,13 +616,13 @@ def _section_dashboard(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    cwv_legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    cwv_legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
     <span style="font-weight:bold;color:#555">Légende CWV :</span>
-    <span style="color:#0cce6b">● Bon</span>
-    <span style="color:#ffa400">● A améliorer</span>
-    <span style="color:#ff4e42">● Mauvais</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
     <span style="color:#999">📱/🖥 appareil de la valeur la plus défavorable (pire des deux par métrique)</span>
-    <span style="color:#aaa;font-style:italic">— Données terrain non disponibles (fournir cwv.json)</span>
+    <span style="color:{STATUS_NEUTRAL};font-style:italic">{STATUS_EMOJI['neutral']} Données terrain non disponibles (fournir cwv.json)</span>
   </div>"""
     cwv_note = "" if cwv else '<p style="font-size:15px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP et CLS nécessitent des données terrain (API PageSpeed ou cwv.json).</p>'
 
@@ -658,11 +696,11 @@ def _section_traffic(traffic):
 
     # Catégories de doublons : couleur + libellé court
     _CAT_META = {
-        "tracker":        ("#6f42c1", "Tracker / analytics"),
-        "font":           ("#d9534f", "Police externe"),
-        "static_no_cache":("#dc3545", "Statique sans cache"),
-        "static_cached":  ("#28a745", "Statique avec cache"),
-        "other":          ("#888",    "Autre"),
+        "tracker":        ("#5a3494", "#f0e9fa", "🔗 Tracker / analytics"),
+        "font":           ("#a83232", "#fbe9e9", "🔤 Police externe"),
+        "static_no_cache":("#a72834", "#fbe9e9", "🔴 Statique sans cache"),
+        "static_cached":  (STATUS_GOOD, STATUS_BG["good"], "✅ Statique avec cache"),
+        "other":          (STATUS_NEUTRAL, STATUS_BG["neutral"], "➖ Autre"),
     }
 
     dup_section = ""
@@ -681,9 +719,9 @@ def _section_traffic(traffic):
 
         dup_kpis = (
             f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:16px">'
-            f'<span style="background:#dc3545;color:white;padding:2px 8px;border-radius:4px"><b>{nb_problematic}</b> à corriger (sans cache)</span>'
-            f'<span style="background:#6f42c1;color:white;padding:2px 8px;border-radius:4px"><b>{nb_tracker}</b> trackers (normal)</span>'
-            f'<span style="background:#d9534f;color:white;padding:2px 8px;border-radius:4px"><b>{nb_font}</b> polices externes</span>'
+            f'<span style="background:#fbe9e9;border:1.5px solid #a72834;color:#a72834;font-weight:bold;padding:2px 8px;border-radius:4px">🔴 <b>{nb_problematic}</b> à corriger (sans cache)</span>'
+            f'<span style="background:#f0e9fa;border:1.5px solid #5a3494;color:#5a3494;font-weight:bold;padding:2px 8px;border-radius:4px">🔗 <b>{nb_tracker}</b> trackers (normal)</span>'
+            f'<span style="background:#fbe9e9;border:1.5px solid #a83232;color:#a83232;font-weight:bold;padding:2px 8px;border-radius:4px">🔤 <b>{nb_font}</b> polices externes</span>'
             f'</div>'
         )
 
@@ -692,7 +730,7 @@ def _section_traffic(traffic):
         for cat, items in groups.items():
             if not items:
                 continue
-            cat_color, cat_label = _CAT_META[cat]
+            cat_color, cat_bg, cat_label = _CAT_META[cat]
             # Cause (identique pour tout le groupe)
             cause = items[0].get("cause", "")
             rows_html = ""
@@ -707,7 +745,7 @@ def _section_traffic(traffic):
             dup_tables += (
                 f'<details style="margin-bottom:8px" {"open" if cat == "static_no_cache" else ""}>'
                 f'<summary style="cursor:pointer;font-weight:bold;font-size:17px;padding:6px 0">'
-                f'<span style="background:{cat_color};color:white;padding:1px 7px;border-radius:4px;font-size:16px;margin-right:6px">{cat_label}</span>'
+                f'<span style="background:{cat_bg};border:1.5px solid {cat_color};color:{cat_color};font-weight:bold;padding:1px 7px;border-radius:4px;font-size:16px;margin-right:6px">{cat_label}</span>'
                 f'{len(items)} URL(s) — <span style="font-weight:normal;color:#555;font-size:16px">{cause}</span>'
                 f'</summary>'
                 f'<table style="margin-top:6px">'
@@ -798,14 +836,14 @@ def _section_coverage(coverage_by_page):
 
 def _cwv_colored(val, unit, thresholds):
     if not isinstance(val, (int, float)):
-        return f'<td style="text-align:right;color:#aaa">—</td>'
+        return f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
     if val <= thresholds[0]:
-        color = "#0cce6b"
+        color, emoji = STATUS_GOOD, STATUS_EMOJI["good"]
     elif val <= thresholds[1]:
-        color = "#ffa400"
+        color, emoji = STATUS_WARN, STATUS_EMOJI["warn"]
     else:
-        color = "#ff4e42"
-    return f'<td style="text-align:right;color:{color};font-weight:bold">{val} {unit}</td>'
+        color, emoji = STATUS_BAD, STATUS_EMOJI["bad"]
+    return f'<td style="text-align:right;color:{color};font-weight:bold">{emoji} {val} {unit}</td>'
 
 
 def _section_cwv(page_metrics, cwv):
@@ -826,10 +864,10 @@ def _section_cwv(page_metrics, cwv):
         # Une sous-ligne par appareil disponible (mobile puis desktop)
         strats = [s for s in ("mobile", "desktop") if by_strat.get(s)]
         if not strats:
-            na = '<td style="text-align:right;color:#aaa">—</td>'
+            na = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
             rows += f"""<tr>
       <td>{page_cell}</td>
-      <td style="color:#aaa">—</td>
+      <td style="color:{STATUS_NEUTRAL}">—</td>
       {na}{na}{na}
     </tr>"""
             continue
@@ -848,18 +886,18 @@ def _section_cwv(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    legend = """<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
+    legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende :</span>
-    <span style="color:#0cce6b">● Bon</span>
-    <span style="color:#ffa400">● A améliorer</span>
-    <span style="color:#ff4e42">● Mauvais</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
   </div>
   <table style="margin-top:10px;font-size:15px;border:none;width:auto">
     <thead><tr style="background:none">
       <th style="border:none;text-align:left">Métrique</th>
-      <th style="border:none;color:#0cce6b">Bon</th>
-      <th style="border:none;color:#ffa400">A améliorer</th>
-      <th style="border:none;color:#ff4e42">Mauvais</th>
+      <th style="border:none;color:{STATUS_GOOD}">Bon</th>
+      <th style="border:none;color:{STATUS_WARN}">A améliorer</th>
+      <th style="border:none;color:{STATUS_BAD}">Mauvais</th>
       <th style="border:none;text-align:left;color:#555">Description</th>
     </tr></thead>
     <tbody>
@@ -898,7 +936,7 @@ def _cwv_methodo_note(cwv):
 
     has_lab = bool(sources & {"pagespeed_lab", "lighthouse"})
     has_field = "crux" in sources
-    color = "#0cce6b" if has_field and not has_lab else "#ffa400"
+    color = STATUS_GOOD if has_field and not has_lab else STATUS_WARN
     bg = "#e8f5e9" if has_field and not has_lab else "#fff8e1"
 
     lab_caveat = ""
@@ -950,10 +988,10 @@ def _cwv_status(metric, val):
     """Retourne (statut, couleur) pour une valeur de métrique CWV donnée."""
     lo, hi = _CWV_THRESHOLDS[metric]
     if val > hi:
-        return "bad", "#ff4e42"
+        return "bad", STATUS_BAD
     if val > lo:
-        return "warn", "#ffa400"
-    return "good", "#0cce6b"
+        return "warn", STATUS_WARN
+    return "good", STATUS_GOOD
 
 
 def _cwv_fmt_value(metric, val):
@@ -1025,12 +1063,12 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
 
     methodo_note = _cwv_methodo_note(cwv)
 
-    legend = """<div style="font-size:15px;margin-top:16px;display:flex;gap:16px;align-items:center">
+    legend = f"""<div style="font-size:15px;margin-top:16px;display:flex;gap:16px;align-items:center">
     <span style="font-weight:bold;color:#555">Légende :</span>
-    <span style="color:#0cce6b">● Bon</span>
-    <span style="color:#ffa400">● A améliorer</span>
-    <span style="color:#ff4e42">● Mauvais</span>
-    <span style="color:#aaa">○ Non mesuré</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
+    <span style="color:{STATUS_NEUTRAL}">{STATUS_EMOJI['neutral']} Non mesuré</span>
   </div>"""
 
     # Numérotation des types de problèmes (①②③...), attribuée dans l'ordre de
@@ -1047,10 +1085,11 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         return problem_number[action_key]
 
     def _render_value(metric, strat, val):
-        """Rend une ligne de valeur (émoji appareil + valeur + repère numéroté si
-        dégradée). Retourne (html, status)."""
+        """Rend une ligne de valeur (émoji statut + émoji appareil + valeur +
+        repère numéroté si dégradée). Retourne (html, status)."""
         status, color = _cwv_status(metric, val)
-        marker = _cwv_device_marker(strat)
+        status_emoji = STATUS_EMOJI.get(status, "")
+        marker = f'{status_emoji} {_cwv_device_marker(strat)}'
         txt = _cwv_fmt_value(metric, val)
         sup = ""
         if status in ("bad", "warn"):
@@ -1062,7 +1101,7 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         row_worst, strat_by_metric = _cwv_worst_per_metric(by_strat)
         worst_strat = strat_by_metric.get(metric) if strat_by_metric else None
         if worst_strat is None:
-            return '<span style="color:#aaa" title="Non mesuré">○</span>'
+            return f'<span style="color:{STATUS_NEUTRAL}" title="Non mesuré">{STATUS_EMOJI["neutral"]}</span>'
 
         marker_w, txt_w, sup_w, status_w, color_w = _render_value(metric, worst_strat, row_worst[metric])
         line1 = f'<div><b style="color:{color_w}">{marker_w} {txt_w}</b>{sup_w}</div>'
@@ -1092,7 +1131,7 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
             inp_cell = _render_cell("inp", by_strat)
             cls_cell = _render_cell("cls", by_strat)
         else:
-            not_measured = '<span style="color:#aaa" title="Non mesuré">○</span>'
+            not_measured = f'<span style="color:{STATUS_NEUTRAL}" title="Non mesuré">{STATUS_EMOJI["neutral"]}</span>'
             lcp_cell = inp_cell = cls_cell = not_measured
 
         rows += (
@@ -1254,8 +1293,18 @@ GREENIT_RULES = {
     },
 }
 
-COMPLIANCE_COLORS = {"A": "#28a745", "B": "#fd7e14", "C": "#dc3545", "NA": "#aaa"}
+COMPLIANCE_STATUS = {"A": "good", "B": "warn", "C": "bad", "NA": "neutral"}
 COMPLIANCE_ORDER  = {"C": 0, "B": 1, "A": 2, "NA": 3}
+
+
+def _compliance_badge_html(level, count=None, min_width="28px"):
+    """Badge de conformité GreenIT (A/B/C/N.A), style "chip" (fond clair + bordure
+    + emoji coloré) : la couleur seule ne doit jamais porter l'information, et
+    l'emoji doit rester visible même sur son propre statut (accessibilité)."""
+    status = COMPLIANCE_STATUS.get(level, "neutral")
+    display = "N.A" if level == "NA" else level
+    label = f"<b>{count}</b> {display}" if count is not None else display
+    return _status_chip(status, label, extra_style=f"min-width:{min_width}")
 
 
 def load_greenit(audit_dir):
@@ -1737,8 +1786,7 @@ def _section_greenit(greenit):
         bp    = agg[key]
         rule  = GREENIT_RULES.get(key, {"name": key, "description": ""})
         level = bp["complianceLevel"]
-        color = COMPLIANCE_COLORS.get(level, "#aaa")
-        badge = f'<span class="badge" style="background:{color};min-width:28px">{level}</span>'
+        badge = _compliance_badge_html(level)
         detail = bp.get("comment") or bp.get("detailComment") or ""
 
         # Bloc <details> avec les URLs incriminées si disponibles
@@ -1832,18 +1880,18 @@ def _section_greenit(greenit):
     nb_na = sum(1 for k in agg if agg[k]["complianceLevel"] == "NA")
 
     summary = (
-        f'<span style="background:#dc3545;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_c}</b> C</span>'
-        f'<span style="background:#fd7e14;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_b}</b> B</span>'
-        f'<span style="background:#28a745;color:white;padding:2px 8px;border-radius:4px;margin-right:6px"><b>{nb_a}</b> A</span>'
-        f'<span style="background:#aaa;color:white;padding:2px 8px;border-radius:4px"><b>{nb_na}</b> N.A</span>'
+        f'<span style="margin-right:6px">{_compliance_badge_html("C", nb_c, min_width="auto")}</span>'
+        f'<span style="margin-right:6px">{_compliance_badge_html("B", nb_b, min_width="auto")}</span>'
+        f'<span style="margin-right:6px">{_compliance_badge_html("A", nb_a, min_width="auto")}</span>'
+        f'{_compliance_badge_html("NA", nb_na, min_width="auto")}'
     )
 
     legend = (
         '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;font-size:16px">'
-        '<span><span class="badge" style="background:#dc3545">C</span> &nbsp;<b>Non conforme</b> - action corrective requise</span>'
-        '<span><span class="badge" style="background:#fd7e14">B</span> &nbsp;<b>Partiellement conforme</b> - amélioration possible</span>'
-        '<span><span class="badge" style="background:#28a745">A</span> &nbsp;<b>Conforme</b> - bonne pratique respectée</span>'
-        '<span><span class="badge" style="background:#aaa">N.A</span> &nbsp;<b>Non applicable</b> - critère sans objet pour ce site</span>'
+        f'<span>{_compliance_badge_html("C", min_width="auto")} &nbsp;<b>Non conforme</b> - action corrective requise</span>'
+        f'<span>{_compliance_badge_html("B", min_width="auto")} &nbsp;<b>Partiellement conforme</b> - amélioration possible</span>'
+        f'<span>{_compliance_badge_html("A", min_width="auto")} &nbsp;<b>Conforme</b> - bonne pratique respectée</span>'
+        f'<span>{_compliance_badge_html("NA", min_width="auto")} &nbsp;<b>Non applicable</b> - critère sans objet pour ce site</span>'
         '</div>'
     )
 
@@ -1900,18 +1948,35 @@ def _section_medias(greenit):
 </section>"""
 
 
+_CONFIDENCE_LEVELS = ("high", "medium", "low", "default", "default_efootprint",
+                      "default_script", "unjustified")
+
+
 def _confidence_badge(conf):
-    """Rend un petit badge coloré pour un niveau de confiance."""
+    """Rend un petit badge coloré pour un niveau de confiance.
+
+    "default"/"default_efootprint" : valeur par défaut de la LIBRAIRIE e-footprint
+    (ex. archétypes smartphone/laptop). "default_script" : valeur fixée en dur par
+    NOTRE script (ex. stockage 50 GB), pas par e-footprint — distinction nécessaire
+    car les deux étaient auparavant confondues sous un même badge trompeur.
+    "unjustified" : donnée précisée manuellement par la personne qui lance l'audit,
+    mais sans justification/source vérifiable fournie (ex. type d'instance choisi
+    sans preuve).
+    """
     mapping = {
-        "high":    ("#28a745", "collecté"),
-        "medium":  ("#5bc0de", "estimé"),
-        "low":     ("#fd7e14", "supposé"),
-        "default": ("#aaa",    "défaut lib"),
+        "high":               ("#1e7e34", "#e8f5e9", "✅", "collecté"),
+        "medium":             ("#0f6674", "#e0f4f7", "🔎", "estimé"),
+        "low":                ("#9a4d00", "#fff3e0", "❓", "supposé"),
+        "default":            ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
+        "default_efootprint": ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
+        "default_script":     ("#33383d", "#e4e5e7", "🛠️", "défaut script"),
+        "unjustified":        ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
     }
-    color, label = mapping.get(conf, ("#aaa", conf or "?"))
+    color, bg, emoji, label = mapping.get(conf, ("#5a5a5a", "#eeeeee", "❔", conf or "?"))
     return (
-        f'<span style="background:{color};color:white;padding:1px 8px;'
-        f'border-radius:4px;font-size:13px;white-space:nowrap">{label}</span>'
+        f'<span style="background:{bg};border:1.5px solid {color};color:{color};'
+        f'font-weight:bold;padding:1px 8px;border-radius:4px;font-size:13px;'
+        f'white-space:nowrap">{emoji} {label}</span>'
     )
 
 
@@ -1922,6 +1987,35 @@ def _audience_source_label(label, url):
         return (f'{label} (<a href="{url}" target="_blank" rel="noopener">'
                 f'&#8599;&nbsp;source</a>)')
     return label
+
+
+def _instance_type_row(hyp):
+    """Ligne "Type d'instance" avec 3 niveaux de confiance :
+    - jamais précisé (--instance non fourni) : valeur par défaut du SCRIPT
+      (pas d'e-footprint), badge "défaut script".
+    - précisé (--instance fourni) mais sans justification (--instance-source
+      absent) : badge "précisé (non justifié)", choix actif mais non vérifié.
+    - précisé ET justifié (--instance-source fourni) : badge "estimé", avec
+      le texte de justification (et lien source si fourni), sur le modèle de
+      _traffic_source_label()/_audience_source_label().
+
+    hyp : dict hypotheses d'efootprint-results.json. Retourne (label_value, conf).
+    """
+    value = hyp.get("instance_type", "?")
+    source_text = hyp.get("instance_type_source")
+    source_url = hyp.get("instance_type_source_url")
+
+    if not hyp.get("instance_type_manual"):
+        return value, "default_script"
+
+    if not source_text:
+        return value, "unjustified"
+
+    label = source_text
+    if source_url:
+        label = (f'{label} (<a href="{source_url}" target="_blank" rel="noopener">'
+                 f'&#8599;&nbsp;source</a>)')
+    return f'{value} <span style="color:#888;font-size:0.85em">— {label}</span>', "medium"
 
 
 def _traffic_source_label(traffic):
@@ -2042,11 +2136,11 @@ def _section_tech(tech_stack):
     le backend caché et le type d'instance serveur restent indétectables.
   </p>
   <p style="font-size:15px;color:#666">
-    Confiance : <span style="background:#28a745;color:white;padding:1px 6px;border-radius:3px;font-size:13px">collecté</span> signal distinctif
+    Confiance : {_confidence_badge("high")} signal distinctif
     &nbsp;·&nbsp;
-    <span style="background:#5bc0de;color:white;padding:1px 6px;border-radius:3px;font-size:13px">estimé</span> signal partagé/indirect
+    {_confidence_badge("medium")} signal partagé/indirect
     &nbsp;·&nbsp;
-    <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:13px">supposé</span> indice faible (HTML)
+    {_confidence_badge("low")} indice faible (HTML)
   </p>
   <table style="width:100%;border-collapse:collapse;margin-top:8px">
     <thead><tr style="background:{OCTO_PALE}">
@@ -2180,7 +2274,7 @@ def _section_efootprint(results):
         ("Pays hébergement",                hyp.get("country", "?"),                     hyp.get("confidence_country")),
         ("Intensité carbone électricité",   f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
         ("Provider hébergeur",              hyp.get("provider", "?"),                    hyp.get("confidence_provider")),
-        ("Instance type",                   hyp.get("instance_type", "?"),               "paramètre"),
+        ("Instance type",                   *_instance_type_row(hyp)),
         ("Mix device (mobile / desktop)",   f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
     ]
     audience_mix = hyp.get("audience_mix")
@@ -2201,7 +2295,7 @@ def _section_efootprint(results):
     hyp_rows += [
         ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
         ("Trafic annuel estimé",            f'{visits:,} visites',                       _traffic_source_label(traffic)),
-        ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default"),
+        ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default_script"),
     ]
     hyp_html = "".join(
         f'<tr>'
@@ -2329,13 +2423,17 @@ def _section_efootprint(results):
 
   <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
   <p style="font-size:15px;color:#666">
-    Niveau de confiance : <span style="background:#28a745;color:white;padding:1px 6px;border-radius:3px;font-size:13px">collecté</span> API/HAR
+    Niveau de confiance : {_confidence_badge("high")} API/HAR
     &nbsp;·&nbsp;
-    <span style="background:#5bc0de;color:white;padding:1px 6px;border-radius:3px;font-size:13px">estimé</span> inféré
+    {_confidence_badge("medium")} inféré ou déclaré avec justification
     &nbsp;·&nbsp;
-    <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:13px">supposé</span> valeur type
+    {_confidence_badge("low")} valeur type
     &nbsp;·&nbsp;
-    <span style="background:#aaa;color:white;padding:1px 6px;border-radius:3px;font-size:13px">défaut lib</span> valeur par défaut e-footprint
+    {_confidence_badge("unjustified")} choix manuel sans preuve
+    &nbsp;·&nbsp;
+    {_confidence_badge("default_efootprint")} valeur par défaut de la librairie e-footprint
+    &nbsp;·&nbsp;
+    {_confidence_badge("default_script")} valeur fixée par notre script (pas e-footprint)
   </p>
   <table style="width:100%;border-collapse:collapse;margin-top:8px">
     <thead><tr style="background:{OCTO_PALE}">
@@ -2358,11 +2456,11 @@ def _methodo_table(rows):
     """Rend un tableau Paramètre / Valeur / Source-confiance pour l'annexe méthodo.
 
     rows : liste de (label, valeur, confiance|libellé). Si la confiance correspond
-    à un niveau connu (high/medium/low/default), affiche le badge ; sinon texte brut.
+    à un niveau connu (cf. _CONFIDENCE_LEVELS), affiche le badge ; sinon texte brut.
     """
     body = ""
     for label, value, conf in rows:
-        if conf in ("high", "medium", "low", "default"):
+        if conf in _CONFIDENCE_LEVELS:
             src = _confidence_badge(conf)
         else:
             src = f'<span style="font-size:14px;color:#666">{conf}</span>'
@@ -2415,7 +2513,7 @@ def _methodo_efootprint(efootprint_results):
         ("Pays d'hébergement", hyp.get("country", "?"), hyp.get("confidence_country", "default")),
         ("Intensité carbone électricité", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),
         ("Provider hébergeur", hyp.get("provider", "?"), hyp.get("confidence_provider", "default")),
-        ("Type d'instance", hyp.get("instance_type", "?"), "paramètre"),
+        ("Type d'instance", *_instance_type_row(hyp)),
         ("Trafic annuel", _visits_val, _traffic_source_label(traffic)),
     ]
     # Mix pays d'audience (sert à pondérer iOS/macOS)
@@ -2448,8 +2546,8 @@ def _methodo_efootprint(efootprint_results):
     rows.append(("Réseau (déduit du mix appareils)",
                  "mobile → réseau mobile ; desktop → wifi",
                  "déduit du mix appareils"))
-    rows.append(("Stockage serveur", f'{hyp.get("storage_gb", 50)} GB', "default"))
-    rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default"))
+    rows.append(("Stockage serveur", f'{hyp.get("storage_gb", 50)} GB', "default_script"))
+    rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default_efootprint"))
 
     table = _methodo_table(rows)
 

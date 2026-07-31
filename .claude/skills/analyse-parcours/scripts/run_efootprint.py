@@ -120,10 +120,13 @@ def resolve_visits(cli_visits, env_data):
 # ---------------------------------------------------------------------------
 
 CONFIDENCE_LABELS = {
-    "high":    "collecté  ",
-    "medium":  "estimé    ",
-    "low":     "supposé   ",
-    "default": "défaut lib",
+    "high":               "collecté  ",
+    "medium":             "estimé    ",
+    "low":                "supposé   ",
+    "default":            "défaut lib",
+    "default_efootprint": "défaut lib",
+    "default_script":     "défaut script",
+    "unjustified":        "précisé (non justifié)",
 }
 
 
@@ -131,7 +134,23 @@ def fmt_conf(conf):
     return CONFIDENCE_LABELS.get(conf, conf or "?")
 
 
-def print_hypotheses(env_data, visits, instance_type, traffic_meta=None):
+def instance_type_confidence(manual, source):
+    """Niveau de confiance du type d'instance :
+    - jamais précisé (--instance non fourni) : "default_script" (valeur fixée
+      par CE script, pas par la librairie e-footprint qui n'a pas de défaut
+      "t3.medium" propre).
+    - précisé (--instance fourni) sans justification (--instance-source
+      absent) : "unjustified" — choix actif mais non vérifié.
+    - précisé ET justifié (--instance-source fourni) : "medium" ("estimé")."""
+    if not manual:
+        return "default_script"
+    if not source:
+        return "unjustified"
+    return "medium"
+
+
+def print_hypotheses(env_data, visits, instance_type, traffic_meta=None,
+                      instance_manual=False, instance_source=None):
     job = env_data.get("job", {})
     server = env_data.get("server", {})
     device = env_data.get("device_mix", {})
@@ -170,9 +189,12 @@ def print_hypotheses(env_data, visits, instance_type, traffic_meta=None):
     print(f"  {'Provider hébergeur':<35} "
           f"{server.get('detected_provider') or 'inconnu':<18}"
           f"{fmt_conf(server.get('confidence_provider'))}")
+    _instance_conf = instance_type_confidence(instance_manual, instance_source)
     print(f"  {'Instance type':<35} "
           f"{instance_type:<18}"
-          f"{'supposé   ' if instance_type == 't3.medium' else 'paramètre '}")
+          f"{fmt_conf(_instance_conf)}")
+    if instance_source:
+        print(f"  {'  justification':<35} {instance_source}")
     print(f"  {'Mix device (phone / desktop)':<35} "
           f"{device.get('phone_fraction', 0):.0%} / {device.get('desktop_fraction', 0):.0%}        "
           f"{fmt_conf(device.get('confidence'))}")
@@ -473,7 +495,8 @@ def save_model(system, source_dir):
     print(f"  Modèle sérialisé : {out_path}")
 
 
-def save_results(system, source_dir, env_data, visits, instance_type, traffic_meta=None):
+def save_results(system, source_dir, env_data, visits, instance_type, traffic_meta=None,
+                  instance_manual=False, instance_source=None, instance_source_url=None):
     """Écrit un JSON léger (totaux + hypothèses) pour consommation par le rapport HTML."""
     fab_kg, energy_kg = extract_results(system)
     total_kg = sum(fab_kg.values()) + sum(energy_kg.values())
@@ -537,6 +560,9 @@ def save_results(system, source_dir, env_data, visits, instance_type, traffic_me
             "provider": server.get("detected_provider") or "inconnu",
             "confidence_provider": server.get("confidence_provider", "default"),
             "instance_type": instance_type,
+            "instance_type_manual": instance_manual,
+            "instance_type_source": instance_source,
+            "instance_type_source_url": instance_source_url,
             # Mix appareils retenu (mobile = phone+tablet, corrigé iOS)
             "phone_fraction": device.get("phone_fraction", 0.6),
             "desktop_fraction": device.get("desktop_fraction", 0.4),
@@ -597,10 +623,20 @@ def main():
                              "'traffic' SimilarWeb écrit par l'agent dans env-data.json. "
                              "Défaut : bloc 'traffic' s'il existe, sinon 100 000 visites/an.")
     parser.add_argument("--instance", default="t3.medium",
-                        help="Type d'instance cloud (défaut : t3.medium)")
+                        help="Type d'instance cloud (défaut : t3.medium, valeur du script "
+                             "sans lien avec e-footprint, non vérifiée). Si précisé, la "
+                             "confiance reste basse ('précisé (non justifié)') sauf si "
+                             "--instance-source est aussi fourni.")
+    parser.add_argument("--instance-source", default=None,
+                        help="Justification de --instance (ex. \"confirmé par l'équipe infra "
+                             "client, ticket #1234\"). Fait passer la confiance à 'estimé'.")
+    parser.add_argument("--instance-source-url", default=None,
+                        help="Lien optionnel vers la preuve/source de --instance-source.")
     parser.add_argument("--refresh-data", action="store_true",
                         help="Relancer collect_env_data.py avant le calcul")
     args = parser.parse_args()
+
+    instance_manual = args.instance != "t3.medium" or args.instance_source is not None
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
@@ -621,7 +657,8 @@ def main():
         print(f"  ⚠ {traffic_meta['warning']}")
 
     # Résumé des hypothèses
-    print_hypotheses(env_data, visits, args.instance, traffic_meta=traffic_meta)
+    print_hypotheses(env_data, visits, args.instance, traffic_meta=traffic_meta,
+                      instance_manual=instance_manual, instance_source=args.instance_source)
 
     # Calcul
     print("[e-footprint] Construction du modèle (hypothétique)...")
@@ -634,7 +671,9 @@ def main():
     # Sauvegarde modèle + résultats légers
     print("[e-footprint] Sérialisation du modèle...")
     save_model(system, source_dir)
-    save_results(system, source_dir, env_data, visits, args.instance, traffic_meta=traffic_meta)
+    save_results(system, source_dir, env_data, visits, args.instance, traffic_meta=traffic_meta,
+                 instance_manual=instance_manual, instance_source=args.instance_source,
+                 instance_source_url=args.instance_source_url)
     print()
     print(f"  Trafic retenu : {visits:,} visites/an (source : {traffic_meta['source']})")
     print("Pour relancer avec d'autres hypothèses :")
