@@ -65,10 +65,30 @@ def resolve_visits(cli_visits, env_data):
 
     Retourne (visits, meta) où meta = {source, source_url, snapshot, confidence,
     note, warning?} pour la traçabilité (console, JSON, rapport HTML).
+
+    Cas particulier : si --visits reprend exactement la valeur déjà tracée dans le
+    bloc 'traffic' (ex. proposée par défaut à l'utilisateur puis validée telle quelle),
+    on hérite de sa provenance (source/source_url/snapshot) au lieu de l'écraser par
+    le libellé générique "saisie manuelle" — sinon le lien "↗ source" SimilarWeb
+    disparaît du rapport alors que la valeur en vient réellement.
     """
     traffic = (env_data or {}).get("traffic") or {}
+    traffic_visits = traffic.get("visits_per_year")
+    traffic_is_sourced = bool(traffic_visits) and traffic.get("source") not in (None, "default")
+
+    def _meta_from_traffic_block():
+        return {
+            "source": traffic.get("source", "SimilarWeb (estimation)"),
+            "source_url": traffic.get("source_url"),
+            "snapshot": traffic.get("snapshot"),
+            "confidence": traffic.get("confidence", "medium"),
+            "note": traffic.get("note"),
+            "warning": None,
+        }
 
     if cli_visits is not None:
+        if traffic_is_sourced and int(traffic_visits) == int(cli_visits):
+            return cli_visits, _meta_from_traffic_block()
         return cli_visits, {
             "source": "saisie manuelle (--visits)",
             "source_url": None,
@@ -79,16 +99,8 @@ def resolve_visits(cli_visits, env_data):
             "warning": None,
         }
 
-    visits = traffic.get("visits_per_year")
-    if visits and traffic.get("source") not in (None, "default"):
-        return int(visits), {
-            "source": traffic.get("source", "SimilarWeb (estimation)"),
-            "source_url": traffic.get("source_url"),
-            "snapshot": traffic.get("snapshot"),
-            "confidence": traffic.get("confidence", "medium"),
-            "note": traffic.get("note"),
-            "warning": None,
-        }
+    if traffic_is_sourced:
+        return int(traffic_visits), _meta_from_traffic_block()
 
     return DEFAULT_VISITS_PER_YEAR, {
         "source": "default",

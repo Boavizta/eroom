@@ -875,13 +875,46 @@ def _cwv_methodo_note(cwv):
 
 
 CWV_ACTIONS = {
-    "lcp_bad":  "optimiser le chargement de l'image/bloc principal (preload, formats modernes, lazy loading désactivé sur hero)",
-    "lcp_warn": "vérifier la priorité de chargement de l'élément principal",
-    "inp_bad":  "réduire le travail JS sur le thread principal (long tasks, event handlers lourds)",
-    "inp_warn": "optimiser les gestionnaires d'événements et éviter les rendus bloquants",
-    "cls_bad":  "définir des dimensions explicites sur images et iframes, éviter les injections DOM tardives",
-    "cls_warn": "vérifier les éléments sans taille réservée (fonts, images, publicités)",
+    "lcp_warn": "L'élément principal de la page (souvent l'image ou le bloc héro) met un "
+                "peu trop de temps à s'afficher. À vérifier : cette image/bloc est-il chargé "
+                "en priorité, ou un script/une autre ressource le retarde-t-il ?",
+    "lcp_bad":  "L'élément principal de la page (image ou bloc héro) met trop de temps à "
+                "s'afficher. Causes probables : image non préchargée, formats non optimisés, "
+                "lazy loading activé par erreur sur le hero, ou script bloquant le rendu.",
+    "inp_warn": "Le thread principal met un peu de temps à répondre après un clic ou un tap. "
+                "Cause probable : gestionnaires d'événements ou traitements JS qui retardent "
+                "la réponse.",
+    "inp_bad":  "Le thread principal met trop de temps à répondre après une interaction "
+                "(clic, tap). Cause probable : tâches JS longues ou gestionnaires "
+                "d'événements lourds qui saturent le thread principal.",
+    "cls_warn": "Des éléments de la page se décalent légèrement après l'affichage initial. "
+                "Cause probable : images, iframes ou polices sans dimensions réservées.",
+    "cls_bad":  "Des éléments de la page se décalent nettement après l'affichage initial, "
+                "perturbant la lecture. Cause probable : images/iframes sans dimensions "
+                "réservées, ou contenus injectés tardivement dans la page.",
 }
+
+_CWV_THRESHOLDS = {"lcp": (1.8, 2.5), "inp": (200, 500), "cls": (0.1, 0.25)}
+_CWV_UNITS = {"lcp": "s", "inp": "ms", "cls": ""}
+_CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩"
+
+
+def _cwv_status(metric, val):
+    """Retourne (statut, couleur) pour une valeur de métrique CWV donnée."""
+    lo, hi = _CWV_THRESHOLDS[metric]
+    if val > hi:
+        return "bad", "#ff4e42"
+    if val > lo:
+        return "warn", "#ffa400"
+    return "good", "#0cce6b"
+
+
+def _cwv_fmt_value(metric, val):
+    if metric == "cls":
+        return f"{val:.2f}"
+    if metric == "lcp":
+        return f"{val:.1f} {_CWV_UNITS[metric]}"
+    return f"{int(round(val))} {_CWV_UNITS[metric]}"
 
 
 def _section_cwv_analyse(page_metrics, cwv):
@@ -902,35 +935,50 @@ def _section_cwv_analyse(page_metrics, cwv):
     <span style="color:#aaa">○ Non mesuré</span>
   </div>"""
 
-    def _metric_row(label, val, unit, thresholds, key_bad, key_warn):
-        if not isinstance(val, (int, float)):
-            return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:#aaa">Non mesuré</span></div>'
-        if val > thresholds[1]:
-            color = "#ff4e42"
-            status = "mauvais"
-            action = CWV_ACTIONS[key_bad]
-        elif val > thresholds[0]:
-            color = "#ffa400"
-            status = "à améliorer"
-            action = CWV_ACTIONS[key_warn]
-        else:
-            color = "#0cce6b"
-            status = "bon"
-            action = ""
-        action_html = f' <span style="color:#555;font-size:16px">- {action}</span>' if action else ""
-        return f'<div style="margin:4px 0;font-size:17px"><b>{label}</b> : <span style="color:{color};font-weight:bold">{val} {unit}</span> <span style="color:{color}">({status})</span>{action_html}</div>'
+    # Numérotation des types de problèmes (①②③...), attribuée dans l'ordre de
+    # première apparition en parcourant le tableau page par page, métrique par
+    # métrique — un même type de problème (ex. "lcp_warn") garde le même numéro
+    # partout, même s'il touche plusieurs pages/appareils.
+    problem_order = []
+    problem_number = {}
 
-    def _device_metrics(strat, c):
-        device_label = "📱 Mobile" if strat == "mobile" else "🖥 Desktop"
-        lcp_row = _metric_row("LCP", c.get("lcp"), "s",  (1.8, 2.5),  "lcp_bad",  "lcp_warn")
-        inp_row = _metric_row("INP", c.get("inp"), "ms", (200, 500),  "inp_bad",  "inp_warn")
-        cls_row = _metric_row("CLS", c.get("cls"), "",  (0.1, 0.25), "cls_bad",  "cls_warn")
-        return f"""<div style="margin-top:8px">
-      <div style="font-size:16px;font-weight:bold;color:#555;margin-bottom:2px">{device_label} {_cwv_source_badge(c.get("source"))}</div>
-      {lcp_row}{inp_row}{cls_row}
-    </div>"""
+    def _note_number(action_key):
+        if action_key not in problem_number:
+            problem_order.append(action_key)
+            problem_number[action_key] = len(problem_order)
+        return problem_number[action_key]
 
-    blocks = ""
+    def _render_value(metric, strat, val):
+        """Rend une ligne de valeur (émoji appareil + valeur + repère numéroté si
+        dégradée). Retourne (html, status)."""
+        status, color = _cwv_status(metric, val)
+        marker = _cwv_device_marker(strat)
+        txt = _cwv_fmt_value(metric, val)
+        sup = ""
+        if status in ("bad", "warn"):
+            n = _note_number(f"{metric}_{status}")
+            sup = f'<sup style="font-size:11px">{_CIRCLED_DIGITS[n - 1]}</sup>'
+        return marker, txt, sup, status, color
+
+    def _render_cell(metric, by_strat):
+        row_worst, strat_by_metric = _cwv_worst_per_metric(by_strat)
+        worst_strat = strat_by_metric.get(metric) if strat_by_metric else None
+        if worst_strat is None:
+            return '<span style="color:#aaa" title="Non mesuré">○</span>'
+
+        marker_w, txt_w, sup_w, status_w, color_w = _render_value(metric, worst_strat, row_worst[metric])
+        line1 = f'<div><b style="color:{color_w}">{marker_w} {txt_w}</b>{sup_w}</div>'
+
+        other_strat = "desktop" if worst_strat == "mobile" else "mobile"
+        other_row = by_strat.get(other_strat)
+        line2 = ""
+        if other_row and isinstance(other_row.get(metric), (int, float)):
+            marker_o, txt_o, sup_o, status_o, color_o = _render_value(metric, other_strat, other_row[metric])
+            style_o = f"color:{color_o};font-weight:bold" if status_o != "good" else "color:#888"
+            line2 = f'<div style="font-size:14px;{style_o}">{marker_o} {txt_o}{sup_o}</div>'
+        return line1 + line2
+
+    rows = ""
     for m in deduped:
         by_strat = _cwv_for_page(m, cwv)
         url = m["title"]
@@ -938,24 +986,57 @@ def _section_cwv_analyse(page_metrics, cwv):
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
 
-        strats = [s for s in ("mobile", "desktop") if by_strat.get(s)]
-        if strats:
-            devices_html = "".join(_device_metrics(s, by_strat[s]) for s in strats)
-        else:
-            devices_html = '<div style="margin-top:8px;color:#aaa;font-size:17px">Non mesuré</div>'
+        sources = {r.get("source") for r in by_strat.values() if r}
+        page_badge = _cwv_source_badge(next(iter(sources))) if len(sources) == 1 else ""
 
-        blocks += f"""<div style="border:1px solid #e0e0e0;border-radius:6px;padding:14px 18px;margin-bottom:14px">
-    <div style="font-size:17px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px">
-      <span style="color:#888;font-size:15px;margin-right:6px">P{num}</span><a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>
-    </div>
-    {devices_html}
-  </div>"""
+        if by_strat:
+            lcp_cell = _render_cell("lcp", by_strat)
+            inp_cell = _render_cell("inp", by_strat)
+            cls_cell = _render_cell("cls", by_strat)
+        else:
+            not_measured = '<span style="color:#aaa" title="Non mesuré">○</span>'
+            lcp_cell = inp_cell = cls_cell = not_measured
+
+        rows += (
+            '<tr style="border-bottom:1px solid #eee">'
+            f'<td style="padding:8px;white-space:nowrap">'
+            f'<span style="color:#888;font-size:14px;margin-right:4px">P{num}</span>'
+            f'<a href="{url}" target="_blank" rel="noopener" style="color:inherit">{short}</a>'
+            f' {page_badge}</td>'
+            f'<td style="padding:8px;text-align:center">{lcp_cell}</td>'
+            f'<td style="padding:8px;text-align:center">{inp_cell}</td>'
+            f'<td style="padding:8px;text-align:center">{cls_cell}</td>'
+            '</tr>'
+        )
+
+    table = f"""<table style="width:100%;border-collapse:collapse;margin-top:10px">
+    <thead><tr style="background:#E0F0F4">
+      <th style="padding:8px;text-align:left">Page</th>
+      <th style="padding:8px">LCP</th>
+      <th style="padding:8px">INP</th>
+      <th style="padding:8px">CLS</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>"""
+
+    legend_notes = ""
+    if problem_order:
+        items = "".join(
+            f'<li><sup>{_CIRCLED_DIGITS[i]}</sup> {CWV_ACTIONS[key]}</li>'
+            for i, key in enumerate(problem_order)
+        )
+        legend_notes = (
+            '<div style="font-size:15px;margin-top:10px;color:#555">'
+            f'<ul style="margin:4px 0 0 16px;padding:0;line-height:1.6">{items}</ul>'
+            '</div>'
+        )
 
     return f"""<section id="cwv-analyse">
   <h2>Analyse Core Web Vitals</h2>
   {methodo_note}
-  {blocks}
+  {table}
   {legend}
+  {legend_notes}
 </section>"""
 
 
