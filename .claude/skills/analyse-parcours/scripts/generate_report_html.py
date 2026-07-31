@@ -43,6 +43,27 @@ TYPE_COLORS = {
     "other":      "#95a5a6",
 }
 
+# Domaines de trackers/analytics tiers connus (fusion avec les catégories
+# "Analytics"/"Balise / Tag manager" de detect_tech.py — les deux listes
+# visent le même périmètre mais sont maintenues séparément selon leur usage :
+# ici pour compter/chiffrer, dans detect_tech.py pour qualifier la stack).
+TRACKER_DOMAINS = {
+    "google-analytics.com", "analytics.google.com", "googletagmanager.com",
+    "hotjar.com", "segment.io", "mixpanel.com", "amplitude.com", "heap.io",
+    "clarity.ms", "swetrix.org", "matomo.org", "plausible.io",
+    "doubleclick.net", "facebook.net", "connect.facebook.net",
+}
+TRACKER_PATHS = {"/log/", "/log/hb", "/hb", "/ping", "/beacon", "/collect", "/track", "/event"}
+
+
+def _is_tracker(host, url):
+    """True si l'hôte/chemin correspond à un tracker/analytics tiers connu."""
+    if host in TRACKER_DOMAINS or any(t in host for t in
+            ("analytics", "swetrix", "gtm", "hotjar", "segment", "mixpanel", "clarity")):
+        return True
+    path = url.split("?")[0].lower()
+    return any(p in path for p in TRACKER_PATHS)
+
 
 # ── Version Agent EROOM (source de vérité : SKILL.md) ────────────────────────
 _skill_md = Path(__file__).parent.parent / "SKILL.md"
@@ -118,22 +139,14 @@ def har_traffic_analysis(har_data):
     # Stocker les headers de réponse par URL pour analyser le cache
     url_resp_headers = {}
 
-    _TRACKER_DOMAINS = {
-        "swetrix.org", "cdn.jsdelivr.net", "google-analytics.com", "googletagmanager.com",
-        "analytics.google.com", "hotjar.com", "segment.io", "mixpanel.com",
-        "amplitude.com", "heap.io", "clarity.ms",
-    }
-    _TRACKER_PATHS = {"/log/", "/log/hb", "/hb", "/ping", "/beacon", "/collect", "/track", "/event"}
     _FONT_DOMAINS  = {"fonts.googleapis.com", "fonts.gstatic.com", "use.typekit.net", "use.fontawesome.com"}
 
     def _dup_category(url, host, hdrs_resp):
         from urllib.parse import urlparse as _up
         path = _up(url).path.lower()
         # Tracker / analytics
-        if host in _TRACKER_DOMAINS or any(t in host for t in ("analytics", "swetrix", "gtm", "hotjar", "segment", "mixpanel")):
+        if _is_tracker(host, url):
             return "tracker", "Requête analytics/tracker — comportement normal, envoi répété intentionnel"
-        if any(path.startswith(p) or path == p for p in _TRACKER_PATHS):
-            return "tracker", "Endpoint de tracking (ping/beacon) — envoi répété intentionnel"
         # Police externe
         if host in _FONT_DOMAINS or "font" in host:
             return "font", "Police externe — absence de cache navigateur entre les pages"
@@ -193,6 +206,19 @@ def har_traffic_analysis(har_data):
         cat, cause = _dup_category(u, host, hdrs)
         duplicates.append({"url": u, "count": c, "category": cat, "cause": cause})
 
+    # Trackers/scripts tiers (Lot 2) : nombre de requêtes + poids cumulé,
+    # calculés sur les requêtes brutes (pas dédupliquées par URL, pour refléter
+    # le trafic réseau réel généré, doublons de tracking inclus).
+    tracker_entries = [r for r in resources if _is_tracker(r["host"], r["url"])]
+    total_size = sum(r["size"] for r in resources) or 1
+    trackers = {
+        "count": len(tracker_entries),
+        "size_ko": round(sum(r["size"] for r in tracker_entries) / 1024, 1),
+        "pct_requests": round(len(tracker_entries) / len(resources) * 100, 1) if resources else 0,
+        "pct_size": round(sum(r["size"] for r in tracker_entries) / total_size * 100, 1),
+        "domains": sorted({r["host"] for r in tracker_entries}),
+    }
+
     return {
         "total_req": len(entries),
         "total_ko": round(sum(r["size"] for r in resources) / 1024, 1),
@@ -200,6 +226,7 @@ def har_traffic_analysis(har_data):
         "http_codes": dict(http_codes),
         "top10": top10,
         "duplicates": duplicates,
+        "trackers": trackers,
     }
 
 
@@ -686,6 +713,19 @@ def _section_traffic(traffic):
 
         dup_section = f'<h3 id="trafic-doublons">Requêtes dupliquées ({len(dups)} URL(s))</h3>{dup_kpis}{dup_tables}'
 
+    tr = traffic.get("trackers") or {}
+    trackers_section = ""
+    if tr.get("count", 0) > 0:
+        tr_domains_html = "".join(f'<span class="domain-tag">{d}</span>' for d in tr.get("domains", [])[:10])
+        trackers_section = f"""<h3 id="trafic-trackers">Trackers et scripts tiers</h3>
+  <div class="kpi-grid" style="margin-bottom:8px">
+    <div class="kpi"><div class="val">{tr['count']}</div><div class="lbl">Requêtes trackers ({tr['pct_requests']}% du total)</div></div>
+    <div class="kpi"><div class="val">{tr['size_ko']:.0f} Ko</div><div class="lbl">Poids trackers ({tr['pct_size']}% du total)</div></div>
+  </div>
+  <div style="margin-bottom:8px">{tr_domains_html}</div>
+  <p style="font-size:15px;color:#888">Pour référence, les pisteurs tiers ajoutent typiquement 20 à 100 requêtes HTTP par page (source : études sur le pistage web) — chiffre à comparer à la mesure ci-dessus.</p>
+"""
+
     return f"""<section id="trafic">
   <h2>Trafic réseau</h2>
   <div class="kpi-grid">
@@ -693,6 +733,7 @@ def _section_traffic(traffic):
     <div class="kpi"><div class="val">{traffic['total_ko']:.0f} Ko</div><div class="lbl">Volume transféré</div></div>
     <div class="kpi"><div class="val">{len(traffic['domains'])}</div><div class="lbl">Domaines</div></div>
   </div>
+  {trackers_section}
   <h3>Domaines contactés</h3>
   <div style="margin-bottom:12px">{domains_html}</div>
   <h3>Codes HTTP</h3>
@@ -957,7 +998,7 @@ def _section_cwv_analyse(page_metrics, cwv):
         sup = ""
         if status in ("bad", "warn"):
             n = _note_number(f"{metric}_{status}")
-            sup = f'<sup style="font-size:11px">{_CIRCLED_DIGITS[n - 1]}</sup>'
+            sup = f'<sup style="font-size:11px;color:#000">{_CIRCLED_DIGITS[n - 1]}</sup>'
         return marker, txt, sup, status, color
 
     def _render_cell(metric, by_strat):
@@ -974,7 +1015,7 @@ def _section_cwv_analyse(page_metrics, cwv):
         line2 = ""
         if other_row and isinstance(other_row.get(metric), (int, float)):
             marker_o, txt_o, sup_o, status_o, color_o = _render_value(metric, other_strat, other_row[metric])
-            style_o = f"color:{color_o};font-weight:bold" if status_o != "good" else "color:#888"
+            style_o = f"color:{color_o};font-weight:bold"
             line2 = f'<div style="font-size:14px;{style_o}">{marker_o} {txt_o}{sup_o}</div>'
         return line1 + line2
 
@@ -1022,7 +1063,7 @@ def _section_cwv_analyse(page_metrics, cwv):
     legend_notes = ""
     if problem_order:
         items = "".join(
-            f'<li><sup>{_CIRCLED_DIGITS[i]}</sup> {CWV_ACTIONS[key]}</li>'
+            f'<li><sup style="color:#000">{_CIRCLED_DIGITS[i]}</sup> {CWV_ACTIONS[key]}</li>'
             for i, key in enumerate(problem_order)
         )
         legend_notes = (
@@ -1139,7 +1180,16 @@ GREENIT_RULES = {
     },
     "PreferHttp2": {
         "name": "Privilégier HTTP/2 à HTTP/1",
-        "description": "HTTP/2 permet le multiplexage des requêtes sur une seule connexion TCP, réduisant la latence et le nombre de connexions.",
+        "description": (
+            "HTTP/2 permet le multiplexage des requêtes sur une seule connexion TCP "
+            "(fin du plafond de 6 connexions/domaine d'HTTP/1.1) et compresse les en-têtes "
+            "(HPACK), réduisant la latence et le nombre de handshakes TCP/TLS. "
+            "Activation selon le serveur : Apache -> mod_http2 (nécessite le MPM event ou "
+            "worker ; incompatible avec mpm_prefork) ; Nginx -> directive 'listen 443 ssl "
+            "http2;' (>= 1.25 pour HTTP/3 QUIC) ; derrière un CDN/reverse-proxy -> HTTP/2 "
+            "est généralement activé par défaut côté edge, vérifier la configuration entre "
+            "le CDN et l'origine."
+        ),
     },
 }
 
@@ -1215,9 +1265,10 @@ def compute_greenit_from_har(har_data):
     nb_errors = 0;         urls_errors = []
     nb_redirects = 0;      urls_redirects = []
     nb_no_cache = 0;       urls_no_cache = []
+    static_cacheable_bytes = 0;  cacheable_ok_bytes = 0  # Lot 3 : gain estimé "visite de retour"
     nb_no_compress = 0;    urls_no_compress = []
     nb_no_etag = 0;        urls_no_etag = []
-    nb_cookie_static = 0;  urls_cookie_static = []
+    nb_cookie_static = 0;  urls_cookie_static = [];  cookie_static_bytes = 0
     cookie_bytes_by_domain = defaultdict(int)
     domains = set()
     css_files = []
@@ -1276,7 +1327,10 @@ def compute_greenit_from_har(har_data):
         if _is_static(mime, url) and status != 304:
             has_cc   = bool(hdrs_resp.get("cache-control") or hdrs_resp.get("expires"))
             has_etag = bool(hdrs_resp.get("etag"))
-            if not has_cc:
+            static_cacheable_bytes += size
+            if has_cc:
+                cacheable_ok_bytes += size
+            else:
                 nb_no_cache += 1
                 if len(urls_no_cache) < 20:
                     urls_no_cache.append(url)
@@ -1296,6 +1350,7 @@ def compute_greenit_from_har(har_data):
         # Cookies sur statiques
         if _is_static(mime, url) and hdrs_req.get("cookie"):
             nb_cookie_static += 1
+            cookie_static_bytes += len(hdrs_req["cookie"].encode())
             if len(urls_cookie_static) < 20:
                 urls_cookie_static.append(url)
         for h in req.get("headers", []):
@@ -1382,6 +1437,12 @@ def compute_greenit_from_har(har_data):
 
     # AddExpiresOrCacheControlHeaders
     lvl, cmt = _pct_ok(nb_no_cache, static_total)
+    # Gain "visite de retour" (Lot 3) : poids déjà évité par le cache en place
+    # + poids additionnel qui serait évité si les ressources sans cache étaient corrigées.
+    _no_cache_bytes = static_cacheable_bytes - cacheable_ok_bytes
+    if static_cacheable_bytes > 0:
+        cmt += (f" — gain revisite actuel : {cacheable_ok_bytes/1024:.0f} Ko évités/visite de retour"
+                f"{f', {_no_cache_bytes/1024:.0f} Ko additionnels possibles si corrigé' if _no_cache_bytes > 0 else ''}")
     agg["AddExpiresOrCacheControlHeaders"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_no_cache}
 
     # CompressHttp
@@ -1428,7 +1489,12 @@ def compute_greenit_from_har(har_data):
 
     # NoCookieForStaticRessources
     lvl = "A" if nb_cookie_static == 0 else "C"
-    cmt = "Aucun cookie sur ressource statique" if nb_cookie_static == 0 else f"{nb_cookie_static} ressource(s) statique(s) avec cookie"
+    if nb_cookie_static == 0:
+        cmt = "Aucun cookie sur ressource statique"
+    else:
+        cmt = (f"{nb_cookie_static} ressource(s) statique(s) avec cookie — "
+               f"{cookie_static_bytes} octets de cookie transmis inutilement sur ce parcours "
+               f"(mesuré depuis les en-têtes HAR, pas une estimation)")
     agg["NoCookieForStaticRessources"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_cookie_static}
 
     # UseETags
@@ -2976,6 +3042,9 @@ def generate(audit_dir, output_path=None):
       <p style="margin:0.3rem 0;"><strong>Effort :</strong> <span data-cost-field="effort">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Durée :</strong> <span data-cost-field="duree">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Tokens :</strong> <span data-cost-field="tokens">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>CO2e estimé :</strong> <span data-cost-field="co2e">—</span></p>
+      <p style="margin:0.3rem 0;font-size:0.9rem;color:#666;"><span data-cost-field="ratio-co2e"></span></p>
+      <p style="margin:0.75rem 0 0 0;font-size:0.8rem;font-style:italic;opacity:0.75;">CO2e estimé à partir des tokens de calcul (input + output + cache creation, hors lecture de cache) : 0,3-1,0 Wh/1000 tokens (Epoch AI 2025, Google Cloud août 2025), PUE 1,1-1,3, intensité carbone électrique 450-480 gCO2/kWh (moyenne mondiale, IEA). Fourchette large car aucune donnée publique précise sur l'infrastructure de calcul réelle de la session ; ordre de grandeur, pas une mesure.</p>
       <p style="margin:0.3rem 0;font-size:0.85rem;color:#888;"><strong>Fichiers sources :</strong> {har_path.name}, {len(cov_files)} fichier(s) Coverage</p>
     </details>
   </div>
