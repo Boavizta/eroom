@@ -40,6 +40,8 @@ TYPE_COLORS = {
     "font":       "#d9534f",
     "html":       "#337ab7",
     "json":       "#9b59b6",
+    "video":      "#e67e22",
+    "pdf":        "#c0392b",
     "other":      "#95a5a6",
 }
 
@@ -113,10 +115,14 @@ def _classify_type(mime, url):
         return "css"
     if "html" in mime:
         return "html"
-    if "image" in mime or re.search(r'\.(png|jpg|jpeg|gif|svg|webp|ico)$', url):
+    if "image" in mime or re.search(r'\.(png|jpg|jpeg|gif|svg|webp|ico|jxl)$', url):
         return "image"
     if "font" in mime or re.search(r'\.(woff2?|ttf|otf|eot)$', url):
         return "font"
+    if "video" in mime or re.search(r'\.(mp4|webm|ogv|mov|avi)$', url):
+        return "video"
+    if "pdf" in mime or url.endswith(".pdf"):
+        return "pdf"
     if "json" in mime or url.endswith(".json"):
         return "json"
     return "other"
@@ -1279,6 +1285,9 @@ def compute_greenit_from_har(har_data):
     nb_bitmap = 0;         urls_bitmap_heavy = []
     nb_bitmap_heavy = 0
     nb_svg_heavy = 0
+    urls_svg_fake = []     # Lot 4 : SVG anormalement lourd (> 30 Ko), probable bitmap encodé
+    nb_video = 0;          video_bytes = 0;  urls_video = []
+    nb_pdf = 0;            pdf_bytes = 0;    urls_pdf = []
     has_print_css = False
     social_domains = {"facebook.com", "twitter.com", "x.com", "linkedin.com", "instagram.com",
                       "platform.twitter.com", "connect.facebook.net", "platform.linkedin.com"}
@@ -1389,12 +1398,28 @@ def compute_greenit_from_har(har_data):
                     nb_svg_heavy += 1
                     if len(urls_svg_heavy) < 20:
                         urls_svg_heavy.append((url, round(size/1024, 1)))
+                # Lot 4 : au-delà de 30 Ko, un SVG (vectoriel, normalement léger)
+                # cache le plus souvent un bitmap encodé en base64 (signal, pas certitude)
+                if size > 30 * 1024 and len(urls_svg_fake) < 20:
+                    urls_svg_fake.append((url, round(size/1024, 1)))
             else:
                 nb_bitmap += 1
-                if size > 100 * 1024 and ext not in ("webp", "avif"):
+                if size > 200 * 1024 and ext not in ("webp", "avif", "jxl"):
                     nb_bitmap_heavy += 1
                     if len(urls_bitmap_heavy) < 20:
                         urls_bitmap_heavy.append((url, round(size/1024, 1)))
+
+        # Vidéos et PDF (Lot 4) : signalement factuel, pas de jugement A/B/C
+        if rtype == "video":
+            nb_video += 1
+            video_bytes += size
+            if len(urls_video) < 20:
+                urls_video.append((url, round(size/1024, 1)))
+        elif rtype == "pdf":
+            nb_pdf += 1
+            pdf_bytes += size
+            if len(urls_pdf) < 20:
+                urls_pdf.append((url, round(size/1024, 1)))
 
         # Réseaux sociaux
         if netloc in social_domains or any(s in netloc for s in ("facebook", "twitter", "linkedin", "instagram")):
@@ -1564,14 +1589,20 @@ def compute_greenit_from_har(har_data):
         )[:10]
         agg["OptimizeBitmapImages"] = {
             "complianceLevel": "A",
-            "comment": f"{nb_bitmap} image(s), aucune > 100 Ko non-webp",
+            "comment": f"{nb_bitmap} image(s), aucune > 200 Ko non-webp/avif/jxl",
             "evidence": [],
             "evidence_images": [{"url": u, "size_kb": round(s/1024, 1)} for u, s in top_bitmaps if u],
         }
     else:
+        heavy_ko = sum(s for _, s in urls_bitmap_heavy)
+        # Gains forfaitaires cnumr JPEG/PNG -> WebP : -31,5% / -50,3% (moyenne ~-41% retenue,
+        # pas de distinction par format source ici — fourchette à préciser en méthodologie)
+        gain_low_ko  = round(heavy_ko * 0.315)
+        gain_high_ko = round(heavy_ko * 0.503)
         agg["OptimizeBitmapImages"] = {
             "complianceLevel": "C",
-            "comment": f"{nb_bitmap_heavy} image(s) > 100 Ko, format non-webp/avif",
+            "comment": (f"{nb_bitmap_heavy} image(s) > 200 Ko, format non-webp/avif/jxl — "
+                        f"gain estimé webp : {gain_low_ko} à {gain_high_ko} Ko (forfaitaire, non mesuré)"),
             "evidence": [f"{u} ({s} Ko)" for u, s in urls_bitmap_heavy],
             "evidence_images": [{"url": u, "size_kb": s} for u, s in urls_bitmap_heavy],
         }
@@ -1582,9 +1613,13 @@ def compute_greenit_from_har(har_data):
     elif nb_svg_heavy == 0:
         agg["OptimizeSvg"] = {"complianceLevel": "A", "comment": f"{nb_svg} SVG, aucun > 10 Ko", "evidence": [], "evidence_images": []}
     else:
+        cmt = f"{nb_svg_heavy} SVG lourd(s) (> 10 Ko)"
+        if urls_svg_fake:
+            cmt += (f" — dont {len(urls_svg_fake)} probable(s) bitmap encodé(s) en base64 "
+                    f"(> 30 Ko, signal non confirmé)")
         agg["OptimizeSvg"] = {
             "complianceLevel": "C",
-            "comment": f"{nb_svg_heavy} SVG lourd(s) (> 10 Ko)",
+            "comment": cmt,
             "evidence": [f"{u} ({s} Ko)" for u, s in urls_svg_heavy],
             "evidence_images": [{"url": u, "size_kb": s} for u, s in urls_svg_heavy],
         }
@@ -1624,7 +1659,14 @@ def compute_greenit_from_har(har_data):
         agg["PreferHttp2"] = {"complianceLevel": "B", "comment": f"Mix HTTP/1.x ({nb_h1}) et HTTP/2+ ({nb_h2})",
                                "evidence": [f"{k}: {v} requête(s)" for k, v in sorted(http_versions.items())]}
 
-    return {"pages": [], "aggregated": agg, "_source": "har"}
+    # Lot 4 : médias volumineux (vidéos, PDF) — signalement factuel, pas de badge A/B/C
+    # (pas de seuil universel défendable, pas de comparaison poids/usage réel possible ici)
+    media = {
+        "video": {"count": nb_video, "size_ko": round(video_bytes/1024), "urls": urls_video},
+        "pdf":   {"count": nb_pdf,   "size_ko": round(pdf_bytes/1024),   "urls": urls_pdf},
+    }
+
+    return {"pages": [], "aggregated": agg, "_source": "har", "media": media}
 
 
 def _section_greenit(greenit):
@@ -1759,6 +1801,47 @@ def _section_greenit(greenit):
     <thead><tr><th style="width:48px">Niveau</th><th>Bonne pratique</th><th>Description</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
+</section>"""
+
+
+def _section_medias(greenit):
+    """Section Lot 4 : contenus médias lourds (vidéos, PDF) — signalement factuel,
+    pas de badge A/B/C (pas de seuil universel défendable pour ces formats).
+    Retourne "" si aucun média détecté (section absente, pas de ligne vide)."""
+    media = (greenit or {}).get("media") or {}
+    video = media.get("video", {})
+    pdf = media.get("pdf", {})
+    if not video.get("count") and not pdf.get("count"):
+        return ""
+
+    def _kpi_block(label, data, color):
+        if not data.get("count"):
+            return ""
+        rows = "".join(
+            f'<tr><td><a href="{u}" target="_blank" rel="noopener" title="{u}">'
+            f'{u.split("/")[-1].split("?")[0][:60] or u[:60]}</a></td>'
+            f'<td style="text-align:right">{s} Ko</td></tr>'
+            for u, s in data.get("urls", [])
+        )
+        return f"""<div style="margin-bottom:16px">
+  <div class="kpi-grid" style="margin-bottom:8px">
+    <div class="kpi"><div class="val">{data['count']}</div><div class="lbl">{label} détecté(s)</div></div>
+    <div class="kpi"><div class="val">{data['size_ko']:,} Ko</div><div class="lbl">Poids cumulé</div></div>
+  </div>
+  <details><summary style="cursor:pointer;color:{color};font-weight:bold">Détail des {data['count']} fichier(s)</summary>
+    <table style="margin-top:6px"><tbody>{rows}</tbody></table>
+  </details>
+</div>"""
+
+    return f"""<section id="medias">
+  <h2>Médias et documents</h2>
+  <p style="font-size:15px;color:#888;margin-bottom:12px">
+    Signalement factuel (poids, nombre) : aucun seuil de conformité n'est appliqué ici,
+    l'usage attendu d'une vidéo ou d'un PDF variant trop selon le contexte du site pour
+    fixer un repère universel.
+  </p>
+  {_kpi_block("Vidéo", video, TYPE_COLORS.get("video", "#e67e22"))}
+  {_kpi_block("PDF", pdf, TYPE_COLORS.get("pdf", "#c0392b"))}
 </section>"""
 
 
@@ -2486,6 +2569,31 @@ def _methodo_ecoindex():
     )
 
 
+def _methodo_medias():
+    """Sous-section E : limites des règles médias (Lot 4)."""
+    return (
+        '<h3 id="methodo-medias" style="margin-top:20px">E. Médias et documents</h3>'
+        '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
+        '<li><b>Seuils "image bitmap lourde" (200 Ko) et "SVG suspect" (30 Ko).</b> '
+        'Heuristiques internes non sourcées (aucun référentiel GreenIT-Analysis/EcoIndex '
+        'officiel ne fixe de seuil de poids en Ko pour ces règles) — <b>confiance faible</b>, '
+        'à ajuster si un référentiel documenté est identifié.</li>'
+        '<li><b>Gain estimé format WebP (-31,5 % à -50,3 %).</b> Chiffres forfaitaires cnumr '
+        'appliqués au poids cumulé des images concernées, sans mesure réelle par image ni '
+        'distinction JPEG/PNG source.</li>'
+        '<li><b>SVG "faux" (probable bitmap encodé en base64).</b> Signal de poids anormal, pas '
+        'une confirmation : un SVG légitimement complexe (carte, illustration détaillée) peut '
+        'aussi dépasser le seuil sans contenir de bitmap.</li>'
+        '<li><b>Surdimensionnement réel non mesurable.</b> Le pipeline n\'effectue aucune capture '
+        'du DOM/CSS de rendu (pas de Puppeteer/Playwright/CDP) : impossible de comparer le poids '
+        'du fichier à sa taille d\'affichage réelle. Les règles média restent au niveau "poids '
+        'brut vs seuil", pas "surdimensionnement mesuré".</li>'
+        '<li><b>Vidéos et PDF.</b> Signalement factuel (poids, nombre), sans badge de conformité : '
+        'aucun seuil universel ne serait défendable, l\'usage attendu variant trop selon le site.</li>'
+        '</ul>'
+    )
+
+
 def _methodo_trafic(efootprint_results=None):
     """Sous-section D : trafic et réseau. Décrit la provenance réelle du volume
     de trafic (saisie analytics, estimation SimilarWeb, ou baseline par défaut)."""
@@ -2540,7 +2648,8 @@ def _methodo_trafic(efootprint_results=None):
 
 
 def _section_methodologie(efootprint_results, cwv):
-    """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic).
+    """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
+    E: médias).
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
@@ -2549,6 +2658,7 @@ def _section_methodologie(efootprint_results, cwv):
         _methodo_cwv(cwv),
         _methodo_ecoindex(),
         _methodo_trafic(efootprint_results),
+        _methodo_medias(),
     ]
     body = "".join(p for p in parts if p)
     return (
@@ -2962,8 +3072,15 @@ def generate(audit_dir, output_path=None):
         annexe_sections.append(("stack-technique", "Stack technique"))
     annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
 
+    has_medias = bool((greenit or {}).get("media", {}).get("video", {}).get("count") or
+                       (greenit or {}).get("media", {}).get("pdf", {}).get("count"))
+
     letters = "abcdefgh"
     n = 3  # 1=Recommandations, 2=GreenIT, puis suit
+    medias_nav = ""
+    if has_medias:
+        medias_nav = f'<li><a href="#medias">{n}. Médias et documents</a></li>'
+        n += 1
     cwv_nav = ""
     if cwv:
         cwv_nav = f'<li><a href="#cwv-analyse">{n}. Analyse Core Web Vitals</a></li>'
@@ -2980,6 +3097,7 @@ def generate(audit_dir, output_path=None):
     nav_items = (
         f'<li><a href="#recommandations">1. Recommandations</a></li>'
         f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
+        f'{medias_nav}'
         f'{cwv_nav}'
         f'{efootprint_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
@@ -3010,6 +3128,8 @@ def generate(audit_dir, output_path=None):
 """
     html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack)
     html += _section_greenit(greenit)
+    if has_medias:
+        html += _section_medias(greenit)
     if cwv:
         html += _section_cwv_analyse(page_metrics, cwv)
     if efootprint_results:
