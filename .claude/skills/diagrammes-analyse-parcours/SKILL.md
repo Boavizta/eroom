@@ -24,6 +24,7 @@ version: 1.0.0
 |-----------|--------------------------|-------------------|------------------|-----------------|
 | Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
+| e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
 
 Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
 
@@ -681,6 +682,63 @@ stop
 
 @enduml
 ```
+
+-----
+
+## Diagramme 3 — e-footprint (pipeline outils CO2e)
+
+**Source de vérité :** le code réel des 3 scripts (pas de doc markdown intermédiaire,
+car les entrées/sorties précises — noms de champs JSON, sous-outils appelés — ne
+sont fiables qu'en lisant le code) :
+- `analyse-parcours/scripts/collect_env_data.py` (orchestrateur collecte : HAR,
+  API CrUX, ipinfo.io, `detect_tech.py`, `similarweb_api.py`)
+- `analyse-parcours/scripts/run_efootprint.py` (orchestrateur calcul : librairie
+  e-footprint/Boavizta)
+- `analyse-parcours/scripts/generate_report_html.py` (restitution section CO2e)
+
+### Description
+
+Diagramme d'activité (PlantUML) en 4 blocs séquentiels verticaux (format A4
+portrait) : outils de collecte -> données récoltées (env-data.json) -> calcul
+e-footprint/Boavizta -> restitution. Une étape de départ séparée représente la
+capture manuelle Chrome DevTools (source du .har et du Coverage-*.json).
+
+Le Bloc 1 liste les 5 sous-outils de `collect_env_data.py` dans leur ordre
+d'exécution réel, avec une note explicite : ils sont **séquentiels**, pas en
+parallèle (contrairement au DISPATCH HAR/Coverage du diagramme 1, qui utilise
+de vrais sous-agents concurrents). Vérifié en lisant le code, pas supposé.
+Les notes de paramètres CLI (Blocs 2 et 3) sont volontairement compactes (une
+ligne, noms de flags seulement, sans description).
+
+Différence avec le diagramme 1 (workflow séquence, pages 4-5) : celui-ci se
+concentre sur les **outils et leurs contrats de données** (paramètres CLI, champs
+JSON en entrée/sortie), pas sur l'échange de messages entre l'utilisateur et Claude.
+
+### Commandes
+
+```bash
+plantuml -tsvg documentation/diagramme/analyse-parcours-efootprint-outils.puml
+rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-efootprint-outils.pdf \
+  documentation/diagramme/analyse-parcours-efootprint-outils.svg
+ls -lh documentation/diagramme/analyse-parcours-efootprint-outils.pdf
+open documentation/diagramme/analyse-parcours-efootprint-outils.pdf
+```
+
+### Pièges rencontrés à la génération
+
+- Un point-virgule `;` à l'intérieur du texte d'un label d'activité multi-lignes
+  est interprété par PlantUML comme la fin du nœud d'activité et casse le
+  parsing plus loin dans le fichier (erreur reportée sur une ligne ultérieure,
+  pas sur le `;` lui-même). Éviter tout `;` dans le corps d'un label `:texte;`
+  — utiliser une virgule à la place.
+- Un flag CLI écrit avec son double-tiret dans un label ou une note (ex.
+  `--audience`, `--visits`) est interprété par PlantUML (syntaxe creole) comme
+  un marqueur de texte barré, à partir du `--` jusqu'au prochain `,` ou `;`.
+  Écrire les noms de flags sans le préfixe `--` dans les notes (ex. `audience`,
+  `visits`) pour éviter ce rendu barré.
+- Rester cohérent sur le vocabulaire employé dans les labels (ex. toujours
+  "parsing", jamais mélanger avec "parse"/"parsé") — les incohérences de terme
+  entre blocs sautent aux yeux sur un diagramme court.
 
 -----
 
