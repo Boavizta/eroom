@@ -28,5 +28,9 @@ rapport-parcours-*.html
 .analysis_start
 .cost-start-ts
 
+# Zone de travail temporaire : handoffs entre sessions, scripts d'expérimentation,
+# baselines figées, notes de lecture. Rien ici n'est un livrable.
+tmp/
+
 # Fichier settings Claude Code avec espace dans le nom
 .claude/ .json
