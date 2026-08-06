@@ -80,7 +80,7 @@ Nom de la clé : **"Clé API pour Agent EROOM"**
 
 ```bash
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
-.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py octo.com/audit --check
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py audits/octo.com/audit --check
 ```
 
 -----
@@ -104,7 +104,7 @@ Le fournir dans `.env` (`IPINFO_TOKEN=ton_token_ici`) débloque le quota nominal
 
 ```bash
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
-.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py octo.com --check
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py audits/octo.com --check
 ```
 
 `--check` teste à la fois l'accès CrUX (clé Google) et ipinfo (token).

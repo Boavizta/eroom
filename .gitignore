@@ -32,5 +32,8 @@ rapport-parcours-*.html
 # baselines figées, notes de lecture. Rien ici n'est un livrable.
 tmp/
 
+# Brouillons de documentation en cours de rédaction : pas encore des livrables.
+documentation/en cours/
+
 # Fichier settings Claude Code avec espace dans le nom
 .claude/ .json

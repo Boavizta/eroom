@@ -10,6 +10,22 @@
 Les fichiers d'entrée (`.har`, `Coverage-*.json`, `cwv.json`) sont cherchés dans `SOURCE_DIR`.
 Les fichiers de sortie (`har-analysis.json`, `coverage-analysis.json`, rapport HTML, `analyse-cout-agent/`) sont écrits dans `AUDIT_DIR`.
 
+## Sous-dossier optionnel des captures brutes
+
+Un HAR de parcours authentifié peut contenir des identifiants, des jetons de session ou des données personnelles. Les captures brutes peuvent donc être rangées dans un sous-dossier dédié, couvert par `.gitignore` :
+
+```
+SOURCE_DIR/donnees-brutes-potentiellement-sensibles/
+```
+
+Règle de recherche appliquée par tous les scripts : **à plat dans `SOURCE_DIR` d'abord, sous-dossier en repli**. Les deux rangements fonctionnent, un audit dont les fichiers sont restés à plat continue de marcher. La constante est déclarée en tête de chaque script concerné (`RAW_DATA_DIR`), dans `collect_env_data.py`, `collect_cwv_pagespeed.py`, `detect_tech.py`, `similarweb_api.py` et `generate_report_html.py`.
+
+Ces fichiers ne sont jamais commités, jamais modifiés, jamais anonymisés.
+
+## Où vivent les cas d'audit
+
+Convention du dépôt : `audits/<site>/`, un dossier par cas analysé. Le `SOURCE_DIR` est ce dossier, l'`AUDIT_DIR` est `audits/<site>/audit/`.
+
 ## Cas 1 — Dossier passé en argument
 
 ```

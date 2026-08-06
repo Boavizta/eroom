@@ -194,12 +194,14 @@ Ajouter ou corriger une règle :
 
 Tester sur le site de contrôle (octo.com) :
 
-    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/detect_tech.py octo.com
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/detect_tech.py audits/octo.com
 
-Attention : `octo.com` est ici un **dossier local** (devant contenir `octo.com/octo.com.har`),
-pas un domaine fetché sur le réseau. Le module est 100 % hors-ligne : il relit le HAR déjà
-capturé, il ne fait aucun appel réseau. La commande doit donc être lancée depuis un `cwd`
-contenant le dossier `octo.com/` (typiquement la racine du projet).
+Attention : l'argument est un **dossier local** (le cas d'audit), pas un domaine fetché sur
+le réseau. Les cas d'audit vivent sous `audits/<site>/`. Le HAR est cherché à plat dans ce
+dossier, puis, en repli, dans le sous-dossier `donnees-brutes-potentiellement-sensibles/`
+(voir la convention en fin de section). Le module est 100 % hors-ligne : il relit le HAR
+déjà capturé, il ne fait aucun appel réseau. La commande doit donc être lancée depuis la
+racine du projet.
 
 Détection attendue sur octo.com (référence de non-régression) : Amazon CloudFront,
 Cloudflare, Fastly, jsDelivr (CDN) ; Google Frontend (serveur) ; Swetrix
@@ -209,8 +211,16 @@ dans le HTML ne doit PAS déclencher un faux positif Vue.js (règle `html` plafo
 
 Vérifier ensuite l'intégration complète :
 
-    .venv/bin/python3 collect_env_data.py octo.com --refresh   # bloc tech_stack, schema 1.3
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py \
+        audits/octo.com --refresh                      # bloc tech_stack, schema 1.3
     # puis régénérer le rapport HTML -> section "Stack technique" en annexe
+
+Rangement des captures brutes : chaque script cherche le HAR et les `Coverage-*.json`
+**à plat dans le cas d'audit d'abord**, puis dans le sous-dossier
+`donnees-brutes-potentiellement-sensibles/` en repli. Ce sous-dossier est dans `.gitignore`
+(un HAR de parcours authentifié peut contenir des identifiants ou des données
+personnelles). Les deux rangements fonctionnent : un audit dont les fichiers sont restés à
+plat continue de marcher.
 
 Si on active un jour l'enrichissement à la volée (section 6a), suivre le format
 amont de webappanalyzer et NE PAS committer ses données dans le dépôt.
