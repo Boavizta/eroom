@@ -107,36 +107,45 @@ Retourner uniquement : "har-analysis.json écrit — <N> requêtes, <N> domaines
 :::dispatch id="analyse-coverage" wave="1" parallel_with="analyse-har"
 OUTPUT_FILE: {{AUDIT_DIR}}/coverage-analysis.json
 AUDIT_DIR: {{AUDIT_DIR}}
+SOURCE_DIR: {{SOURCE_DIR}}
 COVERAGE_FILES: {{COVERAGE_FILES}}
 PIPELINE: skill-steps/30_analyse-coverage.md
 
 Lire et exécuter le pipeline `skill-steps/30_analyse-coverage.md`.
 
-Pour chaque fichier Coverage-*.json :
-- Détecter le format (A : tableau direct / B : objet enveloppé)
-- Calculer métriques JS et CSS (taille totale, inutilisée, %)
-- Identifier les librairies tierces reconnaissables
+Le calcul est fait par un script, PAS à la main. Un test d'extension sur l'URL
+entière a déjà publié une page à zéro Ko (URLs versionnées) :
 
-Produire :
-- Tableau par page (JS/CSS : total Ko, inutilisé Ko, %)
-- Top 5 fichiers JS + Top 3 CSS par code non utilisé
-- Synthèse multi-pages (totaux, évolution page à page)
-- Signaler outliers (page > 2x la médiane)
+```bash
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/coverage_metrics.py {{SOURCE_DIR}} --output {{AUDIT_DIR}}/coverage-analysis.json
+```
 
-Écrire les résultats dans `{{AUDIT_DIR}}/coverage-analysis.json`.
-Format attendu :
+Le script détecte le format des fichiers Coverage, classe JS/CSS sur le chemin de
+l'URL, libelle chaque page depuis le document HTML corroboré par le HAR,
+identifie les bibliothèques tierces et signale les outliers.
+
+Vérifier ensuite la sortie : toute page marquée `no_js_no_css` est à signaler à
+l'utilisateur, c'est le symptôme d'un mauvais classement, pas d'une page sans code.
+
+Format produit :
 {
   "pages": [
     {
       "name": "Page 1",
+      "source_file": "Coverage-....json",
+      "url": "https://...", "url_provenance": "document HTML confirmé par le HAR",
       "js_total_kb": N, "js_unused_kb": N, "js_unused_pct": N,
       "css_total_kb": N, "css_unused_kb": N, "css_unused_pct": N,
+      "resources_count": N, "no_js_no_css": false,
       "top_js_unused": [...], "top_css_unused": [...]
     }
   ],
   "summary": {
-    "total_js_kb": N, "total_js_unused_kb": N,
-    "total_css_kb": N, "total_css_unused_kb": N
+    "pages_count": N,
+    "total_js_kb": N, "total_js_unused_kb": N, "total_js_unused_pct": N,
+    "total_css_kb": N, "total_css_unused_kb": N, "total_css_unused_pct": N,
+    "third_party_libraries": [...], "outlier_pages": [...],
+    "har_reference": "....har"
   }
 }
 Retourner uniquement : "coverage-analysis.json écrit — <N> pages, JS inutilisé : <X> Mo (<Y>%), CSS inutilisé : <X> Ko (<Y>%)"

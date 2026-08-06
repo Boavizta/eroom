@@ -69,6 +69,54 @@ Quota gratuit : 25 000 req/jour (PageSpeed), pas de limite journalière (CrUX).
 
 -----
 
+## Analyse Coverage — `coverage_metrics.py`
+
+Produit `coverage-analysis.json` (étape 30). À utiliser **à la place** d'un calcul
+à la main.
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/coverage_metrics.py <dossier-source>
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/coverage_metrics.py <dossier-source> --check
+
+`--check` compare à la sortie existante et sort en 1 en cas d'écart, sans rien
+réécrire.
+
+### Les deux fautes qui justifient ce script
+
+**1. L'extension se lit sur le chemin, pas sur l'URL entière.** Une URL versionnée
+(`dsfr.min.css?version=39.2.0`) ne se termine pas par son extension. Un test
+`url.endswith(".css")` la classe en "autre" : elle disparaît des agrégats JS/CSS.
+Sur un audit réel, la page qui chargeait le plus de CSS avait *toutes* ses URLs
+versionnées et a été publiée à **zéro Ko de JS et de CSS**. Un zéro ne ressemble
+pas à une erreur, il ressemble à une page sans code : personne ne l'a vu.
+Correction mesurée : JS total 17 657,4 → 18 226,6 Ko, CSS total 3 491,5 → 4 840,4 Ko.
+
+**2. Le libellé d'une page vient du document HTML, corroboré par le HAR.** Sans
+cette corroboration, la première URL sans extension d'asset l'emporte. Sur une
+téléprocédure, c'est souvent une URL technique : la page s'affichait sous
+`/ihm-spd/csrfguard.action` (un jeton anti-CSRF) au lieu du formulaire réellement
+vu par l'usager. Le script ne retient que les URLs que le HAR déclare servies en
+`text/html`, et **dit** dans `url_provenance` si la corroboration a eu lieu.
+
+### Ce qu'il signale de lui-même
+
+Une page non vide dont les agrégats JS et CSS sont tous les deux à zéro est
+marquée `no_js_no_css: true`. C'est le symptôme d'un mauvais classement, pas d'une
+page sans code : le signaler à l'utilisateur.
+
+### Contrôles
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_coverage_metrics.py
+
+28 contrôles, dont le cas négatif (une redirection *vers* un `.css` n'est pas du
+CSS) et la preuve que le défaut d'origine était réel. Vérifiés par mutation : en
+remettant `path = url`, 7 contrôles tombent.
+
+**Sa limite, à connaître** : ces contrôles portent sur le classement et le
+libellé, pas sur la justesse des octets rapportés par Chrome. Si DevTools mesure
+mal une plage, le script recopie fidèlement l'erreur.
+
+-----
+
 ## Filet de sécurité du refactoring e-footprint
 
 Trois vérificateurs, à lancer après chaque modification touchant au calcul CO2e.
@@ -79,6 +127,7 @@ Ils répondent à des questions différentes et ne se remplacent pas :
 | `check_efootprint_contract.py` | la sortie JSON a-t-elle perdu une clé ? |
 | `check_genericite.py` | le code est-il collé à un site précis ? |
 | `check_efootprint_spec.py` | les refus de la bibliothèque refusent-ils encore ? |
+| `check_coverage_metrics.py` | une URL versionnée est-elle encore bien typée ? |
 
 ### `check_efootprint_contract.py` — la sortie n'a rien perdu
 

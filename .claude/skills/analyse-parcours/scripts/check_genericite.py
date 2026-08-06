@@ -123,6 +123,15 @@ FORBIDDEN_VALUES = {
     926.6: "CSS non utilisé (Ko), second cas de test",
     4270.6: "CSS non utilisé (Ko), second cas de test",
     10146.6: "JS non utilisé (Ko), second cas de test",
+    # Agrégats Coverage recalculés par coverage_metrics.py, qui classe l'extension
+    # sur le CHEMIN de l'URL. La page dont toutes les URLs sont versionnées était
+    # publiée à zéro : ces totaux remplacent 17657.4 / 9736.3 / 3491.5 / 3024.2.
+    18226.6: "JS total (Ko), second cas de test",
+    10146.4: "JS non utilisé (Ko), second cas de test, calcul déterministe",
+    4840.4: "CSS total (Ko), second cas de test",
+    4270.7: "CSS non utilisé (Ko), second cas de test, calcul déterministe",
+    1349.1: "CSS total de la page servie en DSFR (Ko), second cas de test",
+    1246.4: "CSS non utilisé de la page servie en DSFR (Ko), second cas de test",
     # Agrégats HAR des deux cas de test
     6987.9: "poids total HAR (Ko), cas de test",
     17674.3: "poids total HAR (Ko), second cas de test",

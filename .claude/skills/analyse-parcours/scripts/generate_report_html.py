@@ -3186,6 +3186,13 @@ def generate(audit_dir, output_path=None):
     _generic_scripts = {"header", "footer", "orejime", "swetrix", "gtm", "analytics",
                         "style", "main", "bundle", "chunk", "home", "index"}
 
+    # URLs que le HAR déclare servies en text/html : elles seules sont des pages.
+    _har_documents = {
+        e.get("request", {}).get("url", "").split("?")[0]
+        for e in har_data.get("log", {}).get("entries", [])
+        if "html" in (e.get("response", {}).get("content", {}).get("mimeType", "") or "").lower()
+    }
+
     for cf in cov_files:
         with open(cf, encoding="utf-8") as _f:
             _raw = json.load(_f)
@@ -3205,7 +3212,12 @@ def generate(audit_dir, output_path=None):
                 _domain_counts[_up0(u).netloc] += 1
         _main_domain = _domain_counts.most_common(1)[0][0] if _domain_counts else ""
 
-        page_url = ""
+        # Le HAR dit lesquelles de ces URLs ont réellement été servies en
+        # text/html. Sans cette corroboration, la première URL sans extension
+        # d'asset l'emporte : sur une téléprocédure, c'est souvent une URL
+        # technique (jeton anti-CSRF, endpoint de messages) et la page s'affiche
+        # sous un libellé qui n'est pas celui de l'écran vu par l'usager.
+        _candidates = []
         first_party = None
         for item in raw_entries:
             u = item.get("url", "")
@@ -3215,12 +3227,19 @@ def generate(audit_dir, output_path=None):
             if _netloc != _main_domain:
                 continue
             if not _asset_exts.search(u.split("?")[0]):
-                page_url = u
-                break
-            if first_party is None and u.endswith(".js"):
+                _candidates.append(u)
+            elif first_party is None and u.endswith(".js"):
                 fname = u.split("/")[-1].split("?")[0].replace(".js", "").lower()
                 if fname not in _generic_scripts:
                     first_party = u
+
+        page_url = ""
+        for u in _candidates:
+            if u.split("?")[0] in _har_documents:
+                page_url = u
+                break
+        if not page_url and _candidates:
+            page_url = _candidates[0]
 
         # 2. Fallback : script JS spécifique à une page
         if not page_url and first_party:
