@@ -71,8 +71,14 @@ Quota gratuit : 25 000 req/jour (PageSpeed), pas de limite journalière (CrUX).
 
 ## Filet de sécurité du refactoring e-footprint
 
-Deux vérificateurs, à lancer après chaque modification touchant au calcul CO2e.
-Ils répondent à des questions différentes et ne se remplacent pas.
+Trois vérificateurs, à lancer après chaque modification touchant au calcul CO2e.
+Ils répondent à des questions différentes et ne se remplacent pas :
+
+| Script | Question à laquelle il répond |
+|---|---|
+| `check_efootprint_contract.py` | la sortie JSON a-t-elle perdu une clé ? |
+| `check_genericite.py` | le code est-il collé à un site précis ? |
+| `check_efootprint_spec.py` | les refus de la bibliothèque refusent-ils encore ? |
 
 ### `check_efootprint_contract.py` — la sortie n'a rien perdu
 
@@ -128,7 +134,38 @@ complet, passe sans broncher. Seule l'exécution sur un second site réel prouve
 généricité. Les entiers courts (82, 317) sont signalés comme "à vérifier" plutôt
 qu'affirmés : ils peuvent légitimement désigner autre chose.
 
+**Un fichier non analysable est une violation, pas un fichier conforme.** Trou
+découvert au lot 1 et corrigé : une classe dont le corps est uniquement une
+docstring devenait un corps vide après nettoyage, ce qui cassait l'analyse
+syntaxique et désactivait *tout* le contrôle des valeurs mesurées du fichier,
+sans aucun message. Le script sortait en vert sans avoir rien examiné. Un filet
+qui s'annule tout seul est pire qu'un filet absent : on se croit protégé.
+
+### `check_efootprint_spec.py` — les garde-fous refusent encore
+
+La bibliothèque `efootprint_model/` ne repose que sur des refus : une valeur sans
+provenance est refusée, une clé qui renvoie dans le vide est refusée, une
+collision de clés est refusée. Un garde-fou cassé ne produit aucune erreur, il
+laisse simplement passer. Ce script vérifie donc les deux sens : une
+spécification correcte passe, **et chaque faute prévue est bien refusée**. Seul
+le second sens prouve quelque chose.
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_efootprint_spec.py
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_efootprint_spec.py -v
+
+92 contrôles. Il vérifie aussi que le message d'erreur mentionne la cause : un
+refus au bon endroit avec un message incompréhensible fait perdre le bénéfice du
+garde-fou.
+
+**Sa limite, à connaître** : il ne vérifie aucun chiffre de CO2e, la bibliothèque
+contrôlée n'en calculant aucun. La non-régression numérique reste celle de
+`check_efootprint_contract.py`.
+
 ### Toute nouvelle valeur publiée doit rejoindre la liste
 
 Quand un chiffre mesuré sur un cas d'audit part dans un rapport, l'ajouter à
 `FORBIDDEN_VALUES` avec son origine. Sinon le filet se périme sans prévenir.
+
+De même, tout nouveau garde-fou ajouté à `efootprint_model/` doit recevoir son
+contrôle de refus dans `check_efootprint_spec.py`. Un refus non testé finit par
+disparaître à l'occasion d'un remaniement, en silence.

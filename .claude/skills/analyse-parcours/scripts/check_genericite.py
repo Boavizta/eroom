@@ -250,6 +250,14 @@ def strip_comments_and_docstrings(source):
     Les lignes retirées sont remplacées par des lignes vides plutôt que
     supprimées, pour que les numéros de ligne signalés restent EXACTS et
     cliquables.
+
+    SUBTILITÉ QUI A COÛTÉ UN TROU DANS LE FILET (corrigée au lot 1) : une classe
+    ou une fonction dont le corps est UNIQUEMENT une docstring se retrouve avec
+    un corps vide après nettoyage, ce qui rend le résultat syntaxiquement
+    invalide. `numeric_literals()` renvoyait alors une liste vide et TOUT le
+    contrôle des valeurs mesurées du fichier était désactivé, sans le moindre
+    message. La docstring est donc remplacée par un `pass` correctement indenté,
+    et `numeric_literals()` signale désormais son échec au lieu de se taire.
     """
     lines = source.splitlines()
 
@@ -285,6 +293,12 @@ def strip_comments_and_docstrings(source):
             continue
         for row in range(first.lineno, (first.end_lineno or first.lineno) + 1):
             lines[row - 1] = ""
+        # Si la docstring était tout le corps, il faut le remplacer par un
+        # `pass` à la bonne indentation, sinon le fichier nettoyé ne se parse
+        # plus et le contrôle des valeurs se désactive en silence.
+        if len(body) == 1 and not isinstance(node, ast.Module):
+            indent = " " * first.col_offset
+            lines[first.lineno - 1] = f"{indent}pass"
 
     return "\n".join(lines)
 
@@ -294,11 +308,13 @@ def numeric_literals(source):
 
     Passe par l'arbre syntaxique : un nombre écrit dans une chaîne de caractères
     n'est pas un littéral numérique et ne doit pas déclencher d'alerte.
+
+    Lève SyntaxError si le source nettoyé ne se parse pas. C'était auparavant
+    un `return []` silencieux, donc un contrôle qui s'annulait tout seul en
+    restant vert. Un filet qui se désactive sans le dire est pire qu'un filet
+    absent : on croit être protégé.
     """
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return []
+    tree = ast.parse(source)
     found = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
@@ -329,7 +345,20 @@ def check_file(path):
     violations = [(lineno, f"exemption invalide : {problem}")
                   for lineno, problem in malformed]
 
-    for lineno, value in numeric_literals(code):
+    # Un source non analysable est signalé comme une VIOLATION, pas ignoré :
+    # sans analyse syntaxique, le contrôle des valeurs mesurées ne tourne pas du
+    # tout, et le fichier serait déclaré conforme sans avoir été examiné.
+    try:
+        literals = numeric_literals(code)
+    except SyntaxError as exc:
+        return sorted(violations + [(
+            exc.lineno or 0,
+            "code non analysable après retrait des commentaires et docstrings "
+            f"({exc.msg}). Le contrôle des valeurs mesurées n'a PAS pu tourner "
+            "sur ce fichier : le déclarer conforme serait faux."
+        )]), sorted((lineno, reason) for lineno, reason in exempt.items())
+
+    for lineno, value in literals:
         if value in ALLOWED_VALUES or lineno in exempt:
             continue
         for forbidden, origin in FORBIDDEN_VALUES.items():
