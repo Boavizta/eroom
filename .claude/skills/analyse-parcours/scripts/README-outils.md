@@ -66,3 +66,69 @@ Options :
 Voir `documentation/setup/setup_api_keys.md`.
 APIs à activer sur Google Cloud : PageSpeed Insights API + Chrome UX Report API.
 Quota gratuit : 25 000 req/jour (PageSpeed), pas de limite journalière (CrUX).
+
+-----
+
+## Filet de sécurité du refactoring e-footprint
+
+Deux vérificateurs, à lancer après chaque modification touchant au calcul CO2e.
+Ils répondent à des questions différentes et ne se remplacent pas.
+
+### `check_efootprint_contract.py` — la sortie n'a rien perdu
+
+Le rapport HTML lit `efootprint-results.json` clé par clé avec `.get()`. Une clé
+manquante n'y provoque **aucune erreur** : elle produit un trou silencieux. Ce
+script compare une baseline figée à la sortie fraîche.
+
+    # Une seule fois, AVANT de modifier le code
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_efootprint_contract.py \
+        audits/<site> --freeze
+
+    # Après chaque modification
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_efootprint_contract.py \
+        audits/<site> --total 174.076
+
+Signale les chemins perdus et les changements de type (erreurs), les chemins
+ajoutés (information). Code de sortie 1 en cas de problème.
+
+Les baselines vont dans `tmp/baselines/`, hors git.
+
+**Sa limite, à connaître** : il vérifie que les clés existent et gardent leur
+type, pas que les valeurs sont justes. Un total passant de 174 à 300 kg avec
+toutes les clés en place ne serait pas vu. D'où `--total`, à utiliser en
+complément et non à la place.
+
+### `check_genericite.py` — le code n'est pas collé au cas de test
+
+Échoue si le code exécutable contient un nom de domaine, une IP, un chemin de cas
+d'audit, ou **une valeur mesurée sur un site précis** (la faute la plus sournoise :
+un nombre nu ressemble à une constante physique).
+
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_genericite.py
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_genericite.py --list-values
+    .venv/bin/python3 .claude/skills/analyse-parcours/scripts/check_genericite.py --audit-exemptions
+
+Cible par défaut : `efootprint_model/`. Tant qu'elle n'existe pas, le script sort
+en 0 avec un message : ce n'est pas une panne.
+
+Docstrings et commentaires sont exclus de l'analyse, un exemple documenté étant
+légitime. Une occurrence légitime dans le code s'exempte avec sa raison :
+
+    RAW_DATA_DIR = "..."        # genericite: ok - declaration de la constante
+
+    TRACKER_DOMAINS = {         # genericite: ok-debut - table explicite de tiers
+        "google-analytics.com",
+    }                           # genericite: ok-fin
+
+Une exemption sans raison écrite est refusée.
+
+**Sa limite, à connaître** : il attrape le copier-coller, pas le biais de
+conception. Une fonction qui suppose un site à deux serveurs, ou du HTML servi
+complet, passe sans broncher. Seule l'exécution sur un second site réel prouve la
+généricité. Les entiers courts (82, 317) sont signalés comme "à vérifier" plutôt
+qu'affirmés : ils peuvent légitimement désigner autre chose.
+
+### Toute nouvelle valeur publiée doit rejoindre la liste
+
+Quand un chiffre mesuré sur un cas d'audit part dans un rapport, l'ajouter à
+`FORBIDDEN_VALUES` avec son origine. Sinon le filet se périme sans prévenir.
