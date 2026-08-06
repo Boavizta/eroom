@@ -47,6 +47,11 @@ except ImportError:
 CRUX_API = "https://chromeuxreport.googleapis.com/v1/records:queryRecord"
 IPINFO_API = "https://ipinfo.io/{ip}/json"
 
+# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage). Il est dans
+# .gitignore : un HAR de parcours authentifié peut contenir des identifiants ou des
+# jetons de session. Les fichiers y sont cherchés en repli, si rien à plat.
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+
 # Clés de confiance pour le JSON de sortie
 CONFIDENCE_HIGH = "high"       # donnée collectée, fiable
 CONFIDENCE_MEDIUM = "medium"   # collectée mais incertaine
@@ -458,7 +463,8 @@ def find_project_root(start):
 # ---------------------------------------------------------------------------
 
 def find_har(source_dir):
-    hars = list(source_dir.glob("*.har"))
+    hars = list(source_dir.glob("*.har")) or list(
+        (source_dir / RAW_DATA_DIR).glob("*.har"))
     if len(hars) == 1:
         return hars[0]
     if len(hars) > 1:

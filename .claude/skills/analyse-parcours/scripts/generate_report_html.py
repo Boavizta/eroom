@@ -33,6 +33,9 @@ OCTO_GREY      = "#ECECF2"
 OCTO_WHITE     = "#FFFFFF"
 
 # Couleurs par type de ressource
+# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+
 TYPE_COLORS = {
     "javascript": "#f0ad4e",
     "css":        "#5bc0de",
@@ -3134,10 +3137,24 @@ def generate(audit_dir, output_path=None):
         if har_files:
             source_dir = audit_dir.parent
     if not har_files:
+        # Dernier repli : le sous-dossier de captures brutes (dans .gitignore),
+        # cherché sous audit_dir puis sous son parent.
+        for cand in (audit_dir, audit_dir.parent):
+            har_files = list((cand / RAW_DATA_DIR).glob("*.har"))
+            if har_files:
+                source_dir = cand
+                break
+    if not har_files:
         raise FileNotFoundError(f"Aucun fichier .har dans {audit_dir} ni dans {audit_dir.parent}")
     har_path = har_files[0]
 
-    cov_files = sorted(source_dir.glob("Coverage-*.json")) or sorted(source_dir.glob("*coverage*.json"))
+    # Les Coverage suivent le même rangement que le HAR : à plat, sinon dans le
+    # sous-dossier de captures brutes. source_dir reste le dossier de l'audit, car
+    # c'est là que vivent les fichiers PRODUITS (cwv.json, etc.).
+    cov_files = (sorted(source_dir.glob("Coverage-*.json"))
+                 or sorted(source_dir.glob("*coverage*.json"))
+                 or sorted((source_dir / RAW_DATA_DIR).glob("Coverage-*.json"))
+                 or sorted((source_dir / RAW_DATA_DIR).glob("*coverage*.json")))
     cwv_path  = audit_dir / "cwv.json"
     if not cwv_path.exists():
         cwv_path = source_dir / "cwv.json"

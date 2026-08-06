@@ -27,6 +27,9 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
+# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+
 # Clés de confiance (alignées sur collect_env_data.py)
 CONFIDENCE_HIGH = "high"       # signal distinctif et non ambigu
 CONFIDENCE_MEDIUM = "medium"   # signal probable mais partagé / indirect
@@ -275,7 +278,8 @@ TECH_RULES = {
 def find_har(source_dir):
     """Trouve le .har dans un dossier (même logique que collect_env_data.find_har)."""
     source_dir = Path(source_dir)
-    hars = list(source_dir.glob("*.har"))
+    hars = list(source_dir.glob("*.har")) or list(
+        (source_dir / RAW_DATA_DIR).glob("*.har"))
     if len(hars) >= 1:
         return hars[0]
     return None

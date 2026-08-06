@@ -42,6 +42,9 @@ from pathlib import Path
 
 PAGESPEED_API = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
+# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+
 # Seuils officiels CWV (Google)
 LCP_GOOD = 2.5    # s
 LCP_POOR = 4.0
@@ -86,6 +89,10 @@ def find_har(audit_dir):
     if not hars:
         # Chercher aussi dans audit_dir lui-même
         hars = list(audit_dir.glob("*.har"))
+    if not hars:
+        # Puis dans le sous-dossier de captures brutes, des deux côtés
+        hars = (list((source_dir / RAW_DATA_DIR).glob("*.har"))
+                or list((audit_dir / RAW_DATA_DIR).glob("*.har")))
     if len(hars) == 1:
         return hars[0]
     if len(hars) > 1:

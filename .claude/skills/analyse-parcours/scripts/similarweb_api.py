@@ -44,6 +44,9 @@ from pathlib import Path
 # voir documentation/implementation/similarweb_reconstitution.md
 DATA_API = "https://data.similarweb.com/api/v1/data"
 
+# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+
 # Version d'extension envoyée dans l'en-tête X-Extension-Version. À revalider si
 # l'API se met à renvoyer 403 : installer/mettre à jour l'extension, recapturer
 # la version courante (chrome://extensions -> carte SimilarWeb).
@@ -228,7 +231,8 @@ def infer_domain(source_dir):
         except (json.JSONDecodeError, OSError):
             pass
     # Repli : premier .har du dossier, title de la première page.
-    hars = list(source_dir.glob("*.har"))
+    hars = list(source_dir.glob("*.har")) or list(
+        (source_dir / RAW_DATA_DIR).glob("*.har"))
     if hars:
         try:
             with open(hars[0], encoding="utf-8") as f:

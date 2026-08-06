@@ -11,6 +11,12 @@ __pycache__/
 .env
 env-data.json
 
+# Données brutes de capture (HAR, Coverage) : jamais versionnées.
+# Un HAR de parcours authentifié peut contenir des identifiants, des jetons de
+# session ou des données personnelles. Le motif couvre tous les cas d'audit,
+# présents et futurs, à n'importe quelle profondeur.
+donnees-brutes-potentiellement-sensibles/
+
 # Outputs e-footprint (générés, non versionnés)
 efootprint-results.json
 efootprint-model.json
