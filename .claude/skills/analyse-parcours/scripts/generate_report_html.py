@@ -147,21 +147,28 @@ def _country_label(code):
 def _classify_type(mime, url):
     mime = (mime or "").lower()
     url  = (url  or "").lower()
-    if "javascript" in mime or url.endswith(".js"):
+    # L'extension se lit sur le CHEMIN seul : une URL versionnée
+    # (style.css?v=2026-6-10) ou fragmentée (app.js#x) garde son extension mais
+    # ne se termine plus par elle. Sans ce nettoyage, ces fichiers tombent en
+    # "other" et disparaissent des agrégats JS/CSS du rapport de code mort.
+    # Les entrées Coverage sont les seules concernées en pratique : les entrées
+    # HAR portent un mimeType, testé avant l'extension.
+    path = url.split("#", 1)[0].split("?", 1)[0]
+    if "javascript" in mime or path.endswith(".js") or path.endswith(".mjs"):
         return "javascript"
-    if "css" in mime or url.endswith(".css"):
+    if "css" in mime or path.endswith(".css"):
         return "css"
     if "html" in mime:
         return "html"
-    if "image" in mime or re.search(r'\.(png|jpg|jpeg|gif|svg|webp|ico|jxl)$', url):
+    if "image" in mime or re.search(r'\.(png|jpg|jpeg|gif|svg|webp|ico|jxl)$', path):
         return "image"
-    if "font" in mime or re.search(r'\.(woff2?|ttf|otf|eot)$', url):
+    if "font" in mime or re.search(r'\.(woff2?|ttf|otf|eot)$', path):
         return "font"
-    if "video" in mime or re.search(r'\.(mp4|webm|ogv|mov|avi)$', url):
+    if "video" in mime or re.search(r'\.(mp4|webm|ogv|mov|avi)$', path):
         return "video"
-    if "pdf" in mime or url.endswith(".pdf"):
+    if "pdf" in mime or path.endswith(".pdf"):
         return "pdf"
-    if "json" in mime or url.endswith(".json"):
+    if "json" in mime or path.endswith(".json"):
         return "json"
     return "other"
 

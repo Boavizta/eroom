@@ -113,6 +113,19 @@ FORBIDDEN_VALUES = {
     # Empreinte CO2e par requête testée pour les hôtes tiers (aucune source publique)
     306.139: "total CO2e avec hôtes tiers à 0,2 g/requête, cas de test",
     187.339: "total CO2e avec hôtes tiers à 0,02 g/requête, cas de test",
+    # Rejeu complet du 06/08/2026 : recollecte CrUX/SimilarWeb, mix appareils
+    # déplacé. Ces totaux remplacent 174.076 dans les rapports livrés.
+    170.856: "total CO2e après rejeu, cas de test",
+    4801.2: "total CO2e du second cas de test (site public)",
+    # Code mort après correction du typage des URL versionnées
+    975.5: "CSS non utilisé (Ko), cas de test",
+    161.9: "CSS non utilisé d'une page (Ko), cas de test",
+    926.6: "CSS non utilisé (Ko), second cas de test",
+    4270.6: "CSS non utilisé (Ko), second cas de test",
+    10146.6: "JS non utilisé (Ko), second cas de test",
+    # Agrégats HAR des deux cas de test
+    6987.9: "poids total HAR (Ko), cas de test",
+    17674.3: "poids total HAR (Ko), second cas de test",
 }
 
 # Un entier court (82, 440, 317) est un nombre COURANT : il peut légitimement

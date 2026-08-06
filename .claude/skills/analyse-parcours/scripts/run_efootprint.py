@@ -10,7 +10,8 @@ pas une mesure réelle de l'impact environnemental du site.
 Usage :
     python3 run_efootprint.py <source_dir>
     python3 run_efootprint.py <source_dir> --visits 500000      # trafic annuel
-    python3 run_efootprint.py <source_dir> --instance t3.large  # instance AWS
+    python3 run_efootprint.py <source_dir> --instance t3.large  # instance (nom propre
+                                                                # au provider détecté)
     python3 run_efootprint.py <source_dir> --refresh-data       # recollecte env-data.json
 
 Lit env-data.json dans source_dir (produit par collect_env_data.py).
@@ -55,6 +56,63 @@ def ensure_env_data(source_dir, refresh=False):
 
 
 DEFAULT_VISITS_PER_YEAR = 100_000
+
+# Nom du provider tel qu'il est détecté par collect_env_data.py -> nom attendu par
+# e-footprint. Sans cette table, un provider bien détecté fait planter le calcul :
+# le script entrait dans la branche Boavizta avec "ovh", qu'e-footprint refuse
+# (il attend "ovhcloud"), et le repli "serveur générique" ne se déclenchait jamais.
+# Cas rencontré sur un site hébergé chez OVH.
+PROVIDER_ALIASES = {"ovh": "ovhcloud"}
+
+# Instance à supposer quand aucune n'est fournie, PAR PROVIDER. Un seul défaut
+# global est impossible : les noms d'instances sont propres à chaque provider
+# ("t3.medium" n'existe pas chez ovhcloud, qui attend "c3-4" ou "b3-8").
+# Gabarit retenu : 2 vCPU / 4 GB, hypothèse de petite production. Chaque valeur
+# est l'instance du catalogue Boavizta du provider la plus proche de ce gabarit,
+# égalité tranchée par ordre alphabétique (aucun sens physique, mais stable).
+# EXCEPTION ASSUMÉE pour aws : "t3.medium", le choix historique du script, fait
+# exactement 2 vCPU / 4 GB et satisfait donc la règle. L'alphabétique aurait
+# désigné "a1.large", du matériel ARM metal dont la fabrication est 3,5 fois
+# plus lourde (9,49 contre 2,66 kg CO2e/an sur le cas de test) : cela aurait
+# déplacé un total déjà publié sans rien mesurer de mieux.
+# La confiance associée reste "défaut script" : c'est une hypothèse, pas une mesure.
+DEFAULT_INSTANCE_BY_PROVIDER = {
+    "aws":      "t3.medium",      # 2 vCPU / 4 GB
+    "azure":    "f2s_v2",         # 2 vCPU / 4 GB
+    "gcp":      "c2d-highcpu-2",  # 2 vCPU / 4 GB
+    "ovhcloud": "c3-4",           # 2 vCPU / 4 GB
+    "scaleway": "play2-nano",     # 2 vCPU / 4 GB
+}
+
+
+def normalize_provider(detected):
+    """Nom e-footprint du provider détecté, ou None si non modélisable en cloud.
+
+    Ne renvoie un nom que si e-footprint le connaît RÉELLEMENT : la liste est lue
+    dans la librairie, pas recopiée, pour qu'elle ne se périme pas en silence.
+    L'appelant retombe sur un serveur générique quand la réponse est None.
+    """
+    if not detected:
+        return None
+    name = PROVIDER_ALIASES.get(detected, detected)
+    try:
+        from efootprint.builders.hardware.boavizta_cloud_server import (
+            all_boavizta_cloud_providers)
+    except ImportError:
+        return None
+    return name if name in {p.value for p in all_boavizta_cloud_providers} else None
+
+
+def resolve_instance_type(cli_instance, provider):
+    """(type d'instance, fourni_par_l_utilisateur).
+
+    Une instance passée en ligne de commande est retenue telle quelle : c'est une
+    information sur l'hébergement réel, le script n'a pas à la corriger. Sinon la
+    valeur vient de la table par provider.
+    """
+    if cli_instance:
+        return cli_instance, True
+    return DEFAULT_INSTANCE_BY_PROVIDER.get(provider, "t3.medium"), False
 
 
 def resolve_visits(cli_visits, env_data):
@@ -137,8 +195,8 @@ def fmt_conf(conf):
 def instance_type_confidence(manual, source):
     """Niveau de confiance du type d'instance :
     - jamais précisé (--instance non fourni) : "default_script" (valeur fixée
-      par CE script, pas par la librairie e-footprint qui n'a pas de défaut
-      "t3.medium" propre).
+      par CE script via DEFAULT_INSTANCE_BY_PROVIDER, pas par la librairie
+      e-footprint, qui n'a pas de défaut propre).
     - précisé (--instance fourni) sans justification (--instance-source
       absent) : "unjustified" — choix actif mais non vérifié.
     - précisé ET justifié (--instance-source fourni) : "medium" ("estimé")."""
@@ -255,12 +313,15 @@ def build_efootprint_model(env_data, visits, instance_type):
     )
 
     # --- Serveur ---
-    provider = server_data.get("detected_provider")
     country_name = server_data.get("efootprint_country", "FRANCE")
     carbon_intensity = server_data.get("carbon_intensity_g_kwh", 400)
 
-    supported_boavizta = ["aws", "gcp", "azure", "scaleway", "ovh"]
-    if provider and provider in supported_boavizta:
+    # normalize_provider() interroge e-footprint : elle ne renvoie un nom que si
+    # la librairie sait vraiment modéliser ce provider. Un nom inconnu donne None
+    # et fait basculer sur le serveur générique, au lieu de lever une exception au
+    # milieu du calcul.
+    provider = normalize_provider(server_data.get("detected_provider"))
+    if provider:
         server = BoaviztaCloudServer.from_defaults(
             f"Serveur {provider} (hypothèse : {instance_type})",
             server_type=ServerTypes.autoscaling(),
@@ -622,11 +683,13 @@ def main():
                         help="Trafic annuel (analytics client). Prioritaire sur le bloc "
                              "'traffic' SimilarWeb écrit par l'agent dans env-data.json. "
                              "Défaut : bloc 'traffic' s'il existe, sinon 100 000 visites/an.")
-    parser.add_argument("--instance", default="t3.medium",
-                        help="Type d'instance cloud (défaut : t3.medium, valeur du script "
-                             "sans lien avec e-footprint, non vérifiée). Si précisé, la "
-                             "confiance reste basse ('précisé (non justifié)') sauf si "
-                             "--instance-source est aussi fourni.")
+    parser.add_argument("--instance", default=None,
+                        help="Type d'instance cloud. Défaut : la plus proche de "
+                             "2 vCPU / 4 GB chez le provider détecté (hypothèse de "
+                             "petite production, non vérifiée) ; les noms sont propres "
+                             "à chaque provider. Si précisé, la confiance reste basse "
+                             "('précisé (non justifié)') sauf si --instance-source est "
+                             "aussi fourni.")
     parser.add_argument("--instance-source", default=None,
                         help="Justification de --instance (ex. \"confirmé par l'équipe infra "
                              "client, ticket #1234\"). Fait passer la confiance à 'estimé'.")
@@ -635,8 +698,6 @@ def main():
     parser.add_argument("--refresh-data", action="store_true",
                         help="Relancer collect_env_data.py avant le calcul")
     args = parser.parse_args()
-
-    instance_manual = args.instance != "t3.medium" or args.instance_source is not None
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
@@ -656,13 +717,20 @@ def main():
     if traffic_meta.get("warning"):
         print(f"  ⚠ {traffic_meta['warning']}")
 
+    # Le type d'instance dépend du provider : il doit donc être résolu APRÈS la
+    # lecture de env-data.json, et avant l'affichage des hypothèses (qui l'annonce).
+    provider = normalize_provider(env_data.get("server", {}).get("detected_provider"))
+    instance_type, instance_manual = resolve_instance_type(args.instance, provider)
+    if args.instance_source is not None:
+        instance_manual = True
+
     # Résumé des hypothèses
-    print_hypotheses(env_data, visits, args.instance, traffic_meta=traffic_meta,
+    print_hypotheses(env_data, visits, instance_type, traffic_meta=traffic_meta,
                       instance_manual=instance_manual, instance_source=args.instance_source)
 
     # Calcul
     print("[e-footprint] Construction du modèle (hypothétique)...")
-    system = build_efootprint_model(env_data, visits, args.instance)
+    system = build_efootprint_model(env_data, visits, instance_type)
     print("[e-footprint] Calcul CO2e...")
 
     # Résultats
@@ -671,13 +739,17 @@ def main():
     # Sauvegarde modèle + résultats légers
     print("[e-footprint] Sérialisation du modèle...")
     save_model(system, source_dir)
-    save_results(system, source_dir, env_data, visits, args.instance, traffic_meta=traffic_meta,
+    save_results(system, source_dir, env_data, visits, instance_type, traffic_meta=traffic_meta,
                  instance_manual=instance_manual, instance_source=args.instance_source,
                  instance_source_url=args.instance_source_url)
     print()
     print(f"  Trafic retenu : {visits:,} visites/an (source : {traffic_meta['source']})")
     print("Pour relancer avec d'autres hypothèses :")
-    print(f"  python3 {Path(__file__).name} {source_dir} --visits 500000 --instance t3.large")
+    # Le nom d'instance dépend du provider : afficher celui retenu ici plutôt
+    # qu'un exemple figé, qui serait refusé chez un autre hébergeur.
+    _prov = provider or "le provider détecté"
+    print(f"  python3 {Path(__file__).name} {source_dir} --visits 500000 "
+          f"--instance <type {_prov}>   (actuel : {instance_type})")
 
 
 if __name__ == "__main__":
