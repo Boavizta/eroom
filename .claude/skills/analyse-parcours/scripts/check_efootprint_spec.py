@@ -768,28 +768,52 @@ def check_sources_and_primary(journal):
 def check_no_efootprint_import(journal):
     print("Indépendance — la spécification n'importe pas e-footprint")
 
+    # build.py est l'EXCEPTION documentée : c'est le seul module dont la
+    # raison d'être est d'instancier e-footprint (cf. son en-tête). L'exempter
+    # ici par son nom, pas en l'ignorant en silence : si un second fichier
+    # se met un jour à importer e-footprint, ce contrôle doit encore le voir.
+    EXEMPT_FILES = {"build.py"}
+
     library = SCRIPTS_DIR / "efootprint_model"
     offenders = []
+    build_py_imports_efootprint = False
     for path in sorted(library.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
+        imports_here = []
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(),
                                       start=1):
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
             if stripped.startswith(("import efootprint", "from efootprint")):
-                offenders.append(f"{path.name}:{lineno}")
+                imports_here.append(lineno)
+        if not imports_here:
+            continue
+        if path.name in EXEMPT_FILES:
+            build_py_imports_efootprint = True
+            continue
+        offenders.extend(f"{path.name}:{lineno}" for lineno in imports_here)
 
     journal.expect_true(
-        "aucun module de la spécification n'importe e-footprint",
+        "aucun module de la spécification (hors build.py) n'importe e-footprint",
         not offenders,
         f"importé dans {', '.join(offenders)}. La spécification doit rester "
         "testable sans la librairie installée ; cette propriété se perd au "
         "premier import et ne se remarque pas tant qu'elle est installée.")
 
+    journal.expect_true(
+        "build.py importe bien e-footprint (l'exemption n'est pas devenue "
+        "obsolète en silence)",
+        build_py_imports_efootprint,
+        "si ce contrôle échoue, soit build.py a été vidé de son rôle, soit "
+        "l'exemption ne cible plus le bon fichier : dans les deux cas, "
+        "l'exemption doit être revue, pas laissée traîner sans objet.")
+
     # Le contrôle ci-dessus est textuel. Celui-ci est réel : on vérifie que
-    # l'import du paquet n'a effectivement PAS chargé e-footprint.
+    # l'import du PAQUET (donc de __init__.py, spec.py, compose.py) n'a
+    # effectivement PAS chargé e-footprint. build.py n'est pas importé par
+    # __init__.py (cf. son garde-fou propre) donc reste hors de ce test.
     journal.expect_true(
         "importer la spécification ne charge pas e-footprint en mémoire",
         not any(name == "efootprint" or name.startswith("efootprint.")

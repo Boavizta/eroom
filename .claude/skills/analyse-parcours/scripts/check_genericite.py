@@ -116,6 +116,9 @@ FORBIDDEN_VALUES = {
     # Rejeu complet du 06/08/2026 : recollecte CrUX/SimilarWeb, mix appareils
     # déplacé. Ces totaux remplacent 174.076 dans les rapports livrés.
     170.856: "total CO2e après rejeu, cas de test",
+    # Lot 2 (07/08/2026) : build_system() + extraction propre (sans regex) sur
+    # l'env-data.json rejoué. Remplace 174.139 comme repère de non-régression.
+    170.904: "total CO2e (lecture propre, Lot 2), cas de test",
     4801.2: "total CO2e du second cas de test (site public)",
     # Code mort après correction du typage des URL versionnées
     975.5: "CSS non utilisé (Ko), cas de test",
