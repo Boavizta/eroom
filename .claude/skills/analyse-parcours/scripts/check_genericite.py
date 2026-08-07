@@ -149,6 +149,11 @@ FORBIDDEN_VALUES = {
     0.250109: "facteur de recalage Nielsen (méthode parcours multi-étapes), cas de test",
     560.9885: "total CO2e (Nielsen recalé, Lot 4), cas de test octo.com",
     14372.7561: "total CO2e (Nielsen brut, pas de recalage SimilarWeb, Lot 4), cas de test ANTS",
+    # Lot 4bis (07/08/2026) : ranges.py, fourchettes infra/usage mesurées sur
+    # les deux cas d'audit (cf. tmp/lot2/_verif_lot4bis_fourchettes.py).
+    533.0142: "borne basse fourchette infra (serverless), Lot 4bis, cas de test octo.com",
+    881.3057: "borne haute fourchette usage (Nielsen brut), Lot 4bis, cas de test octo.com",
+    14036.2206: "borne basse fourchette infra (serverless), Lot 4bis, cas de test ANTS",
 }
 
 # Un entier court (82, 440, 317) est un nombre COURANT : il peut légitimement
