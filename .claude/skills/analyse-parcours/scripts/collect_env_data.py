@@ -43,6 +43,15 @@ try:
 except ImportError:
     detect_tech = None
 
+# efootprint_model/ n'importe jamais e-footprint dans from_har.py (garde-fou
+# vérifié par check_efootprint_spec.py) : cet import reste donc sans risque
+# même si la librairie e-footprint n'est pas installée. Import guardé quand
+# même, par cohérence avec les autres modules frères.
+try:
+    from efootprint_model.from_har import detect_infrastructures
+except ImportError:
+    detect_infrastructures = None
+
 
 CRUX_API = "https://chromeuxreport.googleapis.com/v1/records:queryRecord"
 IPINFO_API = "https://ipinfo.io/{ip}/json"
@@ -995,15 +1004,67 @@ def collect_server_info(ip, token=None):
     }
 
 
+def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), token=None):
+    """Géolocalise CHAQUE infrastructure 1st-party détectée dans le HAR, pas
+    seulement le serveur principal (Lot 3 : sites à plusieurs infras
+    distinctes, ex. ANTS avec 3 serveurs 1st-party).
+
+    Retourne une liste de dicts (même forme que `collect_server_info()`, plus
+    `host`, `hosts`, `request_count`, `transferred_bytes`, `cache_header_seen`,
+    `is_primary`), triée comme `detect_infrastructures()` (octets décroissants,
+    la première est l'infra principale). Une IP non résolue par ipinfo est
+    incluse quand même (host/hosts/octets connus, reste des champs à None) :
+    un échec réseau sur un serveur secondaire ne doit pas faire disparaître
+    l'infra elle-même du modèle.
+
+    Retourne [] si `detect_infrastructures` est indisponible (import guardé)
+    ou si le HAR n'a révélé aucune infra 1st-party.
+    """
+    if detect_infrastructures is None or not har_path:
+        return []
+
+    infrastructures, _ = detect_infrastructures(har_path, audited_domain,
+                                                 first_party_extra=first_party_extra)
+    results = []
+    for i, infra in enumerate(infrastructures):
+        ip = infra["ips"][0] if infra["ips"] else None
+        info = collect_server_info(ip, token) or {}
+        results.append({
+            "host": infra["key"],
+            "hosts": list(infra["hosts"]),
+            "ip": ip,
+            "country_code": info.get("country_code"),
+            "city": info.get("city"),
+            "org": info.get("org"),
+            "detected_provider": info.get("detected_provider"),
+            "carbon_intensity_g_kwh": info.get("carbon_intensity_g_kwh"),
+            "efootprint_country": info.get("efootprint_country"),
+            "confidence_country": CONFIDENCE_HIGH if info.get("country_code") else CONFIDENCE_DEFAULT,
+            "confidence_provider": CONFIDENCE_MEDIUM if info.get("detected_provider") else CONFIDENCE_LOW,
+            "request_count": infra["request_count"],
+            "transferred_bytes": infra["transferred_bytes"],
+            "cache_header_seen": infra["cache_header_seen"],
+            "is_primary": i == 0,
+        })
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Construction env-data.json
 # ---------------------------------------------------------------------------
 
 def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None,
-                   tech_stack=None):
+                   tech_stack=None, servers_info=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
+
+    servers_info : liste optionnelle produite par `collect_multi_server_info()`,
+    UNE ENTRÉE PAR INFRASTRUCTURE 1st-party détectée dans le HAR (Lot 3). Écrite
+    dans la clé "servers" (pluriel), qui coexiste avec "server" (singulier,
+    INCHANGÉE) : "server" continue de décrire l'infra principale exactement
+    comme avant (non-régression), "servers" est une ADDITION que le rapport
+    actuel ignore tant qu'il ne la lit pas.
 
     audience : dict résolu par resolve_audience() portant le mix pays d'audience
     et les parts iOS/macOS pondérées servant à corriger le mix appareils. Si None,
@@ -1184,12 +1245,13 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             )
 
     return {
-        "schema_version": "1.5",
+        "schema_version": "1.6",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
         "network_mix": network_section,
         "server": server_section,
+        "servers": servers_info or [],
         "audience": audience_section,
         "traffic": traffic_section,
         "job": job_section,
@@ -1222,6 +1284,10 @@ def main():
     parser.add_argument("--no-similarweb", action="store_true",
                         help="Désactive l'appel automatique à l'API SimilarWeb "
                              "(mode hors-ligne / éviter le réseau).")
+    parser.add_argument("--first-party-host", action="append", default=[],
+                        help="Hôte à traiter comme 1st-party même si son domaine "
+                             "diffère du site audité (ex. un service auto-hébergé "
+                             "sous un autre nom de domaine). Répétable.")
     args = parser.parse_args()
 
     # Validation précoce du format --audience (fail fast avant toute collecte réseau)
@@ -1339,6 +1405,31 @@ def main():
     else:
         print("  Aucune IP serveur détectée dans le HAR")
 
+    # --- Géolocalisation de CHAQUE infrastructure 1st-party (Lot 3) ---
+    # Un site peut révéler plusieurs infras 1st-party distinctes dans le HAR
+    # (ex. ANTS : 3 serveurs). server_info ci-dessus ne géolocalise que la
+    # principale ; ce bloc complète pour les autres.
+    print("\n[infras] Géolocalisation de chaque infrastructure 1st-party...")
+    servers_info = []
+    audited_domain = similarweb_api.infer_domain(source_dir) if similarweb_api else None
+    if har_path and audited_domain and detect_infrastructures:
+        servers_info = collect_multi_server_info(
+            har_path, audited_domain,
+            first_party_extra=args.first_party_host, token=ipinfo_token)
+        if len(servers_info) > 1:
+            for s in servers_info:
+                tag = "principale" if s["is_primary"] else "secondaire"
+                provider = s["detected_provider"] or "inconnu"
+                print(f"  -> [{tag}] {s['host']} : {s['country_code'] or '?'} / "
+                      f"{provider} ({s['transferred_bytes']:,} octets, "
+                      f"{s['request_count']} requêtes)".replace(",", " "))
+        elif servers_info:
+            print("  -> une seule infra 1st-party détectée (identique à la principale)")
+        else:
+            print("  -> détection indisponible (HAR absent ou domaine introuvable)")
+    else:
+        print("  -> ignoré (HAR, domaine audité ou détection d'infras indisponible)")
+
     # --- Détection de la stack technique (règles maison sur le HAR) ---
     print("\n[techno] Détection de la stack technique (règles maison)...")
     tech_stack = None
@@ -1402,7 +1493,7 @@ def main():
     # --- Assemblage env-data.json ---
     env_data = build_env_data((pages, server_ip), device_mix, server_info,
                               audience=audience, traffic=traffic,
-                              tech_stack=tech_stack)
+                              tech_stack=tech_stack, servers_info=servers_info)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)

@@ -119,6 +119,11 @@ FORBIDDEN_VALUES = {
     # Lot 2 (07/08/2026) : build_system() + extraction propre (sans regex) sur
     # l'env-data.json rejoué. Remplace 174.139 comme repère de non-régression.
     170.904: "total CO2e (lecture propre, Lot 2), cas de test",
+    # Lot 3 (07/08/2026) : from_har.py, parcours multi-étapes + infras multiples.
+    # Validation confirmée : le HAR = parcours d'une personne, donc chaque page
+    # capturée devient une étape (au lieu de la seule page la plus lourde).
+    853.336: "total CO2e (multi-étapes, Lot 3), cas de test octo.com",
+    14480.895: "total CO2e (3 serveurs + 3 étapes, Lot 3), cas de test ANTS",
     4801.2: "total CO2e du second cas de test (site public)",
     # Code mort après correction du typage des URL versionnées
     975.5: "CSS non utilisé (Ko), cas de test",
