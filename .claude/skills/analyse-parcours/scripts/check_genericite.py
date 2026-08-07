@@ -143,6 +143,12 @@ FORBIDDEN_VALUES = {
     # Agrégats HAR des deux cas de test
     6987.9: "poids total HAR (Ko), cas de test",
     17674.3: "poids total HAR (Ko), second cas de test",
+    # Lot 4 (07/08/2026) : temps_utilisateur.py, Nielsen recalé sur Engagments
+    # SimilarWeb (moyenne des Nielsen bruts du parcours, cf. sa docstring).
+    16.058: "temps moyen par page SimilarWeb (TimeOnSite/PagePerVisit), cas de test",
+    0.250109: "facteur de recalage Nielsen (méthode parcours multi-étapes), cas de test",
+    560.9885: "total CO2e (Nielsen recalé, Lot 4), cas de test octo.com",
+    14372.7561: "total CO2e (Nielsen brut, pas de recalage SimilarWeb, Lot 4), cas de test ANTS",
 }
 
 # Un entier court (82, 440, 317) est un nombre COURANT : il peut légitimement

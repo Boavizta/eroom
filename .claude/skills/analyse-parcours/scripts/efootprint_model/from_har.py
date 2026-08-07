@@ -44,6 +44,7 @@ from .spec import (
     script_default,
     script_default_label,
 )
+from .temps_utilisateur import nielsen_raw_seconds, recalibration_factor, step_user_time
 
 # Alias provider : même correspondance que PROVIDER_ALIASES de
 # run_efootprint.py. e-footprint attend "ovhcloud" ; collect_env_data.py (via
@@ -452,10 +453,14 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
     nom affiché — cf. piège ANTS page_3). Parcours dans l'ordre de première
     apparition des pages, ce qui reflète l'ordre réel de navigation capturé.
 
-    user_time N'EST PAS ENCORE Nielsen (Lot 4) : reprend le même défaut que
-    `run_efootprint.py` actuel (1 min, script_default), appliqué À CHAQUE
-    ÉTAPE plutôt qu'une fois globalement. Ce n'est PAS une amélioration de
-    précision sur ce point précis, seulement une généralisation à N étapes.
+    user_time vient de `temps_utilisateur.step_user_time()` (Lot 4, Nielsen
+    2008 recalé) pour chaque étape dont le comptage de mots est connu. Le
+    facteur de recalage se calcule UNE FOIS pour tout le site, à partir de
+    `env_data["traffic"]["avg_time_on_page_s"]` (SimilarWeb Engagments, cf.
+    similarweb_api.py) comparé à la moyenne des Nielsen bruts des étapes du
+    parcours (cf. docstring de `temps_utilisateur.py` sur pourquoi une moyenne
+    contre une moyenne). Étape sans comptage de mots (repli Lot 3) : défaut de
+    script explicite, jamais deviné par Nielsen.
 
     Retourne (SiteSpec, warnings) où warnings liste les pages dont le serveur
     dominant est un hôte tiers (page non attribuable à une infra 1st-party) :
@@ -495,7 +500,12 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
                 order.append(url)
             best_by_url[url] = (pid, total_bytes, page_entries)
 
-    jobs, steps, warnings = [], [], []
+    # Première passe : ne garde que les pages attribuables à une infra
+    # 1st-party (les autres deviennent un warning, jamais une étape), et
+    # relève leur comptage de mots. Nécessaire AVANT de construire les étapes :
+    # le facteur de recalage Nielsen (ci-dessous) se calcule sur l'ensemble du
+    # parcours retenu, pas étape par étape.
+    kept, warnings = [], []
     for step_index, url in enumerate(order):
         pid, total_bytes, page_entries = best_by_url[url]
         infra_key, is_first_party = _page_dominant_infra_key(
@@ -507,7 +517,15 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
                 "Étape ignorée : aucun serveur du modèle ne peut la porter."
             )
             continue
+        word_count = word_counts.get(pid, {}).get("word_count")
+        kept.append((step_index, url, infra_key, total_bytes, word_count))
 
+    avg_time_on_page_s = (env_data.get("traffic") or {}).get("avg_time_on_page_s")
+    nielsen_raws = [nielsen_raw_seconds(wc) for _, _, _, _, wc in kept if wc is not None]
+    factor = recalibration_factor(avg_time_on_page_s, nielsen_raws)
+
+    jobs, steps = [], []
+    for step_index, url, infra_key, total_bytes, word_count in kept:
         job_key = f"job_{step_index}"
         step_key = f"step_{step_index}"
         jobs.append(JobSpec(
@@ -520,16 +538,21 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
             data_stored=script_default(0.0, "kB_stored"),
         ))
 
-        wc = word_counts.get(pid, {})
+        user_time = step_user_time(word_count, factor) if word_count is not None else None
         step_fields = dict(
             key=step_key,
             label=url,
-            user_time=script_default(1.0, "min", "défaut de script, en attente du Lot 4 (Nielsen)"),
+            user_time=user_time or script_default(
+                1.0, "min",
+                "aucun comptage de mots pour cette page (repli Lot 3) : "
+                "Nielsen inapplicable, défaut de script en attendant une "
+                "mesure de contenu."
+            ),
             jobs={job_key: 1},
             url=url,
         )
-        if wc.get("word_count") is not None:
-            step_fields["words"] = measured(float(wc["word_count"]), "dimensionless", _SRC)
+        if word_count is not None:
+            step_fields["words"] = measured(float(word_count), "dimensionless", _SRC)
         steps.append(StepSpec(**step_fields))
 
     journey_key = "parcours"

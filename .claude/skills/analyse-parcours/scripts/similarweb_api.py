@@ -164,12 +164,39 @@ def _snapshot_label(data):
     return f"{_MONTHS_FR.get(month, str(month))} {year}"
 
 
+def _avg_time_on_page_s(data):
+    """Temps moyen par page vue, en secondes : TimeOnSite / PagePerVisit.
+
+    Sert de mesure indépendante pour recalibrer le temps Nielsen brut (cf.
+    `efootprint_model/temps_utilisateur.py`, Lot 4). C'est une moyenne SUR TOUT
+    LE SITE, à comparer à une moyenne de pages, jamais à une seule page :
+    Nielsen calcule un temps par page individuelle (cf. Weinreich et al. 2008,
+    ACM ToWeb, méthodologie section 4.4), SimilarWeb ne renvoie qu'un agrégat.
+
+    Retourne None si Engagments est absent ou incomplet (le site est ignoré
+    par SimilarWeb, ou l'API ne renvoie pas ce bloc) : c'est une INFORMATION
+    manquante, pas une valeur nulle.
+    """
+    eng = data.get("Engagments") or {}
+    try:
+        time_on_site = float(eng.get("TimeOnSite"))
+        page_per_visit = float(eng.get("PagePerVisit"))
+    except (TypeError, ValueError):
+        return None
+    if page_per_visit <= 0:
+        return None
+    return time_on_site / page_per_visit
+
+
 def build_traffic_block(data, source_url):
     """Construit le bloc 'traffic' au format attendu par resolve_traffic().
 
     Base : le mois le plus récent d'EstimatedMonthlyVisits (repli Engagments.Visits),
     annualisé x12 pour rester cohérent avec monthly_visits (visits_per_year =
     monthly_visits x 12). Retourne None si aucune donnée de visites.
+
+    `avg_time_on_page_s`, s'il est disponible, sert au recalage Nielsen (Lot 4) :
+    absent du dict si Engagments ne le fournit pas, jamais mis à 0 ou deviné.
     """
     monthly = None
     emv = data.get("EstimatedMonthlyVisits") or {}
@@ -189,7 +216,7 @@ def build_traffic_block(data, source_url):
         return None
 
     visits_per_year = int(round(monthly * 12 / 1000.0)) * 1000  # arrondi au millier
-    return {
+    block = {
         "visits_per_year": visits_per_year,
         "monthly_visits": monthly,
         # Libellé neutre (voir build_audience_block).
@@ -198,6 +225,10 @@ def build_traffic_block(data, source_url):
         "snapshot": _snapshot_label(data),
         "confidence": CONFIDENCE_MEDIUM,
     }
+    avg_time = _avg_time_on_page_s(data)
+    if avg_time is not None:
+        block["avg_time_on_page_s"] = round(avg_time, 3)
+    return block
 
 
 # ---------------------------------------------------------------------------

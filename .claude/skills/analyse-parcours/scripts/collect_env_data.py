@@ -314,7 +314,7 @@ def resolve_traffic(existing_traffic):
             visits = None
         if visits and visits > 0:
             monthly = existing_traffic.get("monthly_visits")
-            return {
+            resolved = {
                 "visits_per_year": visits,
                 "monthly_visits": int(round(float(monthly))) if monthly else None,
                 "source": existing_traffic.get("source", "SimilarWeb (estimation)"),
@@ -327,6 +327,13 @@ def resolve_traffic(existing_traffic):
                     "Le CO2e total croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) ; le CO2e/visite diminue quand le trafic augmente."),
                 "warning": None,
             }
+            # Temps moyen par page (TimeOnSite/PagePerVisit) : sert au recalage
+            # Nielsen (efootprint_model/temps_utilisateur.py, Lot 4). Additif,
+            # absent si SimilarWeb ne le fournit pas (cf. similarweb_api.py).
+            avg_time = existing_traffic.get("avg_time_on_page_s")
+            if avg_time is not None:
+                resolved["avg_time_on_page_s"] = avg_time
+            return resolved
 
     return {
         "visits_per_year": DEFAULT_VISITS_PER_YEAR,
@@ -1227,6 +1234,8 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
         "confidence": traffic["confidence"],
         "note": traffic.get("note"),
     }
+    if traffic.get("avg_time_on_page_s") is not None:
+        traffic_section["avg_time_on_page_s"] = traffic["avg_time_on_page_s"]
 
     # --- Croisement techno -> serveur (fiabilisation provider CO2e) ---
     # Si ipinfo n'a pas conclu de provider mais que la détection techno révèle un

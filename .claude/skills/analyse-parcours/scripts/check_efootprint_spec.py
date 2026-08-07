@@ -81,6 +81,12 @@ from efootprint_model.spec import (  # noqa: E402
     measured_label,
     script_default_label,
 )
+from efootprint_model.temps_utilisateur import (  # noqa: E402
+    is_within_nielsen_domain,
+    nielsen_raw_seconds,
+    recalibration_factor,
+    step_user_time,
+)
 
 # ---------------------------------------------------------------------------
 # Journal des contrôles
@@ -765,6 +771,101 @@ def check_sources_and_primary(journal):
 # Contrôle : la bibliothèque reste indépendante d'e-footprint
 # ---------------------------------------------------------------------------
 
+def check_nielsen_temps_utilisateur(journal):
+    print("Temps utilisateur — Nielsen recalé, jamais silencieux hors domaine")
+
+    # Domaine de validité publié par Nielsen (30-1250 mots) : correctement
+    # reconnu aux deux bornes et à l'intérieur.
+    journal.expect_true(
+        "150 mots est dans le domaine Nielsen (30-1250)",
+        is_within_nielsen_domain(150.0))
+    journal.expect_true(
+        "30 mots (borne basse incluse) est dans le domaine Nielsen",
+        is_within_nielsen_domain(30.0))
+    journal.expect_true(
+        "1250 mots (borne haute incluse) est dans le domaine Nielsen",
+        is_within_nielsen_domain(1250.0))
+    journal.expect_true(
+        "10 mots est HORS du domaine Nielsen",
+        not is_within_nielsen_domain(10.0))
+    journal.expect_true(
+        "2000 mots est HORS du domaine Nielsen",
+        not is_within_nielsen_domain(2000.0))
+
+    # La formule elle-même : 25 s de socle + 4,4 s par 100 mots.
+    journal.expect_equal(
+        "Nielsen brut à 0 mot vaut le socle seul (25 s)",
+        nielsen_raw_seconds(0.0), 25.0)
+    journal.expect_equal(
+        "Nielsen brut à 100 mots vaut 25 + 4,4 s",
+        nielsen_raw_seconds(100.0), 29.4)
+
+    # Recalage : moyenne SimilarWeb / moyenne des Nielsen bruts du parcours.
+    # Deux pages à 100 et 200 mots -> Nielsen bruts 29.4 et 33.8, moyenne 31.6.
+    raws = [nielsen_raw_seconds(100.0), nielsen_raw_seconds(200.0)]
+    factor = recalibration_factor(15.8, raws)
+    journal.expect_true(
+        "le facteur de recalage est la mesure divisée par la moyenne des Nielsen bruts",
+        factor is not None and abs(factor - 0.5) < 1e-9,
+        f"attendu 0.5, obtenu {factor!r}")
+
+    journal.expect_true(
+        "recalage impossible sans mesure SimilarWeb (avg_time_on_page_s=None)",
+        recalibration_factor(None, raws) is None)
+    journal.expect_true(
+        "recalage impossible sans aucune page à Nielsen connu",
+        recalibration_factor(15.8, []) is None)
+    journal.expect_true(
+        "recalage impossible si toutes les pages du parcours sont à None (repli Lot 3)",
+        recalibration_factor(15.8, [None, None]) is None)
+
+    # step_user_time() : les quatre combinaisons dégradent la confiance
+    # (jamais silencieusement) exactement quand attendu.
+    in_domain_recalibrated = step_user_time(150.0, factor)
+    journal.expect_true(
+        "page dans le domaine + recalage disponible -> confiance medium",
+        in_domain_recalibrated is not None and in_domain_recalibrated.confidence == "medium",
+        f"confiance obtenue : {in_domain_recalibrated.confidence if in_domain_recalibrated else None!r}")
+    journal.expect_true(
+        "medium : aucun motif de dégradation dans le commentaire",
+        "hors du domaine" not in in_domain_recalibrated.comment
+        and "SANS recalage" not in in_domain_recalibrated.comment)
+
+    out_of_domain = step_user_time(10.0, factor)
+    journal.expect_true(
+        "page hors domaine (10 mots) -> confiance dégradée (low)",
+        out_of_domain is not None and out_of_domain.confidence == "low")
+    journal.expect_true(
+        "le motif de sortie de domaine est ÉCRIT dans le commentaire, jamais silencieux",
+        "domaine de validité Nielsen" in out_of_domain.comment)
+
+    no_recalage = step_user_time(150.0, None)
+    journal.expect_true(
+        "aucune mesure SimilarWeb -> confiance dégradée (low), Nielsen BRUT appliqué",
+        no_recalage is not None and no_recalage.confidence == "low"
+        and abs(no_recalage.value - nielsen_raw_seconds(150.0)) < 1e-9)
+    journal.expect_true(
+        "le motif d'absence de recalage est ÉCRIT dans le commentaire, jamais silencieux",
+        "aucune mesure SimilarWeb" in no_recalage.comment)
+
+    both_degraded = step_user_time(10.0, None)
+    journal.expect_true(
+        "hors domaine ET sans recalage -> les DEUX motifs sont écrits, pas un seul",
+        both_degraded is not None
+        and "domaine de validité Nielsen" in both_degraded.comment
+        and "aucune mesure SimilarWeb" in both_degraded.comment)
+
+    journal.expect_true(
+        "aucun comptage de mots (repli Lot 3) -> pas de Traced deviné, None explicite",
+        step_user_time(None, factor) is None)
+
+    journal.expect_true(
+        "le Traced produit est bien tracé (source_name renseigné) : "
+        "un temps Nielsen ne doit jamais ressembler à une mesure sans provenance",
+        in_domain_recalibrated.has_source)
+    print()
+
+
 def check_no_efootprint_import(journal):
     print("Indépendance — la spécification n'importe pas e-footprint")
 
@@ -849,6 +950,7 @@ def main():
     check_reserves(journal)
     check_compose(journal)
     check_sources_and_primary(journal)
+    check_nielsen_temps_utilisateur(journal)
     check_no_efootprint_import(journal)
 
     total = journal.passed + len(journal.failures)
