@@ -48,6 +48,7 @@ from efootprint_model import (  # noqa: E402  (après ajustement de sys.path)
     RESERVE_CODES,
     AudienceSpec,
     Evidence,
+    ExternalApiSpec,
     JobSpec,
     JourneySpec,
     ServerSpec,
@@ -437,6 +438,64 @@ def check_structures(journal):
     journal.expect_true(
         "absence d'en-tête de cache et ratio inconnu restent distinguables",
         silent.cache_hit_ratio is None and silent.cache_header_seen is False)
+    print()
+
+
+# ---------------------------------------------------------------------------
+# Contrôles : appel IA générative (ExternalApiSpec, Lot 7)
+# ---------------------------------------------------------------------------
+
+def check_external_api(journal):
+    print("IA générative — ExternalApiSpec refuse ce qu'EcoLogits ne peut pas chiffrer")
+
+    journal.expect_ok(
+        "un ExternalApiSpec complet se construit",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
+                                output_tokens=measured(300.0, "dimensionless", SRC)))
+
+    journal.expect_refused(
+        "un provider vide est refusé",
+        lambda: ExternalApiSpec(provider="", model_name="claude-sonnet-4-5",
+                                output_tokens=measured(300.0, "dimensionless", SRC)),
+        "provider")
+    journal.expect_refused(
+        "un model_name vide est refusé",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="",
+                                output_tokens=measured(300.0, "dimensionless", SRC)),
+        "model_name")
+    journal.expect_refused(
+        "output_tokens absent est refusé : champ critique, pilote le calcul EcoLogits",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
+                                output_tokens=None),
+        "output_tokens")
+    journal.expect_refused(
+        "output_tokens sans provenance est refusé",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
+                                output_tokens=Traced(300.0, "dimensionless")),
+        "provenance")
+    journal.expect_refused(
+        "request_count_per_step nul est refusé",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
+                                output_tokens=measured(300.0, "dimensionless", SRC),
+                                request_count_per_step=0),
+        "strictement positif")
+    journal.expect_refused(
+        "request_count_per_step négatif est refusé",
+        lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
+                                output_tokens=measured(300.0, "dimensionless", SRC),
+                                request_count_per_step=-1),
+        "strictement positif")
+
+    journal.expect_ok(
+        "un JobSpec avec external_api complet se construit",
+        lambda: sample_job(
+            external_api=ExternalApiSpec(
+                provider="anthropic", model_name="claude-sonnet-4-5",
+                output_tokens=measured(300.0, "dimensionless", SRC))))
+    journal.expect_refused(
+        "un external_api du mauvais type est refusé (pas un simple nom)",
+        lambda: sample_job(external_api="anthropic"),
+        "ExternalApiSpec")
     print()
 
 
@@ -946,6 +1005,7 @@ def main():
     check_traced(journal)
     check_critical_fields(journal)
     check_structures(journal)
+    check_external_api(journal)
     check_validation(journal)
     check_reserves(journal)
     check_compose(journal)

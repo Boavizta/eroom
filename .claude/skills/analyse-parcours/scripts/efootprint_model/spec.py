@@ -372,6 +372,43 @@ class ThirdPartyHost:
         }
 
 
+@dataclass(frozen=True)
+class ExternalApiSpec:
+    """Un appel à un modèle d'IA générative tiers (OpenAI, Anthropic...), à la
+    différence d'un `ThirdPartyHost` : ici une source publique DONNE une
+    empreinte par appel (bibliothèque EcoLogits, déjà installée avec
+    e-footprint), donc la compter en réseau seulement sous-estimerait le calcul
+    lui-même. Distinct d'un `ThirdPartyHost` (CDN, police de caractères) pour
+    qui aucune source publique de ce genre n'existe (cf. sa docstring).
+
+    `provider`/`model_name` doivent être reconnus par le catalogue EcoLogits
+    (ex. "anthropic" / "claude-sonnet-4-5") : c'est `build.py` qui vérifie,
+    cette dataclasse reste zéro import e-footprint.
+    `output_tokens` pilote le calcul : plus de mots générés, plus d'énergie et
+    de calcul consommés. `request_count_per_step` est le nombre d'appels que
+    déclenche l'étape qui le porte (ex. plusieurs tours de conversation).
+    """
+
+    provider: str
+    model_name: str
+    output_tokens: Traced
+    request_count_per_step: float = 1.0
+
+    def __post_init__(self):
+        owner = "ExternalApiSpec"
+        _require_key(self.provider, owner, "provider")
+        _require_key(self.model_name, owner, "model_name")
+        require_traced(self.output_tokens, owner, "output_tokens", kind="value",
+                       critical=True)
+        if isinstance(self.request_count_per_step, bool) \
+                or not isinstance(self.request_count_per_step, Real) \
+                or self.request_count_per_step <= 0:
+            raise SpecError(f"{owner} : \"request_count_per_step\" doit être un "
+                            f"nombre strictement positif, reçu "
+                            f"{self.request_count_per_step!r}.")
+        object.__setattr__(self, "request_count_per_step", float(self.request_count_per_step))
+
+
 # ---------------------------------------------------------------------------
 # Serveur
 # ---------------------------------------------------------------------------
@@ -446,11 +483,11 @@ class JobSpec:
     Le poids décompressé reste un repère utile pour le rapport, mais il n'entre
     pas dans le calcul.
 
-    `external_api` nomme un service tiers si ce traitement en dépend. Aucun
-    constructeur ne l'exploite aujourd'hui : la décision en vigueur est de
-    compter les tiers en réseau seulement (cf. ThirdPartyHost). Le champ est
-    conservé pour le jour où une source publique donnera une empreinte par
-    requête, faute de quoi le chiffre serait inventé.
+    `external_api` porte un `ExternalApiSpec` si ce traitement appelle un
+    modèle d'IA générative tiers (OpenAI, Anthropic...) dont l'empreinte est
+    calculée via EcoLogits (cf. sa docstring), EN PLUS du `data_transferred`
+    habituel : le trafic réseau du prompt/réponse et le calcul du modèle chez
+    le fournisseur sont deux grandeurs distinctes, elles se cumulent.
     """
 
     key: str
@@ -461,7 +498,7 @@ class JobSpec:
     compute_needed: Optional[Traced] = None
     ram_needed: Optional[Traced] = None
     data_stored: Optional[Traced] = None
-    external_api: Optional[str] = None
+    external_api: Optional[ExternalApiSpec] = None
     notes: Tuple[str, ...] = ()
 
     def __post_init__(self):
@@ -477,8 +514,9 @@ class JobSpec:
         for name in ("request_duration", "compute_needed", "ram_needed", "data_stored"):
             require_traced(getattr(self, name), owner, name, kind="value")
 
-        if self.external_api is not None:
-            _require_key(self.external_api, owner, "external_api")
+        if self.external_api is not None and not isinstance(self.external_api, ExternalApiSpec):
+            raise SpecError(f"{owner} : \"external_api\" doit être un "
+                            f"ExternalApiSpec, reçu {type(self.external_api).__name__}.")
 
 
 # ---------------------------------------------------------------------------

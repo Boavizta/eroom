@@ -163,6 +163,33 @@ def _build_server(server_spec, source_cache):
 # Traitements et étapes
 # ---------------------------------------------------------------------------
 
+def _build_external_api(external_api_spec, label, source_cache):
+    """Construit l'appel IA générative EN PLUS du Job réseau habituel (jamais à
+    sa place) : `_build_job()` reste responsable du data_transferred/
+    request_duration, ce module ajoute le calcul EcoLogits séparément.
+
+    Provider/model_name passent en SourceObject bruts, jamais via
+    `to_source_value()` : EcoLogits valide lui-même leur existence dans son
+    catalogue (`_get_model_or_raise()`), une mauvaise valeur doit échouer à la
+    construction avec le message de la librairie, pas être avalée en amont.
+    """
+    from efootprint.builders.external_apis.ecologits.ecologits_external_api import (
+        EcoLogitsGenAIExternalAPI, EcoLogitsGenAIExternalAPIJob)
+    from efootprint.abstract_modeling_classes.source_objects import SourceObject
+
+    api = EcoLogitsGenAIExternalAPI.from_defaults(
+        f"{label} (IA générative)",
+        provider=SourceObject(external_api_spec.provider),
+        model_name=SourceObject(external_api_spec.model_name),
+    )
+    job = EcoLogitsGenAIExternalAPIJob.from_defaults(
+        f"Appel IA {label}",
+        external_api=api,
+        output_token_count=to_source_value(external_api_spec.output_tokens, source_cache),
+    )
+    return job
+
+
 def _build_job(job_spec, servers_by_key, source_cache):
     from efootprint.core.usage.job import Job
 
@@ -186,12 +213,16 @@ def _build_job(job_spec, servers_by_key, source_cache):
         if traced is not None:
             kwargs[kwarg_name] = to_source_value(traced, source_cache)
 
-    return Job.from_defaults(
+    network_job = Job.from_defaults(
         job_spec.label,
         server=servers_by_key[job_spec.server_key],
         data_transferred=to_source_value(job_spec.data_transferred, source_cache),
         **kwargs,
     )
+
+    if job_spec.external_api is None:
+        return (network_job,)
+    return (network_job, _build_external_api(job_spec.external_api, job_spec.label, source_cache))
 
 
 def _build_step(step_spec, jobs_by_key, source_cache):
@@ -204,7 +235,11 @@ def _build_step(step_spec, jobs_by_key, source_cache):
                 f"StepSpec[{step_spec.key}] : traitement \"{job_key}\" absent "
                 "des traitements construits."
             )
-        jobs[jobs_by_key[job_key]] = weight
+        # `_build_job()` renvoie un tuple (job réseau, éventuellement job IA
+        # EcoLogits) : les deux comptent au même poids, l'étape les déclenche
+        # ensemble, jamais l'un sans l'autre.
+        for built_job in jobs_by_key[job_key]:
+            jobs[built_job] = weight
 
     kwargs = {}
     if step_spec.user_time is not None:
