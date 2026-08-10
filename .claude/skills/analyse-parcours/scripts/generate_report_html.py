@@ -2408,6 +2408,68 @@ def _section_efootprint(results):
     dominant_fab = max(fab, key=fab.get) if fab else "?"
     dominant_ener = max(ener, key=ener.get) if ener else "?"
 
+    # Fourchettes d'incertitude (Lot 4bis, rendues Lot 9) : deux axes MESURÉS en
+    # rejouant le même modèle, jamais cumulés (cf. ranges.py et mémoire persistante
+    # "fourchettes non cumulées"). Absent si model.ranges n'existe pas (ancien schéma).
+    ranges = (results.get("model") or {}).get("ranges")
+    ranges_html = ""
+    if ranges:
+        infra_lo, infra_hi = ranges["infra_range_kg"]
+        usage_lo, usage_hi = ranges["usage_range_kg"]
+
+        def _range_row(label, lo, hi, detail):
+            if abs(hi - lo) < 1e-9:
+                span = (f'{lo:.1f} kg <span style="color:#888;font-size:14px">'
+                        f'(fourchette fermée, faute d\'incertitude mesurable ici)</span>')
+            else:
+                ratio = f' <span style="color:#888;font-size:14px">({hi / lo:.2f}x)</span>' if lo else ""
+                span = f'{lo:.1f} - {hi:.1f} kg{ratio}'
+            return (
+                f'<tr><td style="padding:6px 8px">{label}</td>'
+                f'<td style="padding:6px 8px"><b>{span}</b></td>'
+                f'<td style="padding:6px 8px;font-size:14px;color:#666">{detail}</td></tr>'
+            )
+
+        ranges_html = f"""
+  <h3 style="margin-top:24px">Fourchettes d'incertitude</h3>
+  <p style="font-size:15px;color:#666;margin:0 0 8px">
+    Deux incertitudes distinctes bornent l'estimation centrale ci-dessus, chacune mesurée
+    en rejouant le même modèle avec une seule hypothèse changée à la fois. Elles ne
+    s'additionnent <b>jamais</b> entre elles : cumuler le pire cas de chaque axe
+    supposerait que toutes les incertitudes jouent dans le même sens au même moment, ce
+    qui serait statistiquement malhonnête.
+  </p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Axe</th>
+      <th style="padding:6px 8px;text-align:left">Fourchette</th>
+      <th style="padding:6px 8px;text-align:left">Ce qui varie</th>
+    </tr></thead>
+    <tbody>
+      {_range_row("Infrastructure", infra_lo, infra_hi,
+                   "mode de dimensionnement du serveur : serverless ↔ autoscaling")}
+      {_range_row("Usage", usage_lo, usage_hi,
+                   "temps de lecture Nielsen : recalé (mesure SimilarWeb) ↔ brut")}
+    </tbody>
+  </table>"""
+
+    # Cohérence CDN/tiers vs IA générative (tranché Lot 7) : affiché seulement si ce
+    # site a au moins un appel IA générative (poste ExternalAPIs non nul), sinon la
+    # distinction n'a rien à expliquer sur ce site précis.
+    external_apis_kg = fab.get("ExternalAPIs", 0) + ener.get("ExternalAPIs", 0)
+    cdn_ia_html = ""
+    if external_apis_kg > 0:
+        cdn_ia_html = """
+  <p style="font-size:15px;color:#666;margin:12px 0 0">
+    Les services tiers de ce site sont traités différemment selon ce qu'ils font
+    réellement. Un CDN ou une police de caractères servent un fichier déjà prêt : le
+    calcul nécessaire est quasi nul, l'essentiel de leur coût est le réseau, déjà compté
+    dans ce rapport. À l'inverse, un appel à un modèle d'IA générative déclenche un vrai
+    calcul à chaque requête (le modèle produit le texte mot par mot) : ce calcul est
+    compté séparément, via une bibliothèque spécialisée (EcoLogits), car aucune source
+    publique équivalente n'existe pour un CDN.
+  </p>"""
+
     return f"""<section id="efootprint">
   <h2>Impact environnemental (estimation CO2e)</h2>
   <p style="font-size:16px;color:#555;margin-bottom:8px">
@@ -2417,6 +2479,7 @@ def _section_efootprint(results):
   </p>
   {warning}
   {kpis}
+  {ranges_html}
 
   <h3 style="margin-top:24px">Décomposition par poste</h3>
   <div style="display:grid;grid-template-columns:1fr;gap:20px">
@@ -2429,6 +2492,7 @@ def _section_efootprint(results):
       {ener_table}
     </div>
   </div>
+  {cdn_ia_html}
   {weight_composition}
 
   <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
