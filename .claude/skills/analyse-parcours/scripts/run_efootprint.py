@@ -41,6 +41,7 @@ from efootprint_model.build import (  # noqa: E402
 from efootprint_model.compose import (  # noqa: E402
     collect_sources, primary_server, servers_note)
 from efootprint_model.ranges import footprint_ranges_kg  # noqa: E402
+from efootprint_model.sizing_report import servers_sizing  # noqa: E402
 
 RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
 
@@ -474,6 +475,15 @@ def save_results(spec, built, ranges, source_dir, env_data, warnings, reserves):
             "consistency": consistency_report(built),
             "reserves_accepted": [{"code": code, "message": message} for code, message in reserves],
             "warnings": list(warnings),
+            "sizing": {
+                "note": "Diagnostic interne (Lot 6) : le trafic annuel est réparti en "
+                        "timeseries UNIFORME sur 24h, jamais sur le vrai profil horaire du "
+                        "site, ce qui MINIMISE artificiellement l'écart mesuré. Ne pas "
+                        "présenter oversizing_ratio comme une mesure du surdimensionnement "
+                        "réel d'un client. Non affiché dans le rapport HTML (décision "
+                        "reportée au Lot 9).",
+                "servers": servers_sizing(built),
+            },
         },
         "sources": collect_sources(spec),
     }
