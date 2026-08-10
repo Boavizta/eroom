@@ -25,6 +25,7 @@ version: 1.0.0
 | Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 | e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
+| e-footprint — topologie d'un site (composants) | GÉNÉRÉ à la demande, pas de `.puml` fixe en dépôt | variable (dépend du site/archétype demandé) | `efootprint_model/to_plantuml.py::site_to_plantuml()` (lit une `SiteSpec`) | jamais à régénérer soi-même : ce diagramme se produit en appelant `site_to_plantuml(spec)` sur la spec du moment, cf. section dédiée ci-dessous |
 
 Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
 
@@ -739,6 +740,58 @@ open documentation/diagramme/analyse-parcours-efootprint-outils.pdf
 - Rester cohérent sur le vocabulaire employé dans les labels (ex. toujours
   "parsing", jamais mélanger avec "parse"/"parsé") — les incohérences de terme
   entre blocs sautent aux yeux sur un diagramme court.
+
+-----
+
+## Diagramme 4 — e-footprint (topologie technique d'un site, composants)
+
+**Source de vérité :** `efootprint_model/to_plantuml.py::site_to_plantuml()`. Différence
+fondamentale avec les diagrammes 1 à 3 : ceux-là décrivent le CODE des scripts (toujours les
+mêmes participants, un seul `.puml` par diagramme, régénéré quand le code change). Celui-ci
+décrit une DONNÉE (une `SiteSpec` particulière : le site audité, ou un archétype, ou une
+composition) : il n'existe pas de `.puml` fixe à maintenir en dépôt, chaque appel produit un
+diagramme différent selon la spec qu'on lui donne.
+
+### Description
+
+Diagramme de composants (pas de séquence, pas d'activité) : QUI existe et QUI parle à QUI,
+jamais l'ordre des étapes du parcours utilisateur (ça reste le rôle des pages 4-5 du
+diagramme 1). Contenu, par package :
+- **Serveurs 1st-party** : un composant `database` par `ServerSpec` de la spec.
+- **Traitements** : un composant `component` par `JobSpec` SANS appel IA, relié à son
+  serveur (`-down->`).
+- **Appels IA générative** : un composant `cloud` par `JobSpec` qui porte un
+  `ExternalApiSpec` (cf. Lot 7, calcul réel via EcoLogits), avec le provider/modèle affiché
+  dans le label. Séparé des traitements réseau habituels : ce n'est pas la même nature de
+  coût (cf. handoff du 10/08/2026, section 2.4 sur le contraste CDN/tiers vs IA).
+- **Hôtes tiers (réseau seulement)** : un composant `cloud` par `ThirdPartyHost`, si la spec
+  en porte.
+
+### Utilisation
+
+```python
+import sys
+sys.path.insert(0, ".claude/skills/analyse-parcours/scripts")
+from efootprint_model.to_plantuml import site_to_plantuml
+
+# Depuis une spec réelle (from_har.py) ou un archétype (archetypes/*.py) :
+puml_text = site_to_plantuml(spec)
+open("mon_diagramme.puml", "w").write(puml_text)
+```
+
+```bash
+plantuml -tsvg mon_diagramme.puml
+rsvg-convert -f pdf -o mon_diagramme.pdf mon_diagramme.svg
+```
+
+### Piège rencontré à la génération
+
+`@startuml <id>` PILOTE LE NOM DU FICHIER produit par `plantuml` quand aucun `-o` explicite
+n'est passé. Un titre de site avec espaces/accents/parenthèses (nom réel d'un domaine, ou
+nom d'archétype avec préfixe fictif) donnerait un nom de fichier fragile selon la
+plateforme. `to_plantuml.py` sépare donc l'IDENTIFIANT technique (`@startuml <id>`, ASCII
+strict, dérivé du nom du site) du TITRE AFFICHÉ (ligne `title`, accents et espaces
+conservés) : c'est l'identifiant, pas le titre, qui détermine le nom du fichier de sortie.
 
 -----
 
