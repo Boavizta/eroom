@@ -117,6 +117,7 @@ if _skill_md.exists():
 # ── Imports EcoIndex ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from har_metrics import extract_page_metrics, load_cwv
+from efootprint_model.temps_utilisateur import nielsen_raw_seconds as _nielsen_raw_seconds
 
 
 # ── Noms de pays (affichage) ────────────────────────────────────────────────
@@ -2856,6 +2857,69 @@ def _methodo_efootprint(synthese_python):
             f'{_methodo_table(hf_rows)}'
         )
 
+    # --- Temps de lecture par étape (Nielsen 2008 recalé, Lot 10) ---
+    reading_html = ""
+    rt = hyp.get("reading_time")
+    model_steps = (synthese_python.get("model") or {}).get("steps") or []
+    if rt and model_steps:
+        rt_rows = ""
+        for s in model_steps:
+            words = s.get("words")
+            time_s = s.get("user_time_min") or 0
+            words_txt = f'{words:.0f}' if words is not None else "?"
+            raw_s_txt = f'{_nielsen_raw_seconds(words):.0f} s' if words is not None else "?"
+            label = s.get("url") or s.get("label", "?")
+            rt_rows += (
+                f'<tr><td style="padding:5px 8px">{label}</td>'
+                f'<td style="padding:5px 8px;text-align:right">{words_txt}</td>'
+                f'<td style="padding:5px 8px;text-align:right">{raw_s_txt}</td>'
+                f'<td style="padding:5px 8px;text-align:right"><b>{time_s:.0f} s</b></td>'
+                f'<td style="padding:5px 8px">{_confidence_badge(s.get("user_time_confidence"))}</td></tr>'
+            )
+        factor = rt.get("recalibration_factor")
+        total_raw = rt.get("total_raw_s")
+        total_recal = rt.get("total_recalibrated_s")
+        avg_swb = rt.get("avg_time_on_page_s")
+        if rt.get("recalibrated"):
+            _swb_url = traffic.get("source_url")
+            _swb_link = (f' (<a href="{_swb_url}" target="_blank" rel="noopener">'
+                         f'&#8599;&nbsp;source</a>)') if _swb_url else ""
+            recal_note = (
+                f'Le brut ({total_raw:.0f} s cumulés, formule Nielsen seule) est <b>recalé</b> par un '
+                f'facteur unique <b>{factor:.3f}</b> = temps moyen SimilarWeb{_swb_link} par page vue '
+                f'tous pages confondues ({avg_swb:.1f} s/page) ÷ moyenne des Nielsen bruts des pages du '
+                f'parcours. Résultat retenu : <b>{total_recal:.0f} s</b> cumulés. Ce facteur corrige le '
+                'biais de la formule Nielsen (étude 2005, usage avant smartphone, donc structurellement '
+                'surestimée pour un usage mobile) en l\'ancrant sur une mesure réelle d\'engagement '
+                'du site entier, mais il reste propre à CE site (non générique) et porte sur un '
+                'agrégat (moyenne temps/page du site), pas sur les pages précises du parcours capturé. '
+                'Comme les autres données SimilarWeb de ce rapport : estimation tierce (page publique, '
+                'source non officielle, usage limite CGU, potentiellement indisponible), pas une mesure.'
+            )
+        else:
+            recal_note = (
+                f'Aucune mesure SimilarWeb disponible pour ce site : le temps retenu est le Nielsen '
+                f'<b>brut, non recalé</b> ({total_raw:.0f} s cumulés), probablement surestimé '
+                '(étude sous-jacente de 2005, avant l\'usage massif du smartphone).'
+            )
+        reading_html = (
+            '<h4 style="margin:14px 0 4px">Temps de lecture par étape (Nielsen 2008 recalé)</h4>'
+            f'<p style="font-size:15px;color:#666;margin:0 0 4px">'
+            f'Formule : <code>{rt.get("formula")}</code>, appliquée au comptage de mots RÉEL du corps '
+            f'HTML de chaque page capturée dans le HAR (source : '
+            f'<a href="{rt.get("source_url")}" target="_blank" rel="noopener">{rt.get("source_name")}</a>, '
+            f'domaine de validité publié {rt.get("domain_min_words"):.0f}-{rt.get("domain_max_words"):.0f} mots). '
+            f'{recal_note}</p>'
+            f'<table style="width:100%;border-collapse:collapse">'
+            f'<thead><tr style="background:{OCTO_PALE}">'
+            f'<th style="padding:6px 8px;text-align:left">Étape</th>'
+            f'<th style="padding:6px 8px;text-align:right">Mots</th>'
+            f'<th style="padding:6px 8px;text-align:right">Nielsen brut</th>'
+            f'<th style="padding:6px 8px;text-align:right">Temps retenu</th>'
+            f'<th style="padding:6px 8px;text-align:left">Confiance</th>'
+            f'</tr></thead><tbody>{rt_rows}</tbody></table>'
+        )
+
     # --- Méthodes / formules ---
     methods = (
         '<h4 style="margin:14px 0 4px">Méthodes appliquées</h4>'
@@ -2885,7 +2949,7 @@ def _methodo_efootprint(synthese_python):
     )
 
     return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental (CO2e)</h3>'
-            f'{table}{audience_html}{scenarios_html}{har_facts_html}{methods}')
+            f'{table}{audience_html}{scenarios_html}{har_facts_html}{reading_html}{methods}')
 
 
 def _methodo_cwv(cwv):

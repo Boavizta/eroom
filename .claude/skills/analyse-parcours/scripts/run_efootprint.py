@@ -46,6 +46,9 @@ from efootprint_model.ranges import footprint_ranges_kg  # noqa: E402
 from efootprint_model.sizing_report import servers_sizing  # noqa: E402
 from efootprint_model.to_plantuml import site_to_plantuml  # noqa: E402
 from efootprint_model import topology_overview  # noqa: E402
+from efootprint_model.temps_utilisateur import (  # noqa: E402
+    is_within_nielsen_domain, nielsen_raw_seconds, recalibration_factor,
+    NIELSEN_BASE_SECONDS, NIELSEN_SECONDS_PER_100_WORDS)
 
 # Module frère (même dossier) : détection des technologies (stack) par règles
 # maison sur le HAR, réutilisée pour la vue d'ensemble avant calcul (Étape 25).
@@ -413,6 +416,32 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
     def _traced_dict(traced):
         return traced.as_dict() if traced is not None else None
 
+    # Temps de lecture (Nielsen 2008 recalé) : redérivé ici pour l'annexe, à
+    # partir des mêmes comptages de mots que spec_from_env_data() a utilisés
+    # (from_har.py::step_user_time()). Recalcul plutôt que lecture directe des
+    # Traced des étapes : ceux-ci ne portent que la valeur RECALÉE, alors que
+    # l'annexe doit aussi montrer le brut (sans recalage) pour que la personne
+    # qui lit le rapport comprenne d'où vient l'écart, cf. mémoire persistante
+    # "vérifier avant de recommander" (jamais un chiffre sans expliciter le
+    # calcul qui y mène).
+    avg_time_on_page_s = (env_data.get("traffic") or {}).get("avg_time_on_page_s")
+    _step_word_counts = [step.words.value for step in spec.steps if step.words]
+    _nielsen_raws = [nielsen_raw_seconds(w) for w in _step_word_counts]
+    _factor = recalibration_factor(avg_time_on_page_s, _nielsen_raws)
+    reading_time = {
+        "formula": f"{NIELSEN_BASE_SECONDS:.0f} s + {NIELSEN_SECONDS_PER_100_WORDS:.1f} s / 100 mots",
+        "source_name": "Nielsen 2008 (nngroup.com), formule ajustée sur Weinreich et al. 2008 (ACM ToWeb)",
+        "source_url": "https://www.nngroup.com/articles/how-little-do-users-read/",
+        "domain_min_words": 30,
+        "domain_max_words": 1250,
+        "avg_time_on_page_s": avg_time_on_page_s,
+        "recalibration_factor": round(_factor, 4) if _factor is not None else None,
+        "recalibrated": _factor is not None,
+        "total_raw_s": round(sum(_nielsen_raws), 1) if _nielsen_raws else None,
+        "total_recalibrated_s": (round(sum(_nielsen_raws) * _factor, 1)
+                                  if (_nielsen_raws and _factor is not None) else None),
+    }
+
     traffic_env = env_data.get("traffic") or {}
     # spec_from_env_data() ne trace pas source_url/note pour visits_per_year
     # (from_har.py:605, mesure simple) : ils viennent du bloc 'traffic' brut
@@ -511,6 +540,7 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
                             "visiteurs desktop -> wifi.",
             "storage_gb": main_server.storage_gb.value if main_server and main_server.storage_gb else None,
             "servers_note": servers_note(spec),
+            "reading_time": reading_time,
         },
         "model": {
             "schema_version": spec.schema_version,
