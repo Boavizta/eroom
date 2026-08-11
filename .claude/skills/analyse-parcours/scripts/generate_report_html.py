@@ -2063,6 +2063,23 @@ def load_efootprint_results(audit_dir):
     return None
 
 
+def load_topology_svg(audit_dir):
+    """Cherche un topologie-*.svg dans audit_dir ou son parent (source_dir).
+
+    Produit par l'Étape 25 du skill efootprint (build_topology_overview() +
+    compilation plantuml -tsvg, cf. run_efootprint.py) : le diagramme de
+    topologie déjà validé avec l'utilisatrice avant le calcul. Ne tente
+    aucune régénération à la volée (rapport rétrocompatible si absent, même
+    principe que load_efootprint_results()/load_tech_stack()).
+    """
+    audit_dir = Path(audit_dir)
+    for parent in (audit_dir, audit_dir.parent):
+        candidates = sorted(parent.glob("topologie-*.svg"))
+        if candidates:
+            return candidates[0].read_text(encoding="utf-8")
+    return None
+
+
 def load_tech_stack(audit_dir):
     """Cherche le bloc tech_stack dans env-data.json (audit_dir ou parent).
 
@@ -2170,7 +2187,7 @@ def _section_tech(tech_stack):
 </section>"""
 
 
-def _section_efootprint(results):
+def _section_efootprint(results, topology_svg=None):
     """Section 'Impact environnemental (estimation hypothétique)' - CO2e depuis e-footprint."""
     if not results:
         return ""
@@ -2470,6 +2487,21 @@ def _section_efootprint(results):
     publique équivalente n'existe pour un CDN.
   </p>"""
 
+    # Diagramme de topologie (Étape 25 du skill efootprint) : preuve documentée du
+    # modèle validé avec l'utilisatrice avant calcul, PAS régénéré ici (rapport
+    # rétrocompatible si absent, cf. load_topology_svg()).
+    topology_block = ""
+    if topology_svg:
+        topology_block = f"""
+  <h3 style="margin-top:24px">Topologie du modèle</h3>
+  <p style="font-size:15px;color:#666;margin:0 0 8px">
+    Modèle validé avec vous avant calcul (Étape 25) : serveurs 1st-party, traitements,
+    hôtes tiers et suspicions BDD/streaming/IA générative détectées depuis le HAR.
+  </p>
+  <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white">
+    {topology_svg}
+  </div>"""
+
     return f"""<section id="efootprint">
   <h2>Impact environnemental (estimation CO2e)</h2>
   <p style="font-size:16px;color:#555;margin-bottom:8px">
@@ -2480,6 +2512,7 @@ def _section_efootprint(results):
   {warning}
   {kpis}
   {ranges_html}
+  {topology_block}
 
   <h3 style="margin-top:24px">Décomposition par poste</h3>
   <div style="display:grid;grid-template-columns:1fr;gap:20px">
@@ -3243,6 +3276,7 @@ def generate(audit_dir, output_path=None):
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
     efootprint_results = load_efootprint_results(audit_dir)
+    topology_svg = load_topology_svg(audit_dir)
     tech_stack = load_tech_stack(audit_dir)
 
     coverage_by_page = {}
@@ -3419,7 +3453,7 @@ def generate(audit_dir, output_path=None):
     if cwv:
         html += _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page)
     if efootprint_results:
-        html += _section_efootprint(efootprint_results)
+        html += _section_efootprint(efootprint_results, topology_svg)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 

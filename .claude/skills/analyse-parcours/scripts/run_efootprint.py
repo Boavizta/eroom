@@ -42,6 +42,17 @@ from efootprint_model.compose import (  # noqa: E402
     collect_sources, primary_server, servers_note)
 from efootprint_model.ranges import footprint_ranges_kg  # noqa: E402
 from efootprint_model.sizing_report import servers_sizing  # noqa: E402
+from efootprint_model.to_plantuml import site_to_plantuml  # noqa: E402
+from efootprint_model import topology_overview  # noqa: E402
+
+# Module frère (même dossier) : détection des technologies (stack) par règles
+# maison sur le HAR, réutilisée pour la vue d'ensemble avant calcul (Étape 25).
+# Import guardé (le reste fonctionne si le module est absent), même pattern
+# que collect_env_data.py.
+try:
+    import detect_tech
+except ImportError:
+    detect_tech = None
 
 RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
 
@@ -87,6 +98,55 @@ def infer_audited_domain(env_data, source_dir):
         if host:
             return host.removeprefix("www.")
     return source_dir.name
+
+
+def build_topology_overview(source_dir):
+    """Étape 25 (skill efootprint) : construit la vue d'ensemble (texte +
+    PlantUML) AVANT tout calcul CO2e. Ne calcule rien (pas de build_system(),
+    pas de total kg) : seulement de la lecture/présentation.
+
+    Chaîne volontairement identique au début de main() (load_env_data ->
+    find_har -> infer_audited_domain -> spec_from_env_data), pour ne jamais
+    diverger de ce que l'Étape 40 verra réellement. Aucune dépendance sur les
+    paramètres de l'Étape 30 (visits/instance) : la spec a toujours un défaut
+    résolu (100k/an) dès l'Étape 20 (resolve_traffic() dans collect_env_data.py).
+
+    Retourne (spec, overview_text, plantuml_text, warnings). Lève RuntimeError
+    (message actionnable, jamais une trace brute) si les préconditions ne sont
+    pas réunies : HAR absent, ou env-data.json sans serveur détecté.
+    """
+    env_data = load_env_data(source_dir)
+    if not env_data:
+        raise RuntimeError(
+            f"env-data.json introuvable dans {source_dir} : lancer l'Étape 20 "
+            "(collect_env_data.py) avant de demander la vue d'ensemble.")
+
+    har_path = find_har(source_dir)
+    if not har_path:
+        raise RuntimeError(
+            f"Aucun .har trouvé dans {source_dir} (ni dans {RAW_DATA_DIR}/). "
+            "La vue d'ensemble a besoin du HAR pour détecter la topologie "
+            "(serveurs, BDD/streaming/IA suspectés).")
+
+    audited_domain = infer_audited_domain(env_data, source_dir)
+
+    try:
+        spec, warnings = spec_from_env_data(env_data, str(har_path), audited_domain)
+    except (SpecError, ValueError) as exc:
+        # ValueError NUE : spec_from_env_data() lève ce type (pas SpecError)
+        # quand env_data["servers"] est vide (from_har.py) — piège identifié,
+        # `except SpecError` seul ne suffit pas.
+        raise RuntimeError(
+            f"Impossible de construire la topologie : {exc}. Relancer "
+            "l'Étape 20 (collect_env_data.py) si env-data.json est incomplet.")
+
+    tech_result = detect_tech.detect_from_har(har_path) if detect_tech else None
+    spec = topology_overview.annotate_third_party_hosts(spec, tech_result)
+
+    text = topology_overview.overview_text(spec, tech_result)
+    puml = site_to_plantuml(spec, title=audited_domain)
+
+    return spec, text, puml, warnings
 
 
 DEFAULT_VISITS_PER_YEAR = 100_000

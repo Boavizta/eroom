@@ -48,6 +48,9 @@ CATEGORY_ORDER = [
     "Polices",
     "Bibliothèque JS",
     "Consentement / RGPD",
+    "Backend-as-a-Service / BDD (tiers)",
+    "Streaming média",
+    "IA générative (tiers)",
 ]
 
 
@@ -62,10 +65,14 @@ CATEGORY_ORDER = [
 #   "meta_generator" : regex testée sur le contenu de <meta name="generator">
 #   "html"           : regex testée sur le HTML des pages (indice faible)
 #   "cookie"         : regex testée sur les noms de cookies (Set-Cookie)
+#   "content_type"   : regex testée sur le mimeType de chaque réponse (utile pour
+#                      le streaming média quand l'URL ne révèle rien, ex. flux
+#                      servi derrière un chemin opaque) — confiance MEDIUM
 #   "confidence"     : confiance de base si un signal "fort" matche (défaut medium)
 #
 # Un signal via "headers", "meta_generator" ou "cookie" est considéré FORT
-# (confiance de la règle). Un signal via "url" est MEDIUM, via "html" est LOW.
+# (confiance de la règle). Un signal via "url" est MEDIUM, via "content_type"
+# est MEDIUM, via "html" est LOW.
 TECH_RULES = {
     # --- CDN -----------------------------------------------------------------
     "Amazon CloudFront": {
@@ -268,6 +275,89 @@ TECH_RULES = {
         "cat": "Consentement / RGPD", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)didomi\.io",
     },
+
+    # --- Backend-as-a-Service / BDD (tiers) -----------------------------------
+    # SEUL signal HAR honnête pour une "base de données" : un BaaS/DBaaS exposé
+    # DIRECTEMENT au navigateur. Une BDD auto-hébergée derrière un serveur
+    # applicatif n'émet AUCUN signal réseau visible côté client — son absence
+    # ici ne prouve jamais son absence réelle (cf. topology_overview.py).
+    "Firebase / Firestore": {
+        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"(firebaseio\.com|firestore\.googleapis\.com)",
+    },
+    "Supabase": {
+        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"\.supabase\.co",
+    },
+    "MongoDB Atlas (Data API)": {
+        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"data\.mongodb-api\.com",
+    },
+    "Airtable (API)": {
+        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"api\.airtable\.com",
+    },
+
+    # --- Streaming média -------------------------------------------------------
+    # Deux vecteurs : URL/extension (m3u8/mpd, CDN vidéo connus) et content-type
+    # de réponse (clé "content_type", cf. _match_rule() — utile quand l'URL ne
+    # révèle rien, ex. flux servi derrière un chemin opaque).
+    "Flux HLS (.m3u8)": {
+        "cat": "Streaming média", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"\.m3u8(\?|$)",
+        "content_type": r"application/(vnd\.apple\.mpegurl|x-mpegurl)",
+    },
+    "Flux DASH (.mpd)": {
+        "cat": "Streaming média", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"\.mpd(\?|$)",
+        "content_type": r"application/dash\+xml",
+    },
+    "Ressource vidéo/audio (content-type)": {
+        "cat": "Streaming média", "confidence": CONFIDENCE_LOW,
+        "content_type": r"^(video|audio)/",
+    },
+    "Mux (streaming vidéo)": {
+        "cat": "Streaming média", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)(stream\.mux\.com|mux\.com)",
+    },
+    "Cloudflare Stream": {
+        "cat": "Streaming média", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)cloudflarestream\.com|videodelivery\.net",
+    },
+
+    # --- IA générative (tiers) --------------------------------------------------
+    # Domaine d'API exact reconnu = signal quasi certain, mais _match_rule()
+    # plafonne tout match "url" à MEDIUM (cohérence avec les autres règles
+    # url-only du fichier) : la nuance "quasi certain" se porte dans le texte
+    # de présentation (topology_overview.py), pas dans ce badge générique.
+    "OpenAI (API)": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)api\.openai\.com",
+    },
+    "Anthropic (API Claude)": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)api\.anthropic\.com",
+    },
+    "Google Generative AI (Gemini)": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"generativelanguage\.googleapis\.com",
+    },
+    "Mistral AI (API)": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)api\.mistral\.ai",
+    },
+    "Cohere (API)": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "url": r"(//|\.)api\.cohere\.(ai|com)",
+    },
+    "Azure OpenAI": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"openai\.azure\.com",
+    },
+    "Hugging Face Inference API": {
+        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "url": r"api-inference\.huggingface\.co",
+    },
 }
 
 
@@ -301,6 +391,9 @@ def load_har_signals(har_path):
       - "meta_generators": valeurs des <meta name="generator"> trouvées dans le HTML
       - "html_blobs"     : liste des corps HTML (pour patterns "html")
       - "cookies"        : noms de cookies vus (Set-Cookie)
+      - "content_types"  : liste de (host, mimeType) de chaque réponse — le host
+                           est indispensable pour router une détection "content_type"
+                           vers le bon ThirdPartyHost (cf. topology_overview.py)
       - "request_count"  : nombre d'entries
     """
     with open(har_path, encoding="utf-8") as f:
@@ -314,6 +407,7 @@ def load_har_signals(har_path):
     meta_generators = []
     html_blobs = []
     cookies = set()
+    content_types = []
 
     meta_gen_re = re.compile(
         r'<meta[^>]+name=["\']generator["\'][^>]+content=["\']([^"\']+)["\']',
@@ -322,6 +416,7 @@ def load_har_signals(har_path):
 
     for e in entries:
         url = e.get("request", {}).get("url", "")
+        netloc = ""
         if url:
             urls.append(url)
             netloc = urlparse(url).netloc
@@ -337,8 +432,11 @@ def load_har_signals(har_path):
                 cookies.add(value.split("=", 1)[0].strip())
 
         content = resp.get("content", {})
+        mime = content.get("mimeType", "")
+        if mime:
+            content_types.append((netloc, mime))
         text = content.get("text", "")
-        if text and "html" in content.get("mimeType", ""):
+        if text and "html" in mime:
             html_blobs.append(text)
             for m in meta_gen_re.findall(text):
                 meta_generators.append(m)
@@ -355,6 +453,7 @@ def load_har_signals(har_path):
         "meta_generators": meta_generators,
         "html_blobs": html_blobs,
         "cookies": sorted(cookies),
+        "content_types": content_types,
         "request_count": len(entries),
     }
 
@@ -415,6 +514,16 @@ def _match_rule(name, rule, signals):
                 # Un host tiers dédié est un signal fiable ; on garde MEDIUM par prudence.
                 short = urlparse(u).netloc + urlparse(u).path
                 _consider(conf, f'requête {short[:60]}')
+                break
+
+    # 4bis. content-type de réponse (plafonné MEDIUM : un mimeType vidéo/audio
+    # est un fait sur LA RESSOURCE, pas sur le SITE — une page peut charger
+    # une seule vidéo promo sans être un site de streaming).
+    if "content_type" in rule:
+        rx = re.compile(rule["content_type"], re.IGNORECASE)
+        for host_ct, ct in signals["content_types"]:
+            if rx.search(ct):
+                _consider(CONFIDENCE_MEDIUM, f'content-type "{ct[:40]}" chez {host_ct}')
                 break
 
     # 5. HTML (plafonné LOW — sous-chaîne, sujette aux faux positifs)

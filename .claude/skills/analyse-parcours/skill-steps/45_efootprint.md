@@ -50,6 +50,7 @@ Déclencheurs textuels :
 ```
 Étape 10 -> source_dir           (détection ou saisie)
 Étape 20 -> env-data.json        (collect_env_data.py, cache permanent)
+Étape 25 -> vue d'ensemble (topologie + BDD/streaming/IA suspectés, PlantUML)
 Étape 30 -> paramètres utilisateur (AskUserQuestion sur trafic + instance)
 Étape 40 -> efootprint-model.json (run_efootprint.py, recalcul à chaque run)
 Étape 50 -> synthèse + propositions
@@ -57,6 +58,8 @@ Déclencheurs textuels :
 
 Chaque étape peut être relancée indépendamment :
 - Relancer étape 20 : passer `--refresh` à `collect_env_data.py`
+- Relancer étape 25 : rappeler `build_topology_overview()` (aucun paramètre,
+  relit env-data.json + le HAR tels qu'ils sont au moment de l'appel)
 - Relancer étape 40 : rappeler `run_efootprint.py` avec d'autres `--visits` ou `--instance`
 
 -----
@@ -269,6 +272,129 @@ explicite).
 (`EXTENSION_VERSION` dans `similarweb_api.py`) et l'absence d'en-tête `Origin`. Caveat inchangé :
 SimilarWeb reste une **estimation tierce à marge large**, source non officielle (usage limite CGU),
 distincte d'un vrai analytics client : le caveat figure dans l'annexe du rapport.
+
+-----
+
+## Étape 25 - Vue d'ensemble du système avant calcul
+
+**AVERTISSEMENT (rappel obligatoire) :** ce qui suit est une hypothèse de
+topologie construite depuis le HAR, pas une architecture confirmée. La
+détection BDD/streaming/IA est une SUSPICION (heuristique sur signaux réseau
+visibles côté client), jamais une mesure — sauf pour un provider IA/BaaS
+reconnu par son nom de domaine exact, où le signal est quasi certain.
+
+Objectif : avant de lancer le calcul CO2e (Étape 40), présenter à
+l'utilisatrice le système que l'agent a "en tête" — serveurs détectés,
+services tiers, suspicions BDD/streaming/IA — et converger avec elle par
+QCM sur cette vue avant de poursuivre.
+
+### Étape 25a - Construction de la vue d'ensemble
+
+Appeler `run_efootprint.py::build_topology_overview(source_dir)` (chaîne :
+`load_env_data` -> `find_har` -> `infer_audited_domain` -> `spec_from_env_data`
+-> `detect_tech.detect_from_har` -> annotation des hôtes tiers suspects ->
+`site_to_plantuml`). Ne dépend d'AUCUN paramètre de l'Étape 30 : le trafic a
+toujours un défaut résolu (100 000/an) dès l'Étape 20.
+
+**Préconditions** (si non réunies, informer et proposer de relancer l'Étape 20
+avant de continuer) :
+- un `.har` doit exister dans `source_dir` (ou son sous-dossier
+  `donnees-brutes-potentiellement-sensibles/`)
+- `env-data.json` doit contenir au moins un serveur détecté (`servers` non
+  vide) — sinon `collect_env_data.py` n'a pas encore tourné avec ce HAR
+
+`build_topology_overview()` lève `RuntimeError` avec un message actionnable
+si une précondition manque : afficher ce message et proposer de relancer
+l'Étape 20, jamais laisser remonter une trace brute.
+
+### Étape 25b - Présentation texte
+
+Afficher, dans cet ordre :
+1. Le rappel "estimation hypothétique" (cf. AVERTISSEMENT OBLIGATOIRE en tête
+   de fichier).
+2. `print_hypotheses(spec)` (résumé des serveurs détectés, nombre d'étapes,
+   trafic par défaut) — déjà existant, réutilisé À L'IDENTIQUE, AVANT tout
+   ajustement --visits/--instance.
+3. Le résumé de topologie (deuxième élément retourné par
+   `build_topology_overview()`) :
+   - Nombre et libellé des serveurs 1st-party détectés.
+   - Services Backend-as-a-Service / BDD tiers suspectés (domaine exact
+     reconnu -> "identifié" ; sinon -> "suspecté").
+   - Streaming média suspecté (extension .m3u8/.mpd ou content-type
+     vidéo/audio observé).
+   - IA générative tierce identifiée (domaine d'API reconnu : OpenAI,
+     Anthropic, Google Generative AI, Mistral AI, Cohere, Azure OpenAI,
+     Hugging Face).
+   - **Rappel honnête et systématique**, déjà inclus dans le texte généré :
+     "une base de données ou un service auto-hébergé DERRIÈRE le serveur
+     applicatif n'émet aucun signal visible depuis le trafic réseau
+     capturé. Cette section ne peut donc JAMAIS conclure à son absence."
+4. Toute réserve de calcul (`calculation_reserves(spec)`), à titre
+   INFORMATIF uniquement à ce stade (jamais bloquant ici — elle ne bloque
+   qu'à l'Étape 40).
+
+### Étape 25c - Présentation graphique (PlantUML)
+
+Priorité annoncée à l'utilisatrice : **d'abord l'interface web e-footprint**
+(https://e-footprint.boavizta.org/model_builder/), qui reste la référence
+visuelle si elle souhaite l'utiliser directement. **À défaut** (pour rester
+autonome, sans dépendance lourde type Playwright), proposer le diagramme
+PlantUML généré automatiquement (troisième élément retourné par
+`build_topology_overview()`) :
+
+1. Écrire le texte PlantUML dans `<source_dir>/topologie-<domaine>.puml`
+   (fichier généré, non commité — cf. `.gitignore`).
+2. Si `plantuml`/`rsvg-convert` sont disponibles dans l'environnement :
+   générer le SVG puis le PDF (mêmes commandes que le skill
+   `diagrammes-analyse-parcours`), et le montrer à l'utilisatrice.
+   **PIÈGE** : `plantuml -tsvg` nomme le fichier de sortie d'après l'identifiant
+   `@startuml <id>` du diagramme (ex. `site_octo_com.svg`), JAMAIS d'après le
+   nom du fichier `.puml` d'entrée. Toujours renommer le SVG produit en
+   `topologie-<domaine>.svg` juste après la génération (sinon
+   `load_topology_svg()` dans `generate_report_html.py`, qui ne cherche que
+   `topologie-*.svg`, ne le trouve pas et le rapport HTML retombe sur un SVG
+   périmé ou reste sans diagramme).
+3. Sinon : présenter le texte PlantUML brut dans la conversation (elle peut
+   le coller dans https://www.plantuml.com/plantuml/uml/ pour un rendu
+   ponctuel sans installation).
+
+Contenu du diagramme (composants) : serveurs 1st-party (`database`),
+traitements réseau, hôtes tiers — dont ceux annotés d'une suspicion
+BDD/streaming/IA affichent leur note dans le label du composant.
+
+### Étape 25d - Validation par QCM avant de poursuivre
+
+Toujours converger avec l'utilisatrice avant l'Étape 30, via `AskUserQuestion` :
+
+```
+Question : "Voici le système que j'ai identifié à partir du parcours capturé.
+            Correspond-il à ce que vous connaissez du site ?"
+Header   : "Topologie détectée"
+Options  :
+  - Oui, cette topologie est correcte, on peut continuer - Recommandé
+  - Non, il manque un serveur ou une infrastructure (préciser en réponse)
+  - Non, une suspicion (BDD/streaming/IA) est fausse (préciser laquelle)
+  - Je ne sais pas / je veux vérifier sur l'interface e-footprint avant
+```
+
+- **"Oui"** -> poursuivre vers l'Étape 30.
+- **"Il manque une infrastructure"** -> noter l'infrastructure manquante
+  (elle ne pourra pas être ajoutée automatiquement par ce lot, mais la
+  garder en note pour un futur archétype manuel, ou signaler qu'elle sera
+  absente du calcul).
+- **"Suspicion fausse"** -> retirer/corriger la mention dans le résumé
+  affiché à l'utilisatrice (ne PAS modifier le modèle e-footprint : cette
+  étape s'arrête à la présentation, jamais à la construction automatique
+  d'un `ExternalApiSpec` — cf. limite ci-dessous).
+- **"Vérifier sur l'interface"** -> rappeler l'URL de l'interface web
+  e-footprint et attendre son retour avant de poursuivre.
+
+**Limite explicite de cette étape (à rappeler si l'utilisatrice s'attend à
+plus) :** elle affiche des SUSPICIONS, elle ne construit JAMAIS
+automatiquement un `ExternalApiSpec` ni un serveur BDD dédié dans le modèle
+e-footprint (ce sera un lot ultérieur, distinct, non planifié). Le calcul
+de l'Étape 40 reste, à ce stade, strictement identique à ce qu'il était
+avant cette étape.
 
 -----
 

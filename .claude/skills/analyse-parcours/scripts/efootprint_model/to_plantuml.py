@@ -1,44 +1,58 @@
 #!/usr/bin/env python3
 """
-Diagramme de composants PlantUML depuis une `SiteSpec` : topologie technique
-(serveurs 1st-party + traitements, qui parle à qui), pas le parcours
-utilisateur (cf. les diagrammes de séquence du skill diagrammes-analyse-
-parcours pour ça).
+Diagramme depuis une `SiteSpec` : parcours utilisateur, traitements et
+infrastructure technique, qui parle à qui.
 
 ZÉRO import e-footprint ici, comme spec.py/compose.py/from_har.py : ce module
 ne lit que des dataclasses de spec.py, il ne construit aucun objet
 e-footprint. Utile pour visualiser une spec AVANT de la calculer (ex. vérifier
 qu'un archétype ou une composition a bien le nombre de serveurs attendu).
 
-PALETTE ET RÈGLES ANTI-CROISEMENT : reprend le skill global
-`diagramme-de-composants` (~/.claude/skills/diagramme-de-composants/SKILL.md) :
-palette OCTO, `top to bottom direction`, flèches directionnelles, un package
-par nature de composant (serveurs, traitements, hôtes tiers, appels IA).
+PALETTE ET DISPOSITION : calquées sur la vraie interface e-footprint
+(model_builder, https://e-footprint.boavizta.org/model_builder/) — 3 colonnes
+"Parcours" / "Traitements" / "Infrastructure", cartes à coins arrondis,
+liens fins sans pointe de flèche. Choix ASSUMÉ (décision explicite de
+l'utilisatrice) : ressemblance visuelle à l'outil de référence plutôt que
+cohérence avec la palette OCTO des autres diagrammes du projet (usage
+ponctuel/pédagogique, pas un livrable permanent). PlantUML ne sachant pas
+dessiner de point rond en bout de ligne, le lien reste un trait nu (`--`),
+approximation acceptée du rendu LeaderLine de l'interface source.
 """
 
 _HEADER = """@startuml {diagram_id}
 
 skinparam BackgroundColor #FFFFFF
-skinparam ComponentBackgroundColor #E0F0F4
-skinparam ComponentBorderColor #5BA1BC
-skinparam ComponentFontColor #1C2856
-skinparam ArrowColor #5BA1BC
-skinparam DatabaseBackgroundColor #82C1DD
-skinparam DatabaseBorderColor #5BA1BC
-skinparam DatabaseFontColor #1C2856
-skinparam CloudBackgroundColor #ECECF2
-skinparam CloudBorderColor #888FA8
-skinparam CloudFontColor #1C2856
-skinparam NoteBackgroundColor #ECECF2
-skinparam NoteBorderColor #5BA1BC
-skinparam PackageBorderColor #5BA1BC
-skinparam PackageFontColor #1C2856
+skinparam RoundCorner 12
+skinparam ArrowColor #9CA3AF
+skinparam ArrowThickness 1
+skinparam ComponentBackgroundColor #FFFFFF
+skinparam ComponentBorderColor #E5E7EB
+skinparam ComponentBorderThickness 2
+skinparam ComponentFontColor #111928
+skinparam DatabaseBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #E5E7EB
+skinparam DatabaseBorderThickness 2
+skinparam DatabaseFontColor #111928
+skinparam CloudBackgroundColor #FFFFFF
+skinparam CloudBorderColor #E5E7EB
+skinparam CloudBorderThickness 2
+skinparam CloudFontColor #111928
+skinparam RectangleBackgroundColor #FFFFFF
+skinparam RectangleBorderColor #E5E7EB
+skinparam RectangleBorderThickness 2
+skinparam RectangleFontColor #111928
+skinparam NoteBackgroundColor #F9FAFB
+skinparam NoteBorderColor #D1D5DB
+skinparam PackageBackgroundColor #F9FAFB
+skinparam PackageBorderColor #D1D5DB
+skinparam PackageFontColor #2D4675
+skinparam PackageFontStyle bold
 skinparam defaultFontName Arial
-skinparam defaultFontColor #1C2856
+skinparam defaultFontColor #111928
 
-top to bottom direction
+left to right direction
 
-title <color:#1C2856>{title} - Topologie technique</color>
+title <color:#2D4675>{title} - Topologie technique</color>
 """
 
 
@@ -61,13 +75,11 @@ def _escape_label(text):
 
 
 def site_to_plantuml(spec, *, title=None):
-    """Génère le texte PlantUML (diagramme de composants) d'une `SiteSpec`.
-
-    Un package "Serveurs 1st-party" (un composant par ServerSpec), un package
-    "Traitements" (un composant par JobSpec, relié à son serveur), un package
-    "Hôtes tiers (réseau seulement)" si `third_party_hosts` est renseigné, et
-    des appels IA générative isolés en cloud si un JobSpec porte un
-    `external_api` (cf. spec.py::ExternalApiSpec).
+    """Génère le texte PlantUML d'une `SiteSpec`, en 3 colonnes reprenant la
+    disposition de l'interface e-footprint (model_builder) : "Parcours"
+    (JourneySpec/StepSpec) à gauche, "Traitements" (JobSpec, dont les appels
+    IA générative) au centre, "Infrastructure" (ServerSpec, hôtes tiers) à
+    droite — le flux se lit usage -> infra, de gauche à droite.
 
     Retourne une chaîne, à écrire dans un fichier `.puml` par l'appelant
     (ce module ne touche jamais au disque, comme spec.py/compose.py).
@@ -83,49 +95,76 @@ def site_to_plantuml(spec, *, title=None):
 
     server_alias = {server.key: _sanitize_alias(f"srv_{server.key}") for server in spec.servers}
     job_alias = {job.key: _sanitize_alias(f"job_{job.key}") for job in spec.jobs}
+    step_alias = {step.key: _sanitize_alias(f"step_{step.key}") for step in spec.steps}
 
-    lines.append(f'package "Serveurs 1st-party" #E0F0F4 {{')
-    for server in spec.servers:
-        alias = server_alias[server.key]
-        lines.append(f'  database "{_escape_label(server.label)}" as {alias} #82C1DD')
-    lines.append("}")
-    lines.append("")
+    # --- Colonne 1 : Parcours (JourneySpec regroupant des StepSpec) --------
+    if spec.journeys:
+        lines.append('package "Parcours" {')
+        for journey in spec.journeys:
+            journey_alias = _sanitize_alias(f"jrn_{journey.key}")
+            lines.append(f'  package "{_escape_label(journey.label)}" as {journey_alias} {{')
+            for step_key in journey.steps:
+                step = spec.step_by_key(step_key)
+                alias = step_alias[step.key]
+                lines.append(f'    rectangle "{_escape_label(step.label)}" as {alias}')
+            lines.append("  }")
+        lines.append("}")
+        lines.append("")
 
+    # --- Colonne 2 : Traitements (JobSpec, dont appels IA générative) ------
     ai_jobs = [job for job in spec.jobs if job.external_api is not None]
     network_only_jobs = [job for job in spec.jobs if job.external_api is None]
 
     if network_only_jobs:
-        lines.append(f'package "Traitements" #ECECF2 {{')
+        lines.append('package "Traitements" {')
         for job in network_only_jobs:
             alias = job_alias[job.key]
-            lines.append(f'  [{_escape_label(job.label)}] as {alias} #DBDDE5')
+            lines.append(f'  [{_escape_label(job.label)}] as {alias}')
         lines.append("}")
         lines.append("")
 
     if ai_jobs:
-        lines.append(f'package "Appels IA générative (empreinte calculée via EcoLogits)" #ECECF2 {{')
+        lines.append('package "Appels IA générative (empreinte calculée via EcoLogits)" {')
         for job in ai_jobs:
             alias = job_alias[job.key]
             api = job.external_api
             label = f"{job.label}\\n{api.provider}/{api.model_name}"
-            lines.append(f'  cloud "{_escape_label(label)}" as {alias} #DBDDE5')
+            lines.append(f'  cloud "{_escape_label(label)}" as {alias}')
         lines.append("}")
         lines.append("")
 
+    # --- Colonne 3 : Infrastructure (ServerSpec, hôtes tiers) ---------------
+    lines.append('package "Infrastructure" {')
+    for server in spec.servers:
+        alias = server_alias[server.key]
+        lines.append(f'  database "{_escape_label(server.label)}" as {alias}')
+    lines.append("}")
+    lines.append("")
+
     if spec.third_party_hosts:
-        lines.append(f'package "Hôtes tiers (réseau seulement)" #ECECF2 {{')
+        lines.append('package "Hôtes tiers (réseau seulement)" {')
         for host in spec.third_party_hosts:
             alias = _sanitize_alias(f"tp_{host.host}")
-            lines.append(f'  cloud "{_escape_label(host.host)}" as {alias} #888FA8')
+            label = host.host if not host.note else f"{host.host}\\n({host.note})"
+            lines.append(f'  cloud "{_escape_label(label)}" as {alias}')
         lines.append("}")
         lines.append("")
+
+    # --- Liens : étape -> traitement déclenché, traitement -> serveur ------
+    for step in spec.steps:
+        step_a = step_alias[step.key]
+        for job_key in step.jobs:
+            job_a = job_alias.get(job_key)
+            if job_a is None:
+                continue
+            lines.append(f"{step_a} -- {job_a}")
 
     for job in spec.jobs:
         job_a = job_alias[job.key]
         server_a = server_alias.get(job.server_key)
         if server_a is None:
             continue
-        lines.append(f"{job_a} -down-> {server_a}")
+        lines.append(f"{job_a} -- {server_a}")
 
     lines.append("")
     lines.append("@enduml")
@@ -149,4 +188,4 @@ if __name__ == "__main__":
     print(puml)
     print()
     print(f"OK : diagramme généré, {len(frag.servers)} serveur(s), "
-          f"{len(frag.jobs)} traitement(s).")
+          f"{len(frag.jobs)} traitement(s), {len(frag.steps)} étape(s).")

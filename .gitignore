@@ -20,6 +20,9 @@ donnees-brutes-potentiellement-sensibles/
 # Outputs e-footprint (générés, non versionnés)
 efootprint-results.json
 efootprint-model.json
+topologie-*.puml
+topologie-*.svg
+topologie-*.pdf
 
 # Rapports HTML générés
 rapport-parcours-*.html
