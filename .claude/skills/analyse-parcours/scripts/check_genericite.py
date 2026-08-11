@@ -154,6 +154,11 @@ FORBIDDEN_VALUES = {
     533.0142: "borne basse fourchette infra (serverless), Lot 4bis, cas de test octo.com",
     881.3057: "borne haute fourchette usage (Nielsen brut), Lot 4bis, cas de test octo.com",
     14036.2206: "borne basse fourchette infra (serverless), Lot 4bis, cas de test ANTS",
+    # Lot 10 (11/08/2026) : correction du bug de pairing mots<->page (from_har.py) :
+    # le comptage de mots existait déjà dans le HAR sur une AUTRE répétition de
+    # la même URL que celle retenue pour le poids réseau, jamais lu jusque-là.
+    # Remplace 560.9885 comme repère de non-régression pour octo.com.
+    268.6406: "total CO2e après correction du pairing mots/page (Lot 10), cas de test octo.com",
 }
 
 # Un entier court (82, 440, 317) est un nombre COURANT : il peut légitimement

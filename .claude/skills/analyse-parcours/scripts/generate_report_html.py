@@ -2541,6 +2541,57 @@ def _section_efootprint(results, topology_svg=None):
     publique équivalente n'existe pour un CDN.
   </p>"""
 
+    # Repère "calcul mental" par étape (Lot 10) : ce qui pèse le plus dans le
+    # parcours, pour que la lecture n'ait plus à deviner pourquoi une étape
+    # compte plus qu'une autre. `impact_pct_of_grand_total` vient d'une
+    # RÉPARTITION proportionnelle du CO2e Devices/Network déjà calculé
+    # (step_impact_shares(), build.py) : ce n'est pas une mesure indépendante
+    # par étape, le libellé doit le dire pour ne pas laisser croire à une
+    # finesse de calcul qui n'existe pas. Absent si model.steps n'existe pas
+    # (ancien schéma) : rapport rétrocompatible, comme les autres blocs Lot 9.
+    model_steps = (results.get("model") or {}).get("steps") or []
+    steps_block = ""
+    if model_steps:
+        steps_sorted = sorted(
+            model_steps, key=lambda s: s.get("impact_pct_of_grand_total", 0), reverse=True)
+        step_rows = ""
+        for s in steps_sorted:
+            pct = s.get("impact_pct_of_grand_total", 0) * 100
+            time_s = s.get("user_time_min", 0) or 0
+            label = s.get("url") or s.get("label", "?")
+            bar = (
+                f'<div style="background:#eee;border-radius:3px;height:14px;position:relative;overflow:hidden">'
+                f'  <div style="background:{OCTO_BLUE};height:100%;width:{min(pct, 100):.1f}%"></div>'
+                f'</div>'
+            )
+            step_rows += (
+                f'<tr>'
+                f'<td style="padding:6px 8px">{label}</td>'
+                f'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">{time_s:.0f} s</td>'
+                f'<td style="padding:6px 8px">{_confidence_badge(s.get("user_time_confidence"))}</td>'
+                f'<td style="padding:6px 8px;text-align:right;color:#666;font-variant-numeric:tabular-nums">{pct:.1f} %</td>'
+                f'<td style="padding:6px 8px;width:160px">{bar}</td>'
+                f'</tr>'
+            )
+        steps_block = f"""
+  <h3 style="margin-top:24px">Ce qui pèse le plus, étape par étape</h3>
+  <p style="font-size:14px;color:#888;margin:0 0 8px">
+    Répartition <b>proportionnelle</b> du CO2e des terminaux visiteurs et du réseau déjà
+    calculé ci-dessus, au prorata du temps passé et du poids transféré par étape. Ce
+    n'est <b>pas</b> une mesure indépendante par étape : c'est un repère pour situer
+    d'un coup d'œil les étapes qui comptent le plus dans le total.
+  </p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Étape</th>
+      <th style="padding:6px 8px;text-align:right">Temps retenu</th>
+      <th style="padding:6px 8px;text-align:left">Source</th>
+      <th style="padding:6px 8px;text-align:right">Part du CO2e total</th>
+      <th style="padding:6px 8px">Répartition</th>
+    </tr></thead>
+    <tbody>{step_rows}</tbody>
+  </table>"""
+
     # Diagramme de topologie (Étape 25 du skill efootprint) : preuve documentée du
     # modèle validé avec l'utilisatrice avant calcul, PAS régénéré ici (rapport
     # rétrocompatible si absent, cf. load_topology_svg()).
@@ -2583,6 +2634,7 @@ def _section_efootprint(results, topology_svg=None):
   </div>
   {cdn_ia_html}
   {weight_composition}
+  {steps_block}
 
   <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
   <p style="font-size:15px;color:#666">

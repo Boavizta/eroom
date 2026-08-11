@@ -434,6 +434,72 @@ def total_kg(built):
     return sum(fab.values()) + sum(energy.values())
 
 
+def step_impact_shares(built):
+    """Répartition PROPORTIONNELLE (pas un recalcul indépendant par étape) de
+    l'empreinte Devices et Network par étape du parcours, pour donner un
+    repère de contribution relative sans rejouer le modèle N fois.
+
+    MÉTHODE, VOLONTAIREMENT SIMPLE ET À NOMMER COMME TELLE DANS LE RAPPORT :
+    - Devices (fabrication + énergie) réparti au prorata du temps utilisateur
+      pondéré (`user_time * times_per_journey`) de chaque étape : c'est le
+      temps passé par le visiteur qui pilote la consommation de SON appareil.
+    - Network (énergie) réparti au prorata du poids transféré pondéré (somme
+      des jobs rattachés à l'étape, poids du job × times_per_journey de
+      l'étape) : c'est le volume transféré qui pilote l'énergie réseau.
+    - Servers / Storage / ExternalAPIs : NON répartis ici. Un serveur ou un
+      stockage est un coût d'infra qui ne se découpe pas proprement par étape
+      (il tourne pour TOUT le parcours) ; un appel IA générative a déjà une
+      attribution exacte via son propre job (ExternalApiSpec), pas besoin
+      d'une répartition approchée. Ces postes restent uniquement dans les
+      totaux globaux du site.
+
+    Retourne {step_key: {"device_kg", "network_kg", "total_kg",
+    "pct_of_grand_total"}}. `pct_of_grand_total` est rapporté au TOTAL CO2e/an
+    du site (tous postes, fabrication + énergie), pas seulement à
+    Devices+Network : une étape ne pèse jamais 100 % du total réel, même si
+    elle concentre tout le Devices/Network réparti ici.
+    """
+    from efootprint.constants.units import u
+
+    spec = built.spec
+    fab = fabrication_kg(built)
+    energy = energy_kg(built)
+    grand_total = sum(fab.values()) + sum(energy.values())
+
+    device_pool_kg = fab.get("Devices", 0.0) + energy.get("Devices", 0.0)
+    network_pool_kg = energy.get("Network", 0.0)
+
+    time_weights, weight_weights = {}, {}
+    for step in spec.steps:
+        time_weights[step.key] = (
+            (step.user_time.value if step.user_time else 0.0) * step.times_per_journey
+        )
+        transferred_bytes = 0.0
+        for job_key, job_weight in step.jobs.items():
+            data_transferred = spec.job_by_key(job_key).data_transferred
+            if data_transferred is None:
+                continue
+            quantity = data_transferred.value * u.parse_units(data_transferred.unit)
+            transferred_bytes += quantity.to(u.byte).magnitude * job_weight
+        weight_weights[step.key] = transferred_bytes * step.times_per_journey
+
+    total_time = sum(time_weights.values()) or 1e-9
+    total_weight = sum(weight_weights.values()) or 1e-9
+
+    shares = {}
+    for step in spec.steps:
+        device_kg = device_pool_kg * (time_weights[step.key] / total_time)
+        network_kg = network_pool_kg * (weight_weights[step.key] / total_weight)
+        step_total = device_kg + network_kg
+        shares[step.key] = {
+            "device_kg": device_kg,
+            "network_kg": network_kg,
+            "total_kg": step_total,
+            "pct_of_grand_total": (step_total / grand_total) if grand_total else 0.0,
+        }
+    return shares
+
+
 def consistency_report(built, tolerance_kg=1e-3, relative_tolerance=1e-6):
     """Vérifie que notre somme par catégorie retombe sur la somme PAR OBJET
     que la librairie calcule (`fabrication_footprint_sum_over_period` /

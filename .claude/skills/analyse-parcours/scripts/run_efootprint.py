@@ -39,7 +39,7 @@ from efootprint_model import SpecError, arbitrations_for, calculation_reserves  
 from efootprint_model.from_har import spec_from_env_data  # noqa: E402
 from collect_env_data import find_har  # noqa: E402
 from efootprint_model.build import (  # noqa: E402
-    build_system, consistency_report, energy_kg, fabrication_kg, total_kg)
+    build_system, consistency_report, energy_kg, fabrication_kg, step_impact_shares, total_kg)
 from efootprint_model.compose import (  # noqa: E402
     collect_sources, primary_server, servers_note)
 from efootprint_model.ranges import footprint_ranges_kg  # noqa: E402
@@ -400,6 +400,7 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
     fab_kg = fabrication_kg(built)
     energy_kg_ = energy_kg(built)
     total = total_kg(built)
+    impact_shares = step_impact_shares(built)
     audience = spec.audience
     visits = audience.visits_per_year.value if audience and audience.visits_per_year else 0
 
@@ -540,6 +541,15 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
                     "user_time_confidence": step.user_time.confidence if step.user_time else "default",
                     "words": step.words.value if step.words else None,
                     "times_per_journey": step.times_per_journey,
+                    # Répartition PROPORTIONNELLE (pas une mesure indépendante
+                    # par étape) du CO2e Devices/Network déjà calculé, cf.
+                    # step_impact_shares() : donne un repère de contribution
+                    # relative pour la lecture du rapport, sans rejouer le
+                    # modèle une fois par étape.
+                    "impact_device_kg": round(impact_shares[step.key]["device_kg"], 4),
+                    "impact_network_kg": round(impact_shares[step.key]["network_kg"], 4),
+                    "impact_total_kg": round(impact_shares[step.key]["total_kg"], 4),
+                    "impact_pct_of_grand_total": round(impact_shares[step.key]["pct_of_grand_total"], 4),
                 }
                 for step in spec.steps
             ],
@@ -659,6 +669,24 @@ def main():
     print("[e-footprint] Sérialisation du modèle...")
     save_boavizta_model(built, source_dir)
     save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves)
+
+    # Régénère le .puml (Étape 25) avec la part d'impact par étape (Lot 10),
+    # connue seulement maintenant que le calcul a tourné. Le fichier écrit à
+    # l'Étape 25 (avant calcul, sans part d'impact) est donc remplacé par
+    # cette version enrichie : c'est CETTE version qui doit être compilée en
+    # SVG (`plantuml -tsvg`, cf. skill-steps/45_efootprint.md) pour le rapport
+    # final. N'écrit rien si le SiteSpec n'a pas de parcours (archétype seul).
+    if spec.journeys:
+        shares = step_impact_shares(built)
+        pct_by_step = {key: v["pct_of_grand_total"] for key, v in shares.items()}
+        audience_mix = (env_data.get("audience") or {}).get("mix")
+        puml = site_to_plantuml(
+            spec, title=audited_domain, audience_mix=audience_mix, step_shares=pct_by_step)
+        puml_path = source_dir / f"topologie-{audited_domain}.puml"
+        puml_path.write_text(puml, encoding="utf-8")
+        print(f"  Diagramme régénéré (avec part d'impact) : {puml_path}")
+        print("  Recompiler en SVG avant de régénérer le rapport HTML : "
+              f"plantuml -tsvg {puml_path}")
     print()
     visits = spec.audience.visits_per_year.value if spec.audience and spec.audience.visits_per_year else 0
     print(f"  Trafic retenu : {visits:,.0f} visites/an")

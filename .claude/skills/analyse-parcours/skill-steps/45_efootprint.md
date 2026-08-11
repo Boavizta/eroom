@@ -492,6 +492,16 @@ Le script :
 4. Sérialise dans `<source_dir>/efootprint-boavizta-model.json` (modèle
    e-footprint natif) et `<source_dir>/efootprint-synthese-python.json`
    (résumé consommé par le rapport HTML et le contrôle de non-régression)
+5. Régénère `<source_dir>/topologie-<domaine>.puml` (écrasant celui de
+   l'Étape 25) en y ajoutant la part de CO2e de chaque étape, maintenant
+   connue puisque le calcul a tourné (répartition proportionnelle, cf.
+   `build.py::step_impact_shares()`, pas une mesure indépendante par étape)
+
+**Après l'Étape 40, si un diagramme SVG doit accompagner le rapport final**,
+recompiler ce `.puml` régénéré (`plantuml -tsvg <chemin affiché par le
+script>`, puis renommer en `topologie-<domaine>.svg` comme à l'Étape 25c) :
+c'est cette version, avec la part d'impact, qui doit être utilisée dans le
+rapport HTML final, pas celle de l'Étape 25 (vue d'ensemble pré-calcul).
 
 Capturer stdout pour le renvoyer à l'utilisateur en bloc, puis synthétiser.
 

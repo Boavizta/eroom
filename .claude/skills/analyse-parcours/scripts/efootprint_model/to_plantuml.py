@@ -310,7 +310,7 @@ def _build_links(spec, step_alias, job_alias, server_alias):
     return lines
 
 
-def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None):
+def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step_shares=None):
     """Génère le texte PlantUML d'une `SiteSpec`, en 3 colonnes reprenant la
     disposition de l'interface e-footprint (model_builder) : "Parcours"
     (JourneySpec/StepSpec), "Traitements" (JobSpec, dont les appels IA
@@ -321,6 +321,13 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None):
     (trafic annuel, mix appareils, mix pays via `audience_mix`, temps de
     lecture cumulé) et un détail par composant (temps de l'étape, poids
     transféré du traitement, instance/provider du serveur).
+
+    step_shares : {step_key: pct_of_grand_total} optionnel, cf.
+    `build.py::step_impact_shares()`. Absent AVANT le calcul (Étape 25, vue
+    d'ensemble) : la part d'impact n'existe qu'une fois le CO2e effectivement
+    calculé. Fourni après (Étape 40) pour afficher, en plus du temps déjà
+    présent, la part ESTIMÉE (répartition proportionnelle, pas une mesure
+    indépendante) de chaque étape dans le total CO2e du site.
 
     Retourne une chaîne, à écrire dans un fichier `.puml` par l'appelant
     (ce module ne touche jamais au disque, comme spec.py/compose.py).
@@ -360,6 +367,8 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None):
                 user_time_txt = _format_seconds(step.user_time)
                 if user_time_txt:
                     step_label = f"{step_label}\\n{user_time_txt}"
+                if step_shares and step.key in step_shares:
+                    step_label = f"{step_label}\\n~{step_shares[step.key] * 100:.0f} % du CO2e"
                 lines.append(f'    rectangle "{wrapped(step_label)}" as {alias}')
             for a, b in zip(step_aliases_in_journey, step_aliases_in_journey[1:]):
                 lines.append(f"    {a} -[hidden]d- {b}")

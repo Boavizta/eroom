@@ -490,11 +490,13 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
     # des rechargements, pas des étapes différentes du parcours).
     best_by_url = {}
     order = []
+    pids_by_url = {}
     for i, page in enumerate(har.get("log", {}).get("pages", [])):
         pid = page.get("id", f"page_{i + 1}")
         url = page.get("title", "")
         page_entries = entries_by_page.get(pid, [])
         total_bytes = sum(_entry_bytes(e) for e in page_entries)
+        pids_by_url.setdefault(url, []).append(pid)
         if url not in best_by_url or total_bytes > best_by_url[url][1]:
             if url not in best_by_url:
                 order.append(url)
@@ -517,7 +519,17 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
                 "Étape ignorée : aucun serveur du modèle ne peut la porter."
             )
             continue
-        word_count = word_counts.get(pid, {}).get("word_count")
+        # Le comptage de mots peut avoir été mesuré sur une AUTRE répétition
+        # de cette URL que celle retenue pour le poids (ex. un rechargement
+        # servi depuis le cache HTTP porte le corps HTML, celui qui porte le
+        # plus d'octets réels ne le porte pas). Les deux mesures viennent du
+        # même HAR ; ne retenir que le pid du poids perdrait un comptage
+        # disponible et retomberait à tort sur le défaut de script plus bas.
+        word_count = next(
+            (wc for other_pid in pids_by_url[url]
+             if (wc := word_counts.get(other_pid, {}).get("word_count")) is not None),
+            None,
+        )
         kept.append((step_index, url, infra_key, total_bytes, word_count))
 
     avg_time_on_page_s = (env_data.get("traffic") or {}).get("avg_time_on_page_s")
