@@ -54,7 +54,7 @@ GR -> FS : Lire coverage-analysis.json
 FS -> GR : Métriques code mort JS/CSS
 GR -> FS : Lire cwv.json (si présent)
 FS -> GR : LCP / INP / CLS par page
-GR -> FS : Lire efootprint-results.json (si présent)
+GR -> FS : Lire efootprint-synthese-python.json (si présent)
 FS -> GR : Totaux CO2e + hypothèses
 
 note over GR, FS
@@ -63,10 +63,10 @@ note over GR, FS
   2. Recommandations priorisées (P1 rouge / P2 orange / P3 vert)
   3. Bonnes pratiques GreenIT
   4. Core Web Vitals (si cwv.json - LCP/INP/CLS avec seuils Google)
-  5. Impact environnemental CO2e (si efootprint-results.json - skill /efootprint)
+  5. Impact environnemental CO2e (si efootprint-synthese-python.json - skill /efootprint)
   6. Annexes : Tableau de bord EcoIndex, Trafic réseau, Code mort, CWV détaillé
   Si cwv.json absent : LCP affiche onLoad HAR avec note explicite.
-  Section CO2e omise si efootprint-results.json absent.
+  Section CO2e omise si efootprint-synthese-python.json absent.
 end note
 
 GR -> C : rapport-parcours-YYYY-MM-DD.html

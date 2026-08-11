@@ -131,7 +131,7 @@ Ils répondent à des questions différentes et ne se remplacent pas :
 
 ### `check_efootprint_contract.py` — la sortie n'a rien perdu
 
-Le rapport HTML lit `efootprint-results.json` clé par clé avec `.get()`. Une clé
+Le rapport HTML lit `efootprint-synthese-python.json` clé par clé avec `.get()`. Une clé
 manquante n'y provoque **aucune erreur** : elle produit un trou silencieux. Ce
 script compare une baseline figée à la sortie fraîche.
 

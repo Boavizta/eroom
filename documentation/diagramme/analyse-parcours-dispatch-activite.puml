@@ -98,7 +98,7 @@ partition "**Merge + suite** (contexte principal)" {
   :Étape 40 — generate_report_html.py
   Sections : Recommandations P1/P2/P3,
   Bonnes pratiques GreenIT, CWV (si cwv.json),
-  e-footprint CO2e (si efootprint-results.json),
+  e-footprint CO2e (si efootprint-synthese-python.json),
   Annexes (EcoIndex, Trafic, Code mort)
   -> rapport-parcours-YYYY-MM-DD.html;
 
@@ -106,7 +106,7 @@ partition "**Merge + suite** (contexte principal)" {
 
   note right #E0F0F4
     Section CO2e conditionnelle :
-    affichée uniquement si efootprint-results.json
+    affichée uniquement si efootprint-synthese-python.json
     présent dans le dossier-audit
   end note
 }
@@ -132,8 +132,8 @@ partition "**Étape optionnelle - e-footprint CO2e** (skill /efootprint)" #C8E6C
     :E3 - run_efootprint.py
     Modèle Boavizta (devices/network/server/storage)
     Calcul fabrication + énergie
-    -> efootprint-model.json
-    -> efootprint-results.json;
+    -> efootprint-boavizta-model.json
+    -> efootprint-synthese-python.json;
 
     note right
       Résultats :

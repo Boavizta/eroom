@@ -427,8 +427,8 @@ end note
 ### Contenu de référence — analyse-parcours-p5.puml
 
 **Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 30, 40, 50) + `run_efootprint.py`
-(modèle Boavizta, schéma `efootprint-results.json`) + `generate_report_html.py`
-(section CO2e). Points à revérifier si le code change : structure d'`efootprint-results.json`
+(modèle Boavizta, schéma `efootprint-synthese-python.json`) + `generate_report_html.py`
+(section CO2e). Points à revérifier si le code change : structure d'`efootprint-synthese-python.json`
 (bloc `traffic`, `totals` avec dicts `fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`,
 gros bloc `hypotheses`), position de la section (entre CWV et Annexes), trafic réutilisé
 depuis le bloc `traffic` s'il est déjà résolu.
@@ -504,11 +504,11 @@ REF -> REF : Construire modèle Boavizta :\n- Devices (2 profils : mobile / desk
 
 REF -> REF : Calcul impact :\n- Fabrication (dict par poste)\n- Énergie (dict par poste)\n- Total kg/an + g/visite
 
-REF -> FS : efootprint-model.json\n(modèle complet sérialisé)
-REF -> FS : efootprint-results.json\n(totaux + hypothèses, format léger)
+REF -> FS : efootprint-boavizta-model.json\n(modèle complet sérialisé)
+REF -> FS : efootprint-synthese-python.json\n(totaux + hypothèses, format léger)
 
 note over REF, FS
-  efootprint-results.json (extrait) :
+  efootprint-synthese-python.json (extrait) :
   {
     "visits_per_year": ...,
     "traffic": {source, source_url, snapshot, confidence},
@@ -539,7 +539,7 @@ C -> U : AskUserQuestion — et ensuite ?\n- Relancer avec d'autres hypothèses\
 
 alt Régénérer le rapport HTML
   C -> GR : python3 generate_report_html.py <dossier-audit>
-  GR -> FS : Lire efootprint-results.json\n(+ har, coverage, cwv, tech_stack)
+  GR -> FS : Lire efootprint-synthese-python.json\n(+ har, coverage, cwv, tech_stack)
   FS -> GR : Données rapport
   GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
   GR -> FS : rapport-parcours-YYYY-MM-DD.html
@@ -549,7 +549,7 @@ end
 
 note over U, C
   Boucle humain-dans-la-boucle : aucune itération automatique.
-  Section CO2e omise si efootprint-results.json absent (rapport rétro-compatible).
+  Section CO2e omise si efootprint-synthese-python.json absent (rapport rétro-compatible).
 end note
 
 @enduml

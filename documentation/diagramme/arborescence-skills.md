@@ -116,6 +116,6 @@ Deux skills de projet.
 - `diagrammes-analyse-parcours` : skill outil qui génère les diagrammes PlantUML d'analyse-parcours.
 
 À l'étape 40, `generate_report_html.py` AFFICHE une section CO2e si un
-`efootprint-results.json` existe déjà ; il ne la DÉCLENCHE pas (l'étape 45 reste
+`efootprint-synthese-python.json` existe déjà ; il ne la DÉCLENCHE pas (l'étape 45 reste
 optionnelle, invoquée via `/efootprint`).
 Voir aussi `documentation/implementation/` pour le détail des scripts.

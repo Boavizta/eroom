@@ -7,7 +7,7 @@ via la librairie e-footprint (Boavizta). Elle s'appuie sur les scripts
 existants dans `.claude/skills/analyse-parcours/scripts/` :
 
 - `collect_env_data.py` : collecte HAR + CrUX + ipinfo -> `env-data.json`
-- `run_efootprint.py` : calcul CO2e + sérialisation -> `efootprint-model.json`
+- `run_efootprint.py` : calcul CO2e + sérialisation -> `efootprint-boavizta-model.json`
 
 **Cette étape ne duplique pas la logique** : elle détecte, questionne, appelle.
 
@@ -52,7 +52,7 @@ Déclencheurs textuels :
 Étape 20 -> env-data.json        (collect_env_data.py, cache permanent)
 Étape 25 -> vue d'ensemble (topologie + BDD/streaming/IA suspectés, PlantUML)
 Étape 30 -> paramètres utilisateur (AskUserQuestion sur trafic + instance)
-Étape 40 -> efootprint-model.json (run_efootprint.py, recalcul à chaque run)
+Étape 40 -> efootprint-boavizta-model.json + efootprint-synthese-python.json (run_efootprint.py, recalcul à chaque run)
 Étape 50 -> synthèse + propositions
 ```
 
@@ -293,8 +293,9 @@ QCM sur cette vue avant de poursuivre.
 Appeler `run_efootprint.py::build_topology_overview(source_dir)` (chaîne :
 `load_env_data` -> `find_har` -> `infer_audited_domain` -> `spec_from_env_data`
 -> `detect_tech.detect_from_har` -> annotation des hôtes tiers suspects ->
-`site_to_plantuml`). Ne dépend d'AUCUN paramètre de l'Étape 30 : le trafic a
-toujours un défaut résolu (100 000/an) dès l'Étape 20.
+`site_to_plantuml`, avec le mix pays d'audience lu dans `env-data.json`). Ne
+dépend d'AUCUN paramètre de l'Étape 30 : le trafic a toujours un défaut résolu
+(100 000/an) dès l'Étape 20.
 
 **Préconditions** (si non réunies, informer et proposer de relancer l'Étape 20
 avant de continuer) :
@@ -358,9 +359,19 @@ PlantUML généré automatiquement (troisième élément retourné par
    le coller dans https://www.plantuml.com/plantuml/uml/ pour un rendu
    ponctuel sans installation).
 
-Contenu du diagramme (composants) : serveurs 1st-party (`database`),
-traitements réseau, hôtes tiers — dont ceux annotés d'une suspicion
-BDD/streaming/IA affichent leur note dans le label du composant.
+Disposition : 3 colonnes côte à côte (Parcours / Traitements / Infrastructure),
+plus hautes que larges, police agrandie et texte replié pour la lisibilité
+(cf. docstring de `to_plantuml.py` pour le détail des essais testés).
+
+Contenu du diagramme : serveurs 1st-party (`database`), traitements réseau
+(dont appels IA générative), hôtes tiers — dont ceux annotés d'une suspicion
+BDD/streaming/IA affichent leur note dans le label du composant — ainsi que
+les grandes hypothèses de calcul : une note globale (trafic annuel, mix
+appareils, mix pays d'audience, temps de lecture cumulé du parcours) et un
+détail par composant concerné (temps de l'étape, poids transféré du
+traitement, type d'instance/provider du serveur). Valeur seule, sans badge de
+confiance : le détail source/confiance reste dans le tableau d'hypothèses du
+rapport (`print_hypotheses()`/section HTML dédiée), pas dupliqué ici.
 
 ### Étape 25d - Validation par QCM avant de poursuivre
 
@@ -478,7 +489,9 @@ Le script :
 1. Affiche le tableau des hypothèses (déjà géré, ne pas dupliquer)
 2. Construit le modèle e-footprint
 3. Affiche les résultats CO2e (fabrication + énergie)
-4. Sérialise dans `<source_dir>/efootprint-model.json`
+4. Sérialise dans `<source_dir>/efootprint-boavizta-model.json` (modèle
+   e-footprint natif) et `<source_dir>/efootprint-synthese-python.json`
+   (résumé consommé par le rapport HTML et le contrôle de non-régression)
 
 Capturer stdout pour le renvoyer à l'utilisateur en bloc, puis synthétiser.
 
@@ -550,8 +563,12 @@ python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py <source_dir> -
 
 Dans `<source_dir>/` :
 - `env-data.json` - Données collectées (cache permanent, --refresh manuel)
-- `efootprint-model.json` - Modèle e-footprint sérialisé complet (recréé à chaque run)
-- `efootprint-results.json` - Totaux CO2e + hypothèses, format léger consommé par le rapport HTML
+- `efootprint-boavizta-model.json` - Modèle e-footprint (Boavizta) natif,
+  sérialisé complet (recréé à chaque run) : rechargeable dans le vrai
+  model_builder ou via `json_to_system`, jamais lu par ce projet
+- `efootprint-synthese-python.json` - Résumé applicatif propre à ce projet
+  (totaux CO2e + hypothèses, format léger), consommé par
+  `generate_report_html.py` et `check_efootprint_contract.py`
 
 Ces fichiers **ne doivent pas être commités** dans git.
 
@@ -560,7 +577,7 @@ Ces fichiers **ne doivent pas être commités** dans git.
 ## Intégration rapport HTML
 
 Le générateur `generate_report_html.py` détecte automatiquement
-`efootprint-results.json` (dans `audit_dir` ou son parent) et insère une
+`efootprint-synthese-python.json` (dans `audit_dir` ou son parent) et insère une
 section "Impact environnemental (estimation CO2e)" dans le rapport, entre
 "Analyse Core Web Vitals" et "Annexes". Si le fichier est absent, la section
 est simplement omise (rapport rétro-compatible).

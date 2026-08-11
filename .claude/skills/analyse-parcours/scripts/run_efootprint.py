@@ -15,7 +15,9 @@ Usage :
     python3 run_efootprint.py <source_dir> --refresh-data       # recollecte env-data.json
 
 Lit env-data.json dans source_dir (produit par collect_env_data.py).
-Écrit efootprint-model.json dans source_dir (relançabilité).
+Écrit efootprint-boavizta-model.json dans source_dir (relançabilité) et
+efootprint-synthese-python.json (consommé par generate_report_html.py et
+check_efootprint_contract.py).
 
 DEPUIS LE LOT 5 : ce script délègue toute la modélisation à `efootprint_model`
 (spec_from_env_data -> build_system -> ranges), au lieu de construire un modèle
@@ -144,7 +146,11 @@ def build_topology_overview(source_dir):
     spec = topology_overview.annotate_third_party_hosts(spec, tech_result)
 
     text = topology_overview.overview_text(spec, tech_result)
-    puml = site_to_plantuml(spec, title=audited_domain)
+    # Le mix pays d'audience (SimilarWeb) vit dans env-data.json, jamais dans
+    # la SiteSpec (AudienceSpec.country_mix existe mais n'est peuplé par aucun
+    # adaptateur) : lu ici pour l'afficher dans la note d'hypothèses du diagramme.
+    audience_mix = (env_data.get("audience") or {}).get("mix")
+    puml = site_to_plantuml(spec, title=audited_domain, audience_mix=audience_mix)
 
     return spec, text, puml, warnings
 
@@ -355,15 +361,26 @@ def print_results(spec, built, ranges):
 # Sérialisation
 # ---------------------------------------------------------------------------
 
-def save_model(built, source_dir):
+def save_boavizta_model(built, source_dir):
+    """Écrit efootprint-boavizta-model.json : sérialisation NATIVE de la
+    bibliothèque e-footprint (Boavizta) via `system_to_json`, indépendante de
+    ce projet. Utile pour recharger le modèle dans la vraie interface web
+    e-footprint (model_builder) ou via `json_to_system`, jamais lu par
+    `generate_report_html.py` ni `check_efootprint_contract.py` (cf.
+    `save_synthese_python()` pour le format consommé par ce projet)."""
     from efootprint.api_utils.system_to_json import system_to_json
-    out_path = source_dir / "efootprint-model.json"
+    out_path = source_dir / "efootprint-boavizta-model.json"
     system_to_json(built.system, save_calculated_attributes=False, output_filepath=str(out_path))
     print(f"  Modèle sérialisé : {out_path}")
 
 
-def save_results(spec, built, ranges, source_dir, env_data, warnings, reserves):
-    """Écrit efootprint-results.json.
+def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves):
+    """Écrit efootprint-synthese-python.json : résumé applicatif propre à ce
+    projet (PAS un format e-footprint), consommé par deux scripts Python :
+    `generate_report_html.py` (alimente le rapport HTML) et
+    `check_efootprint_contract.py` (garde-fou de non-régression, comparé à
+    une baseline). Jamais destiné à être ouvert directement ni rechargé dans
+    la bibliothèque e-footprint (cf. `save_boavizta_model()` pour ça).
 
     Additif STRICT par rapport à l'ancien format (cf. handoff du 05/08/2026,
     section F.3) : les ~60 clés `hypotheses` historiques, DOCUMENTAIRES (poids
@@ -548,7 +565,7 @@ def save_results(spec, built, ranges, source_dir, env_data, warnings, reserves):
         "sources": collect_sources(spec),
     }
 
-    out_path = source_dir / "efootprint-results.json"
+    out_path = source_dir / "efootprint-synthese-python.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     print(f"  Résultats sérialisés : {out_path}")
@@ -640,8 +657,8 @@ def main():
     print_results(spec, built, ranges)
 
     print("[e-footprint] Sérialisation du modèle...")
-    save_model(built, source_dir)
-    save_results(spec, built, ranges, source_dir, env_data, warnings, reserves)
+    save_boavizta_model(built, source_dir)
+    save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves)
     print()
     visits = spec.audience.visits_per_year.value if spec.audience and spec.audience.visits_per_year else 0
     print(f"  Trafic retenu : {visits:,.0f} visites/an")

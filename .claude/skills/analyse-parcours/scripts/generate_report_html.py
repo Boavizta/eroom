@@ -2009,7 +2009,7 @@ def _instance_type_row(hyp):
       le texte de justification (et lien source si fourni), sur le modèle de
       _traffic_source_label()/_audience_source_label().
 
-    hyp : dict hypotheses d'efootprint-results.json. Retourne (label_value, conf).
+    hyp : dict hypotheses d'efootprint-synthese-python.json. Retourne (label_value, conf).
     """
     value = hyp.get("instance_type", "?")
     source_text = hyp.get("instance_type_source")
@@ -2031,7 +2031,7 @@ def _instance_type_row(hyp):
 def _traffic_source_label(traffic):
     """Libellé de provenance du trafic annuel, avec snapshot et lien source.
 
-    traffic : bloc {source, source_url, snapshot, confidence} d'efootprint-results.json.
+    traffic : bloc {source, source_url, snapshot, confidence} d'efootprint-synthese-python.json.
     Retourne un libellé lisible ("estimation SimilarWeb, juin 2026 ↗ source",
     "saisie (analytics client)", "hypothèse par défaut") destiné à la colonne source
     des tableaux d'hypothèses."""
@@ -2052,11 +2052,14 @@ def _traffic_source_label(traffic):
     return label
 
 
-def load_efootprint_results(audit_dir):
-    """Cherche efootprint-results.json dans audit_dir ou son parent (source_dir)."""
+def load_synthese_python(audit_dir):
+    """Cherche efootprint-synthese-python.json dans audit_dir ou son parent
+    (source_dir) : résumé applicatif écrit par
+    `run_efootprint.py::save_synthese_python()`, PAS le modèle e-footprint
+    natif (`efootprint-boavizta-model.json`, jamais lu par ce rapport)."""
     audit_dir = Path(audit_dir)
-    for candidate in [audit_dir / "efootprint-results.json",
-                       audit_dir.parent / "efootprint-results.json"]:
+    for candidate in [audit_dir / "efootprint-synthese-python.json",
+                       audit_dir.parent / "efootprint-synthese-python.json"]:
         if candidate.exists():
             with open(candidate, encoding="utf-8") as f:
                 return json.load(f)
@@ -2070,7 +2073,7 @@ def load_topology_svg(audit_dir):
     compilation plantuml -tsvg, cf. run_efootprint.py) : le diagramme de
     topologie déjà validé avec l'utilisatrice avant le calcul. Ne tente
     aucune régénération à la volée (rapport rétrocompatible si absent, même
-    principe que load_efootprint_results()/load_tech_stack()).
+    principe que load_synthese_python()/load_tech_stack()).
     """
     audit_dir = Path(audit_dir)
     for parent in (audit_dir, audit_dir.parent):
@@ -2425,6 +2428,57 @@ def _section_efootprint(results, topology_svg=None):
     dominant_fab = max(fab, key=fab.get) if fab else "?"
     dominant_ener = max(ener, key=ener.get) if ener else "?"
 
+    # Synthèse en tête, langage clair : demande explicite de l'utilisatrice
+    # d'une lecture "très synthétique et claire" avant le détail technique
+    # (tableaux/fourchettes plus bas). Couleurs catégorielles VALIDÉES par le
+    # script du skill dataviz (validate_palette.js) : le bleu OCTO existant
+    # (#5BA1BC) échoue au plancher de chroma en usage catégoriel — remplacé
+    # ici par la paire bleu/orange de référence, jamais réutilisée pour le
+    # texte (les tokens de texte restent OCTO_DARK/gris, cf. règle "le texte
+    # ne porte jamais la couleur de la série").
+    _SYN_FAB_COLOR = "#2a78d6"
+    _SYN_ENER_COLOR = "#eb6834"
+    _FR_POSTE = {
+        "Devices": "terminaux des visiteurs (mobiles, ordinateurs)",
+        "Servers": "serveurs applicatifs",
+        "Storage": "stockage",
+        "Network": "réseau (transport des données)",
+        "ExternalAPIs": "appels IA générative",
+        "EdgeDevices": "équipements réseau intermédiaires",
+    }
+    _grand_total = fab_total + ener_total
+    _fab_share = fab_total / _grand_total if _grand_total else 0
+    _ener_share = 1 - _fab_share
+    _top_poste_kg = {}
+    for _poste in set(fab) | set(ener):
+        _top_poste_kg[_poste] = fab.get(_poste, 0) + ener.get(_poste, 0)
+    _top_poste = max(_top_poste_kg, key=_top_poste_kg.get) if _top_poste_kg else None
+    _top_poste_share = (_top_poste_kg.get(_top_poste, 0) / _grand_total) if _top_poste and _grand_total else 0
+    _top_poste_label = _FR_POSTE.get(_top_poste, _top_poste or "?")
+
+    _fab_bar_pct = _fab_share * 100
+    _ener_bar_pct = _ener_share * 100
+    synthese_html = f"""
+  <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:16px 20px;margin:16px 0 24px">
+    <p style="font-size:16px;color:#333;margin:0 0 12px;line-height:1.5">
+      Ce site émet l'équivalent de <b>~{total_kg:.1f} kg de CO2e par an</b>, dont
+      <b>{_fab_share:.0%}</b> vient de la <b>fabrication</b> des équipements (amortie sur leur
+      durée de vie) et <b>{_ener_share:.0%}</b> de l'<b>énergie</b> consommée à l'usage.
+      Le poste le plus lourd, toutes causes confondues, est
+      <b>{_top_poste_label}</b> ({_top_poste_share:.0%} du total).
+    </p>
+    <div role="img" aria-label="Répartition {_fab_share:.0%} fabrication, {_ener_share:.0%} énergie">
+      <div style="display:flex;height:22px;border-radius:4px;overflow:hidden;gap:2px">
+        <div style="background:{_SYN_FAB_COLOR};width:{_fab_bar_pct:.1f}%"></div>
+        <div style="background:{_SYN_ENER_COLOR};width:{_ener_bar_pct:.1f}%"></div>
+      </div>
+      <div style="display:flex;gap:20px;margin-top:8px;font-size:13px;color:#555">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_FAB_COLOR};margin-right:5px"></span>Fabrication — {fab_total:.1f} kg ({_fab_share:.0%})</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_ENER_COLOR};margin-right:5px"></span>Énergie — {ener_total:.1f} kg ({_ener_share:.0%})</span>
+      </div>
+    </div>
+  </div>"""
+
     # Fourchettes d'incertitude (Lot 4bis, rendues Lot 9) : deux axes MESURÉS en
     # rejouant le même modèle, jamais cumulés (cf. ranges.py et mémoire persistante
     # "fourchettes non cumulées"). Absent si model.ranges n'existe pas (ancien schéma).
@@ -2496,7 +2550,8 @@ def _section_efootprint(results, topology_svg=None):
   <h3 style="margin-top:24px">Topologie du modèle</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
     Modèle validé avec vous avant calcul (Étape 25) : serveurs 1st-party, traitements,
-    hôtes tiers et suspicions BDD/streaming/IA générative détectées depuis le HAR.
+    hôtes tiers, suspicions BDD/streaming/IA générative détectées depuis le HAR, et
+    grandes hypothèses de calcul (trafic annuel, mix appareils/pays, temps de lecture).
   </p>
   <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white">
     {topology_svg}
@@ -2504,6 +2559,7 @@ def _section_efootprint(results, topology_svg=None):
 
     return f"""<section id="efootprint">
   <h2>Impact environnemental (estimation CO2e)</h2>
+  {synthese_html}
   <p style="font-size:16px;color:#555;margin-bottom:8px">
     Estimation via la librairie <a href="https://github.com/Boavizta/e-footprint" target="_blank" rel="noopener">e-footprint</a> (Boavizta).
     Poste dominant en fabrication : <b>{dominant_fab}</b> ({fab.get(dominant_fab, 0):.1f} kg CO2e/an).
@@ -2584,13 +2640,13 @@ def _methodo_table(rows):
             f'</tr></thead><tbody>{body}</tbody></table>')
 
 
-def _methodo_efootprint(efootprint_results):
+def _methodo_efootprint(synthese_python):
     """Sous-section A : hypothèses ET méthodes du calcul CO2e."""
-    if not efootprint_results:
+    if not synthese_python:
         return ""
-    hyp = efootprint_results.get("hypotheses", {})
-    visits = efootprint_results.get("visits_per_year", 0)
-    traffic = efootprint_results.get("traffic", {})
+    hyp = synthese_python.get("hypotheses", {})
+    visits = synthese_python.get("visits_per_year", 0)
+    traffic = synthese_python.get("traffic", {})
 
     def pct(v):
         return f'{v:.0%}' if isinstance(v, (int, float)) else "?"
@@ -2860,15 +2916,15 @@ def _methodo_medias():
     )
 
 
-def _methodo_trafic(efootprint_results=None):
+def _methodo_trafic(synthese_python=None):
     """Sous-section D : trafic et réseau. Décrit la provenance réelle du volume
     de trafic (saisie analytics, estimation SimilarWeb, ou baseline par défaut)."""
-    traffic = (efootprint_results or {}).get("traffic", {})
+    traffic = (synthese_python or {}).get("traffic", {})
     source = traffic.get("source")
     url = traffic.get("source_url")
     snapshot = traffic.get("snapshot")
     monthly = traffic.get("monthly_visits")
-    visits = (efootprint_results or {}).get("visits_per_year")
+    visits = (synthese_python or {}).get("visits_per_year")
 
     if source and source not in ("default", "paramètre"):
         src_txt = source
@@ -2913,17 +2969,17 @@ def _methodo_trafic(efootprint_results=None):
     )
 
 
-def _section_methodologie(efootprint_results, cwv):
+def _section_methodologie(synthese_python, cwv):
     """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
     E: médias).
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
     parts = [
-        _methodo_efootprint(efootprint_results),
+        _methodo_efootprint(synthese_python),
         _methodo_cwv(cwv),
         _methodo_ecoindex(),
-        _methodo_trafic(efootprint_results),
+        _methodo_trafic(synthese_python),
         _methodo_medias(),
     ]
     body = "".join(p for p in parts if p)
@@ -3275,7 +3331,7 @@ def generate(audit_dir, output_path=None):
     traffic      = har_traffic_analysis(har_data)
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
-    efootprint_results = load_efootprint_results(audit_dir)
+    synthese_python = load_synthese_python(audit_dir)
     topology_svg = load_topology_svg(audit_dir)
     tech_stack = load_tech_stack(audit_dir)
 
@@ -3406,7 +3462,7 @@ def generate(audit_dir, output_path=None):
         cwv_nav = f'<li><a href="#cwv-analyse">{n}. Analyse Core Web Vitals</a></li>'
         n += 1
     efootprint_nav = ""
-    if efootprint_results:
+    if synthese_python:
         efootprint_nav = f'<li><a href="#efootprint">{n}. Impact environnemental (CO2e)</a></li>'
         n += 1
     annexes_num = n
@@ -3452,8 +3508,8 @@ def generate(audit_dir, output_path=None):
         html += _section_medias(greenit)
     if cwv:
         html += _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page)
-    if efootprint_results:
-        html += _section_efootprint(efootprint_results, topology_svg)
+    if synthese_python:
+        html += _section_efootprint(synthese_python, topology_svg)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
@@ -3469,7 +3525,7 @@ def generate(audit_dir, output_path=None):
         tech_num = f"A.{[sid for sid, _ in annexe_sections].index('stack-technique') + 1}"
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_tech(tech_stack), tech_num)}</div>\n'
     methodo_num = f"A.{len(annexe_sections)}"  # methodologie est le dernier élément d'annexe_sections
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(efootprint_results, cwv), methodo_num)}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv), methodo_num)}</div>\n'
     html += '</section>\n'
 
     html += "</main>\n"

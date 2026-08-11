@@ -4,9 +4,10 @@ Filet de sécurité du refactoring e-footprint : contrôle de CONTRAT sur la sor
 
 POURQUOI CE SCRIPT EXISTE
 -------------------------
-Le rapport HTML lit `efootprint-results.json` clé par clé avec `.get()`. S'il
-manque une clé, il n'échoue pas : il affiche un trou, ou une valeur par défaut,
-SANS AUCUNE ERREUR. Un refactoring peut donc casser le rapport en silence.
+Le rapport HTML lit `efootprint-synthese-python.json` clé par clé avec
+`.get()`. S'il manque une clé, il n'échoue pas : il affiche un trou, ou une
+valeur par défaut, SANS AUCUNE ERREUR. Un refactoring peut donc casser le
+rapport en silence.
 
 Ce script compare une BASELINE figée à une sortie fraîche et signale :
   - les chemins PERDUS            -> ERREUR (le rapport perdra de l'information)
@@ -30,8 +31,8 @@ Usage :
     python3 check_efootprint_contract.py audits/<site> --total 174.076 --tol 1e-3
 
 Options utiles :
-    --baseline <chemin>   baseline explicite (défaut : tmp/baselines/<site>-efootprint-results.json)
-    --results <chemin>    sortie à contrôler (défaut : <source_dir>/efootprint-results.json)
+    --baseline <chemin>   baseline explicite (défaut : tmp/baselines/<site>-efootprint-synthese-python.json)
+    --results <chemin>    sortie à contrôler (défaut : <source_dir>/efootprint-synthese-python.json)
     --strict-added        traite aussi les chemins AJOUTÉS comme des erreurs
 
 Code de sortie : 0 si le contrat est tenu, 1 sinon. Prévu pour un enchaînement
@@ -51,7 +52,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 BASELINE_DIR = PROJECT_ROOT / "tmp" / "baselines"
 
-RESULTS_FILENAME = "efootprint-results.json"
+SYNTHESE_FILENAME = "efootprint-synthese-python.json"
 
 # Chemins dont la valeur change à chaque exécution sans que rien ne soit cassé.
 # Comparer leur contenu n'aurait aucun sens ; leur PRÉSENCE et leur TYPE le sont
@@ -110,8 +111,8 @@ def compatible(type_before, type_after):
 # ---------------------------------------------------------------------------
 
 def default_baseline_path(source_dir):
-    """tmp/baselines/<nom-du-cas-d-audit>-efootprint-results.json"""
-    return BASELINE_DIR / f"{source_dir.name}-{RESULTS_FILENAME}"
+    """tmp/baselines/<nom-du-cas-d-audit>-efootprint-synthese-python.json"""
+    return BASELINE_DIR / f"{source_dir.name}-{SYNTHESE_FILENAME}"
 
 
 def load_json(path, label):
@@ -219,7 +220,7 @@ def check_total(results, expected, tolerance):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Contrôle de contrat sur efootprint-results.json "
+        description="Contrôle de contrat sur efootprint-synthese-python.json "
                     "(clés présentes et typées, pas valeurs justes).",
     )
     parser.add_argument("source_dir", type=Path,
@@ -229,7 +230,7 @@ def main():
     parser.add_argument("--baseline", type=Path, default=None,
                         help="Baseline explicite (défaut : tmp/baselines/<site>-...json).")
     parser.add_argument("--results", type=Path, default=None,
-                        help="Sortie à contrôler (défaut : <source_dir>/efootprint-results.json).")
+                        help="Sortie à contrôler (défaut : <source_dir>/efootprint-synthese-python.json).")
     parser.add_argument("--strict-added", action="store_true",
                         help="Traite les chemins ajoutés comme des erreurs.")
     parser.add_argument("--total", type=float, default=None,
@@ -243,7 +244,7 @@ def main():
         print(f"[erreur] Cas d'audit introuvable : {source_dir}")
         return 1
 
-    results_path = args.results or (source_dir / RESULTS_FILENAME)
+    results_path = args.results or (source_dir / SYNTHESE_FILENAME)
     baseline_path = args.baseline or default_baseline_path(source_dir)
 
     if args.freeze:

@@ -8,7 +8,7 @@ description: >
   S'active aussi pour l'estimation CO2e (e-footprint) : "estime l'empreinte carbone",
   "impact CO2", "empreinte environnementale", "efootprint",
   "empreinte écologique du site", "/efootprint", ou mention d'un env-data.json /
-  efootprint-model.json.
+  efootprint-boavizta-model.json.
 version: 1.1.0
 ---
 
@@ -159,7 +159,7 @@ Sections : EcoIndex | Trafic réseau | Code mort | CWV (si cwv.json) | Recommand
 comme "estime l'empreinte carbone" / "impact CO2". Réutilise `env-data.json` (HAR +
 CrUX + mix pays/trafic SimilarWeb) pour calculer une estimation CO2e hypothétique via
 la librairie e-footprint (Boavizta), puis insère une section "Impact environnemental"
-dans le rapport HTML (Étape 40) si `efootprint-results.json` est présent.
+dans le rapport HTML (Étape 40) si `efootprint-synthese-python.json` est présent.
 
 ---
 

@@ -18,8 +18,8 @@ env-data.json
 donnees-brutes-potentiellement-sensibles/
 
 # Outputs e-footprint (générés, non versionnés)
-efootprint-results.json
-efootprint-model.json
+efootprint-synthese-python.json
+efootprint-boavizta-model.json
 topologie-*.puml
 topologie-*.svg
 topologie-*.pdf
