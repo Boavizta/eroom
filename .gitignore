@@ -26,6 +26,8 @@ topologie-*.pdf
 
 # Rapports HTML générés
 rapport-parcours-*.html
+har-analysis.json
+coverage-analysis.json
 
 # Fichiers internes analyse
 .analysis_start
