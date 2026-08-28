@@ -29,9 +29,15 @@ rapport-parcours-*.html
 har-analysis.json
 coverage-analysis.json
 
+# Core Web Vitals : output généré par collect_cwv_pagespeed.py, cohérence avec
+# les autres outputs e-footprint/rapport ci-dessus (jamais couvert par une
+# règle avant le 28/08/2026 : simple oubli, pas un choix délibéré).
+cwv.json
+
 # Fichiers internes analyse
 .analysis_start
 .cost-start-ts
+.cost-session-id
 
 # Zone de travail temporaire : handoffs entre sessions, scripts d'expérimentation,
 # baselines figées, notes de lecture. Rien ici n'est un livrable.
