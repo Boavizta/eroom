@@ -395,17 +395,20 @@ Options  :
   absente du calcul).
 - **"Suspicion fausse"** -> retirer/corriger la mention dans le résumé
   affiché à l'utilisatrice (ne PAS modifier le modèle e-footprint : cette
-  étape s'arrête à la présentation, jamais à la construction automatique
-  d'un `ExternalApiSpec` — cf. limite ci-dessous).
+  étape s'arrête à la présentation).
 - **"Vérifier sur l'interface"** -> rappeler l'URL de l'interface web
   e-footprint et attendre son retour avant de poursuivre.
 
 **Limite explicite de cette étape (à rappeler si l'utilisatrice s'attend à
 plus) :** elle affiche des SUSPICIONS, elle ne construit JAMAIS
-automatiquement un `ExternalApiSpec` ni un serveur BDD dédié dans le modèle
-e-footprint (ce sera un lot ultérieur, distinct, non planifié). Le calcul
-de l'Étape 40 reste, à ce stade, strictement identique à ce qu'il était
-avant cette étape.
+automatiquement un serveur BDD dédié dans le modèle e-footprint (lot
+ultérieur, distinct, non planifié — piste 3 du bilan comparatif). Pour l'IA
+générative tierce **texte** en revanche (OpenAI/Anthropic/Gemini/Mistral/
+Cohere/Azure OpenAI/Hugging Face), cette étape ne s'arrête plus à la
+présentation : voir "IA générative tierce" à l'Étape 30 ci-dessous, qui peut
+faire entrer cet appel dans le calcul de l'Étape 40 si l'utilisatrice connaît
+le modèle exact. Sans réponse (ou "je ne sais pas"), le calcul de l'Étape 40
+reste strictement identique à ce qu'il était avant cette étape.
 
 -----
 
@@ -451,6 +454,59 @@ Options AWS :
 Adapter la liste au provider détecté. Si provider inconnu ou non supporté :
 `run_efootprint.py` bascule automatiquement sur `Server` générique
 (pas de question à poser).
+
+### IA générative tierce (uniquement si un host détecté n'est pas encore résolu)
+
+`env-data.json::ai_external_apis` contient un host avec `"resolved": false`
+quand l'Étape 25 a identifié un appel à une IA générative tierce **texte**
+sans que l'utilisatrice ait encore précisé le modèle exact. Tant qu'un host
+reste non résolu (ou que le modèle est "inconnu"), son appel n'est PAS compté
+dans le total CO2e — statu quo, jamais de valeur inventée. Ces deux questions
+permettent de l'inclure. Contrairement au trafic/à l'instance, la réponse est
+**persistée dans env-data.json** (jamais redemandée, sauf `--refresh`).
+
+Poser une question par host non résolu, dans l'ordre de détection.
+
+**Question 1 — modèle exact** :
+```
+Question : "Ce site semble appeler {provider} (host {host}). Quel modèle
+            utilise-t-il probablement ?"
+Header   : "Modèle {provider}"
+Options  : 3-4 modèles courants du catalogue EcoLogits pour CE provider
+           (ex. pour Anthropic : Claude Sonnet 4.5, Claude Haiku 4.5,
+           Claude Opus 4.1) + "Je ne sais pas"
+```
+- Ne JAMAIS proposer de saisie libre non vérifiée : EcoLogits refuse tout nom
+  de modèle absent de son catalogue (erreur à la construction plutôt qu'un
+  défaut deviné). Un modèle non listé -> orienter vers "Je ne sais pas".
+- **Modèle choisi** -> passer à la Question 2.
+- **"Je ne sais pas"** -> `collect_env_data.py <source_dir> --set-ai-model <host> unknown`
+  (marque `resolved=true, model_name=null` : jamais redemandé sauf `--refresh`),
+  informer que ce host reste hors calcul, passer au host suivant.
+
+**Question 2 (si modèle connu) — longueur type d'une réponse** :
+```
+Question : "En moyenne, une réponse de ce modèle fait plutôt combien de mots ?"
+Header   : "Longueur réponse"
+Options  : Courte (~50 mots) / Moyenne (~150 mots) / Longue (~400 mots) /
+           Je ne sais pas
+```
+- Convertir l'option en `output_tokens` (ordre de grandeur 1 mot ≈ 1,3 token) :
+  50 -> 65, 150 -> 195, 400 -> 520.
+- **Option choisie** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name> --set-ai-output-tokens <host> <tokens>`.
+- **"Je ne sais pas"** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name>`
+  SEUL (sans `--set-ai-output-tokens`). **Décision QCM du 28/08/2026, différente
+  de la Question 1** : contrairement au modèle inconnu (exclusion, aucun défaut
+  raisonnable entre fournisseurs), l'appel EST compté ici, avec une hypothèse
+  par défaut "réponse moyenne" (~150 mots, `_DEFAULT_OUTPUT_TOKENS` dans
+  `from_har.py`) — visible comme telle dans l'annexe hypothèses du rapport,
+  jamais un défaut silencieux. Toujours le dire explicitement à l'utilisatrice
+  ("je compte cet appel avec une hypothèse de longueur moyenne, faute de
+  précision").
+
+**Le volume d'appels par an n'est PAS demandé** : il est dérivé automatiquement
+du nombre de requêtes vers ce host observées dans le HAR capturé (cf.
+`from_har.py::_ai_job_specs_for_step()`), jamais d'une question supplémentaire.
 
 ### Autres paramètres
 

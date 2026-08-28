@@ -1061,7 +1061,7 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
 # ---------------------------------------------------------------------------
 
 def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None,
-                   tech_stack=None, servers_info=None):
+                   tech_stack=None, servers_info=None, ai_external_apis=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
@@ -1083,6 +1083,12 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
     tech_stack : dict de détection techno (detect_tech.detect_from_har). Écrit tel
     quel dans la clé "tech_stack". Si None, la clé vaut None (non-régression : le
     rapport et le calcul restent valides sans détection).
+
+    ai_external_apis : dict {host: {rule_name, provider, resolved, model_name,
+    output_tokens}} fusionné par merge_ai_external_apis() — PERSISTÉ (jamais
+    redemandé une fois "resolved", contrairement à tech_stack recalculé à chaque
+    run). Si None, la clé vaut {} (non-régression : from_har.py ignore un bloc
+    absent, aucun appel IA générative ajouté au calcul).
     """
     pages, _ = har_data if isinstance(har_data, tuple) else (har_data, None)
     har_metrics = aggregate_page_metrics(pages)
@@ -1254,7 +1260,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             )
 
     return {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
         "device_mix": device_section,
@@ -1265,7 +1271,38 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
         "traffic": traffic_section,
         "job": job_section,
         "tech_stack": tech_stack,
+        "ai_external_apis": ai_external_apis or {},
     }
+
+
+def merge_ai_external_apis(detected, existing, refresh):
+    """Fusionne les hosts IA générative détectés avec les réponses déjà données
+    par l'utilisatrice (persistées, jamais expirées sauf --refresh explicite).
+
+    `detected` : {host: {"rule_name", "provider"}}, cf.
+    detect_tech.ai_generative_hosts_from_har(). `existing` : bloc
+    "ai_external_apis" du précédent env-data.json, ou None.
+
+    Une entrée "resolved" (l'utilisatrice a répondu, même "je ne sais pas" ->
+    model_name=None) n'est JAMAIS redemandée sauf --refresh : c'est le contrat
+    qui permet à l'orchestration du skill de savoir quels hosts questionner
+    (resolved=False) sans reposer une question déjà tranchée.
+    """
+    existing = existing or {}
+    merged = {} if refresh else dict(existing)
+    for host, info in (detected or {}).items():
+        if host in merged:
+            merged[host]["rule_name"] = info["rule_name"]
+            merged[host]["provider"] = info["provider"]
+        else:
+            merged[host] = {
+                "rule_name": info["rule_name"],
+                "provider": info["provider"],
+                "resolved": False,
+                "model_name": None,
+                "output_tokens": None,
+            }
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -1297,6 +1334,18 @@ def main():
                         help="Hôte à traiter comme 1st-party même si son domaine "
                              "diffère du site audité (ex. un service auto-hébergé "
                              "sous un autre nom de domaine). Répétable.")
+    parser.add_argument("--set-ai-model", nargs=2, metavar=("HOST", "MODEL_NAME"),
+                        action="append", default=[],
+                        help="Enregistre le modèle IA générative choisi par "
+                             "l'utilisatrice pour un host IA détecté (ex. "
+                             "--set-ai-model api.anthropic.com claude-sonnet-4-5). "
+                             "Utiliser MODEL_NAME=unknown si elle ne connaît pas le "
+                             "modèle exact (le host reste alors hors calcul). Répétable.")
+    parser.add_argument("--set-ai-output-tokens", nargs=2, metavar=("HOST", "TOKENS"),
+                        action="append", default=[],
+                        help="Longueur type d'une réponse de ce host, en tokens "
+                             "générés (ex. --set-ai-output-tokens api.anthropic.com 300). "
+                             "Répétable.")
     args = parser.parse_args()
 
     # Validation précoce du format --audience (fail fast avant toute collecte réseau)
@@ -1456,21 +1505,57 @@ def main():
     else:
         print("  Pas de HAR — détection ignorée")
 
+    # --- Détection des hosts IA générative tierce (résolution : voir plus bas) ---
+    print("\n[ia] Détection des hosts IA générative tierce (règles maison)...")
+    ai_hosts_detected = {}
+    if har_path and detect_tech:
+        ai_hosts_detected = detect_tech.ai_generative_hosts_from_har(har_path) or {}
+        if ai_hosts_detected:
+            print(f"  -> {len(ai_hosts_detected)} host(s) IA détecté(s) : "
+                  + ", ".join(f"{h} ({i['rule_name']})" for h, i in ai_hosts_detected.items()))
+        else:
+            print("  -> Aucun host IA générative détecté")
+    else:
+        print("  -> ignoré (HAR ou module detect_tech indisponible)")
+
     # --- Résolution du mix pays d'audience (points 4a/4b) ---
     # Ordre : --audience > audience_mix déjà écrit par l'agent (SimilarWeb) > défaut FR.
     # Sur --refresh on préserve le bloc audience de l'agent s'il existe déjà.
     print("\n[audience] Résolution du mix pays (pondération iOS/macOS)...")
     existing_audience = None
     existing_traffic = None
+    existing_ai_external_apis = None
     if env_data_path.exists():
         try:
             with open(env_data_path, encoding="utf-8") as f:
                 _prev = json.load(f)
             existing_audience = _prev.get("audience")
             existing_traffic = _prev.get("traffic")
+            existing_ai_external_apis = _prev.get("ai_external_apis")
         except (json.JSONDecodeError, OSError):
             existing_audience = None
             existing_traffic = None
+            existing_ai_external_apis = None
+
+    ai_external_apis = merge_ai_external_apis(
+        ai_hosts_detected, existing_ai_external_apis, refresh=args.refresh)
+
+    # Réponses de l'utilisatrice, collectées par l'orchestration du skill via
+    # AskUserQuestion PUIS repassées ici en CLI (même mécanisme que --audience/
+    # --ios-mobile-share ci-dessus) : ce script ne pose jamais de question lui-même.
+    for host, model_name in args.set_ai_model:
+        entry = ai_external_apis.setdefault(
+            host, {"rule_name": None, "provider": None, "output_tokens": None})
+        entry["model_name"] = None if model_name.lower() == "unknown" else model_name
+        entry["resolved"] = True
+    for host, tokens in args.set_ai_output_tokens:
+        entry = ai_external_apis.setdefault(
+            host, {"rule_name": None, "provider": None, "model_name": None, "resolved": False})
+        entry["output_tokens"] = float(tokens)
+    if ai_external_apis:
+        _resolved = sum(1 for v in ai_external_apis.values() if v.get("resolved"))
+        print(f"\n[ia] {len(ai_external_apis)} host(s) IA suivis, {_resolved} résolu(s) "
+              f"(modèle connu ou explicitement inconnu)")
 
     # Voie principale : compléter les blocs manquants via l'API interne SimilarWeb.
     # La saisie manuelle (--audience) prime et bloque l'écriture du mix pays.
@@ -1502,7 +1587,8 @@ def main():
     # --- Assemblage env-data.json ---
     env_data = build_env_data((pages, server_ip), device_mix, server_info,
                               audience=audience, traffic=traffic,
-                              tech_stack=tech_stack, servers_info=servers_info)
+                              tech_stack=tech_stack, servers_info=servers_info,
+                              ai_external_apis=ai_external_apis)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)

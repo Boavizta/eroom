@@ -128,33 +128,51 @@ caractères qui livre un fichier déjà prêt, un appel à un modèle générati
 vrai calcul (le modèle produit le texte mot par mot) — le compter uniquement en octets
 transférés sous-estimerait largement son empreinte réelle.
 
-**Mais ce composant n'est JAMAIS ajouté automatiquement au calcul par l'agent EROOM.**
-L'Étape 25 du skill efootprint (vue d'ensemble avant calcul) *détecte* qu'un appel à
-une IA générative tierce a eu lieu — par reconnaissance du nom de domaine exact dans le
-HAR (`detect_tech.py`, catégories "OpenAI (API)", "Anthropic (API Claude)", "Google
+**Depuis le 28/08/2026, ce composant PEUT être ajouté automatiquement au calcul —
+mais seulement si l'utilisatrice connaît le modèle exact.** L'Étape 25 du skill
+efootprint (vue d'ensemble avant calcul) *détecte* qu'un appel à une IA générative
+tierce a eu lieu — par reconnaissance du nom de domaine exact dans le HAR
+(`detect_tech.py`, catégories "OpenAI (API)", "Anthropic (API Claude)", "Google
 Generative AI (Gemini)", "Mistral AI (API)", "Cohere (API)", "Azure OpenAI", "Hugging
-Face Inference API") — et l'affiche comme "identifié" à l'utilisatrice. Mais elle
-s'arrête à la présentation : elle ne construit **jamais** automatiquement un
-`ExternalApiSpec` dans le modèle de calcul (limite documentée dans
-`skill-steps/45_efootprint.md`). Concrètement : si un site audité appelle une IA
-générative en coulisses, le rapport le SIGNALE, mais le total CO2e affiché ne l'inclut
-PAS tant que ce composant n'a pas été ajouté à la main au modèle. C'est un lot futur,
-non planifié à ce jour.
+Face Inference API"). L'Étape 30 pose alors deux questions (modèle exact, puis longueur
+type d'une réponse) ; le nombre d'appels par an est lui dérivé automatiquement du
+nombre de requêtes vers ce host observées dans le HAR capturé, croisé avec le trafic
+annuel du site déjà connu (SimilarWeb ou saisie) — jamais une question supplémentaire.
 
-Concrètement, "ajouté à la main" veut dire : quelqu'un doit ouvrir le script Python qui
-construit le modèle de calcul et écrire une ligne comme celle-ci, avec les bonnes
-valeurs pour le site audité (fournisseur, nom du modèle, nombre de réponses générées
-par an) :
+Les deux questions restantes n'ont pas le même traitement en cas de réponse "je ne sais
+pas" (décision QCM du 28/08/2026) :
+- **Modèle inconnu** : le host reste hors calcul, SIGNALÉ dans le rapport mais pas
+  chiffré. Aucun défaut proposé : les modèles EcoLogits diffèrent trop entre eux
+  (fournisseur, taille) pour qu'une valeur par défaut soit honnête.
+- **Longueur de réponse inconnue** (modèle SEUL connu) : l'appel est compté malgré
+  tout, avec une hypothèse par défaut documentée ("réponse moyenne", ~150 mots,
+  `_DEFAULT_OUTPUT_TOKENS` dans `from_har.py`) — visible comme telle dans l'annexe
+  hypothèses, jamais un défaut silencieux.
+
+Mécanique du calcul (`efootprint_model/from_har.py::_ai_job_specs_for_step()`) :
+un `JobSpec` dédié porte l'`ExternalApiSpec`, rattaché au **même serveur 1st-party déjà
+modélisé** pour la page où l'appel a été vu — jamais un serveur fictif supplémentaire
+(un archétype antérieur, `archetypes/ia_streaming.py`, en créait un et aurait doublé la
+fabrication serveur si branché tel quel sur un site réel ; non utilisé par ce
+mécanisme). Le poids réseau de l'appel reste compté une seule fois, dans le job de
+page ; ce `JobSpec` dédié porte `data_transferred=0` et n'existe que pour déclencher le
+calcul EcoLogits.
+
+Exemple concret de ce que ça représente, une fois les deux questions répondues :
 
 ```python
-ExternalApiSpec(provider="anthropic", model_name="claude-3-5-sonnet", output_tokens=800)
+ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5", output_tokens=195,
+                request_count_per_step=3.0)  # request_count_per_step dérivé du HAR
 ```
 
-Personne ne fait ce geste aujourd'hui dans l'agent EROOM : ni l'agent, ni un script
-automatique. Il faudrait connaître ces valeurs (souvent non visibles depuis le trafic
-réseau capturé) et les saisir soi-même dans le code, à chaque nouvel audit. C'est la
-différence entre "on a vu passer une IA" (automatique, fait aujourd'hui) et "on a
-compté son empreinte" (manuel, jamais fait à ce jour).
+Persistance : les réponses de l'utilisatrice sont écrites dans
+`env-data.json::ai_external_apis` (une entrée par host, jamais expirée sauf
+`--refresh` explicite de `collect_env_data.py`) — contrairement au trafic annuel/type
+d'instance, qui restent redemandés à chaque exécution du skill.
+
+**Limite qui reste vraie** : seul le cas **texte** est couvert (chatbots/assistants).
+L'IA générative **vidéo** tierce (Sora, Veo, Kling...) n'est ni détectée ni calculée —
+piste 2 du bilan comparatif, non planifiée à ce jour.
 
 **3.2. Serveur d'IA auto-hébergé (le site fait tourner lui-même un modèle sur ses
 propres machines, type GPU dédié)**

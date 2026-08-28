@@ -592,6 +592,60 @@ def detect_from_har(har_path):
 
 
 # ---------------------------------------------------------------------------
+# IA générative tierce : détection PAR HOST (pas par catégorie agrégée)
+# ---------------------------------------------------------------------------
+# detect()/detect_from_har() ci-dessus servent la présentation (Étape 25,
+# topology_overview.py) : ils agrègent par catégorie et ne portent pas le host
+# exact. efootprint_model/from_har.py a besoin, lui, du host exact pour savoir
+# À QUEL job réseau rattacher un calcul EcoLogits (cf. collect_env_data.py qui
+# appelle la fonction ci-dessous et écrit son résultat dans
+# env-data.json::ai_external_apis). Réutilise les mêmes règles "url" de
+# TECH_RULES, jamais une redécouverte de pattern.
+
+AI_PROVIDER_BY_RULE_NAME = {
+    # Nom de règle (TECH_RULES) -> clé provider du catalogue EcoLogits
+    # (efootprint_model/build.py::_build_external_api). Azure OpenAI route vers
+    # les mêmes modèles qu'OpenAI : même catalogue EcoLogits, pas un provider
+    # distinct.
+    "OpenAI (API)": "openai",
+    "Anthropic (API Claude)": "anthropic",
+    "Google Generative AI (Gemini)": "google_genai",
+    "Mistral AI (API)": "mistralai",
+    "Cohere (API)": "cohere",
+    "Azure OpenAI": "openai",
+    "Hugging Face Inference API": "huggingface_hub",
+}
+
+
+def ai_generative_hosts_from_har(har_path):
+    """Hosts appelant une IA générative tierce, détectés par domaine exact.
+
+    Retourne {host: {"rule_name": ..., "provider": clé_ecologits}}, un host par
+    domaine d'API vu dans le HAR (pas d'agrégation par catégorie). None si le
+    HAR est absent/illisible.
+    """
+    if not har_path or not Path(har_path).exists():
+        return None
+    signals = load_har_signals(har_path)
+    rules = {name: rule for name, rule in TECH_RULES.items()
+             if rule["cat"] == "IA générative (tiers)"}
+
+    result = {}
+    for url in signals["urls"]:
+        host = urlparse(url).netloc
+        if not host or host in result:
+            continue
+        for name, rule in rules.items():
+            rx = re.compile(rule["url"], re.IGNORECASE)
+            if rx.search(url):
+                provider = AI_PROVIDER_BY_RULE_NAME.get(name)
+                if provider:
+                    result[host] = {"rule_name": name, "provider": provider}
+                break
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Point d'entrée autonome
 # ---------------------------------------------------------------------------
 

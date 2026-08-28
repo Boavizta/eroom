@@ -33,6 +33,7 @@ from .compose import compose
 from .spec import (
     AudienceSpec,
     Evidence,
+    ExternalApiSpec,
     JobSpec,
     JourneySpec,
     ServerSpec,
@@ -443,6 +444,86 @@ def _server_spec_from_info(server_info, key):
     return ServerSpec(**fields)
 
 
+# Hypothèse par défaut si l'utilisatrice ne connaît pas la longueur type d'une
+# réponse (décision QCM du 28/08/2026, cf. plan piste 1) : ~150 mots ("réponse
+# moyenne", même ordre de grandeur que l'option "Moyenne" de la question posée
+# à l'Étape 30), converti en tokens via le ratio ~1,3 token/mot documenté au
+# même endroit.
+_DEFAULT_OUTPUT_TOKENS = 195.0
+
+
+def _ai_job_specs_for_step(step_index, page_entries, ai_external_apis, server_key):
+    """JobSpec(s) portant un appel IA générative tierce détecté sur CETTE page.
+
+    `ai_external_apis` : bloc env-data.json::ai_external_apis (host ->
+    {provider, model_name, output_tokens, resolved}), écrit par
+    collect_env_data.py (détection) et complété par l'orchestration du skill
+    (réponses de l'utilisatrice, cf. collect_env_data.py --set-ai-model). Un
+    host non "resolved" ou sans model_name connu (réponse "je ne sais pas" à
+    la question sur le MODÈLE) ne produit AUCUN job : il reste dans
+    l'affichage documentaire actuel, jamais de valeur inventée pour le
+    modèle — EcoLogits n'a aucun défaut raisonnable à proposer entre
+    fournisseurs/tailles de modèle très différents.
+
+    `output_tokens` absent (réponse "je ne sais pas" à la question sur la
+    LONGUEUR, décision QCM du 28/08/2026) : PAS d'exclusion cette fois-ci —
+    une hypothèse par défaut documentée ("réponse moyenne", cf.
+    `_DEFAULT_OUTPUT_TOKENS`) est utilisée à la place, visible comme telle
+    dans l'annexe hypothèses du rapport. Différence avec le modèle : un ordre
+    de grandeur de longueur de réponse est un défaut raisonnable une fois le
+    modèle connu, contrairement à deviner QUEL modèle est appelé.
+
+    `data_transferred=0` sur le job retourné : les octets de cet appel sont
+    déjà comptés dans `total_bytes` du job de page (qui somme TOUS les hôtes
+    de la page, tiers compris). Ce job existe UNIQUEMENT pour porter le calcul
+    EcoLogits (`external_api`) sans compter une seconde fois le réseau.
+    `compute_needed`/`ram_needed` volontairement absents (None) : ce job ne
+    consomme aucune ressource du serveur 1st-party auquel il est rattaché
+    (`server_key`, le même que le job de page — jamais un serveur fictif, cf.
+    plan piste 1 sur le double comptage identifié dans l'archétype
+    `ia_streaming.py`), seul EcoLogits calcule la compute du FOURNISSEUR tiers.
+    """
+    if not ai_external_apis:
+        return []
+    jobs = []
+    for host, info in ai_external_apis.items():
+        if not info.get("resolved") or not info.get("model_name"):
+            continue
+        output_tokens = info.get("output_tokens")
+        request_count = sum(
+            1 for e in page_entries
+            if urlparse(e.get("request", {}).get("url", "")).netloc == host
+        )
+        if request_count == 0:
+            continue
+        host_key = re.sub(r"[^a-z0-9]+", "_", host.lower()).strip("_")
+        output_tokens_traced = (
+            measured(output_tokens, "dimensionless", _SRC)
+            if output_tokens is not None
+            else script_default(
+                _DEFAULT_OUTPUT_TOKENS, "dimensionless",
+                comment="Aucune longueur de réponse fournie par l'utilisatrice "
+                        "(question posée à l'Étape 30, sans réponse) : hypothèse "
+                        "par défaut d'une réponse \"moyenne\" (~150 mots).")
+        )
+        jobs.append(JobSpec(
+            key=f"job_ia_{step_index}_{host_key}",
+            server_key=server_key,
+            label=f"Appel IA ({info.get('rule_name') or host})",
+            data_transferred=script_default(
+                0.0, "B",
+                comment="Octets déjà comptés dans le job de page ; ce job ne "
+                        "porte que le calcul EcoLogits (external_api)."),
+            external_api=ExternalApiSpec(
+                provider=info["provider"],
+                model_name=info["model_name"],
+                output_tokens=output_tokens_traced,
+                request_count_per_step=float(request_count),
+            ),
+        ))
+    return jobs
+
+
 def spec_from_env_data(env_data, har_path, audited_domain, *,
                        first_party_extra=(), name=None):
     """Assemble une SiteSpec complète depuis env-data.json + le HAR brut.
@@ -536,6 +617,8 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
     nielsen_raws = [nielsen_raw_seconds(wc) for _, _, _, _, wc in kept if wc is not None]
     factor = recalibration_factor(avg_time_on_page_s, nielsen_raws)
 
+    ai_external_apis = env_data.get("ai_external_apis") or {}
+
     jobs, steps = [], []
     for step_index, url, infra_key, total_bytes, word_count in kept:
         job_key = f"job_{step_index}"
@@ -549,6 +632,15 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
             ram_needed=script_default(50.0, "MB_ram"),
             data_stored=script_default(0.0, "kB_stored"),
         ))
+        step_jobs = {job_key: 1}
+
+        # Appel(s) IA générative tierce détecté(s) sur cette page (piste 1,
+        # cf. plan) : jamais un serveur/job en plus qui doublerait le poids
+        # réseau, cf. docstring de _ai_job_specs_for_step().
+        page_entries = best_by_url[url][2]
+        for ai_job in _ai_job_specs_for_step(step_index, page_entries, ai_external_apis, infra_key):
+            jobs.append(ai_job)
+            step_jobs[ai_job.key] = 1
 
         user_time = step_user_time(word_count, factor) if word_count is not None else None
         step_fields = dict(
@@ -560,7 +652,7 @@ def spec_from_env_data(env_data, har_path, audited_domain, *,
                 "Nielsen inapplicable, défaut de script en attendant une "
                 "mesure de contenu."
             ),
-            jobs={job_key: 1},
+            jobs=step_jobs,
             url=url,
         )
         if word_count is not None:
