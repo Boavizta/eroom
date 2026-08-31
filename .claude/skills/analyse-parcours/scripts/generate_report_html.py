@@ -436,6 +436,12 @@ def _html_head(title):
   h3 {{ font-size: 18px; color: var(--octo-dark); margin: 16px 0 8px; font-weight: bold; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 17px; margin-bottom: 12px; }}
   th {{ background: var(--octo-dark); color: white; padding: 7px 10px; text-align: left; font-size: 16px; }}
+  /* RGAA/WCAG : un lien dans un en-tête sombre ne doit jamais garder le bleu/violet
+     par défaut du navigateur (contraste insuffisant sur --octo-dark) ; blanc = ~14:1
+     de contraste (largement > 4.5:1 exigé), souligné pour rester distinguable sans
+     dépendre de la seule couleur. */
+  th a {{ color: white; text-decoration: underline; }}
+  th a:visited {{ color: white; }}
   td {{ padding: 6px 10px; border-bottom: 1px solid #ddd; }}
   tr:nth-child(even) td {{ background: var(--octo-pale); }}
   tr.alert td {{ background: #ffe0e0; }}
