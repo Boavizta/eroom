@@ -48,3 +48,7 @@ documentation/en cours/
 
 # Fichier settings Claude Code avec espace dans le nom
 .claude/ .json
+
+# Notes de perimetre propres a un audit precis (chiffres de trafic, donnees
+# metier du site audite) : meme logique que le reste d'audits/*, jamais versionne.
+PERIMETRE-CAPTURE.md
