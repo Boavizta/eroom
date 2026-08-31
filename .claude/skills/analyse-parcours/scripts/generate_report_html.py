@@ -641,8 +641,8 @@ def _section_dashboard(page_metrics, cwv):
   <h2>Tableau de bord EcoIndex et CWV (Core Web Vitals)</h2>
   <table>
     <thead><tr>
-      <th>Page</th><th>EcoIndex</th><th>Requêtes</th>
-      <th>Poids</th><th>DOM</th><th>LCP</th><th>INP</th><th>CLS</th>
+      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requêtes</th>
+      <th>Poids</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>
@@ -897,26 +897,13 @@ def _section_cwv(page_metrics, cwv):
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
-    legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center">
+    legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
     <span style="font-weight:bold;color:#555">Légende :</span>
     <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
     <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
     <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
-  </div>
-  <table style="margin-top:10px;font-size:15px;border:none;width:auto">
-    <thead><tr style="background:none">
-      <th style="border:none;text-align:left">Métrique</th>
-      <th style="border:none;color:{STATUS_GOOD}">Bon</th>
-      <th style="border:none;color:{STATUS_WARN}">A améliorer</th>
-      <th style="border:none;color:{STATUS_BAD}">Mauvais</th>
-      <th style="border:none;text-align:left;color:#555">Description</th>
-    </tr></thead>
-    <tbody>
-      <tr><td style="border:none"><b>LCP</b></td><td style="border:none">&lt; 1,8 s</td><td style="border:none">1,8 - 2,5 s</td><td style="border:none">&gt; 2,5 s</td><td style="border:none">Largest Contentful Paint - temps d'affichage du plus grand élément visible</td></tr>
-      <tr><td style="border:none"><b>INP</b></td><td style="border:none">&lt; 200 ms</td><td style="border:none">200 - 500 ms</td><td style="border:none">&gt; 500 ms</td><td style="border:none">Interaction to Next Paint - réactivité aux interactions utilisateur</td></tr>
-      <tr><td style="border:none"><b>CLS</b></td><td style="border:none">&lt; 0,1</td><td style="border:none">0,1 - 0,25</td><td style="border:none">&gt; 0,25</td><td style="border:none">Cumulative Layout Shift - stabilité visuelle (décalages inattendus)</td></tr>
-    </tbody>
-  </table>"""
+    <span style="color:#888">Définitions et seuils : voir le <a href="#glossaire">Glossaire</a> (Annexes)</span>
+  </div>"""
 
     methodo_note = _cwv_methodo_note(cwv)
 
@@ -924,7 +911,7 @@ def _section_cwv(page_metrics, cwv):
   <h2>Core Web Vitals</h2>
   {methodo_note}
   <table>
-    <thead><tr><th>Page</th><th>Appareil</th><th>LCP</th><th>INP</th><th>CLS</th></tr></thead>
+    <thead><tr><th>Page</th><th>Appareil</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
   {legend}
@@ -1160,9 +1147,9 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
     table = f"""<table style="width:100%;border-collapse:collapse;margin-top:10px">
     <thead><tr style="background:#E0F0F4">
       <th style="padding:8px;text-align:left">Page</th>
-      <th style="padding:8px">LCP</th>
-      <th style="padding:8px">INP</th>
-      <th style="padding:8px">CLS</th>
+      <th style="padding:8px">{_glossary_link("LCP")}</th>
+      <th style="padding:8px">{_glossary_link("INP")}</th>
+      <th style="padding:8px">{_glossary_link("CLS")}</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>"""
@@ -1991,13 +1978,40 @@ def _confidence_badge(conf):
     )
 
 
+# Domaines connus -> libellé court affiché dans "(↗ source <nom>)". Le nom du
+# site est TOUJOURS visible dans le lien (jamais un "source" nu qui ne dit pas
+# d'où vient la donnée) ; repli sur le domaine tel quel si non listé ici.
+_SOURCE_DOMAIN_LABELS = {
+    "similarweb.com": "similarweb",
+    "www.similarweb.com": "similarweb",
+    "boavizta.org": "boavizta",
+    "api.boavizta.org": "boavizta",
+    "ecoindex.fr": "ecoindex.fr",
+    "www.ecoindex.fr": "ecoindex.fr",
+    "web.dev": "web.dev",
+    "blog.octo.com": "blog OCTO",
+    "ademe.fr": "ademe",
+    "base-empreinte.ademe.fr": "ademe",
+}
+
+
+def _source_link(url, label=None):
+    """Lien '(↗ source <nom>)' vers une URL de provenance, nom du site déduit
+    du domaine (jamais un "source" nu). Retourne une chaîne vide si url est
+    absent, pour un usage direct en f-string sans test préalable."""
+    if not url:
+        return ""
+    if label is None:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower()
+        label = _SOURCE_DOMAIN_LABELS.get(host, host.removeprefix("www."))
+    return f' (<a href="{url}" target="_blank" rel="noopener">&#8599;&nbsp;source {label}</a>)'
+
+
 def _audience_source_label(label, url):
-    """Libellé de source du mix pays d'audience, suffixé d'un lien standard
-    ("↗ source") vers l'URL de provenance (ex. page SimilarWeb) si fournie."""
-    if url:
-        return (f'{label} (<a href="{url}" target="_blank" rel="noopener">'
-                f'&#8599;&nbsp;source</a>)')
-    return label
+    """Libellé de source du mix pays d'audience, suffixé d'un lien lisible
+    ("↗ source similarweb") vers l'URL de provenance si fournie."""
+    return f'{label}{_source_link(url)}' if url else label
 
 
 def _instance_type_row(hyp):
@@ -2022,10 +2036,7 @@ def _instance_type_row(hyp):
     if not source_text:
         return value, "unjustified"
 
-    label = source_text
-    if source_url:
-        label = (f'{label} (<a href="{source_url}" target="_blank" rel="noopener">'
-                 f'&#8599;&nbsp;source</a>)')
+    label = f'{source_text}{_source_link(source_url)}'
     return f'{value} <span style="color:#888;font-size:0.85em">— {label}</span>', "medium"
 
 
@@ -2047,9 +2058,7 @@ def _traffic_source_label(traffic):
     label = source
     if snapshot:
         label = f'{label}, {snapshot}'
-    if url:
-        label = (f'{label} (<a href="{url}" target="_blank" rel="noopener">'
-                 f'&#8599;&nbsp;source</a>)')
+    label = f'{label}{_source_link(url)}'
     return label
 
 
@@ -2154,7 +2163,7 @@ def _section_tech(tech_stack):
             f'<h4 style="margin:20px 0 8px">Hôtes tiers ({len(third_party)})</h4>'
             f'<p style="font-size:14px;color:#666;margin:0 0 6px">Domaines distincts '
             f'du domaine principal sollicités lors du chargement (scripts, polices, '
-            f'analytics, CDN externes).</p>'
+            f'analytics, {_glossary_link("CDN")} externes).</p>'
             f'<ul style="list-style:none;padding:0;margin:0">{tp_items}</ul>'
         )
 
@@ -2610,7 +2619,7 @@ def _section_efootprint(results, topology_svg=None):
   </div>"""
 
     return f"""<section id="efootprint">
-  <h2>Impact environnemental (estimation CO2e)</h2>
+  <h2>Impact environnemental (estimation {_glossary_link("CO2e")})</h2>
   {synthese_html}
   <p style="font-size:16px;color:#555;margin-bottom:8px">
     Estimation via la librairie <a href="https://github.com/Boavizta/e-footprint" target="_blank" rel="noopener">e-footprint</a> (Boavizta).
@@ -2806,7 +2815,7 @@ def _methodo_efootprint(synthese_python):
                    f'<td style="padding:5px 8px">{pct(mac_w)}</td></tr>')
         src = hyp.get("audience_source", "default")
         src_url = hyp.get("audience_source_url")
-        _src_link = f' (<a href="{src_url}" target="_blank" rel="noopener">&#8599;&nbsp;source</a>)' if src_url else ""
+        _src_link = _source_link(src_url)
         caveat = ""
         if isinstance(src, str) and "similarweb" in src.lower():
             caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
@@ -2881,9 +2890,7 @@ def _methodo_efootprint(synthese_python):
         total_recal = rt.get("total_recalibrated_s")
         avg_swb = rt.get("avg_time_on_page_s")
         if rt.get("recalibrated"):
-            _swb_url = traffic.get("source_url")
-            _swb_link = (f' (<a href="{_swb_url}" target="_blank" rel="noopener">'
-                         f'&#8599;&nbsp;source</a>)') if _swb_url else ""
+            _swb_link = _source_link(traffic.get("source_url"))
             recal_note = (
                 f'Le brut ({total_raw:.0f} s cumulés, formule Nielsen seule) est <b>recalé</b> par un '
                 f'facteur unique <b>{factor:.3f}</b> = temps moyen SimilarWeb{_swb_link} par page vue '
@@ -2948,7 +2955,9 @@ def _methodo_efootprint(synthese_python):
         '</ul>'
     )
 
-    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental (CO2e)</h3>'
+    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental ({_glossary_link("CO2e")})</h3>'
+            f'<p style="font-size:16px;color:#555;margin-bottom:8px">Ce n\'est pas une {_glossary_link("ACV")} '
+            f'complète : e-footprint ne modélise que 2 phases (fabrication + usage), pas le transport ni la fin de vie.</p>'
             f'{table}{audience_html}{scenarios_html}{har_facts_html}{reading_html}{methods}')
 
 
@@ -2967,8 +2976,8 @@ def _methodo_cwv(cwv):
         '<h3 id="methodo-cwv" style="margin-top:20px">B. Core Web Vitals</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         f'<li><b>Sources présentes :</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
-        '<li><b>CrUX = terrain Chrome.</b> Les données "terrain" proviennent du champ '
-        '<code>loadingExperience</code> de la réponse PageSpeed Insights (percentiles P75 '
+        f'<li><b>{_glossary_link("CrUX")} = terrain Chrome.</b> Les données "terrain" proviennent du champ '
+        f'<code>loadingExperience</code> de la réponse PageSpeed Insights ({_glossary_link("P75")} '
         'des utilisateurs Chrome réels) : ce n\'est PAS un appel dédié à l\'API CrUX.</li>'
         '<li><b>Limite iOS/Safari.</b> Comme le mix appareils, le terrain CrUX ne couvre '
         'que Chrome ; les utilisateurs iOS/Safari ne sont pas représentés.</li>'
@@ -2995,7 +3004,7 @@ def _methodo_cwv(cwv):
 def _methodo_ecoindex():
     """Sous-section C : formule EcoIndex."""
     return (
-        '<h3 id="methodo-ecoindex" style="margin-top:20px">C. EcoIndex / GreenIT</h3>'
+        f'<h3 id="methodo-ecoindex" style="margin-top:20px">C. {_glossary_link("EcoIndex")} / {_glossary_link("GreenIT")}</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Formule (cnumr/ecoindex_reference) :</b> '
         '<code>score = 100 − 5 × (3·q_DOM + 2·q_req + q_poids) / 6</code>, '
@@ -3046,9 +3055,7 @@ def _methodo_trafic(synthese_python=None):
         src_txt = source
         if snapshot:
             src_txt += f', {snapshot}'
-        if url:
-            src_txt += (f' (<a href="{url}" target="_blank" rel="noopener">'
-                        f'&#8599;&nbsp;source</a>)')
+        src_txt += _source_link(url)
         derivation = ""
         if monthly and visits:
             derivation = (f' Dérivation : {monthly:,}/mois × 12 ≈ {visits:,}/an.')
@@ -3106,6 +3113,80 @@ def _section_methodologie(synthese_python, cwv):
         'Cette annexe recense, par domaine, les données et hypothèses entrant dans '
         'chaque calcul (valeur, source, niveau de confiance) ainsi que les méthodes appliquées.</p>\n'
         f'{body}\n'
+        '</section>'
+    )
+
+
+def _glossary_link(acronym):
+    """Lien vers l'entrée du glossaire (Annexes) pour un acronyme donné, à
+    poser sur les en-têtes de tableau et la première mention de chaque
+    section — pas à chaque occurrence (cf. décision : un terme n'est pas
+    réexpliqué à chaque phrase, comme un lien Wikipédia une fois par article)."""
+    slug = acronym.lower()
+    return f'<a href="#glossaire-{slug}" title="Voir la définition dans le Glossaire">{acronym}</a>'
+
+
+# (acronyme, nom complet + définition courte, seuils optionnels, url source optionnelle)
+_GLOSSARY_ENTRIES = [
+    ("LCP", "Largest Contentful Paint : temps d'affichage du plus grand élément visible de la page.",
+     "< 1,8 s bon · 1,8-2,5 s à améliorer · > 2,5 s mauvais", "https://web.dev/articles/vitals"),
+    ("INP", "Interaction to Next Paint : délai entre une interaction utilisateur et la mise à jour visuelle qui en résulte.",
+     "< 200 ms bon · 200-500 ms à améliorer · > 500 ms mauvais", "https://web.dev/articles/vitals"),
+    ("CLS", "Cumulative Layout Shift : somme des décalages visuels inattendus pendant le chargement de la page.",
+     "< 0,1 bon · 0,1-0,25 à améliorer · > 0,25 mauvais", "https://web.dev/articles/vitals"),
+    ("EcoIndex", "Score d'éco-conception 0 à 100 (grade A à G), calculé depuis le nombre de requêtes, "
+     "le poids transféré et la taille du DOM d'une page (formule GreenIT-Analysis / cnumr).",
+     "≥ 80 = A · ≥ 55 = C · < 25 = F/G", "https://www.ecoindex.fr/comment-ca-marche/"),
+    ("GreenIT", "GreenIT-Analysis : méthodologie et outil de référence pour mesurer l'écoconception d'un "
+     "site web, à l'origine de la formule EcoIndex utilisée dans ce rapport.",
+     "", "https://www.ecoindex.fr/comment-ca-marche/"),
+    ("DOM", "Document Object Model : l'arborescence de la page telle que le navigateur la construit à "
+     "partir du HTML (chaque balise devient un nœud).", "", ""),
+    ("HAR", "HTTP Archive : format d'export du trafic réseau capturé par les outils de développement du "
+     "navigateur (onglet Réseau), source de toutes les mesures de ce rapport.", "", ""),
+    ("CDN", "Content Delivery Network : réseau de serveurs répartis géographiquement qui mettent en "
+     "cache et livrent le contenu au plus près de l'utilisateur.", "", ""),
+    ("CrUX", "Chrome UX Report : données de performance réelles agrégées par Google auprès des "
+     "utilisateurs Chrome (percentiles sur les 28 derniers jours), par opposition aux mesures « lab ».", "", ""),
+    ("P75", "75ᵉ percentile : valeur sous laquelle se situent 75 % des mesures collectées "
+     "(25 % des visiteurs vivent donc une expérience moins bonne que ce chiffre).", "", ""),
+    ("TTFB", "Time To First Byte : délai d'attente entre l'envoi de la requête et la réception du "
+     "premier octet de réponse du serveur.", "", ""),
+    ("PUE", "Power Usage Effectiveness : ratio d'efficacité énergétique d'un datacenter (énergie totale "
+     "consommée ÷ énergie utilisée par les seuls serveurs). Plus proche de 1 = plus efficace.", "", ""),
+    ("ACV", "Analyse de Cycle de Vie : méthode normalisée (ISO 14040/14044) évaluant l'impact "
+     "environnemental d'un produit sur toutes ses phases. La bibliothèque e-footprint utilisée ici n'en "
+     "modélise que deux (fabrication + usage), voir l'annexe Méthodologie A.", "", ""),
+    ("CO2e", "CO2 équivalent : unité qui convertit l'ensemble des gaz à effet de serre émis en un seul "
+     "indicateur comparable, selon leur pouvoir de réchauffement global.", "", ""),
+]
+
+
+def _section_glossaire():
+    """Glossaire centralisé de tous les acronymes du rapport, une seule
+    définition par terme (référencée par lien depuis les en-têtes de tableau
+    et la première mention de chaque section, jamais réexpliquée en clair
+    plusieurs fois — sinon le rapport devient illisible pour les termes très
+    répétés comme HAR ou CO2e)."""
+    rows = ""
+    for acro, defi, seuils, url in _GLOSSARY_ENTRIES:
+        rows += (
+            f'<tr id="glossaire-{acro.lower()}">'
+            f'<td style="white-space:nowrap"><b>{acro}</b></td>'
+            f'<td>{defi}{_source_link(url)}</td>'
+            f'<td style="color:#555;font-size:15px">{seuils}</td>'
+            f'</tr>'
+        )
+    return (
+        '<section id="glossaire">\n'
+        '<h2>Glossaire</h2>\n'
+        '<p style="font-size:16px;color:#555;margin-bottom:8px">'
+        'Chaque acronyme n\'est défini qu\'ici : les tableaux et le texte du rapport y renvoient '
+        'par un lien plutôt que de répéter la définition à chaque occurrence.</p>\n'
+        '<table>\n'
+        '<thead><tr><th>Terme</th><th>Définition</th><th>Seuils</th></tr></thead>\n'
+        f'<tbody>{rows}</tbody>\n'
+        '</table>\n'
         '</section>'
     )
 
@@ -3233,9 +3314,9 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         n = len(items)
         js_note = " (code mort JS > 60 % identifié)" if _has_heavy_js else ""
         return (
-            f"<strong>Réduire le LCP</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Réduire le {_glossary_link('LCP')}</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
-            f"Causes probables : image hero non préchargée, JS bloquant le rendu{js_note}, TTFB élevé.<br>"
+            f"Causes probables : image hero non préchargée, JS bloquant le rendu{js_note}, {_glossary_link('TTFB')} élevé.<br>"
             f"Actions : ajouter <code>&lt;link rel=\"preload\"&gt;</code> sur l'image hero &middot; "
             f"passer le JS non critique en <code>defer</code>/<code>async</code> &middot; "
             f"analyser le TTFB avec WebPageTest.<br>"
@@ -3249,7 +3330,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         n = len(items)
         signal = _cwv_reco_signal_html("inp", traffic, greenit, coverage_by_page)
         return (
-            f"<strong>Réduire l'INP</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Réduire l'{_glossary_link('INP')}</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
             f"Causes probables : long tasks JS, thread principal saturé lors des interactions.<br>"
             f"Actions : découper les tâches longues (&gt; 50 ms) &middot; "
@@ -3264,7 +3345,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         n = len(items)
         signal = _cwv_reco_signal_html("cls", traffic, greenit, coverage_by_page)
         return (
-            f"<strong>Corriger les décalages de mise en page (CLS)</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Corriger les décalages de mise en page ({_glossary_link('CLS')})</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
             f"Causes probables : images ou iframes sans dimensions explicites, polices web sans size-adjust.<br>"
             f"Actions : définir <code>width</code>/<code>height</code> sur les médias &middot; "
@@ -3291,16 +3372,16 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     # EcoIndex < 40 → priorité 1
     for m in page_metrics:
         if m["ecoindex"] < 40:
-            prio1.append(f"<b>{m['title'][:40]}</b> : EcoIndex {m['ecoindex']}/100 (grade {m['grade']}) - optimisation urgente")
+            prio1.append(f"<b>{m['title'][:40]}</b> : {_glossary_link('EcoIndex')} {m['ecoindex']}/100 (grade {m['grade']}) - optimisation urgente")
         elif m["ecoindex"] < 55:
-            prio2.append(f"<b>{m['title'][:40]}</b> : EcoIndex {m['ecoindex']}/100 (grade {m['grade']}) - à améliorer")
+            prio2.append(f"<b>{m['title'][:40]}</b> : {_glossary_link('EcoIndex')} {m['ecoindex']}/100 (grade {m['grade']}) - à améliorer")
 
     # DOM élevé
     for m in page_metrics:
         if m["dom"] > 1500:
-            prio1.append(f"DOM {m['dom']} éléments sur <b>{m['title'][:30]}</b> - réduire les composants inactifs")
+            prio1.append(f"{_glossary_link('DOM')} {m['dom']} éléments sur <b>{m['title'][:30]}</b> - réduire les composants inactifs")
         elif m["dom"] > 800:
-            prio2.append(f"DOM {m['dom']} éléments sur <b>{m['title'][:30]}</b> - évaluer les composants superflus")
+            prio2.append(f"{_glossary_link('DOM')} {m['dom']} éléments sur <b>{m['title'][:30]}</b> - évaluer les composants superflus")
 
     # Doublons
     if traffic["duplicates"]:
@@ -3563,6 +3644,7 @@ def generate(audit_dir, output_path=None):
     if has_tech:
         annexe_sections.append(("stack-technique", "Stack technique"))
     annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
+    annexe_sections.append(("glossaire", "Glossaire"))
 
     has_medias = bool((greenit or {}).get("media", {}).get("video", {}).get("count") or
                        (greenit or {}).get("media", {}).get("pdf", {}).get("count"))
@@ -3608,7 +3690,7 @@ def generate(audit_dir, output_path=None):
   <div class="meta">
     Date : {today} &nbsp;|&nbsp;
     {nb_pages} page(s) analysée(s) &nbsp;|&nbsp;
-    HAR : {har_path.name} &nbsp;|&nbsp;
+    <a href="#glossaire-har" title="Voir la définition dans le Glossaire" style="color:inherit;text-decoration:underline">HAR</a> : {har_path.name} &nbsp;|&nbsp;
     Coverage : {len(cov_files)} fichier(s)
   </div>
 </header>
@@ -3640,8 +3722,11 @@ def generate(audit_dir, output_path=None):
         # Numéro dérivé de la position dans annexe_sections (robuste à la présence de cwv)
         tech_num = f"A.{[sid for sid, _ in annexe_sections].index('stack-technique') + 1}"
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_tech(tech_stack), tech_num)}</div>\n'
-    methodo_num = f"A.{len(annexe_sections)}"  # methodologie est le dernier élément d'annexe_sections
+    _annexe_ids = [sid for sid, _ in annexe_sections]
+    methodo_num = f"A.{_annexe_ids.index('methodologie') + 1}"
+    glossaire_num = f"A.{_annexe_ids.index('glossaire') + 1}"
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv), methodo_num)}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), glossaire_num)}</div>\n'
     html += '</section>\n'
 
     html += "</main>\n"
@@ -3656,7 +3741,7 @@ def generate(audit_dir, output_path=None):
       <p style="margin:0.3rem 0;"><strong>Tokens :</strong> <span data-cost-field="tokens">—</span></p>
       <p style="margin:0.3rem 0;"><strong>CO2e estimé :</strong> <span data-cost-field="co2e">—</span></p>
       <p style="margin:0.3rem 0;font-size:0.9rem;color:#666;"><span data-cost-field="ratio-co2e"></span></p>
-      <p style="margin:0.75rem 0 0 0;font-size:0.8rem;font-style:italic;opacity:0.75;">CO2e estimé à partir des tokens de calcul (input + output + cache creation, hors lecture de cache) : 0,3-1,0 Wh/1000 tokens (Epoch AI 2025, Google Cloud août 2025), PUE 1,1-1,3, intensité carbone électrique 450-480 gCO2/kWh (moyenne mondiale, IEA). Fourchette large car aucune donnée publique précise sur l'infrastructure de calcul réelle de la session ; ordre de grandeur, pas une mesure.</p>
+      <p style="margin:0.75rem 0 0 0;font-size:0.8rem;font-style:italic;opacity:0.75;">CO2e estimé à partir des tokens de calcul (input + output + cache creation, hors lecture de cache) : 0,3-1,0 Wh/1000 tokens (Epoch AI 2025, Google Cloud août 2025), {_glossary_link("PUE")} 1,1-1,3, intensité carbone électrique 450-480 gCO2/kWh (moyenne mondiale, IEA). Fourchette large car aucune donnée publique précise sur l'infrastructure de calcul réelle de la session ; ordre de grandeur, pas une mesure.</p>
       <p style="margin:0.3rem 0;font-size:0.85rem;color:#888;"><strong>Fichiers sources :</strong> {har_path.name}, {len(cov_files)} fichier(s) Coverage</p>
     </details>
   </div>
