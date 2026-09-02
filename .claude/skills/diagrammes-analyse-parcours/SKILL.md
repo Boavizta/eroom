@@ -26,6 +26,7 @@ version: 1.0.0
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 | e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
 | e-footprint — topologie d'un site (composants) | GÉNÉRÉ à la demande, pas de `.puml` fixe en dépôt | variable (dépend du site/archétype demandé) | `efootprint_model/to_plantuml.py::site_to_plantuml()` (lit une `SiteSpec`) | jamais à régénérer soi-même : ce diagramme se produit en appelant `site_to_plantuml(spec)` sur la spec du moment, cf. section dédiée ci-dessous. Depuis l'Étape 25 du skill efootprint, produit AUSSI systématiquement (pas seulement à la demande ponctuelle), via `run_efootprint.py::build_topology_overview()`. Les hôtes tiers annotés d'une suspicion BDD/streaming/IA (`efootprint_model/topology_overview.py`) affichent leur note dans le label du composant. |
+| EOF — pipeline outils (activité, 2 pages) | `eof-pipeline-outils.puml` (contient 2 diagrammes : `eof-pipeline-outils` + `eof-radar-svg`) | `eof-pipeline-outils.pdf` (2 pages) | `.claude/skills/eof/scripts/build_template.py` (page 1 : récupération gviz + construction du Markdown) + `.claude/skills/eof/scripts/generate_radar_svg.py` (page 2, pipeline indépendant) | l'un des 2 scripts change ses entrées/sorties, ou la liste des `gid`/onglets de la Google Sheet source change |
 
 Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
 
@@ -792,6 +793,52 @@ nom d'archétype avec préfixe fictif) donnerait un nom de fichier fragile selon
 plateforme. `to_plantuml.py` sépare donc l'IDENTIFIANT technique (`@startuml <id>`, ASCII
 strict, dérivé du nom du site) du TITRE AFFICHÉ (ligne `title`, accents et espaces
 conservés) : c'est l'identifiant, pas le titre, qui détermine le nom du fichier de sortie.
+
+-----
+
+## Diagramme 5 — EOF (pipeline outils, 2 pages)
+
+**Source de vérité :** `.claude/skills/eof/scripts/build_template.py` (page 1) et
+`.claude/skills/eof/scripts/generate_radar_svg.py` (page 2) — code réel des scripts,
+comme le diagramme 3 (pas de doc markdown intermédiaire pour les entrées/sorties
+précises).
+
+### Description
+
+Skill séparé de `analyse-parcours` (référentiel EOF-V.1.1, EROOM Optimization
+Framework). Deux pipelines représentés dans UN SEUL fichier `.puml` contenant 2
+diagrammes d'activité (2 blocs `@startuml`/`@enduml`) :
+
+- **Page 1 (`eof-pipeline-outils`)** : récupération des 9 onglets de la Google
+  Sheet source via l'API `gviz` (un `gid` par onglet — les exports CSV/XLSX
+  classiques échouent, redirection à jeton à usage unique), puis construction du
+  template Markdown vierge par `build_template.py` (3 formats d'évaluation
+  différents selon l'onglet : échelle 1-5, menu à 5 choix, menu à 3 choix propre
+  à "Facilité de changement").
+- **Page 2 (`eof-radar-svg`)** : `generate_radar_svg.py`, INDÉPENDANT de la page 1
+  (ne consomme pas sa sortie) — calcule un radar SVG par trigonométrie pure,
+  sans bibliothèque de graphique.
+
+### Commandes
+
+```bash
+plantuml -tsvg documentation/diagramme/eof-pipeline-outils.puml
+rsvg-convert -f pdf -o documentation/diagramme/eof-pipeline-outils.pdf \
+  documentation/diagramme/eof-pipeline-outils.svg \
+  documentation/diagramme/eof-radar-svg.svg
+ls -lh documentation/diagramme/eof-pipeline-outils.pdf
+open documentation/diagramme/eof-pipeline-outils.pdf
+```
+
+### Piège rencontré à la vérification
+
+Un rendu PNG rapide via `rsvg-convert -w <largeur> fichier.svg -o fichier.png` (sans
+option de fond) affiche un fond NOIR même quand le `.puml` porte
+`skinparam backgroundColor #FFFFFF` : PlantUML écrit ce blanc comme un style CSS
+(`style="...background:#FFFFFF;"`) sur la balise `<svg>` racine, que `rsvg-convert`
+ignore par défaut en conversion PNG (zones transparentes rendues noires). Le SVG et
+le PDF finaux sont corrects (vérifié en ouvrant le vrai PDF) — pour une vérification
+PNG fidèle, forcer le fond explicitement : `rsvg-convert -b white ...`.
 
 -----
 

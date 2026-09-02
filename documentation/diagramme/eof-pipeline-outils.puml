@@ -1,0 +1,126 @@
+@startuml eof-pipeline-outils
+title Skill EOF (EROOM Optimization Framework) — Pipeline outils
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+  DiamondBackgroundColor #E0F0F4
+  DiamondBorderColor #5BA1BC
+}
+skinparam ArrowColor #5BA1BC
+skinparam ActivityBarColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam PartitionBackgroundColor #ECECF2
+skinparam PartitionBorderColor #5BA1BC
+
+start
+
+:Source — Google Sheet publique
+"EOF-V.1.1 (EROOM Optimization Framework)"
+9 onglets, 1 gid par onglet;
+
+note right
+  Endpoints d'export classiques (CSV/XLSX)
+  échouent ici : redirection 307 vers une URL
+  signée à usage unique, invalide en appel séparé.
+  Seule la voie gviz fonctionne, un onglet à la fois.
+end note
+
+partition "**Bloc 1 — Récupération** (9 appels, un par onglet)" {
+  :curl gviz/tq?tqx=out:json&gid=<gid>
+  x9 (À LIRE, Diagnostic rapide,
+  6 piliers, Synthèse)
+  -> tmp/eof-gviz/*.json;
+}
+
+note right #C8E6C9
+  Champ "f" (formaté) préféré à "v" (brut) :
+  contourne un bug de mise en forme du Sheet
+  source (IDs de critère stockés comme des
+  dates sur 3 onglets, ex. 3.1 -> Date(2025,0,3)).
+end note
+
+partition "**Bloc 2 — build_template.py** (déterministe, aucun calcul LLM)" {
+  :Parser les 9 JSON;
+  :Onglet 0 — Diagnostic rapide
+  Évaluation = échelle 1 à 5
+  (5 crans texte par critère);
+  :Onglets 1 à 5 — Produit, Architecture,
+  Infrastructure, Stockage, Algo & Code
+  Évaluation = 5 choix catégoriels
+  (Point fort / Potentiel identifié /
+  Non applicable / À évaluer / En cours);
+  :Onglet 6 — Facilité de changement
+  Évaluation = 3 choix DIFFÉRENTS
+  (Facile / Effort modéré / Difficile);
+  :Injecter 3 liens hypertexte + 2 logos
+  (récupérés une fois depuis l'Excel fourni,
+  gviz seul ne les fournit pas);
+  :Générer le sommaire + la section Synthèse
+  (formule de score documentée en texte,
+  aucun score chiffré : template vierge);
+  -> EOF-V.1.1 ... Référentiel complet.md;
+}
+
+note right
+  Aucune case n'est pré-cochée.
+  Seul "Niveau d'impact" affiche la valeur
+  fixe du référentiel (donnée, pas une
+  réponse à donner).
+end note
+
+:livrer le template Markdown vierge;
+
+stop
+
+@enduml
+
+@startuml eof-radar-svg
+title Skill EOF — generate_radar_svg.py (indépendant du Bloc 2)
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam ActivityBarColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam PartitionBackgroundColor #ECECF2
+skinparam PartitionBorderColor #5BA1BC
+
+start
+
+:Entrée : liste (catégorie, valeur 0-100)
+— fictive pour un test, réelle une fois
+un audit rempli (ex. octo.com, à venir);
+
+partition "**generate_radar_svg.py::radar_svg()**" {
+  :Calculer les coordonnées par trigonométrie
+  (cos/sin, 1 axe tous les 360°/n);
+  :Dessiner la grille — vrais cercles
+  0/25/50/75/100 % (pas des hexagones);
+  :Dessiner le polygone de données
+  (lignes droites entre les points,
+  bleu marine #2D4675, contraste ~9,35:1);
+  :Échapper le texte (xml.sax.saxutils.escape)
+  — un "&" brut casse le rendu SVG;
+}
+
+note right #C8E6C9
+  Bug trouvé et corrigé en cours de route :
+  "Stockage & Données" non échappé cassait
+  le parsing XML, tronquant tout le rendu
+  après ce label dans certains navigateurs.
+end note
+
+:-> fichier .svg;
+
+stop
+
+@enduml
