@@ -26,6 +26,15 @@ PILLAR_TABS = [
     ("facilite", "🛠 6 — Facilité de changement"),
 ]
 
+# Ordre de LECTURE du template vierge (sommaire + corps), distinct de
+# PILLAR_TABS ci-dessus : 0 - Diagnostic rapide (avant, hors liste) → 6 -
+# Facilité de changement en premier (préalable pratique : est-il seulement
+# possible d'agir ?) → puis 1,2,3,4,5 dans l'ordre du référentiel. Ne
+# s'applique qu'à ce fichier de sortie humain : PILLAR_TABS et
+# build_referentiel_json() gardent l'ordre canonique 1..6 (consommé par
+# run_eof.py côté eof-audit/analyse-parcours, hors scope de ce changement).
+PILLAR_TABS_TEMPLATE_ORDER = [PILLAR_TABS[5]] + PILLAR_TABS[0:5]
+
 # Dropdown observé sur les onglets piliers (5 valeurs, cf. relevé empirique
 # sur les 6 onglets). Correspondance numérique observée (score brut avant
 # pondération) :
@@ -345,7 +354,7 @@ def main():
         ("À lire", "à-lire"),
         ("0 — Diagnostic rapide", "0--diagnostic-rapide"),
     ]
-    for key, title in PILLAR_TABS:
+    for key, title in PILLAR_TABS_TEMPLATE_ORDER:
         anchor = title.lower()
         anchor = re.sub(r"[^\w\s-]", "", anchor).strip().replace(" ", "-")
         toc_items.append((title, anchor))
@@ -360,7 +369,7 @@ def main():
     parts.append("\n-----\n")
     parts.append(apply_hyperlink(build_diag_rapide(json_dir), "diag-rapide"))
     parts.append("\n-----\n")
-    for key, title in PILLAR_TABS:
+    for key, title in PILLAR_TABS_TEMPLATE_ORDER:
         parts.append(apply_hyperlink(build_pillar(json_dir, key, title), key))
         parts.append("\n-----\n")
     parts.append(build_synthese(json_dir, criteria_counts))

@@ -2324,6 +2324,24 @@ def _section_efootprint(results, topology_svg=None):
     <tbody>{_breakdown_rows(ener, 4)}</tbody>
   </table>"""
 
+    # Storage (fabrication) n'est pas une mesure de volume de données : sous 1 To,
+    # e-footprint/Boavizta n'a aucune résolution (tout stockage non nul est arrondi à
+    # un disque entier de 1 To). Ce poste reflète le nombre de serveurs déclarés, pas
+    # une donnée d'audit sur les pratiques de stockage (cf. dimension EOF 4, évaluée
+    # séparément). Décision actée dans tmp/handoff-2026-08-06-efootprint-fourchettes.md
+    # (section C.3), jamais écrite dans le rapport avant ce jour.
+    storage_caveat_html = ""
+    if fab.get("Storage", 0) > 0:
+        storage_caveat_html = f"""
+  <p style="font-size:14px;color:#888;margin:8px 0 0">
+    Le poste <b>Storage</b> ci-dessus ({fab.get("Storage", 0):.2f} kg) ne mesure pas un
+    volume de données : sous 1 To, e-footprint n'a aucune résolution (tout stockage
+    non nul est arrondi à un disque entier de 1 To côté Boavizta). Ce chiffre reflète
+    le nombre de serveurs déclarés, pas les pratiques réelles de gestion des données
+    (archivage, doublons, bases de test...) — voir la dimension EOF "4 — Stockage et
+    données", évaluée indépendamment de ce calcul.
+  </p>"""
+
     # Tableau des hypothèses
     # LOT 1 : page_weight_kb = poids TRANSFÉRÉ (réseau réel) si dispo ; on affiche le
     # décompressé en repère quand les deux diffèrent (env-data >= 1.4).
@@ -2365,7 +2383,8 @@ def _section_efootprint(results, topology_svg=None):
     hyp_rows += [
         ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
         ("Trafic annuel estimé",            f'{visits:,} visites',                       _traffic_source_label(traffic)),
-        ("Stockage serveur",                f'{hyp.get("storage_gb", 50)} GB',           "default_script"),
+        ("Stockage serveur (nb. serveurs déclarés, pas un volume de données — voir plus bas)",
+         f'{hyp.get("storage_gb", 50)} GB',           "default_script"),
     ]
     hyp_html = "".join(
         f'<tr>'
@@ -2563,6 +2582,14 @@ def _section_efootprint(results, topology_svg=None):
                    "temps de lecture Nielsen : recalé (mesure SimilarWeb) ↔ brut")}
     </tbody>
   </table>"""
+        if fab.get("Storage", 0) > 0:
+            ranges_html += (
+                '\n  <p style="font-size:14px;color:#888;margin:8px 0 0">'
+                "Le stockage (storage_gb) n'apparaît volontairement pas comme un 3e axe "
+                "ici : sous 1 To, e-footprint n'a aucune résolution (voir plus haut et "
+                "annexe méthodologique) — une fourchette sur ce paramètre serait fermée "
+                "ou artificielle, pas une vraie incertitude mesurée.</p>"
+            )
 
     # Cohérence CDN/tiers vs IA générative (tranché Lot 7) : affiché seulement si ce
     # site a au moins un appel IA générative (poste ExternalAPIs non nul), sinon la
@@ -2672,6 +2699,7 @@ def _section_efootprint(results, topology_svg=None):
       {ener_table}
     </div>
   </div>
+  {storage_caveat_html}
   {cdn_ia_html}
   {weight_composition}
   {steps_block}
@@ -2760,6 +2788,13 @@ def _section_eof(results, radar_svg_text=None):
     de 3.3, voir ci-dessous). À évaluer humainement dans le template du skill
     <code>eof</code>.
   </p>
+  <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;margin:12px 0;border-radius:4px">
+    <b>&#9888; Un préalable, pas un bonus</b><br>
+    Le référentiel EOF est formel : si le score de ce diagnostic est très
+    faible, il n’est pas nécessaire de poursuivre le détail des 6 dimensions
+    ci-dessous. Le potentiel d’optimisation est soit déjà faible, soit trop
+    coûteux à atteindre. À évaluer humainement AVANT de lire la suite.
+  </div>
   <ul style="font-size:14px;color:#555;columns:2;column-gap:24px">{diag_rows}</ul>"""
 
     # KPIs en tête, scopés aux 54 critères détaillés uniquement (décision du 2026-09-03)
@@ -2790,6 +2825,7 @@ def _section_eof(results, radar_svg_text=None):
     {radar_svg_text}
   </div>"""
 
+    criteres_list = results.get("criteres", [])
     dim_rows = ""
     for d in dimensions:
         score_txt = f"{d['score_pct']:.0f}%" if d.get("score_pct") is not None else '<span style="color:#888">sans donnée</span>'
@@ -2800,6 +2836,20 @@ def _section_eof(results, radar_svg_text=None):
             f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{score_txt}</td>'
             f'</tr>'
         )
+        # Avec 1 seul critère répondu, score_pct est mathématiquement forcé à 0%
+        # ou 100% (moyenne d'un seul terme) : préciser sur quel critère il repose,
+        # sinon le % donne une fausse impression de verdict global (cf. plan).
+        if d.get("repondus") == 1:
+            matched = next(
+                (c for c in criteres_list if c.get("dimension") == d["nom"] and c.get("reponse")),
+                None,
+            )
+            if matched:
+                dim_rows += (
+                    f'<tr><td colspan="3" style="padding:0 8px 10px;font-size:13px;color:#888">'
+                    f'(basé sur {matched["id"]} — {matched["critere"]} → {matched["reponse"]})'
+                    f'</td></tr>'
+                )
     dim_table = f"""<table style="width:100%;border-collapse:collapse;margin-top:12px">
     <thead><tr style="background:{OCTO_PALE}">
       <th style="padding:6px 8px;text-align:left">Dimension</th>
@@ -2832,8 +2882,29 @@ def _methodo_eof(results):
     sans aucune donnée, pas seulement le résumé optimiste du corps."""
     if not results:
         return ""
+    dims_by_nom = {d["nom"]: d for d in results.get("dimensions", [])}
     rows = ""
+    last_dimension = None
     for c in results.get("criteres", []):
+        dimension = c.get("dimension")
+        emoji = dimension.split(" ", 1)[0] if dimension else ""
+        if dimension != last_dimension:
+            d = dims_by_nom.get(dimension, {})
+            repondus, dim_total = d.get("repondus", 0), d.get("total", 0)
+            pct = (repondus / dim_total * 100) if dim_total else 0
+            bar = (
+                f'<div style="background:#e0e0e0;border-radius:3px;height:10px;width:120px;'
+                f'display:inline-block;vertical-align:middle;margin-left:10px;overflow:hidden">'
+                f'<div style="background:{OCTO_BLUE};height:100%;width:{pct:.0f}%"></div>'
+                f'</div>'
+            )
+            rows += (
+                f'<tr><td colspan="5" style="padding:10px 8px 6px;background:{OCTO_PALE};font-weight:bold">'
+                f'{dimension}{bar} '
+                f'<span style="font-weight:normal;font-size:13px;color:#555">{repondus}/{dim_total}</span>'
+                f'</td></tr>'
+            )
+            last_dimension = dimension
         if c["reponse"]:
             valeur = c["reponse"]
             source = c.get("source") or "—"
@@ -2849,7 +2920,7 @@ def _methodo_eof(results):
         src_html = _confidence_badge(conf) if conf else '<span style="color:#aaa">—</span>'
         rows += (
             f'<tr>'
-            f'<td style="padding:5px 8px;white-space:nowrap">{c["id"]}</td>'
+            f'<td style="padding:5px 8px;white-space:nowrap">{emoji} {c["id"]}</td>'
             f'<td style="padding:5px 8px">{c["critere"]}</td>'
             f'<td style="padding:5px 8px">{valeur}</td>'
             f'<td style="padding:5px 8px">{src_html}</td>'
@@ -2977,7 +3048,10 @@ def _methodo_efootprint(synthese_python):
     rows.append(("Réseau (déduit du mix appareils)",
                  "mobile → réseau mobile ; desktop → wifi",
                  "déduit du mix appareils"))
-    rows.append(("Stockage serveur", f'{hyp.get("storage_gb", 50)} GB', "default_script"))
+    rows.append((
+        "Stockage serveur (nb. serveurs déclarés, pas un volume de données : sous "
+        "1 To, e-footprint n'a aucune résolution)",
+        f'{hyp.get("storage_gb", 50)} GB', "default_script"))
     rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default_efootprint"))
 
     table = _methodo_table(rows)
