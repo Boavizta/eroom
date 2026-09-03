@@ -1,222 +1,331 @@
-# Analyse — Minimiser le nombre de questions humaines pour maximiser les réponses EOF
+# Analyse — Minimiser les questions humaines pour maximiser les réponses EOF
 
-> Fichier intermédiaire (pas consommé par du code, pas encore décisionnel).
-> Objectif : avant de concevoir un futur "mode entretien" pour `eof-audit`
-> (poser des questions à un humain quand les données d'audit ne suffisent
-> pas), identifier les liens entre les 70 questions du référentiel
-> (54 critères détaillés + 16 questions de 🏦 0-Diagnostic rapide) pour
-> qu'une même information serve à répondre à plusieurs critères, et que les
-> critères restants soient regroupés en un minimum de questions composées
-> plutôt que posés un par un.
+> **v2 (2026-09-03, seconde passe)**. La v1 (même fichier, cf. git) cherchait
+> uniquement à regrouper les questions entre elles. Cette v2 ajoute deux
+> choses que la v1 n'avait pas faites : (a) mesurer la couverture en **poids
+> de score** et non en nombre de critères, (b) chercher de **nouvelles
+> sources de données** capables de répondre à des critères aujourd'hui
+> classés "aucune donnée".
 >
-> Méthode : lecture intégrale du texte des 70 questions (`eof-referentiel.json`),
-> recherche de 3 types de liens, jamais d'inférence automatique fabriquée à
-> partir d'un lien "faible" (cf. section "Liens écartés" en fin de document).
+> Fichier intermédiaire d'analyse : pas consommé par du code.
+>
+> Méthode de cette v2 : sondes réelles exécutées sur `octo.com` le
+> 2026-09-03 (DNS, HTTP, headers, CSS, JS, API tierces). Chaque piste est
+> étiquetée **vérifié en réel**, **non vérifié**, ou **écarté après test**.
+> Aucune piste n'est présentée comme acquise sans test.
 
 -----
+-----
 
-## 1. Ce qui est déjà résolu sans aucune question humaine (5/70)
+## 1. Le vrai problème n'est pas le nombre de critères, c'est le poids
 
-Inchangé depuis `eof_criteria_mapping.py`, + 1 nouveauté trouvée par cette analyse :
+Le référentiel pondère chaque critère (`poids` : 1.0 Modéré, 1.5 Significatif,
+2.0 Déterminant). **Poids total des 54 critères détaillés : 80.0.**
 
-| id | Critère | Donnée | Confidence |
+| | Critères | Poids | % du score |
 |---|---|---|---|
-| 1.12 | Trackers | `tech_stack.categories['Analytics']` | medium |
-| 2.1 | Technologies gourmandes | `ai_external_apis` / `tech_stack` | medium |
-| 3.3 | Mix électrique région (détaillé) | `servers[].carbon_intensity_g_kwh` | high |
-| 5.4 | Indicateurs de performance | `cwv.json` (seuils CWV officiels) | high |
-| **0.16** *(nouveau)* | Mix électrique pays (Diagnostic rapide) | **même champ que 3.3** | high |
+| Répondus automatiquement (aujourd'hui) | 7 | 9.0 | **11.3 %** |
+| dont réellement tranchés (hors 1.6 = "🤔 À évaluer") | 6 | 8.0 | **10.0 %** |
+| Indices "partiels" (jamais cochés) | 11 | 16.5 | 20.6 % |
+| Aucune donnée | 36 | 54.5 | 68.1 % |
 
-**0.16 est un doublon quasi exact de 3.3**, avec un avantage : ses 5 crans
-sont des **seuils numériques explicites** (`> 750`, `< 500`, `< 300`,
-`< 200`, `< 100` gCO2e/kWh), qui se lisent directement sur
-`servers[].carbon_intensity_g_kwh` — plus précis encore que le seuil
-binaire utilisé pour 3.3. Sur octo.com (381 gCO2e/kWh, Allemagne) :
-tranche **"2 - < 500 gCO2e/kWh"**.
+**Constat central** : les 8 critères **Déterminants** (poids 2.0, soit 16.0 =
+**20 % du score à eux seuls**) sont **tous les 8 non répondus** : `1.1`, `1.2`,
+`2.2`, `5.8`, `5.9`, `6.1`, `6.4`, `6.6`.
 
-⚠️ **Ceci contredit la décision du 2026-09-03** ("Diagnostic rapide : aperçu
-sans remplissage automatique"). Cette décision reste valable pour les 15
-autres questions de 🏦 0 (aucune n'a de donnée). Mais pour 0.16 spécifiquement,
-la donnée existe, est déjà utilisée pour 3.3, et le lien est un doublon
-exact (pas une inférence) : **à valider explicitement avec l'utilisatrice
-avant d'implémenter**, ce n'est pas fait dans cette analyse.
+Conséquence directe pour la stratégie : optimiser le nombre de questions posées
+sans regarder les poids fait rater l'essentiel. Une question qui débloque
+`6.4` + `6.6` + `6.1` (3 Déterminants, 6.0 de poids) vaut plus que six
+questions sur des critères Modérés (6.0 aussi, mais six interactions).
+
+**Métrique à retenir désormais : poids de score couvert par interaction
+humaine.** C'est la formulation opérationnelle de "minimum de questions,
+maximum de réponses".
 
 -----
 
-## 2. Doublons exacts / quasi-exacts (même fait, formulation différente)
+## 2. Poids couvert par cluster (classement des questions à poser en premier)
 
-Une seule réponse humaine suffit pour les deux critères de chaque paire.
-Aucune des deux n'a de donnée d'audit — le gain est uniquement sur le
-**nombre de questions posées à l'humain**, pas sur l'automatisation.
+Reprise des clusters de la v1, chiffrés :
 
-| Paire | Textes | Nature du lien |
+| Cluster | Critères | Poids | Dont Déterminants |
+|---|---|---|---|
+| **D — Maturité d'ingénierie** (6.1→6.9) | 9 | **14.0** | 6.1, 6.4, 6.6 (3) |
+| **A — Infrastructure / FinOps** (3.1,3.2,3.5→3.9) | 7 | **10.5** | 0 |
+| **G — Conception UX / compatibilité** (1.2→1.6,1.10,1.11) | 7 | **9.5** | 1.2 (1) |
+| **C — Dette technique / perf** (5.1,5.2,5.6→5.9) | 6 | **9.0** | 5.8, 5.9 (2) |
+| **B — Stockage et données** (4.2→4.6) | 5 | 6.5 | 0 |
+| **E — Architecture** (2.2,2.3,2.4) | 3 | 5.0 | 2.2 (1) |
+| **F — Nécessité du produit** (1.1,1.7) | 2 | 3.5 | 1.1 (1) |
+
+**4 questions composées (D + A + G + C) = 43.0 de poids = 54 % du score**,
+et 6 des 8 Déterminants. C'est le meilleur rapport réponses/questions
+disponible, et c'est très supérieur à ce que toute automatisation
+supplémentaire peut apporter (cf. section 4 : plafond réaliste ~+5 points).
+
+-----
+
+## 3. Levier le plus fort : demander des artefacts, pas des réponses
+
+L'angle de la v1 était "regrouper les questions". Angle manqué : **une même
+interaction peut demander un document plutôt qu'une réponse**, et un document
+se lit sans mobiliser l'attention de l'interlocuteur sur 9 questions.
+
+### 3.a Accès en lecture au dépôt de code = le plus gros gain unitaire
+
+Un accès en lecture (ou même une simple capture de l'arborescence + quelques
+fichiers) permet de répondre factuellement, sans interprétation :
+
+| Critère | Poids | Ce qu'on lit dans le dépôt |
 |---|---|---|
-| **0.3 ⟺ 6.10** | "Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?" | **Texte identique mot pour mot.** Échelles différentes (0.3 : 5 crans SLA ; 6.10 : 🟢/🟡/🔴) — nécessite une table de correspondance simple (SLA 24/7 99,99% → 🔴 ; pas de SLA → 🟢) mais un seul fait à établir. |
-| **0.15 ⟺ 4.1** | "Politique de suppression/archivage" vs "Mécanismes de suppression/archivage mis en place" | Même fait (politique de rétention des données), granularité quasi identique. |
-| **0.11 ⟺ 1.13** | "Parcours utilisateurs fluides, intuitifs, sans friction UX/UI" vs "Principaux parcours utilisateurs optimisés fluides et efficaces" | Même fait (qualité UX des parcours), formulation quasi identique. |
-| **0.12 ⟺ 1.8** | "Compatible matériel ancien + expérience fluide" vs "Support médiocre sur appareils anciens" | Même fait, **polarité inversée** (0.12 positif, 1.8 négatif) — propager avec négation. |
-| **0.13 ⟺ 5.3** | "Backlog contient des pb de perf" vs "Équipe a identifié des améliorations perf et les a ajoutées au backlog" | Même fait (existence d'un backlog performance), formulation quasi identique. |
+| `6.3` CI/CD | 1.5 | `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile` |
+| **`6.4` tests non-régression** | **2.0** | répertoires de tests, config Jest/Pytest/Playwright |
+| **`6.6` indicateurs qualité** | **2.0** | `sonar-project.properties`, config lint, badges CI |
+| **`6.1` observabilité** | **2.0** | dépendances OpenTelemetry / Datadog / Sentry |
+| `6.2` revues de code | 1.5 | `CODEOWNERS`, template de PR, règles de branche |
+| `6.7` documentation | 1.5 | `README`, `docs/`, ADR |
+| `6.8` code dupliqué | 1.0 | mesurable (`jscpd`) sur le dépôt |
+| `6.9` autonomie outillage | 1.0 | diversité des outils déjà intégrés par l'équipe |
+| **`5.8` dépendances à jour** | **2.0** | lockfile + Dependabot/Renovate, versions vs dernières |
+| `5.6` pile technique à jour | 1.5 | `engines`, `.python-version`, `pom.xml` |
+| `5.1` analyse statique | 1.0 | config linter / analyseur |
+| `6.5` découplage métier/technique | 1.5 | structure des dossiers (hexagonal, DDD) |
 
-**5 paires → 10 critères couverts par 5 réponses humaines au lieu de 10.**
+**12 critères, 18.5 de poids (23 % du score), 5 des 8 Déterminants, pour
+UNE seule demande.** À comparer aux 9.0 que produit tout le pipeline
+automatique actuel. C'est la piste à prioriser avant toute nouvelle
+automatisation technique.
 
------
+Limite honnête : `6.8` et `5.8` demandent de faire tourner un outil sur le
+dépôt (pas juste le lire) ; et un dépôt accessible ne dit rien de la
+**qualité** des tests, seulement de leur existence. `6.4` peut donc passer
+de "aucune donnée" à un cran plausible, pas à une certitude.
 
-## 3. Clusters thématiques (regroupables en une question composée)
+### 3.b Deux autres artefacts, même logique
 
-Contrairement à la section 2, ces critères ne sont **pas le même fait** :
-répondre à l'un ne répond pas automatiquement aux autres. Mais ils portent
-sur le **même sujet** et peuvent être posés en **une seule interaction**
-("décrivez votre gestion de X"), dont la réponse riche de l'humain permet
-ensuite de renseigner chaque critère séparément — sans fabriquer de lien
-logique qui n'existe pas, juste en évitant de répéter la question 6 ou 7
-fois sous des angles légèrement différents.
-
-### Cluster A — Infrastructure / FinOps (7 critères, 1 question)
-`3.1` (facture réductible), `3.2` (suivi impact env.), `3.5` (mutualisation),
-`3.6` (surdimensionnement), `3.7` (élasticité/auto-scaling), `3.8`
-(environnements toujours actifs), `3.9` (env. de test = taille prod)
-
-*Question suggérée* : "Décrivez la gestion de votre infrastructure : les
-composants sont-ils mutualisés/dimensionnés au juste besoin, disposez-vous
-d'élasticité (auto-scaling), les environnements non productifs sont-ils
-coupés quand inutilisés, leur taille est-elle réduite par rapport à la
-prod, et suivez-vous les coûts/l'impact environnemental de cette
-infrastructure ?"
-
-### Cluster B — Stockage et données (5 critères, 1 question)
-`4.2` (bonnes pratiques BDD), `4.3` (techno adaptée), `4.4` (BDD test =
-taille prod), `4.5` (doublons), `4.6` (données froides)
-
-*(4.1 exclu : déjà apparié avec 0.15 en section 2)*
-
-### Cluster C — Dette technique & suivi performance (6 critères, 1 question)
-`5.1` (outils d'analyse statique), `5.2` (tests de charge révélateurs),
-`5.6` (pile technique à jour), `5.7` (composants réglables), `5.8`
-(dépendances à jour), `5.9` (pb de compatibilité identifiés)
-
-*(5.3 exclu : déjà apparié avec 0.13 ; 5.4 déjà automatique ; 5.5 déjà
-"partiel" avec indice coverage/CWV)*
-
-### Cluster D — Maturité d'ingénierie / Facilité de changement (11 critères, 1 question)
-`6.1` (observabilité), `6.2` (revues de code/pair prog), `6.3` (CI/CD),
-`6.4` (tests non-régression), `6.5` (découplage métier/technique), `6.6`
-(indicateurs qualité), `6.7` (documentation), `6.8` (code dupliqué), `6.9`
-(autonomie équipe outillage), **+ `0.5`** (code source accessible à
-l'équipe) **+ `0.6`** (compétences dispo) — ces deux questions du
-Diagnostic rapide portent sur le même thème "capacité de l'équipe à agir"
-que 6.9/6.2/6.7, naturellement posées dans la même interaction.
-
-*(6.10 exclu : déjà apparié avec 0.3 en section 2)*
-
-C'est le plus gros cluster (11 critères en une seule question) : c'est
-attendu, "Facilité de changement" est structurellement la dimension la
-plus organisationnelle du référentiel — c'est aussi la dimension à 0/10
-répondue automatiquement, ce qui est cohérent.
-
-### Cluster E — Architecture (3-4 critères, 1 question)
-`2.2` (stratégie de compatibilité), `2.3` (séparation/communication
-composants), `2.4` (lissage pics de charge), **+ `0.7`** (complexité
-architecture, en cadrage/intro de la question)
-
-*(2.1 exclu : déjà automatique ; 2.5 déjà "partiel" avec indice HAR)*
-
-### Cluster F — Nécessité et sobriété du produit (3 critères, 1 question)
-`1.1` (moyen simple existant), `1.7` (fonctionnalités utiles/utilisées),
-`0.2` (fonctionnalités redondantes)
-
-*Question suggérée* : "Le produit numérique a-t-il une alternative plus
-simple pour cette action, ses fonctionnalités sont-elles toutes utilisées,
-et existe-t-il des doublons avec d'autres produits/systèmes ?"
-
-### Cluster G — Conception UX et compatibilité (7 critères, 1 question)
-`1.2` (utilisateurs cibles connus), `1.3` (MAJ obligatoires tous
-appareils), `1.4` (composants custom vs natifs), `1.5` (autoplay
-animations/vidéos), `1.6` (adapter ressources à la config matérielle),
-`1.10` (dark patterns), `1.11` (valeurs par défaut modifiables)
-
-*(1.13 exclu : déjà apparié avec 0.11 ; 1.8 exclu : déjà apparié avec 0.12)*
-
-**7 clusters → 42 critères couverts par 7 questions composées au lieu de 42.**
+- **Facture cloud détaillée ou export IaC (Terraform/CloudFormation)** →
+  cluster A quasi entier (`3.1`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`) + `4.3`,
+  `4.4`. Soit ~13.5 de poids pour une demande. L'IaC donne le
+  dimensionnement réel, ce qui corrige le point noir connu (`instance_type`
+  / `storage_gb` d'e-footprint ne sont que des défauts de script).
+- **Export du backlog filtré sur "perf"** → `5.3` + `0.13`, et confirme
+  `5.2`. Faible poids (3.0) mais coût quasi nul si l'outil est accessible.
 
 -----
 
-## 4. Questions de Diagnostic rapide restées isolées (6)
+## 4. Nouvelles sources automatiques : ce que les sondes du 2026-09-03 donnent
 
-Aucun lien fort trouvé (ni doublon, ni cluster naturel) — restent des
-questions à poser telles quelles, une par une :
+### 4.a VÉRIFIÉ EN RÉEL — environnements non productifs exposés (`3.8`, `3.9`)
 
-`0.1` (criticité du service), `0.4` (dépendances techniques), `0.8`
-(taille infra), `0.9` (volume de données), `0.10` (complexité
-fonctionnelle), `0.14` (fonctionnalités optimisées)
+```
+dig +short staging.octo.com  ->  d3cowsu17vt1rf.cloudfront.net / 3.164.163.68
+curl -sI https://staging.octo.com/  ->  HTTP/2 200, 27947 octets,
+                                        last-modified Tue 01 Sep 2026 01:00:41
+prod https://octo.com/       ->  HTTP/2 200, 27748 octets,
+                                        last-modified Thu 03 Sep 2026 01:01:31
+```
+
+ETag et last-modified **différents** de la prod : ce n'est pas un alias
+wildcard, c'est bien un environnement distinct, servi publiquement, avec un
+contenu quasi identique en volume à la prod.
+
+- `3.8` "Tous les environnements sont-ils toujours activés ?" →
+  **automatisable** (💡 Potentiel d'amélioration : un env non productif
+  répond en permanence).
+- `3.9` "Les environnements de test sont-ils aussi grands que la prod ?" →
+  **indice** (volume de contenu comparable, mais le volume HTML ne dit rien
+  du dimensionnement de l'infra derrière).
+
+Gain : +1.5 tranché, +1.5 en indice.
+
+⚠️ **Piège méthodologique découvert au passage, à traiter avant d'implémenter** :
+octo.com renvoie **HTTP 200 + la page d'accueil** pour n'importe quelle URL
+inexistante (`/package.json`, `/scripts/home.js.map` → 200, 27748 octets, la
+homepage). Toute sonde qui conclut "le fichier existe" sur la base du code
+HTTP produira des **faux positifs**. Il faut valider par signature de contenu
+(taille + `content-type` + empreinte du corps), jamais par le statut seul.
+
+⚠️ **Décision de posture nécessaire** : sonder des sous-domaines d'un client
+est de la reconnaissance légère. À cadrer explicitement (liste fixe et
+courte, DNS + HEAD uniquement, aucune tentative d'authentification, jamais de
+chemins sensibles type `/.git` ou `/.env`) et à faire valider avant d'être
+mis dans le pipeline par défaut.
+
+### 4.b VÉRIFIÉ EN RÉEL — le header CSP est un inventaire de tiers déclaré
+
+Le CSP de la prod (**déjà collecté** par `analyze_security_headers.py`, mais
+seul son `grade` est exploité aujourd'hui) liste ~30 domaines autorisés :
+
+```
+*.herokuapp.com  *.hsforms.net  *.hsforms.com  *.hs-scripts.com
+*.hs-analytics.net  *.hubspot.com  *.hs-banner.com  *.hsadspixel.net
+*.hubapi.com  *.licdn.com  *.linkedin.com  cdnjs.cloudflare.com
+swetrix.org  cdn.jsdelivr.net  challenges.cloudflare.com  ...
+```
+
+C'est **plus large que ce que le HAR capte** (le HAR ne voit que les tiers
+sollicités sur le parcours capturé ; le CSP déclare tout ce qui est prévu).
+Coût : **zéro appel réseau supplémentaire**. Meilleur rapport gain/effort de
+toute cette analyse.
+
+Exploitations possibles :
+- `2.3` séparation/communication des composants → `*.herokuapp.com` révèle
+  une plateforme applicative distincte du site statique → **indice**.
+- `3.5` mutualisation → PaaS (Heroku) + CDN mutualisé → **indice**.
+- `3.7` élasticité → dynos Heroku / CloudFront sont élastiques par nature →
+  **indice** (jamais une preuve que l'élasticité est configurée).
+- `1.12` trackers → **corrige une erreur de fond**, cf. 5.a.
+
+### 4.c VÉRIFIÉ EN RÉEL — fraîcheur de déploiement (`6.3`)
+
+L'indice `6.3` actuel repose sur `sitemap.days_since_lastmod`. Or **octo.com
+n'a pas de `sitemap.xml`** (vérifié : 0 balise `<loc>`, `wellknown-scan.json`
+ne contient que `domain` et `note`). L'indice est donc **vide en pratique**.
+
+Substitut vérifié, bien plus fiable : le paramètre de cache-busting
+`/style.css?v=2026-8-3-1-1`. Décodé avec un mois indexé à 0 (comportement de
+`Date.getMonth()` en JS) : 2026, mois 8 = septembre, jour 3, 01h01. Ce qui
+correspond **exactement** au `last-modified` de la prod (Thu 03 Sep 2026
+01:01:31 GMT). Autrement dit : build automatisé, daté du jour, lancé vers
+01h00 → **indice fort de pipeline automatisé nocturne**, là où le sitemap ne
+donnait rien.
+
+Généralisable : croiser `last-modified` / `ETag` / paramètres `?v=` des
+assets. Deux audits espacés donneraient en plus une **cadence** de déploiement.
+
+### 4.d NON VÉRIFIÉ — Lighthouse `legacy-javascript` pour `1.3` / `1.8` / `5.9`
+
+`run_lighthouse.sh` existe déjà. Lighthouse expose un audit
+`legacy-javascript` (polyfills et transpilation ciblant les vieux
+navigateurs) et `third-party-summary`. C'est le proxy le plus direct
+disponible pour "support médiocre sur appareils anciens" (`1.8`, 1.5) et
+"problèmes de compatibilité identifiés" (`5.9`, **2.0 Déterminant**) — la v1
+avait à raison écarté CrUX pour cet usage, mais n'avait pas examiné
+Lighthouse.
+
+**Je n'ai pas lancé Lighthouse pour le confirmer.** À tester avant d'y
+compter : gain potentiel jusqu'à 5.0 de poids, gain réel inconnu.
+
+### 4.e ÉCARTÉ APRÈS TEST — versions de dépendances par sondage externe (`5.6`, `5.8`)
+
+Testé sur octo.com, tout est négatif : aucun `<meta name="generator">`, aucun
+`sourceMappingURL` dans le HTML ni dans `/scripts/home.js` (3771 octets),
+`/scripts/home.js.map` et `/package.json` inexistants (les 200 observés sont
+le soft-404 décrit en 4.a).
+
+La conclusion de la v1 ("pas de version détectable") est donc **confirmée pour
+ce site**. À nuancer quand même : sur un site WordPress/Drupal (`meta
+generator` versionné) ou livrant ses source maps, la détection marcherait. À
+garder comme **sonde opportuniste** (coût quasi nul, gain nul ici, gain réel
+ailleurs), jamais comme une source sur laquelle compter. `5.8` (2.0
+Déterminant) reste à couvrir par le dépôt (3.a).
+
+### 4.f Marginal — Green Web Foundation
+
+`api.thegreenwebfoundation.org/api/v3/greencheck/octo.com` → `green: false`
+(vérifié). Le référentiel n'a **pas** de critère "hébergement renouvelable"
+(la numérotation saute de `3.3` à `3.5`, cf. section 6). Utilisable seulement
+pour corroborer `3.3`, déjà répondu. Gain : 0. Mentionné pour clore la piste.
 
 -----
 
-## 5. Ce qui reste "partiel" (indice affiché, confirmation humaine légère)
+## 5. Corrections de qualité trouvées en chemin (indépendantes du comptage)
 
-Inchangé de `eof_criteria_mapping.py`, avec un regroupement : `1.15` et
-`1.16` utilisent déjà **le même champ** (`traffic.visits_per_year`) — à
-poser comme **une seule** question de confirmation, pas deux.
+### 5.a `1.12` pénalise aujourd'hui la sobriété — à corriger
 
-`1.9`, `1.14`, `{1.15+1.16}`, `2.5`, `5.5` → **5 questions de confirmation**
-(au lieu de 6 critères).
+`env-data.json` détecte `Analytics: ["Swetrix"]`, et la règle actuelle
+("au moins un Analytics détecté → 💡") a donc classé octo.com en potentiel
+d'amélioration. Or **Swetrix est justement l'option sobre** (sans cookie,
+sans profilage). Et dans le même temps la vraie pile de tracking marketing
+est **invisible** pour la règle : le HTML charge `hs-scripts` (HubSpot) et le
+CSP autorise `hs-analytics`, `hsadspixel`, `licdn`, `linkedin`.
 
------
+La réponse "💡" est juste par accident, avec un motif faux. Correction :
+classer les traceurs par nature (mesure d'audience sobre / auto-hébergée
+d'un côté, marketing-CRM-pixels publicitaires de l'autre) et fonder la
+réponse sur la seconde catégorie. Source additionnelle : le CSP (4.b) + le
+HTML déjà re-fetché.
 
-## 6. Bilan quantifié
+### 5.b Bug latent dans `parse_html_criteria.py` : attributs non quotés
 
-| | Nombre |
-|---|---|
-| Critères totaux (54 détaillés + 16 Diagnostic rapide) | 70 |
-| **Résolus sans aucune interaction humaine** (§1) | **5** |
-| Résolus par doublon (1 réponse = 2 critères, §2) | 10 critères → 5 questions |
-| Résolus par cluster thématique (§3) | 42 critères → 7 questions |
-| Isolés, 1 question chacun (§4) | 6 critères → 6 questions |
-| Partiels, confirmation légère (§5) | 6 critères → 5 questions |
-| **Total questions humaines nécessaires** | **23** (au lieu de 65 restants un par un) |
+octo.com sert du HTML minifié à attributs non quotés
+(`<script src=/scripts/home.js defer>`, `<link rel=stylesheet
+href=/assets/orejime.css>`). Or les regex du script exigent des guillemets :
 
-**Résultat : 70 critères couverts par 5 réponses automatiques + 23
-interactions humaines**, au lieu de 65 questions séparées si on interrogeait
-chaque critère individuellement — un facteur ~2,8 de réduction du nombre
-d'interactions, sans qu'aucune réponse ne soit jamais fabriquée à la place
-de l'humain.
+```python
+_STYLESHEET_LINK_RE = ... rel=["']?stylesheet["']?[^>]*\bhref=["']([^"']+)["']
+_DIV_ROLE_BUTTON_RE = re.compile(r"role=[\"']button[\"']", re.IGNORECASE)
+```
 
------
+`href=` et `role=` non quotés ne matchent pas. Conséquence : feuilles de
+style ignorées (→ `media_query_count`, `has_prefers_reduced_or_scheme`
+sous-évalués, critères `1.6` et `1.11`) et boutons `role=button` non quotés
+non comptés (`1.4`).
 
-## 7. Liens écartés (pour mémoire — évalués, jugés trop faibles pour être utilisés)
-
-- **0.14 (fonctionnalités optimisées) vs 5.4 (indicateurs de performance,
-  déjà automatique via CWV)** : CWV ne mesure que la performance de
-  chargement frontend, pas l'efficacité algorithmique/backend que 0.14
-  interroge plus largement. Propager la réponse de 5.4 vers 0.14 serait une
-  extrapolation non vérifiée. **Écarté.**
-- **Écart mobile/desktop dans `cwv.json` comme signal de compatibilité
-  matériel ancien (1.8/0.12/5.9)** : vérifié sur octo.com — le mobile est
-  systématiquement plus lent que le desktop (attendu, réseau + CPU), mais
-  CrUX mobile agrège TOUS les mobiles Chrome, pas spécifiquement le
-  matériel ancien de la cible. **Écarté** (aurait fabriqué un signal).
-- **`device_mix`/`network_mix` d'`env-data.json`** : donnent une
-  répartition mobile/desktop/réseau, mais rien sur l'ancienneté du
-  matériel. Vérifié, aucun signal utilisable trouvé.
-- **`tech_stack.technologies` pour 5.6/5.8 (stack/dépendances à jour)** :
-  vérifié, aucune information de version dans les données détectées
-  (seulement nom/catégorie/évidence HTTP) — pas automatisable depuis ce
-  pipeline.
-- **`README.md`/`CONTEXT.md` métier (cherché à l'Étape 10
-  d'`analyse-parcours`)** : aurait pu répondre à plusieurs questions
-  organisationnelles s'il existait. Absent pour octo.com. À garder en tête
-  pour un futur site audité qui en fournirait un.
+**Impact réel sur octo.com : nul, vérifié.** La seule CSS ignorée
+(`/assets/orejime.css`, 5654 octets) ne contient ni `@media` ni `prefers-*`,
+et la CSS principale (172 796 octets, bien lue) n'a pas de `prefers-*` non
+plus : `has_prefers_reduced_or_scheme: false` est un résultat correct. Le bug
+est donc **latent**, pas actif ici — mais il produira un faux négatif
+silencieux sur le premier site minifié qui déclare `prefers-reduced-motion`
+dans une CSS à `href` non quoté. À corriger (rendre le guillemet fermant
+optionnel), sans urgence.
 
 -----
 
-## 8. Suite possible (non décidée, non implémentée)
+## 6. Point à lever sur le référentiel lui-même
 
-1. Valider avec l'utilisatrice l'automatisation de **0.16** (§1) —
-   contredit une décision précédente, à trancher explicitement.
-2. Si un futur "mode entretien" est construit pour `eof-audit`, cette
-   analyse donne directement sa structure : 5 questions de confirmation
-   (§5) + 5 questions de doublon (§2) + 7 questions composées (§3) + 6
-   questions isolées (§4) = 23 interactions, dans cet ordre de priorité
-   (les clusters couvrant le plus de critères en premier).
-3. Rejouer cette analyse si le référentiel change (43→54→? critères déjà
-   observé) : les liens texte peuvent bouger, ne pas supposer qu'ils sont
-   stables dans le temps.
+La numérotation des critères **saute `3.4`** (`3.1`, `3.2`, `3.3`, puis
+`3.5`...). Le total fait bien 54 (16+5+8+6+9+10), donc rien n'est "perdu" par
+rapport au compte attendu, mais un trou de numérotation peut signaler soit un
+critère retiré côté Google Sheet, soit une ligne sautée à l'export. À vérifier
+lors de la prochaine synchronisation du skill `eof` : si un critère "3.4"
+existe dans la Sheet, l'export en perd un silencieusement.
+
+-----
+
+## 7. Bilan chiffré de cette v2
+
+Couverture du poids (base 80.0) :
+
+| Scénario | Poids tranché | % | Interactions humaines |
+|---|---|---|---|
+| Aujourd'hui | 9.0 | 11 % | 0 |
+| + sondes vérifiées (4.a, 4.b, 4.c) | 10.5 tranché + ~7.5 d'indices | 13 % tranché | 0 |
+| + Lighthouse **si confirmé** (4.d) | ~13 | ~16 % | 0 |
+| **+ accès dépôt (3.a)** | **~31.5** | **~39 %** | **1 demande** |
+| + IaC / facture cloud (3.b) | ~45 | ~56 % | 2 demandes |
+| + 4 questions composées D/A/G/C | ~65 | ~81 % | 6 |
+
+Lecture : **le plafond de l'automatisation pure est autour de 16 % du poids.**
+Tout le reste passe par de l'humain ou des artefacts. Deux demandes
+d'artefacts valent plus (56 %) que six questions posées à froid, et coûtent
+moins d'attention à l'interlocuteur.
+
+Révision du chiffre de la v1 : "23 interactions" reste valable comme
+borne haute si on veut les 70 critères. Mais si l'objectif est
+"maximum de réponses pour un minimum de questions", la bonne cible est
+**2 artefacts + 4 questions composées ≈ 6 interactions pour ~81 % du poids**,
+au lieu de 23 pour 100 %.
+
+-----
+
+## 8. Ce qui reste à décider (rien n'est implémenté)
+
+Par ordre décroissant de gain par unité d'effort :
+
+1. **Exploiter le CSP déjà collecté** (4.b) — zéro appel réseau, +3 indices
+   et corrige `1.12`. Aucun risque de posture. À faire en premier.
+2. **Substituer la fraîcheur d'assets au sitemap pour `6.3`** (4.c) — l'indice
+   actuel est vide sur octo.com, celui-ci est vérifié.
+3. **Corriger `1.12`** (5.a) — corrige un motif faux, pas un comptage.
+4. **Formaliser la demande d'artefacts** (3.a/3.b) : c'est le vrai levier
+   (+28 points de poids), mais c'est un changement de nature du pipeline
+   (il devient collaboratif, plus seulement observationnel). À valider.
+5. **Tester Lighthouse `legacy-javascript`** (4.d) avant d'y compter.
+6. **Sondage de sous-domaines** (4.a) — gain net et vérifié, mais demande une
+   décision de posture explicite + une validation par signature de contenu
+   pour éviter les faux positifs du soft-404.
+7. **Corriger les regex non quotées** (5.b) — bug latent, impact nul
+   aujourd'hui, à faire quand on touchera le fichier.
+8. **Vérifier `3.4`** à la prochaine synchro (section 6).
