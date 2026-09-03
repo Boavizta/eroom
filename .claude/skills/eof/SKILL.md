@@ -103,5 +103,5 @@ prévisualiser le rendu avant de calculer un vrai radar sur un cas réel.
 
 ## Diagramme
 
-`documentation/diagramme/eof-pipeline-outils.puml/.svg/.pdf` (2 pages) — registre
+`documentation/diagrammes/eof-pipeline-outils.puml/.svg/.pdf` (2 pages) — registre
 dans `.claude/skills/diagrammes-analyse-parcours/SKILL.md`, section "Diagramme 5".

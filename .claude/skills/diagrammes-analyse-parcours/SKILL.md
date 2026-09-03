@@ -27,15 +27,16 @@ version: 1.0.0
 | e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
 | e-footprint — topologie d'un site (composants) | GÉNÉRÉ à la demande, pas de `.puml` fixe en dépôt | variable (dépend du site/archétype demandé) | `efootprint_model/to_plantuml.py::site_to_plantuml()` (lit une `SiteSpec`) | jamais à régénérer soi-même : ce diagramme se produit en appelant `site_to_plantuml(spec)` sur la spec du moment, cf. section dédiée ci-dessous. Depuis l'Étape 25 du skill efootprint, produit AUSSI systématiquement (pas seulement à la demande ponctuelle), via `run_efootprint.py::build_topology_overview()`. Les hôtes tiers annotés d'une suspicion BDD/streaming/IA (`efootprint_model/topology_overview.py`) affichent leur note dans le label du composant. |
 | EOF — pipeline outils (activité, 2 pages) | `eof-pipeline-outils.puml` (contient 2 diagrammes : `eof-pipeline-outils` + `eof-radar-svg`) | `eof-pipeline-outils.pdf` (2 pages) | `.claude/skills/eof/scripts/build_template.py` (page 1 : récupération gviz + construction du Markdown) + `.claude/skills/eof/scripts/generate_radar_svg.py` (page 2, pipeline indépendant) | l'un des 2 scripts change ses entrées/sorties, ou la liste des `gid`/onglets de la Google Sheet source change |
+| EOF-audit — pipeline outils (activité) | `eof-audit-pipeline.puml` | `eof-audit-pipeline.pdf` | `.claude/skills/analyse-parcours/scripts/run_eof.py` + `eof_criteria_mapping.py` + les 3 extracteurs Phase 1 (`parse_html_criteria.py`, `analyze_security_headers.py`, `scan_wellknown.py`) + l'extension a11y/best-practices de `collect_cwv_pagespeed.py` | l'un de ces scripts change ses entrées/sorties, ou le nombre de critères automatisables/indices évolue (Phase 2, `eof-questionnaire`) |
 
-Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagramme/` à la racine du projet.
+Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagrammes/` à la racine du projet.
 
 -----
 
 ## Procédure générale de régénération
 
 Pour chaque diagramme modifié :
-1. Modifier le `.puml` dans `documentation/diagramme/` en cohérence avec la source de vérité
+1. Modifier le `.puml` dans `documentation/diagrammes/` en cohérence avec la source de vérité
 2. Générer le SVG : `plantuml -tsvg <fichier>.puml`
 3. Convertir en PDF via `rsvg-convert`
 4. Vérifier + ouvrir
@@ -69,19 +70,19 @@ p4-p5 sont OPTIONNELLES (skill `/efootprint`) mais incluses dans le PDF assembl�
 ### Commandes
 
 ```bash
-plantuml -tsvg documentation/diagramme/analyse-parcours-p1.puml \
-         documentation/diagramme/analyse-parcours-p2.puml \
-         documentation/diagramme/analyse-parcours-p3.puml \
-         documentation/diagramme/analyse-parcours-p4.puml \
-         documentation/diagramme/analyse-parcours-p5.puml
-rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-workflow.pdf \
-  documentation/diagramme/analyse-parcours-p1.svg \
-  documentation/diagramme/analyse-parcours-p2.svg \
-  documentation/diagramme/analyse-parcours-p3.svg \
-  documentation/diagramme/analyse-parcours-p4.svg \
-  documentation/diagramme/analyse-parcours-p5.svg
-ls -lh documentation/diagramme/analyse-parcours-workflow.pdf
-open documentation/diagramme/analyse-parcours-workflow.pdf
+plantuml -tsvg documentation/diagrammes/analyse-parcours-p1.puml \
+         documentation/diagrammes/analyse-parcours-p2.puml \
+         documentation/diagrammes/analyse-parcours-p3.puml \
+         documentation/diagrammes/analyse-parcours-p4.puml \
+         documentation/diagrammes/analyse-parcours-p5.puml
+rsvg-convert -f pdf -o documentation/diagrammes/analyse-parcours-workflow.pdf \
+  documentation/diagrammes/analyse-parcours-p1.svg \
+  documentation/diagrammes/analyse-parcours-p2.svg \
+  documentation/diagrammes/analyse-parcours-p3.svg \
+  documentation/diagrammes/analyse-parcours-p4.svg \
+  documentation/diagrammes/analyse-parcours-p5.svg
+ls -lh documentation/diagrammes/analyse-parcours-workflow.pdf
+open documentation/diagrammes/analyse-parcours-workflow.pdf
 ```
 
 ### Contenu de référence — analyse-parcours-p1.puml
@@ -580,11 +581,11 @@ Suite   — Étape 35 EcoIndex + Étape 40 Rapport HTML (contexte principal)
 ### Commandes
 
 ```bash
-plantuml -tsvg documentation/diagramme/analyse-parcours-dispatch-activite.puml
-rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-dispatch-activite.pdf \
-  documentation/diagramme/analyse-parcours-dispatch-activite.svg
-ls -lh documentation/diagramme/analyse-parcours-dispatch-activite.pdf
-open documentation/diagramme/analyse-parcours-dispatch-activite.pdf
+plantuml -tsvg documentation/diagrammes/analyse-parcours-dispatch-activite.puml
+rsvg-convert -f pdf -o documentation/diagrammes/analyse-parcours-dispatch-activite.pdf \
+  documentation/diagrammes/analyse-parcours-dispatch-activite.svg
+ls -lh documentation/diagrammes/analyse-parcours-dispatch-activite.pdf
+open documentation/diagrammes/analyse-parcours-dispatch-activite.pdf
 ```
 
 ### Contenu de référence — analyse-parcours-dispatch-activite.puml
@@ -719,11 +720,11 @@ JSON en entrée/sortie), pas sur l'échange de messages entre l'utilisateur et C
 ### Commandes
 
 ```bash
-plantuml -tsvg documentation/diagramme/analyse-parcours-efootprint-outils.puml
-rsvg-convert -f pdf -o documentation/diagramme/analyse-parcours-efootprint-outils.pdf \
-  documentation/diagramme/analyse-parcours-efootprint-outils.svg
-ls -lh documentation/diagramme/analyse-parcours-efootprint-outils.pdf
-open documentation/diagramme/analyse-parcours-efootprint-outils.pdf
+plantuml -tsvg documentation/diagrammes/analyse-parcours-efootprint-outils.puml
+rsvg-convert -f pdf -o documentation/diagrammes/analyse-parcours-efootprint-outils.pdf \
+  documentation/diagrammes/analyse-parcours-efootprint-outils.svg
+ls -lh documentation/diagrammes/analyse-parcours-efootprint-outils.pdf
+open documentation/diagrammes/analyse-parcours-efootprint-outils.pdf
 ```
 
 ### Pièges rencontrés à la génération
@@ -822,12 +823,12 @@ diagrammes d'activité (2 blocs `@startuml`/`@enduml`) :
 ### Commandes
 
 ```bash
-plantuml -tsvg documentation/diagramme/eof-pipeline-outils.puml
-rsvg-convert -f pdf -o documentation/diagramme/eof-pipeline-outils.pdf \
-  documentation/diagramme/eof-pipeline-outils.svg \
-  documentation/diagramme/eof-radar-svg.svg
-ls -lh documentation/diagramme/eof-pipeline-outils.pdf
-open documentation/diagramme/eof-pipeline-outils.pdf
+plantuml -tsvg documentation/diagrammes/eof-pipeline-outils.puml
+rsvg-convert -f pdf -o documentation/diagrammes/eof-pipeline-outils.pdf \
+  documentation/diagrammes/eof-pipeline-outils.svg \
+  documentation/diagrammes/eof-radar-svg.svg
+ls -lh documentation/diagrammes/eof-pipeline-outils.pdf
+open documentation/diagrammes/eof-pipeline-outils.pdf
 ```
 
 ### Piège rencontré à la vérification
@@ -839,6 +840,43 @@ option de fond) affiche un fond NOIR même quand le `.puml` porte
 ignore par défaut en conversion PNG (zones transparentes rendues noires). Le SVG et
 le PDF finaux sont corrects (vérifié en ouvrant le vrai PDF) — pour une vérification
 PNG fidèle, forcer le fond explicitement : `rsvg-convert -b white ...`.
+
+-----
+
+## Diagramme 6 — EOF-audit (pipeline outils, étape de `analyse-parcours`)
+
+**Source de vérité :** `.claude/skills/analyse-parcours/scripts/run_eof.py` +
+`eof_criteria_mapping.py` + les 3 extracteurs Phase 1 (`parse_html_criteria.py`,
+`analyze_security_headers.py`, `scan_wellknown.py`) + l'extension
+accessibility/best-practices de `collect_cwv_pagespeed.py` — code réel des
+scripts, comme les diagrammes 3 et 5.
+
+### Description
+
+Distinct du diagramme 5 (skill `eof` : fabrication du template vierge depuis la
+Google Sheet) : celui-ci représente l'**étape `eof-audit`** de `analyse-parcours`,
+qui remplit ce template pour un site audité précis, à partir des données déjà
+collectées (HAR, Coverage, e-footprint, CWV) et de 3 extracteurs ajoutés en
+Phase 1 (2026-09-03, plan `eof-questionnaire`) :
+
+- `parse_html_criteria.py` : re-fetch live des pages déjà auditées (le `.har`
+  capturé ne contient pas les corps de réponse HTML/CSS).
+- `analyze_security_headers.py` : score sécurité local depuis les en-têtes déjà
+  présents dans le `.har`.
+- `scan_wellknown.py` : fetch direct de 3 fichiers publics standards du domaine.
+
+Résultat : 7 critères détaillés automatisables (était 4) + 11 indices "partiel"
+(était 6), sur les 54 du référentiel — 36 restent "je ne sais pas" (questions
+organisationnelles/produit, hors de portée de toute donnée technique d'audit).
+
+### Commandes
+
+```bash
+plantuml -tsvg documentation/diagrammes/eof-audit-pipeline.puml
+rsvg-convert -f pdf -o documentation/diagrammes/eof-audit-pipeline.pdf \
+  documentation/diagrammes/eof-audit-pipeline.svg
+open documentation/diagrammes/eof-audit-pipeline.pdf
+```
 
 -----
 
@@ -892,4 +930,4 @@ skinparam responseMessageBelowArrow true
 - `alt` / `loop` / `note` / `partition` en français.
 - **Interdire les doubles tirets `--` dans les labels.** PlantUML interprète `--texte--`
   comme du texte barré. Utiliser un seul tiret `-`.
-  Vérifier : `grep "\-\-" documentation/diagramme/*.puml` doit retourner 0 occurrence dans les lignes `-> ... :`.
+  Vérifier : `grep "\-\-" documentation/diagrammes/*.puml` doit retourner 0 occurrence dans les lignes `-> ... :`.

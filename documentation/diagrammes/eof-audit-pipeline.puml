@@ -1,0 +1,104 @@
+@startuml eof-audit-pipeline
+title Étape "eof-audit" (skill analyse-parcours) — Pipeline outils -> référentiel EOF
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+  DiamondBackgroundColor #E0F0F4
+  DiamondBorderColor #5BA1BC
+}
+skinparam ArrowColor #5BA1BC
+skinparam ActivityBarColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam PartitionBackgroundColor #ECECF2
+skinparam PartitionBorderColor #5BA1BC
+
+start
+
+partition "**Sources déjà collectées** (parcours de base + e-footprint)" {
+  :env-data.json
+  (device_mix, servers[], traffic, tech_stack...);
+  :audit/har-analysis.json
+  (domaines, http_codes, duplicate_urls);
+  :audit/coverage-analysis.json
+  (JS/CSS inutilisé par page);
+  :cwv.json
+  (LCP/INP/CLS — CrUX ou PageSpeed lab);
+}
+
+note right #C8E6C9
+  cwv.json étendu Phase 1 (2026-09-03) :
+  collect_cwv_pagespeed.py demande en plus
+  les catégories "accessibility" et
+  "best-practices" (même appel API PageSpeed,
+  aucun coût réseau additionnel) ->
+  accessibility_score_pct / best_practices_score_pct
+end note
+
+partition "**Extracteurs Phase 1** (nouveaux, 2026-09-03)" {
+  :parse_html_criteria.py
+  re-fetch live des pages déjà auditées
+  (le .har capturé ne contient pas les
+  corps HTML/CSS — vérifié : 46/311 entrées
+  avec un body, aucune de page HTML/CSS)
+  -> html-css-criteria.json;
+  :analyze_security_headers.py
+  score sécurité local (type securityheaders.com)
+  depuis les en-têtes déjà dans le .har
+  -> security-headers-analysis.json;
+  :scan_wellknown.py
+  fetch direct security.txt / robots.txt /
+  sitemap.xml (3 requêtes HTTP publiques)
+  -> wellknown-scan.json;
+}
+
+note right
+  Piège rencontré et corrigé sur octo.com :
+  robots.txt ET sitemap.xml renvoyaient un
+  statut 200 mais le HTML de fallback de la
+  SPA (catch-all routing), pas la ressource
+  demandée -> détection ajoutée pour ne pas
+  compter un faux "présent".
+end note
+
+partition "**run_eof.py** (déterministe, aucun calcul LLM)" {
+  :Charger eof-referentiel.json
+  (54 critères + 16 Diagnostic rapide,
+  produit par le skill eof, JAMAIS régénéré ici);
+  :Charger les 7 sources ci-dessus
+  dans un dict data{} unique;
+  if (Règle "automatisable" tranche
+  sans ambiguïté ?) then (oui)
+    :Cocher une option du menu à 5
+    (dont "🤔 À évaluer" si zone ambiguë
+    — reste une réponse explicite, pas
+    un "je ne sais pas");
+  else (non / catégorie "partiel")
+    :Afficher un indice contextuel en annexe
+    (confidence low/medium, jamais coché);
+  endif
+  :Calculer les scores par dimension
+  (moyenne pondérée sur les réponses réelles);
+}
+
+note right #C8E6C9
+  Politique anti-fabrication inchangée :
+  7 critères détaillés automatisables (était 4)
+  + 11 indices "partiel" (était 6) après Phase 1.
+  36 critères restent "je ne sais pas"
+  (questions organisationnelles/produit).
+end note
+
+:-> eof-audit-results.json
+(résumé, consommé par generate_report_html.py);
+:-> eof-rempli.md
+(référentiel complet, réponse/contexte + source);
+:-> eof-radar-<domaine>.svg
+(radar 6 dimensions, "N/A" si aucune réponse);
+
+stop
+
+@enduml
