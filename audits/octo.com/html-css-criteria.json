@@ -1,0 +1,93 @@
+{
+  "pages": [
+    {
+      "url": "https://octo.com/",
+      "has_autoplay_media": false,
+      "img_count": 32,
+      "adaptive_img_ratio": 0.66,
+      "native_buttons": 2,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement",
+      "has_autoplay_media": false,
+      "img_count": 11,
+      "adaptive_img_ratio": 0.27,
+      "native_buttons": 2,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/nos-offres",
+      "has_autoplay_media": false,
+      "img_count": 4,
+      "adaptive_img_ratio": 0.0,
+      "native_buttons": 4,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
+      "has_autoplay_media": false,
+      "img_count": 15,
+      "adaptive_img_ratio": 0.27,
+      "native_buttons": 2,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn",
+      "has_autoplay_media": false,
+      "img_count": 15,
+      "adaptive_img_ratio": 0.27,
+      "native_buttons": 2,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    },
+    {
+      "url": "https://octo.com/publications",
+      "has_autoplay_media": false,
+      "img_count": 21,
+      "adaptive_img_ratio": 0.71,
+      "native_buttons": 2,
+      "custom_role_buttons": 0,
+      "viewport_content": "width=device-width,initial-scale=1",
+      "viewport_ok": true,
+      "stylesheet_urls": [
+        "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
+        "https://octo.com/style.css?v=2026-8-3-1-1"
+      ]
+    }
+  ],
+  "css": {
+    "media_query_count": 228,
+    "has_prefers_reduced_or_scheme": false
+  },
+  "note": "HTML/CSS re-fetchés en direct sur les mêmes URLs déjà listées dans env-data.json (le .har capturé ne contient pas les corps de réponse HTML/CSS) — pas de nouveau périmètre de pages."
+}

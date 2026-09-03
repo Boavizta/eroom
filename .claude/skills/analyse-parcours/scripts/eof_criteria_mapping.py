@@ -10,13 +10,36 @@ et les exemples de valeurs ci-dessous ont été vérifiés sur `audits/octo.com/
 au moment de l'écriture (2026-09-03) ; à revalider si la structure de ces
 fichiers change.
 
-Reconnaissance de départ (54 critères passés en revue un par un) :
-seulement 5 sont réellement automatisables depuis les données déjà
-collectées, 5 donnent un indice faible/indirect (jamais une validation), et
-44 sont des questions organisationnelles ou produit (revues de code, tests,
-documentation, connaissance des utilisateurs cibles, etc.) qu'aucune donnée
-technique d'audit ne peut renseigner. Ce n'est pas un défaut de ce fichier :
-c'est la nature du référentiel EOF, largement humain par construction.
+Reconnaissance de départ (54 critères passés en revue un par un) : 4 sont
+automatisables depuis les données déjà collectées, 6 donnent un indice
+faible/indirect (jamais une validation), et 44 sont des questions
+organisationnelles ou produit qu'aucune donnée technique d'audit ne peut
+renseigner (+ 0.16, seule exception "🏦 0-Diagnostic rapide", traitée à part
+dans run_eof.py). Ce n'est pas un défaut de ce fichier : c'est la nature du
+référentiel EOF, largement humain par construction.
+
+Extension Phase 1 (2026-09-03, cf. plan `eof-questionnaire`) : +3
+automatisables (1.5, 1.6, 1.13, via `parse_html_criteria.py` et l'extension
+accessibility/best-practices de `collect_cwv_pagespeed.py`) et +5 indices
+(1.4, 1.11, 6.1, 6.3, 6.6, via `parse_html_criteria.py`,
+`analyze_security_headers.py`, `scan_wellknown.py`). Deux volets prévus par
+le plan initial se sont révélés irréalisables en pratique et ont été
+abandonnés (jamais de valeur inventée à la place) :
+- 1.1 (Lighthouse a11y/Best Practices) supposait des données déjà collectées
+  dans `audit/lighthouse-*.json` — inexistant : ni `run_lighthouse.sh` ni
+  `collect_cwv_pagespeed.py` ne demandaient ces catégories. Corrigé en
+  étendant `collect_cwv_pagespeed.py` (même appel API, catégories
+  supplémentaires, aucun coût réseau additionnel) plutôt qu'abandonné.
+- 1.2/1.8 (réseau CrUX "effective_connection_type", "phone_lowend") :
+  l'API CrUX (`chromeuxreport.googleapis.com`) n'expose PAS ces dimensions
+  (erreur HTTP 400 "invalid metric" testée en conditions réelles) — ce
+  n'est pas un chantier "faible effort", la donnée n'existe simplement pas
+  via cette API. 1.8 et 1.9 restent donc "partiel" comme avant Phase 1.
+- 1.4/1.5 (parsing HTML/CSS) supposait de lire les corps HTML/CSS déjà
+  présents dans le `.har` — vérifié : 46/311 entrées seulement ont un body
+  capturé (aucune n'étant du HTML/CSS de page). `parse_html_criteria.py`
+  refait donc un fetch HTTP direct des mêmes URLs déjà auditées (pas un
+  nouveau périmètre de pages, juste une source de contenu différente).
 
 Politique de sortie, stricte, pour ne jamais fabriquer un score :
 - "automatisable" -> la règle peut cocher une option précise du menu à 5
@@ -140,6 +163,86 @@ MAPPING = {
         "regle": "Même champ que 1.15 : donne le chiffre de trafic, pas la comparaison à l'infrastructure réellement déployée (dimensionnement serveur non mesuré de façon fiable, cf. efootprint-synthese-python.json où server_type/instance_type sont souvent des défauts de script, pas des observations).",
         "confidence_max": "medium",
         "note": "Ne jamais croiser avec server_type/instance_type d'efootprint-synthese-python.json si leur source est 'default_script' - ce serait fabriquer un jugement à partir d'un défaut technique, pas d'une mesure.",
+    },
+    "1.5": {
+        "critere_court": "Y a-t-il des animations/vidéos/sons lus automatiquement ?",
+        "categorie": "automatisable",
+        "champ_donnee": "html-css-criteria.json: pages[].has_autoplay_media (HTML re-fetché en direct, cf. note du script — le .har ne contient pas les corps HTML)",
+        "regle": (
+            "Aucune page avec <video autoplay> ni <audio autoplay> -> "
+            "'✅ Point fort confirmé'. Au moins une page concernée -> "
+            "'💡 Potentiel d'amélioration identifié'."
+        ),
+        "confidence_max": "high",
+        "note": "Ne détecte que l'attribut HTML autoplay au chargement, pas un autoplay déclenché en JS après coup (angle mort connu).",
+    },
+    "1.6": {
+        "critere_court": "Est-il possible d'adapter les ressources à la configuration matérielle de l'utilisateur ?",
+        "categorie": "automatisable",
+        "champ_donnee": "html-css-criteria.json: pages[].adaptive_img_ratio (srcset/<picture>) ET css.media_query_count",
+        "regle": (
+            "'✅' seulement si AUCUNE page n'a un adaptive_img_ratio à 0 (avec des "
+            "images) ET qu'au moins 3 media queries CSS distinctes existent. "
+            "'💡' seulement si NI srcset/<picture> NI media query ne sont trouvés nulle "
+            "part. Sinon (signal mixte : ex. media queries nombreuses mais une page "
+            "sans image adaptative) -> '🤔 À évaluer' (contrainte déterministe : deux "
+            "signaux discordants ne sont jamais tranchés au doigt mouillé)."
+        ),
+        "confidence_max": "medium",
+        "note": "Deux proxys distincts (images responsive, CSS adaptative) fusionnés prudemment ; ne mesure pas l'adaptation JS (ex. qualité vidéo dynamique).",
+    },
+    "1.13": {
+        "critere_court": "Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?",
+        "categorie": "automatisable",
+        "champ_donnee": "cwv.json: accessibility_score_pct (API PageSpeed Insights, catégorie accessibility, mêmes appels que les CWV)",
+        "regle": (
+            "Score d'accessibilité >= 90 sur TOUTES les pages/stratégies -> "
+            "'✅ Point fort confirmé'. Score < 60 sur au moins une -> "
+            "'💡 Potentiel d'amélioration identifié'. Zone 60-90 sans aucune page "
+            "< 60 -> '🤔 À évaluer' (ambigu, ne pas trancher)."
+        ),
+        "confidence_max": "high",
+        "note": "Proxy accessibilité (pas directement 'fluidité de parcours') — le référentiel n'a pas de critère a11y dédié dans les 54, celui-ci est le plus proche sémantiquement. À corroborer humainement.",
+    },
+    "1.4": {
+        "critere_court": "La conception comprend-elle des composants personnalisés plutôt que des composants natifs ?",
+        "categorie": "partiel",
+        "champ_donnee": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
+        "regle": "Un ratio custom/natif élevé est un indice de composants réinventés plutôt que natifs - ne couvre que les boutons (proxy partiel, pas tous les composants UI personnalisés).",
+        "confidence_max": "low",
+        "note": "Détection HTML statique uniquement (post-hydratation React/Vue le DOM réel diffère potentiellement) — indice, jamais une preuve.",
+    },
+    "1.11": {
+        "critere_court": "Sobriété par défaut : préférences système respectées (mouvement réduit, thème) ?",
+        "categorie": "partiel",
+        "champ_donnee": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
+        "regle": "Présence de @media (prefers-reduced-motion) ou (prefers-color-scheme) dans le CSS chargé est un indice de sobriété par défaut - l'absence n'est pas une preuve d'absence de sobriété (peut être géré autrement, ex. JS).",
+        "confidence_max": "low",
+        "note": "Détection syntaxique simple (présence de la règle), pas de vérification que le comportement réel change en conséquence.",
+    },
+    "6.1": {
+        "critere_court": "Existe-t-il un dispositif d'observabilité efficace pour le produit ?",
+        "categorie": "partiel",
+        "champ_donnee": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
+        "regle": "Un score sécurité élevé (grade A/B) est un indice indirect de maturité opérationnelle générale, jamais une preuve d'observabilité (métriques/logs/traces) - donnée totalement invisible côté client.",
+        "confidence_max": "low",
+        "note": "Proxy très indirect (rigueur sécurité != observabilité) ; affiché en annexe seulement, jamais coché.",
+    },
+    "6.3": {
+        "critere_court": "Existe-t-il un processus CI/CD efficace ?",
+        "categorie": "partiel",
+        "champ_donnee": "har-analysis.json: http_codes/dominant_http_version (part HTTP/2) ; wellknown-scan.json: sitemap.days_since_lastmod",
+        "regle": "HTTP/2 généralisé et/ou sitemap récent (<30j) sont des indices indirects de maturité de déploiement - ne mesurent ni la fréquence de déploiement réelle ni l'existence d'un pipeline CI/CD (le contenu peut être mis à jour manuellement).",
+        "confidence_max": "low",
+        "note": "Deux proxys faibles et indirects, jamais combinés en une réponse automatique.",
+    },
+    "6.6": {
+        "critere_court": "Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?",
+        "categorie": "partiel",
+        "champ_donnee": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
+        "regle": "Un score Best Practices élevé et/ou un security.txt bien formé sont des indices de pratiques de qualité outillées - ne prouvent jamais l'existence d'indicateurs de qualité suivis en interne (SonarQube, etc., invisibles côté client).",
+        "confidence_max": "low",
+        "note": "Trois proxys faibles combinés en annexe informative seulement, jamais un critère cochable automatiquement.",
     },
     "5.5": {
         "critere_court": "Les parcours critiques (les plus fréquents) sont-ils optimisés en priorité ?",

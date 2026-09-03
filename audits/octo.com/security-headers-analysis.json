@@ -1,0 +1,304 @@
+{
+  "pages": [
+    {
+      "url": "https://octo.com/",
+      "score_pct": 90,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=31536000; includeSubDomains",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement",
+      "score_pct": 90,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=31536000; includeSubDomains",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/nos-offres",
+      "score_pct": 90,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=31536000; includeSubDomains",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
+      "score_pct": 70,
+      "grade": "B",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn",
+      "score_pct": 70,
+      "grade": "B",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://octo.com/publications",
+      "score_pct": 90,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self' 'unsafe-inline' 'unsafe-eval' *.herokuapp.com *.laduckconf.com *.lagrosseconf.com *.schoolofpo.com *.usievents.com *.octo.com octo.com octo.tools *.octo.tools *.googleapis.com *.gstatic.com *.amazonaws.com *.hsforms.net *.hsforms.com *.hs-scripts.com *.hs-analytics.net *.hubspot.com *.hs-banner.com *.hsadspixel.net *.hubapi.com *.licdn.com *.linkedin.com cdnjs.cloudflare.com swetrix.org cdn.jsdelivr.net challenges.cloudflare.com octo-6695516.hs-sites.com static.hsappstatic.net blob: data:",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=31536000; includeSubDomains",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    }
+  ],
+  "worst_page": {
+    "url": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
+    "score_pct": 70,
+    "grade": "B"
+  },
+  "note": "Score calculé localement (pondération inspirée de securityheaders.com), depuis les en-têtes déjà capturés dans le .har — aucun appel réseau."
+}

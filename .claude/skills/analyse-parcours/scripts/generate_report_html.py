@@ -2771,14 +2771,21 @@ def _section_eof(results, radar_svg_text=None):
     # Aperçu Diagnostic rapide (0) — toujours "à remplir humainement", jamais
     # de tentative de réponse automatique (échelle 1-5 différente, décision
     # explicite) : placé AVANT le radar des 6 dimensions détaillées.
-    diag_rows = "".join(
-        (
-            f'<li>{q["id"]} — {q["critere"]} → <b>{q["reponse"].replace("<", "&lt;")}</b> '
-            f'{_confidence_badge(q["confidence"])} '
-            f'<span style="color:#888;font-size:12px">(doublon exact de 3.3)</span></li>'
-        ) if q.get("reponse") else f'<li>{q["id"]} — {q["critere"]}</li>'
-        for q in diag.get("questions", [])
-    )
+    def _diag_row(q):
+        if q.get("reponse"):
+            doublon = ' <span style="color:#888;font-size:12px">(doublon exact de 3.3)</span>' if q["id"] == "0.16" else ""
+            return (
+                f'<li>{q["id"]} — {q["critere"]} → <b>{q["reponse"].replace("<", "&lt;")}</b> '
+                f'{_confidence_badge(q["confidence"])}{doublon}</li>'
+            )
+        if q.get("indice_contextuel"):
+            return (
+                f'<li>{q["id"]} — {q["critere"]} '
+                f'<span style="color:#888;font-size:13px">— donnée indicative : {q["indice_contextuel"]}</span></li>'
+            )
+        return f'<li>{q["id"]} — {q["critere"]}</li>'
+
+    diag_rows = "".join(_diag_row(q) for q in diag.get("questions", []))
     diag_block = f"""
   <h3>🏦 0 — Diagnostic rapide (aperçu)</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
@@ -2930,11 +2937,11 @@ def _methodo_eof(results):
     return f"""
   <h3 style="margin-top:24px">Détail des 54 critères EOF</h3>
   <p style="font-size:15px;color:#666">
-    {_confidence_badge("high")} déduit d’une mesure directe (CrUX, ipinfo)
+    {_confidence_badge("high")} déduit d’une mesure directe (CrUX, ipinfo, PageSpeed Insights)
     &nbsp;·&nbsp;
-    {_confidence_badge("medium")} déduit d’un signal indirect (détection HAR/tech stack)
+    {_confidence_badge("medium")} déduit d’un signal indirect (détection HAR/tech stack, HTML/CSS re-fetché)
     &nbsp;·&nbsp;
-    {_confidence_badge("low")} indice contextuel faible, jamais une réponse validée
+    {_confidence_badge("low")} indice contextuel faible (en-têtes sécurité, security.txt/robots.txt/sitemap, HTML/CSS statique), jamais une réponse validée
   </p>
   <table style="width:100%;border-collapse:collapse;font-size:14px">
     <thead><tr style="background:{OCTO_PALE}">
@@ -2947,10 +2954,18 @@ def _methodo_eof(results):
     <tbody>{rows}</tbody>
   </table>
   <p style="font-size:14px;color:#888;margin-top:8px">
-    Table de correspondance : <code>eof_criteria_mapping.py</code> (10 critères avec règle,
-    44 absents par choix = toujours "je ne sais pas"). Régénérer après une nouvelle
-    collecte de données : <code>python3 run_eof.py &lt;source_dir&gt;</code> puis régénérer
-    le rapport.
+    Table de correspondance : <code>eof_criteria_mapping.py</code> (18 critères avec règle :
+    7 automatisables + 11 indices "partiel", 36 absents par choix = toujours "je ne sais pas").
+    Sources exploitées, en plus de <code>env-data.json</code>/<code>har-analysis.json</code>/
+    <code>coverage-analysis.json</code>/<code>cwv.json</code> : <code>html-css-criteria.json</code>
+    (re-fetch live des pages déjà auditées — <code>parse_html_criteria.py</code>),
+    <code>security-headers-analysis.json</code> (score sécurité local depuis le HAR —
+    <code>analyze_security_headers.py</code>), <code>wellknown-scan.json</code> (fetch direct
+    security.txt/robots.txt/sitemap.xml — <code>scan_wellknown.py</code>), et
+    <code>accessibility_score_pct</code>/<code>best_practices_score_pct</code> dans
+    <code>cwv.json</code> (catégories PageSpeed Insights ajoutées à l'appel existant).
+    Régénérer après une nouvelle collecte de données :
+    <code>python3 run_eof.py &lt;source_dir&gt;</code> puis régénérer le rapport.
   </p>"""
 
 

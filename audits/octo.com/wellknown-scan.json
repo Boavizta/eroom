@@ -1,0 +1,13 @@
+{
+  "domain": "octo.com",
+  "security_txt": {
+    "present": false
+  },
+  "robots_txt": {
+    "present": false
+  },
+  "sitemap": {
+    "present": false
+  },
+  "note": "Fetch direct et public (aucune authentification), pas de nouvel appel au-delà de ces 2-3 requêtes HTTP par domaine."
+}

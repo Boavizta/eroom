@@ -3,17 +3,21 @@
 site audité, à partir UNIQUEMENT de `eof-referentiel.json` (produit par le
 skill `eof`) et des données déjà collectées par `analyse-parcours`
 (`env-data.json`, `audit/har-analysis.json`, `audit/coverage-analysis.json`,
-`cwv.json`). Ne lit JAMAIS la Google Sheet ni le Markdown humain — c'est le
-découplage voulu entre "synchroniser le référentiel" et "auditer un site"
-(cf. plan d'architecture, `tmp/handoff.md`).
+`cwv.json`, `security-headers-analysis.json`, `wellknown-scan.json`,
+`html-css-criteria.json`). Ne lit JAMAIS la Google Sheet ni le Markdown
+humain — c'est le découplage voulu entre "synchroniser le référentiel" et
+"auditer un site" (cf. plan d'architecture, `tmp/handoff.md`).
 
-Sur les 54 critères détaillés (6 dimensions), une reconnaissance manuelle a
-montré que seuls 10 sont exploitables depuis les données d'audit existantes
-(4 "automatisable" avec case cochée, 6 "partiel" avec indice contextuel
-jamais coché) — les 44 autres restent "je ne sais pas" par construction,
+Sur les 54 critères détaillés (6 dimensions), une reconnaissance manuelle
+initiale (2026-09-03) avait montré que 10 étaient exploitables (4
+"automatisable", 6 "partiel"). Extension Phase 1 (même jour, plan
+`eof-questionnaire`) : 18 exploitables (7 "automatisable" avec case cochée :
+1.12, 2.1, 3.3, 5.4, 1.5, 1.6, 1.13 ; 11 "partiel" avec indice contextuel
+jamais coché) — les 36 autres restent "je ne sais pas" par construction,
 cf. `eof_criteria_mapping.py`. Les 16 questions de 🏦 0-Diagnostic rapide ne
 sont JAMAIS remplies automatiquement (échelle 1-5 différente, décision
-explicite) : elles apparaissent seulement en aperçu.
+explicite), SAUF 0.16 : elles apparaissent en aperçu, avec pour 0.4 et 0.10
+un indice contextuel affiché à titre indicatif (jamais une réponse cochée).
 
 Usage :
     python3 run_eof.py <source_dir>
@@ -65,14 +69,21 @@ def load_audit_data(source_dir):
     har = load_json(find_first(audit_dir / "har-analysis.json", source_dir / "har-analysis.json"))
     coverage = load_json(find_first(audit_dir / "coverage-analysis.json", source_dir / "coverage-analysis.json"))
     cwv = load_json(find_first(source_dir / "cwv.json", audit_dir / "cwv.json"))
-    return env, har, coverage, cwv
+    headers = load_json(find_first(source_dir / "security-headers-analysis.json", audit_dir / "security-headers-analysis.json"))
+    wellknown = load_json(find_first(source_dir / "wellknown-scan.json", audit_dir / "wellknown-scan.json"))
+    htmlcss = load_json(find_first(source_dir / "html-css-criteria.json", audit_dir / "html-css-criteria.json"))
+    return {
+        "env": env, "har": har, "coverage": coverage, "cwv": cwv,
+        "headers": headers, "wellknown": wellknown, "htmlcss": htmlcss,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Règles "automatisable" : retournent (reponse, confidence, source) ou (None, None, motif)
 # ---------------------------------------------------------------------------
 
-def rule_1_12(env, har, coverage, cwv):
+def rule_1_12(data):
+    env = data["env"]
     categories = ((env or {}).get("tech_stack") or {}).get("categories") or {}
     analytics = categories.get("Analytics")
     tp_share = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("third_party_share")
@@ -83,7 +94,8 @@ def rule_1_12(env, har, coverage, cwv):
             f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra}")
 
 
-def rule_2_1(env, har, coverage, cwv):
+def rule_2_1(data):
+    env = data["env"]
     ai = (env or {}).get("ai_external_apis") or {}
     techs = ((env or {}).get("tech_stack") or {}).get("technologies") or []
     flagged = [t["name"] for t in techs if t.get("category", "").lower() in ("ia", "intelligence artificielle", "blockchain")]
@@ -93,7 +105,8 @@ def rule_2_1(env, har, coverage, cwv):
     return "💡 Potentiel d'amélioration identifié", "medium", f"env-data.json: ai_external_apis/tech_stack = {detail}"
 
 
-def rule_3_3(env, har, coverage, cwv):
+def rule_3_3(data):
+    env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
         servers = [env["server"]]
@@ -110,7 +123,8 @@ def rule_3_3(env, har, coverage, cwv):
     return "✅ Point fort confirmé", "high", f"env-data.json: servers[] = {detail} (sous le seuil {seuil} gCO2/kWh)"
 
 
-def rule_5_4(env, har, coverage, cwv):
+def rule_5_4(data):
+    cwv = data["cwv"]
     if not cwv:
         return None, None, "cwv.json absent"
     poor_pages, all_good = [], True
@@ -132,7 +146,57 @@ def rule_5_4(env, har, coverage, cwv):
     return "🤔 À évaluer", "high", "cwv.json: zone intermédiaire ('needs improvement'), aucune page 'poor'"
 
 
-RULES = {"1.12": rule_1_12, "2.1": rule_2_1, "3.3": rule_3_3, "5.4": rule_5_4}
+# --- Extension Phase 1 (2026-09-03) ---------------------------------------
+
+def rule_1_5(data):
+    htmlcss = data["htmlcss"]
+    pages = (htmlcss or {}).get("pages")
+    if not pages:
+        return None, None, "html-css-criteria.json absent"
+    offenders = [p["url"] for p in pages if p.get("has_autoplay_media")]
+    if offenders:
+        return "💡 Potentiel d'amélioration identifié", "high", f"html-css-criteria.json: autoplay détecté sur {offenders}"
+    return "✅ Point fort confirmé", "high", "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
+
+
+def rule_1_6(data):
+    htmlcss = data["htmlcss"]
+    pages = (htmlcss or {}).get("pages")
+    css = (htmlcss or {}).get("css")
+    if not pages or css is None:
+        return None, None, "html-css-criteria.json absent"
+    ratios = [p["adaptive_img_ratio"] for p in pages if p.get("adaptive_img_ratio") is not None]
+    has_any_adaptive_img = any(r > 0 for r in ratios)
+    all_pages_adaptive = bool(ratios) and all(r >= 0.5 for r in ratios)
+    has_media_queries = (css.get("media_query_count") or 0) >= 3
+    source = f"html-css-criteria.json: adaptive_img_ratio par page = {ratios} ; media_query_count = {css.get('media_query_count')}"
+    if all_pages_adaptive and has_media_queries:
+        return "✅ Point fort confirmé", "medium", source
+    if not has_any_adaptive_img and not has_media_queries:
+        return "💡 Potentiel d'amélioration identifié", "medium", source
+    return "🤔 À évaluer", "medium", source + " (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)"
+
+
+def rule_1_13(data):
+    cwv = data["cwv"]
+    if not cwv:
+        return None, None, "cwv.json absent"
+    scores = [e["accessibility_score_pct"] for e in cwv if e.get("accessibility_score_pct") is not None]
+    if not scores:
+        return None, None, "cwv.json: aucun accessibility_score_pct disponible"
+    worst = min(scores)
+    source = f"cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = {worst}, valeurs = {scores}"
+    if worst < 60:
+        return "💡 Potentiel d'amélioration identifié", "high", source
+    if worst >= 90:
+        return "✅ Point fort confirmé", "high", source
+    return "🤔 À évaluer", "high", source + " (zone 60-90, ambigu)"
+
+
+RULES = {
+    "1.12": rule_1_12, "2.1": rule_2_1, "3.3": rule_3_3, "5.4": rule_5_4,
+    "1.5": rule_1_5, "1.6": rule_1_6, "1.13": rule_1_13,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +216,8 @@ RULES = {"1.12": rule_1_12, "2.1": rule_2_1, "3.3": rule_3_3, "5.4": rule_5_4}
 _CARBON_BUCKETS = [(100, 5), (200, 4), (300, 3), (500, 2)]
 
 
-def rule_diag_0_16(env, crans):
+def rule_diag_0_16(data, crans):
+    env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
         servers = [env["server"]]
@@ -179,12 +244,14 @@ def rule_diag_0_16(env, crans):
 # Contextes "partiel" : indice affiché en annexe, jamais une réponse cochée
 # ---------------------------------------------------------------------------
 
-def context_1_9(env, har, coverage, cwv):
+def context_1_9(data):
+    env = data["env"]
     v = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("data_transferred_bytes_real")
     return f"Poids réel transféré (page repère) : {v / 1024:.0f} Ko" if v else None
 
 
-def context_1_14(env, har, coverage, cwv):
+def context_1_14(data):
+    env = data["env"]
     pages = [(p.get("url", "?"), p.get("size_kb")) for p in ((env or {}).get("pages") or []) if p.get("size_kb") is not None]
     if not pages:
         return None
@@ -192,13 +259,15 @@ def context_1_14(env, har, coverage, cwv):
     return f"Page la plus lourde : {pages[0][0]} ({pages[0][1]:.0f} Ko) ; la plus légère : {pages[-1][0]} ({pages[-1][1]:.0f} Ko)"
 
 
-def context_1_15(env, har, coverage, cwv):
+def context_1_15(data):
+    env = data["env"]
     t = (env or {}).get("traffic") or {}
     v = t.get("visits_per_year")
     return f"Trafic estimé : {v:,} visites/an ({t.get('source', '?')})" if v else None
 
 
-def context_5_5(env, har, coverage, cwv):
+def context_5_5(data):
+    coverage = data["coverage"]
     pages = (coverage or {}).get("pages") or []
     worst = sorted(pages, key=lambda p: -(p.get("js_unused_pct") or 0))[:2]
     if not worst:
@@ -206,25 +275,110 @@ def context_5_5(env, har, coverage, cwv):
     return "; ".join(f"{p.get('url', '?')} : JS inutilisé {p.get('js_unused_pct', '?')}%" for p in worst)
 
 
-def context_2_5(env, har, coverage, cwv):
+def context_2_5(data):
+    har = data["har"]
     dups = sorted((har or {}).get("duplicate_urls") or [], key=lambda d: -d.get("count", 0))[:3]
     if not dups:
         return None
     return "; ".join(f"{d['url']} ×{d['count']}" for d in dups)
 
 
+# --- Extension Phase 1 (2026-09-03) ---------------------------------------
+
+def context_1_4(data):
+    htmlcss = data["htmlcss"]
+    pages = (htmlcss or {}).get("pages") or []
+    native = sum(p.get("native_buttons") or 0 for p in pages)
+    custom = sum(p.get("custom_role_buttons") or 0 for p in pages)
+    if native + custom == 0:
+        return None
+    return f"Boutons natifs <button> : {native} ; boutons personnalisés (role=\"button\") : {custom} (toutes pages confondues)"
+
+
+def context_1_11(data):
+    htmlcss = data["htmlcss"]
+    css = (htmlcss or {}).get("css")
+    if css is None:
+        return None
+    return ("@media (prefers-reduced-motion|prefers-color-scheme) détecté dans le CSS chargé"
+            if css.get("has_prefers_reduced_or_scheme")
+            else "Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé")
+
+
+def context_6_1(data):
+    headers = data["headers"]
+    worst = (headers or {}).get("worst_page")
+    if not worst:
+        return None
+    return f"Score en-têtes sécurité (proxy indirect de maturité prod) : {worst['score_pct']}% (grade {worst['grade']}) sur {worst['url']}"
+
+
+def context_6_3(data):
+    wellknown = data["wellknown"]
+    parts = []
+    sitemap = (wellknown or {}).get("sitemap") or {}
+    if sitemap.get("present") and sitemap.get("days_since_lastmod") is not None:
+        parts.append(f"sitemap.xml mis à jour il y a {sitemap['days_since_lastmod']} jour(s)")
+    elif wellknown is not None:
+        parts.append("sitemap.xml absent ou sans <lastmod>")
+    return "; ".join(parts) if parts else None
+
+
+def context_6_6(data):
+    cwv = data["cwv"]
+    headers = data["headers"]
+    wellknown = data["wellknown"]
+    parts = []
+    if cwv:
+        bp_scores = [e["best_practices_score_pct"] for e in cwv if e.get("best_practices_score_pct") is not None]
+        if bp_scores:
+            parts.append(f"Best Practices Lighthouse (pire page) : {min(bp_scores)}%")
+    if headers and headers.get("worst_page"):
+        parts.append(f"en-têtes sécurité (pire page) : grade {headers['worst_page']['grade']}")
+    if wellknown is not None:
+        txt = (wellknown.get("security_txt") or {})
+        parts.append(f"security.txt : {'présent, bien formé' if txt.get('well_formed') else ('présent, mal formé' if txt.get('present') else 'absent')}")
+    return "; ".join(parts) if parts else None
+
+
 CONTEXTS = {
     "1.9": context_1_9, "1.14": context_1_14,
     "1.15": context_1_15, "1.16": context_1_15,  # même champ trafic
     "5.5": context_5_5, "2.5": context_2_5,
+    "1.4": context_1_4, "1.11": context_1_11,
+    "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6,
 }
+
+# Indices contextuels pour 🏦 0-Diagnostic rapide — jamais une réponse cochée
+# (seul 0.16 a droit à une réponse automatique, cf. plus haut), simplement une
+# donnée affichée en regard de la question dans l'aperçu.
+
+def diag_context_0_4(data):
+    har = data["har"]
+    third_party = (har or {}).get("domains", {}).get("third_party")
+    if third_party is None:
+        return None
+    return f"{len(third_party)} domaine(s) tiers détecté(s) dans le HAR (≠ dépendances techniques du SI, simple proxy) : {', '.join(third_party)}"
+
+
+def diag_context_0_10(data):
+    wellknown = data["wellknown"]
+    sitemap = (wellknown or {}).get("sitemap") or {}
+    if not sitemap.get("present") or not sitemap.get("url_count"):
+        return None
+    import math
+    n = sitemap["url_count"]
+    return f"{n} URL(s) dans le sitemap (échelle grossière log2 ≈ {math.log2(n):.1f})"
+
+
+DIAG_CONTEXTS = {"0.4": diag_context_0_4, "0.10": diag_context_0_10}
 
 
 # ---------------------------------------------------------------------------
 # Évaluation d'un critère
 # ---------------------------------------------------------------------------
 
-def evaluate_criterion(crit, env, har, coverage, cwv):
+def evaluate_criterion(crit, data):
     entry = MAPPING.get(crit["id"])
     result = {
         "id": crit["id"], "dimension": crit["pilier"], "critere": crit["critere"],
@@ -237,7 +391,7 @@ def evaluate_criterion(crit, env, har, coverage, cwv):
     result["categorie"] = entry["categorie"]
     if entry["categorie"] == "automatisable":
         rule = RULES.get(crit["id"])
-        reponse, confidence, source = rule(env, har, coverage, cwv) if rule else (None, None, "règle non implémentée")
+        reponse, confidence, source = rule(data) if rule else (None, None, "règle non implémentée")
         result["source"] = source
         if reponse is not None:
             result["reponse"] = reponse
@@ -245,7 +399,7 @@ def evaluate_criterion(crit, env, har, coverage, cwv):
             result["confidence"] = confidence
     elif entry["categorie"] == "partiel":
         ctx_fn = CONTEXTS.get(crit["id"])
-        contexte = ctx_fn(env, har, coverage, cwv) if ctx_fn else None
+        contexte = ctx_fn(data) if ctx_fn else None
         if contexte:
             result["contexte"] = contexte
             result["confidence"] = entry["confidence_max"]
@@ -253,15 +407,18 @@ def evaluate_criterion(crit, env, har, coverage, cwv):
     return result
 
 
-def build_diag_rapide_apercu(referentiel, env):
+def build_diag_rapide_apercu(referentiel, data):
     questions = []
     for q in referentiel["diagnostic_rapide"]:
         entry = {"id": q["id"], "critere": q["critere"], "niveau_impact": q["niveau_impact"],
-                 "reponse": None, "confidence": None, "source": None}
+                 "reponse": None, "confidence": None, "source": None, "indice_contextuel": None}
         if q["id"] == "0.16":
-            reponse, confidence, source = rule_diag_0_16(env, q["crans"])
+            reponse, confidence, source = rule_diag_0_16(data, q["crans"])
             if reponse is not None:
                 entry.update(reponse=reponse, confidence=confidence, source=source)
+        ctx_fn = DIAG_CONTEXTS.get(q["id"])
+        if ctx_fn:
+            entry["indice_contextuel"] = ctx_fn(data)
         questions.append(entry)
     return questions
 
@@ -303,6 +460,11 @@ def build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_aper
                 f"- **{q['id']}** — {q['critere']} → **{q['reponse']}** "
                 f"_(automatique, confidence {q['confidence']} — {q['source']})_"
             )
+        elif q.get("indice_contextuel"):
+            lines.append(
+                f"- **{q['id']}** — {q['critere']} _(niveau d'impact : {q['niveau_impact']})_ "
+                f"— donnée indicative : {q['indice_contextuel']}"
+            )
         else:
             lines.append(f"- **{q['id']}** — {q['critere']} _(niveau d'impact : {q['niveau_impact']})_")
     lines.append("")
@@ -341,15 +503,16 @@ def main():
         sys.exit(1)
     referentiel = json.loads(REFERENTIEL_PATH.read_text(encoding="utf-8"))
 
-    env, har, coverage, cwv = load_audit_data(source_dir)
-    if not any((env, har, coverage, cwv)):
-        print("⚠ Aucune donnée d'audit trouvée (env-data.json / har-analysis.json / coverage-analysis.json / cwv.json) "
+    data = load_audit_data(source_dir)
+    if not any(data.values()):
+        print("⚠ Aucune donnée d'audit trouvée (env-data.json / har-analysis.json / coverage-analysis.json / "
+              "cwv.json / security-headers-analysis.json / wellknown-scan.json / html-css-criteria.json) "
               "— tous les critères resteront 'je ne sais pas'.")
 
-    results = [evaluate_criterion(c, env, har, coverage, cwv) for c in referentiel["criteres"]]
+    results = [evaluate_criterion(c, data) for c in referentiel["criteres"]]
     results_by_id = {r["id"]: r for r in results}
     dimensions = compute_dimension_scores(results)
-    diag_rapide_apercu = build_diag_rapide_apercu(referentiel, env)
+    diag_rapide_apercu = build_diag_rapide_apercu(referentiel, data)
 
     auto_answered = [r for r in results if r["categorie"] == "automatisable" and r["reponse"] is not None]
     partiel_with_context = [r for r in results if r["categorie"] == "partiel" and r["contexte"] is not None]

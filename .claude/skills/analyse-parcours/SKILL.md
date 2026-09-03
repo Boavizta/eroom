@@ -9,7 +9,7 @@ description: >
   "impact CO2", "empreinte environnementale", "efootprint",
   "empreinte écologique du site", "/efootprint", ou mention d'un env-data.json /
   efootprint-boavizta-model.json.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Analyse de parcours web (HAR + Coverage)

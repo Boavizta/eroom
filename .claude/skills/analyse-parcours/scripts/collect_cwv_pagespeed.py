@@ -18,9 +18,15 @@ Lit GOOGLE_API_KEY depuis .env à la racine du projet.
 Format de sortie :
     [
       {"page": "page_1", "url": "https://...", "lcp": 2.5, "inp": 200, "cls": 0.1,
-       "source": "crux", "strategy": "mobile", "crux_category": "NEEDS_IMPROVEMENT"},
+       "source": "crux", "strategy": "mobile", "crux_category": "NEEDS_IMPROVEMENT",
+       "accessibility_score_pct": 96, "best_practices_score_pct": 92},
       ...
     ]
+
+accessibility_score_pct / best_practices_score_pct : scores Lighthouse (mêmes
+appels API, catégories additionnelles demandées dans la même requête — pas
+d'appel réseau supplémentaire) — absents (clé omise) si l'API ne les renvoie
+pas pour cette page.
 
 Sources possibles :
     "crux"          - Données terrain CrUX P75 (recommandé — utilisateurs réels)
@@ -107,9 +113,9 @@ def call_pagespeed(url, api_key, strategy="mobile"):
         "url": url,
         "key": api_key,
         "strategy": strategy,
-        "category": "performance",
+        "category": ["performance", "accessibility", "best-practices"],
     }
-    full_url = PAGESPEED_API + "?" + urllib.parse.urlencode(params)
+    full_url = PAGESPEED_API + "?" + urllib.parse.urlencode(params, doseq=True)
     try:
         req = urllib.request.urlopen(full_url, timeout=30)
         return json.loads(req.read().decode("utf-8"))
@@ -182,6 +188,21 @@ def extract_lab(data):
     }
 
 
+def extract_lighthouse_scores(data):
+    """Extrait les scores Lighthouse accessibility / best-practices (0-100),
+    présents dans la même réponse API quelle que soit la source (crux/lab) des
+    CWV. Retourne {} si absents (jamais une valeur inventée)."""
+    categories = data.get("lighthouseResult", {}).get("categories", {})
+    out = {}
+    a11y = categories.get("accessibility", {}).get("score")
+    if a11y is not None:
+        out["accessibility_score_pct"] = round(a11y * 100)
+    bp = categories.get("best-practices", {}).get("score")
+    if bp is not None:
+        out["best_practices_score_pct"] = round(bp * 100)
+    return out
+
+
 def collect(audit_dir, urls, api_key, strategies=("mobile",)):
     """Collecte les CWV pour chaque URL et chaque stratégie.
 
@@ -210,6 +231,12 @@ def collect(audit_dir, urls, api_key, strategies=("mobile",)):
                 else:
                     print(f"    [{strategy}] -> Aucune métrique disponible.")
                     continue
+
+            lh_scores = extract_lighthouse_scores(data)
+            if lh_scores:
+                entry.update(lh_scores)
+                print(f"    [{strategy}] -> Lighthouse a11y={lh_scores.get('accessibility_score_pct', '?')} "
+                      f"best-practices={lh_scores.get('best_practices_score_pct', '?')}")
 
             results.append(entry)
             time.sleep(0.5)  # Éviter de dépasser le quota par minute
