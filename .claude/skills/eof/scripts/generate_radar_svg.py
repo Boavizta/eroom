@@ -33,7 +33,13 @@ AXES_EOF = [
 
 
 def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
-    """axes : liste de tuples (nom, valeur 0-100). Retourne le texte SVG complet.
+    """axes : liste de tuples (nom, valeur 0-100 OU None). Retourne le texte SVG complet.
+
+    Une valeur `None` (dimension sans aucune donnée réelle) est rendue à
+    r=0 (le polygone se pince sur cet axe) avec un marqueur gris "N/A" au
+    lieu d'un point coloré + pourcentage : jamais assimilée à un vrai 0%
+    (qui signifierait "point fort confirmé partout"), une absence de
+    réponse n'est pas une réponse.
 
     width/height généreux par défaut : le libellé le plus long ("Facilité de
     changement") dépasse largement le rayon du radar. Une valeur trop petite
@@ -46,7 +52,7 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
 
     def point(i, value):
         angle = -math.pi / 2 + i * 2 * math.pi / n
-        r = R * (value / SCALE)
+        r = R * ((value or 0) / SCALE)
         return cx + r * math.cos(angle), cy + r * math.sin(angle)
 
     def axis_end(i):

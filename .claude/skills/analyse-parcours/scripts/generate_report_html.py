@@ -2099,6 +2099,30 @@ def load_topology_svg(audit_dir):
     return None
 
 
+def load_eof_results(audit_dir):
+    """Cherche eof-audit-results.json (audit_dir ou parent) — résumé léger
+    écrit par `run_eof.py::main()`. Jamais lu s'il est absent (rapport
+    rétrocompatible, même principe que load_synthese_python())."""
+    audit_dir = Path(audit_dir)
+    for candidate in [audit_dir / "eof-audit-results.json",
+                       audit_dir.parent / "eof-audit-results.json"]:
+        if candidate.exists():
+            with open(candidate, encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def load_eof_radar_svg(audit_dir):
+    """Cherche un eof-radar-*.svg (audit_dir ou parent), produit par
+    `run_eof.py` (radar_svg() du skill eof, dimensions 'N/A' incluses)."""
+    audit_dir = Path(audit_dir)
+    for parent in (audit_dir, audit_dir.parent):
+        candidates = sorted(parent.glob("eof-radar-*.svg"))
+        if candidates:
+            return candidates[0].read_text(encoding="utf-8")
+    return None
+
+
 def load_tech_stack(audit_dir):
     """Cherche le bloc tech_stack dans env-data.json (audit_dir ou parent).
 
@@ -2683,6 +2707,182 @@ def _section_efootprint(results, topology_svg=None):
 </section>"""
 
 
+def _section_eof(results, radar_svg_text=None):
+    """Section 'Potentiel d'optimisation (référentiel EOF)' - depuis
+    eof-audit-results.json (run_eof.py). Absent -> section omise, rapport
+    rétrocompatible (même principe que _section_efootprint()).
+
+    La grande majorité des 54 critères détaillés ne peut PAS être déduite
+    des données d'audit (questions organisationnelles/produit) : le ratio
+    réel observé est faible (quelques critères sur 54), affiché tel quel,
+    jamais maquillé. Une dimension sans aucune réponse affiche "sans
+    donnée", jamais un faux 0 % (cf. radar_svg() du skill eof)."""
+    if not results:
+        return ""
+
+    total = results.get("criteres_total", 0)
+    n_auto = results.get("criteres_repondus_auto", 0)
+    n_partiel = results.get("criteres_avec_indice_partiel", 0)
+    potentiel = results.get("potentiel_optimisation_global_pct")
+    dimensions = results.get("dimensions", [])
+    diag = results.get("diagnostic_rapide_apercu", {})
+
+    warning = (
+        f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
+        f'padding:12px 16px;margin:16px 0;border-radius:4px">'
+        f'<b>&#9888; Audit automatique très partiel</b><br>'
+        f'Sur {total} critères détaillés, seuls <b>{n_auto}</b> ont pu être '
+        f'répondus automatiquement depuis les données d’audit (+ {n_partiel} '
+        f'indice(s) contextuel(s), jamais une réponse validée). Les autres '
+        f'restent <b>"je ne sais pas"</b> par construction : ce sont des '
+        f'questions organisationnelles ou produit, qu’aucune mesure technique '
+        f'ne peut trancher. Détail complet critère par critère en annexe.'
+        f'</div>'
+    )
+
+    # Aperçu Diagnostic rapide (0) — toujours "à remplir humainement", jamais
+    # de tentative de réponse automatique (échelle 1-5 différente, décision
+    # explicite) : placé AVANT le radar des 6 dimensions détaillées.
+    diag_rows = "".join(
+        (
+            f'<li>{q["id"]} — {q["critere"]} → <b>{q["reponse"].replace("<", "&lt;")}</b> '
+            f'{_confidence_badge(q["confidence"])} '
+            f'<span style="color:#888;font-size:12px">(doublon exact de 3.3)</span></li>'
+        ) if q.get("reponse") else f'<li>{q["id"]} — {q["critere"]}</li>'
+        for q in diag.get("questions", [])
+    )
+    diag_block = f"""
+  <h3>🏦 0 — Diagnostic rapide (aperçu)</h3>
+  <p style="font-size:15px;color:#666;margin:0 0 8px">
+    {diag.get("total_questions", 0)} questions, échelle 1 à 5, <b>jamais remplies
+    automatiquement</b> (décision explicite : aucune donnée d’audit ne permet de
+    juger ces critères de façon fiable), à une exception près (0.16, doublon exact
+    de 3.3, voir ci-dessous). À évaluer humainement dans le template du skill
+    <code>eof</code>.
+  </p>
+  <ul style="font-size:14px;color:#555;columns:2;column-gap:24px">{diag_rows}</ul>"""
+
+    # KPIs en tête, scopés aux 54 critères détaillés uniquement (décision du 2026-09-03)
+    kpi_style = (
+        "flex:1;min-width:180px;background:white;border:1px solid #ddd;"
+        "border-radius:6px;padding:16px;text-align:center"
+    )
+    potentiel_txt = f"~{potentiel:.0f}%" if potentiel is not None else "n/a"
+    kpis = (
+        f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
+        f'  <div style="{kpi_style}">'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Remplissage automatique</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{n_auto}/{total}</div>'
+        f'    <div style="font-size:14px;color:#888">critères répondus (54 détaillés)</div>'
+        f'  </div>'
+        f'  <div style="{kpi_style}">'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Potentiel d’optimisation</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{potentiel_txt}</div>'
+        f'    <div style="font-size:14px;color:#888">moyenne pondérée, sur les réponses réelles uniquement</div>'
+        f'  </div>'
+        f'</div>'
+    )
+
+    radar_block = ""
+    if radar_svg_text:
+        radar_block = f"""
+  <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white;text-align:center">
+    {radar_svg_text}
+  </div>"""
+
+    dim_rows = ""
+    for d in dimensions:
+        score_txt = f"{d['score_pct']:.0f}%" if d.get("score_pct") is not None else '<span style="color:#888">sans donnée</span>'
+        dim_rows += (
+            f'<tr>'
+            f'<td style="padding:6px 8px">{d["nom"]}</td>'
+            f'<td style="padding:6px 8px;text-align:right">{d["repondus"]}/{d["total"]}</td>'
+            f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{score_txt}</td>'
+            f'</tr>'
+        )
+    dim_table = f"""<table style="width:100%;border-collapse:collapse;margin-top:12px">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:6px 8px;text-align:left">Dimension</th>
+      <th style="padding:6px 8px;text-align:right">Répondus</th>
+      <th style="padding:6px 8px;text-align:right">Potentiel d’optimisation</th>
+    </tr></thead>
+    <tbody>{dim_rows}</tbody>
+  </table>"""
+
+    return f"""<section id="eof">
+  <h2>Potentiel d’optimisation (référentiel EOF)</h2>
+  {warning}
+  {diag_block}
+  <h3 style="margin-top:24px">Six dimensions détaillées</h3>
+  {kpis}
+  {radar_block}
+  {dim_table}
+  <p style="font-size:14px;color:#888;margin-top:12px">
+    Un score plus élevé reflète un potentiel d’optimisation plus important (pas une
+    meilleure note). Détail critère par critère, source et confiance de chaque réponse
+    en annexe.
+  </p>
+</section>"""
+
+
+def _methodo_eof(results):
+    """Annexe méthodologique EOF : le détail des 54 critères, un par un —
+    réponse ou "je ne sais pas", confidence, source/donnée exploitée. Jamais
+    de valeur masquée : c'est ici qu'on voit explicitement les critères
+    sans aucune donnée, pas seulement le résumé optimiste du corps."""
+    if not results:
+        return ""
+    rows = ""
+    for c in results.get("criteres", []):
+        if c["reponse"]:
+            valeur = c["reponse"]
+            source = c.get("source") or "—"
+            conf = c.get("confidence")
+        elif c.get("contexte"):
+            valeur = f'je ne sais pas <span style="color:#888">— indice : {c["contexte"]}</span>'
+            source = c.get("source") or "—"
+            conf = c.get("confidence")
+        else:
+            valeur = "je ne sais pas"
+            source = "aucune donnée d’audit (critère organisationnel/produit)"
+            conf = None
+        src_html = _confidence_badge(conf) if conf else '<span style="color:#aaa">—</span>'
+        rows += (
+            f'<tr>'
+            f'<td style="padding:5px 8px;white-space:nowrap">{c["id"]}</td>'
+            f'<td style="padding:5px 8px">{c["critere"]}</td>'
+            f'<td style="padding:5px 8px">{valeur}</td>'
+            f'<td style="padding:5px 8px">{src_html}</td>'
+            f'<td style="padding:5px 8px;font-size:13px;color:#666">{source}</td>'
+            f'</tr>'
+        )
+    return f"""
+  <h3 style="margin-top:24px">Détail des 54 critères EOF</h3>
+  <p style="font-size:15px;color:#666">
+    {_confidence_badge("high")} déduit d’une mesure directe (CrUX, ipinfo)
+    &nbsp;·&nbsp;
+    {_confidence_badge("medium")} déduit d’un signal indirect (détection HAR/tech stack)
+    &nbsp;·&nbsp;
+    {_confidence_badge("low")} indice contextuel faible, jamais une réponse validée
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:5px 8px;text-align:left">ID</th>
+      <th style="padding:5px 8px;text-align:left">Critère</th>
+      <th style="padding:5px 8px;text-align:left">Réponse</th>
+      <th style="padding:5px 8px;text-align:left">Confiance</th>
+      <th style="padding:5px 8px;text-align:left">Source / donnée exploitée</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+  <p style="font-size:14px;color:#888;margin-top:8px">
+    Table de correspondance : <code>eof_criteria_mapping.py</code> (10 critères avec règle,
+    44 absents par choix = toujours "je ne sais pas"). Régénérer après une nouvelle
+    collecte de données : <code>python3 run_eof.py &lt;source_dir&gt;</code> puis régénérer
+    le rapport.
+  </p>"""
+
+
 def _methodo_table(rows):
     """Rend un tableau Paramètre / Valeur / Source-confiance pour l'annexe méthodo.
 
@@ -3098,9 +3298,9 @@ def _methodo_trafic(synthese_python=None):
     )
 
 
-def _section_methodologie(synthese_python, cwv):
+def _section_methodologie(synthese_python, cwv, eof_results=None):
     """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
-    E: médias).
+    E: médias, F: EOF).
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
@@ -3110,6 +3310,7 @@ def _section_methodologie(synthese_python, cwv):
         _methodo_ecoindex(),
         _methodo_trafic(synthese_python),
         _methodo_medias(),
+        _methodo_eof(eof_results),
     ]
     body = "".join(p for p in parts if p)
     return (
@@ -3537,6 +3738,8 @@ def generate(audit_dir, output_path=None):
     synthese_python = load_synthese_python(audit_dir)
     topology_svg = load_topology_svg(audit_dir)
     tech_stack = load_tech_stack(audit_dir)
+    eof_results = load_eof_results(audit_dir)
+    eof_radar_svg = load_eof_radar_svg(audit_dir)
 
     coverage_by_page = {}
     _asset_exts = re.compile(r'\.(js|css|webp|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|otf|eot|json|map)(\?.*)?$', re.I)
@@ -3669,6 +3872,10 @@ def generate(audit_dir, output_path=None):
     if synthese_python:
         efootprint_nav = f'<li><a href="#efootprint">{n}. Impact environnemental (CO2e)</a></li>'
         n += 1
+    eof_nav = ""
+    if eof_results:
+        eof_nav = f'<li><a href="#eof">{n}. Potentiel d’optimisation (EOF)</a></li>'
+        n += 1
     annexes_num = n
     annexe_inline = " &nbsp;·&nbsp; ".join(
         f'<a href="#{sid}">{annexes_num}.{letters[i]} {slabel}</a>'
@@ -3680,6 +3887,7 @@ def generate(audit_dir, output_path=None):
         f'{medias_nav}'
         f'{cwv_nav}'
         f'{efootprint_nav}'
+        f'{eof_nav}'
         f'<li style="display:flex;flex-direction:column;gap:2px">'
         f'<span style="display:flex;flex-direction:row;align-items:baseline;gap:12px">'
         f'<a href="#annexes">{annexes_num}. Annexes</a>'
@@ -3714,6 +3922,8 @@ def generate(audit_dir, output_path=None):
         html += _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page)
     if synthese_python:
         html += _section_efootprint(synthese_python, topology_svg)
+    if eof_results:
+        html += _section_eof(eof_results, eof_radar_svg)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
@@ -3731,7 +3941,7 @@ def generate(audit_dir, output_path=None):
     _annexe_ids = [sid for sid, _ in annexe_sections]
     methodo_num = f"A.{_annexe_ids.index('methodologie') + 1}"
     glossaire_num = f"A.{_annexe_ids.index('glossaire') + 1}"
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv), methodo_num)}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results), methodo_num)}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), glossaire_num)}</div>\n'
     html += '</section>\n'
 

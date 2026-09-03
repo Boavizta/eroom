@@ -137,6 +137,20 @@ L'utilisateur peut forcer un re-run en disant "relance Lighthouse".
 
 ---
 
+## Étape 39 — Potentiel d'optimisation (référentiel EOF)
+
+→ Voir `skill-steps/39_eof-audit.md`
+
+Étape **automatique** (pas une commande), déclenchée après l'Étape 37, avant
+le rapport. Remplit ce qui peut l'être du référentiel EOF-V.1.1 depuis
+`eof-referentiel.json` (skill `eof`) et les données déjà collectées — jamais
+la Google Sheet. Sur 54 critères détaillés, seuls ~10 sont exploitables
+(4 automatisables, 6 indices partiels) ; les autres restent "je ne sais pas"
+par construction. Si `eof-referentiel.json` est absent : étape sautée,
+rapport sans section EOF.
+
+---
+
 ## Étape 40 — Rapport HTML
 
 → Voir `skill-steps/40_rapport.md`

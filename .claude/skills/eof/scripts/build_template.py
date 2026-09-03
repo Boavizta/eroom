@@ -162,6 +162,66 @@ def build_pillar(json_dir, tab_name, title):
     return "\n".join(out)
 
 
+def parse_poids(v):
+    if v is None:
+        return None
+    return float(str(v).replace(",", "."))
+
+
+def build_diag_rapide_json(json_dir):
+    """Liste structurée des 16 questions de l'onglet 0-Diagnostic rapide,
+    pour affichage en aperçu (topo) uniquement — échelle 1-5 différente des
+    6 dimensions détaillées, jamais remplie automatiquement par `eof-audit`,
+    jamais mêlée à la liste `criteres` (54) ni à son radar."""
+    rows = load_tab(json_dir, "diag-rapide")
+    out = []
+    for r in rows:
+        crit_id = cell(r, 1)
+        if not is_id(crit_id):
+            continue
+        methode = cell(r, 4)
+        crans = [c.strip() for c in methode.split("\n") if c.strip()] if methode else []
+        out.append({
+            "id": crit_id,
+            "critere": cell(r, 2),
+            "crans": crans,
+            "niveau_impact": cell(r, 5),
+        })
+    return out
+
+
+def build_referentiel_json(json_dir):
+    """Construit la table structurée du référentiel :
+    - `criteres` : les 54 critères détaillés (6 dimensions), ceux que lit
+      `eof-audit` pour remplir automatiquement et calculer le radar.
+    - `diagnostic_rapide` : les 16 questions de l'onglet 0, pour un aperçu
+      seulement (échelle différente, jamais remplies automatiquement — cf.
+      section "Comment ce référentiel se lit").
+    C'est ce fichier, et lui seul, que le futur processus `eof-audit` doit
+    lire : jamais la Google Sheet, jamais le Markdown humain.
+    """
+    criteres = []
+    for key, title in PILLAR_TABS:
+        rows = load_tab(json_dir, key)
+        eval_options = FACILITE_EVAL_OPTIONS if key == "facilite" else PILLAR_EVAL_OPTIONS
+        for r in rows:
+            crit_id = cell(r, 1)
+            if not is_id(crit_id):
+                continue
+            criteres.append({
+                "id": crit_id,
+                "pilier": title,
+                "critere": cell(r, 2),
+                "explication": cell(r, 3),
+                "methode": cell(r, 5),
+                "niveau_impact": cell(r, 6),
+                "poids": parse_poids(cell(r, 9)),
+                "options_evaluation": [o for o, _ in eval_options],
+                "options_evaluation_score": {o: s for o, s in eval_options},
+            })
+    return {"criteres": criteres, "diagnostic_rapide": build_diag_rapide_json(json_dir)}
+
+
 def build_a_lire(json_dir):
     rows = load_tab(json_dir, "a-lire")
     out = ["## 📖 À lire\n"]
@@ -308,7 +368,17 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
 
+    referentiel = build_referentiel_json(json_dir)
+    referentiel_path = os.path.join(os.path.dirname(out_path) or ".", "eof-referentiel.json")
+    with open(referentiel_path, "w", encoding="utf-8") as f:
+        json.dump(referentiel, f, ensure_ascii=False, indent=2)
+
     print(f"Template écrit : {out_path}")
+    print(
+        f"Référentiel structuré écrit : {referentiel_path} "
+        f"({len(referentiel['criteres'])} critères détaillés + "
+        f"{len(referentiel['diagnostic_rapide'])} questions Diagnostic rapide)"
+    )
     print("Critères par pilier :", criteria_counts, "total =", sum(criteria_counts.values()))
 
 
