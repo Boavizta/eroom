@@ -62,18 +62,21 @@ HORS de ce plan").
 
 MAPPING = {
     "1.12": {
-        "critere_court": "Le produit exploite-t-il des données inutiles (tracking non essentiel) ?",
+        "critere_court": "Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?",
         "categorie": "automatisable",
-        "champ_donnee": "env-data.json: tech_stack.categories['Analytics'] (liste des technos détectées) ; har_summary.efootprint.third_party_share",
+        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (inventaire tiers déclarés) ; har-analysis.json: domains (tiers réellement chargés)",
         "regle": (
-            "Si aucune techno de catégorie 'Analytics' n'est détectée -> "
-            "'✅ Point fort confirmé'. Si au moins une est détectée -> "
-            "'💡 Potentiel d'amélioration identifié' (jamais '✅' dans ce cas : "
-            "la détection ne dit rien de la finalité du traceur - mesure "
-            "d'audience légitime vs marketing tiers -, seulement de sa présence)."
+            "Si un CSP est présent et que des hôtes de pistage (familles "
+            "marketing_crm, pixels_publicitaires_sociaux, analytics_comportemental) "
+            "sont effectivement chargés -> '💡 Potentiel d'amélioration identifié'. "
+            "Si des hôtes de pistage sont déclarés au CSP mais absents du HAR -> "
+            "'🤔 À évaluer' (écart probable : capture faite sans accepter le consentement). "
+            "Si seulement de l'analytics sobre est chargé (sans cookie, sans profilage) -> "
+            "'✅ Point fort confirmé'. "
+            "Si aucun CSP n'est disponible, repli sur l'ancienne heuristique tech_stack."
         ),
         "confidence_max": "medium",
-        "note": "Détecte uniquement ce qui transite côté client (HAR) ; un tracking côté serveur (ex. logs) est invisible.",
+        "note": "Détecte uniquement ce qui transite côté client (HAR) ; un tracking côté serveur (ex. logs) est invisible. L'analytics sobre (Swetrix, Plausible, Matomo...) est volontairement exclu du pistage.",
     },
     "2.1": {
         "critere_court": "Le produit utilise-t-il des technologies dont l'impact environnemental est significatif (IA générative, blockchain) sans justification claire ?",
@@ -90,10 +93,18 @@ MAPPING = {
         "confidence_max": "medium",
         "note": "Un appel IA fait côté backend (jamais visible dans le HAR client) est invisible à cette règle - un 'aucun signal' n'est jamais une preuve d'absence.",
     },
+    "2.3": {
+        "critere_court": "Est-il possible d'optimiser la séparation et la communication entre les composants ?",
+        "categorie": "partiel",
+        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+        "regle": "La présence de domaines PaaS backend distincts déclarés dans le CSP (famille paas_backend de csp_inventory) est un indice de composants séparés - ne prouve ni l'optimisation de leur couplage ni l'efficacité de leur communication.",
+        "confidence_max": "low",
+        "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité. Angle mort structurel : un backend auto-hébergé derrière un reverse proxy 1st-party est invisible ici.",
+    },
     "2.5": {
         "critere_court": "Les résultats de calculs ou de requêtes coûteux sont-ils mis en cache plutôt que recalculés à chaque fois ?",
         "categorie": "partiel",
-        "champ_donnee": "audit/har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
+        "champ_donnee": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
         "regle": (
             "Une URL à fort 'count' dans duplicate_urls, avec une faible part "
             "de réponses 304 dans http_codes, est un indice de requête répétée "
@@ -116,6 +127,22 @@ MAPPING = {
         ),
         "confidence_max": "high",
         "note": "La donnée carbon_intensity (ipinfo + table carbone) est déjà confidence 'high' en source ; ne couvre que les serveurs identifiés depuis le HAR, jamais une infra invisible (BDD/service auto-hébergé derrière l'applicatif).",
+    },
+    "3.5": {
+        "critere_court": "L'infrastructure peut-elle être mutualisée ?",
+        "categorie": "partiel",
+        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
+        "regle": "La présence de domaines PaaS/CDN/cloud mutualisé déclarés dans le CSP est un indice d'infrastructure mutualisée - ne prouve pas que TOUTE l'infrastructure l'est, ni l'absence de serveurs dédiés ailleurs.",
+        "confidence_max": "low",
+        "note": "Inventaire déclaré (CSP), pas observé. Un domaine cloud autorisé n'est pas nécessairement sollicité. Angle mort structurel : une infra auto-hébergée derrière un reverse proxy 1st-party est invisible ici.",
+    },
+    "3.7": {
+        "critere_court": "Des outils et des stratégies d'élasticité/d'auto-scaling peuvent-ils être déployés pour réduire la taille de l'infrastructure ?",
+        "categorie": "partiel",
+        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+        "regle": "La présence de domaines PaaS backend déclarés dans le CSP est un indice de plate-forme supportant l'élasticité - ne prouve pas que l'auto-scaling est configuré, ni que la charge varie suffisamment pour le justifier.",
+        "confidence_max": "low",
+        "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité, et même sollicité, rien ne dit que l'élasticité est activée. Angle mort structurel : un Kubernetes auto-hébergé est invisible ici.",
     },
     "5.4": {
         "critere_court": "Les indicateurs de performance (Core Web Vitals) sont-ils bons ?",
@@ -231,10 +258,10 @@ MAPPING = {
     "6.3": {
         "critere_court": "Existe-t-il un processus CI/CD efficace ?",
         "categorie": "partiel",
-        "champ_donnee": "har-analysis.json: http_codes/dominant_http_version (part HTTP/2) ; wellknown-scan.json: sitemap.days_since_lastmod",
-        "regle": "HTTP/2 généralisé et/ou sitemap récent (<30j) sont des indices indirects de maturité de déploiement - ne mesurent ni la fréquence de déploiement réelle ni l'existence d'un pipeline CI/CD (le contenu peut être mis à jour manuellement).",
+        "champ_donnee": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
+        "regle": "Fraîcheur de déploiement (âge de la ressource la plus récente) et atomicité (dispersion des Last-Modified entre ressources de code) sont des indices indirects de maturité de déploiement - ne mesurent ni la fréquence de déploiement réelle ni l'existence d'un pipeline CI/CD (le contenu peut être mis à jour manuellement).",
         "confidence_max": "low",
-        "note": "Deux proxys faibles et indirects, jamais combinés en une réponse automatique.",
+        "note": "Une dispersion serrée peut résulter d'un dépôt manuel de l'arborissance complète, et un déploiement récent ne dit rien de la fréquence des déploiements.",
     },
     "6.6": {
         "critere_court": "Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?",
@@ -244,10 +271,18 @@ MAPPING = {
         "confidence_max": "low",
         "note": "Trois proxys faibles combinés en annexe informative seulement, jamais un critère cochable automatiquement.",
     },
+    "6.8": {
+        "critere_court": "Y a-t-il du code dupliqué dans l'application ?",
+        "categorie": "partiel",
+        "champ_donnee": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
+        "regle": "L'absence de duplication détectée par Lighthouse (score=1, 0 items) ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente de bundles JS côté client - un indice faible, jamais une validation.",
+        "confidence_max": "low",
+        "note": "Détection côté client uniquement (JS chargé dans le HAR), angle mort sur le code backend et sur la duplication interne au sein d'un même bundle.",
+    },
     "5.5": {
         "critere_court": "Les parcours critiques (les plus fréquents) sont-ils optimisés en priorité ?",
         "categorie": "partiel",
-        "champ_donnee": "audit/coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
+        "champ_donnee": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
         "regle": "Suppose que les pages effectivement auditées sont les parcours les plus fréquents du site - hypothèse non vérifiée par les données disponibles (pas de classement de fréquentation par page).",
         "confidence_max": "low",
         "note": "Le \"critique\"/\"fréquent\" n'est jamais mesuré : seul le contenu des pages auditées l'est.",

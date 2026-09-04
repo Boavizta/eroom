@@ -36,6 +36,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from eof_criteria_mapping import MAPPING  # noqa: E402
+from csp_inventory import inventory_from_headers_analysis, tracking_summary  # noqa: E402
+from deploy_freshness import analyse_har_freshness, find_har, summarise  # noqa: E402
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent / "eof" / "scripts"))
 from generate_radar_svg import radar_svg  # noqa: E402
@@ -64,6 +66,9 @@ def find_first(*candidates):
 
 
 def load_audit_data(source_dir):
+    """Charge les données d'audit. COÛT : parse le .har entier (fichier lourd)
+    pour deploy_freshness, alors qu'aujourd'hui seuls les résumés JSON étaient lus.
+    """
     audit_dir = source_dir / "audit"
     env = load_json(find_first(source_dir / "env-data.json", audit_dir / "env-data.json"))
     har = load_json(find_first(audit_dir / "har-analysis.json", source_dir / "har-analysis.json"))
@@ -75,6 +80,7 @@ def load_audit_data(source_dir):
     return {
         "env": env, "har": har, "coverage": coverage, "cwv": cwv,
         "headers": headers, "wellknown": wellknown, "htmlcss": htmlcss,
+        "source_dir": source_dir,  # exposé pour deploy_freshness (nécessite le chemin du .har, pas le JSON)
     }
 
 
@@ -83,15 +89,55 @@ def load_audit_data(source_dir):
 # ---------------------------------------------------------------------------
 
 def rule_1_12(data):
-    env = data["env"]
-    categories = ((env or {}).get("tech_stack") or {}).get("categories") or {}
-    analytics = categories.get("Analytics")
-    tp_share = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("third_party_share")
-    if not analytics:
-        return "✅ Point fort confirmé", "medium", "env-data.json: tech_stack.categories — aucune techno 'Analytics' détectée"
-    extra = f", third_party_share={tp_share:.1%}" if tp_share is not None else ""
-    return ("💡 Potentiel d'amélioration identifié", "medium",
-            f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra}")
+    """Distingue pistage (marketing, pixels publicitaires, analytics comportemental)
+    de l'analytics sobre (sans cookie, sans profilage).
+    """
+    headers = data["headers"]
+    har = data["har"]
+    inv = inventory_from_headers_analysis(headers)
+
+    # Si aucun CSP disponible, repli sur l'ancienne heuristique tech_stack
+    if inv is None:
+        env = data["env"]
+        categories = ((env or {}).get("tech_stack") or {}).get("categories") or {}
+        analytics = categories.get("Analytics")
+        if not analytics:
+            return "✅ Point fort confirmé", "medium", "env-data.json: tech_stack.categories — aucune techno 'Analytics' détectée"
+        tp_share = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("third_party_share")
+        extra = f", third_party_share={tp_share:.1%}" if tp_share is not None else ""
+        return ("💡 Potentiel d'amélioration identifié", "medium",
+                f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra} (CSP absent : heuristique ancienne)")
+
+    summary = tracking_summary(inv, har)
+    if summary is None or not summary["loaded_connu"]:
+        return (None, None,
+                "security-headers-analysis.json: CSP présent mais har-analysis.json absent — "
+                "impossible de distinguer déclaré/chargé")
+
+    pistage = summary["pistage_charge"]
+    pistage_declare_only = summary["pistage_declare_non_charge"]
+    sobre = summary["analytics_sobre_charge"]
+
+    # Pistage effectivement chargé -> problème identifié
+    if pistage:
+        return ("💡 Potentiel d'amélioration identifié", "medium",
+                f"security-headers-analysis.json + har-analysis.json: pistage effectivement chargé : {', '.join(pistage)}")
+
+    # Pistage déclaré mais absent du HAR -> écart (probablement capture sans consentement)
+    if pistage_declare_only:
+        return ("🤔 À évaluer", "medium",
+                f"security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR "
+                f"({', '.join(pistage_declare_only)}) — probable capture sans accepter le consentement")
+
+    # Seulement analytics sobre -> point fort
+    if sobre:
+        return ("✅ Point fort confirmé", "medium",
+                f"security-headers-analysis.json + har-analysis.json: seulement analytics sobre chargé ({', '.join(sobre)}), "
+                "aucun pistage marketing/publicitaire/comportemental")
+
+    # Ni pistage ni analytics sobre
+    return ("✅ Point fort confirmé", "medium",
+            "security-headers-analysis.json + har-analysis.json: aucun pistage ni analytics détecté")
 
 
 def rule_2_1(data):
@@ -275,6 +321,19 @@ def context_5_5(data):
     return "; ".join(f"{p.get('url', '?')} : JS inutilisé {p.get('js_unused_pct', '?')}%" for p in worst)
 
 
+def context_2_3(data):
+    """Indice de composants backend séparés (PaaS distincts déclarés au CSP)."""
+    headers = data["headers"]
+    inv = inventory_from_headers_analysis(headers)
+    if not inv:
+        return None
+    families = inv["familles"]
+    paas = families.get("paas_backend") or []
+    if not paas:
+        return None
+    return f"Composant(s) backend externalisé(s) détecté(s) ({', '.join(paas)}) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication"
+
+
 def context_2_5(data):
     har = data["har"]
     dups = sorted((har or {}).get("duplicate_urls") or [], key=lambda d: -d.get("count", 0))[:3]
@@ -313,15 +372,54 @@ def context_6_1(data):
     return f"Score en-têtes sécurité (proxy indirect de maturité prod) : {worst['score_pct']}% (grade {worst['grade']}) sur {worst['url']}"
 
 
+def context_3_5(data):
+    """Indice d'infrastructure mutualisée (PaaS/CDN/cloud déclarés au CSP)."""
+    headers = data["headers"]
+    inv = inventory_from_headers_analysis(headers)
+    if not inv:
+        return None
+    families = inv["familles"]
+    paas = families.get("paas_backend") or []
+    cdn = families.get("cdn_bibliotheques") or []
+    cloud = families.get("infra_cloud_generique") or []
+    all_mut = paas + cdn + cloud
+    if not all_mut:
+        return None
+    return f"Infrastructure mutualisée déclarée au CSP : {len(all_mut)} domaine(s) (PaaS/CDN/cloud) : {', '.join(all_mut[:5])}{'...' if len(all_mut) > 5 else ''}"
+
+
+def context_3_7(data):
+    """Indice de plate-forme supportant l'élasticité (PaaS déclarés au CSP)."""
+    headers = data["headers"]
+    inv = inventory_from_headers_analysis(headers)
+    if not inv:
+        return None
+    families = inv["familles"]
+    paas = families.get("paas_backend") or []
+    if not paas:
+        return None
+    return f"Plate-forme(s) PaaS détectée(s) ({', '.join(paas)}) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier"
+
+
 def context_6_3(data):
-    wellknown = data["wellknown"]
-    parts = []
-    sitemap = (wellknown or {}).get("sitemap") or {}
-    if sitemap.get("present") and sitemap.get("days_since_lastmod") is not None:
-        parts.append(f"sitemap.xml mis à jour il y a {sitemap['days_since_lastmod']} jour(s)")
-    elif wellknown is not None:
-        parts.append("sitemap.xml absent ou sans <lastmod>")
-    return "; ".join(parts) if parts else None
+    """Indice de fraîcheur et atomicité de déploiement (Last-Modified du .har)."""
+    source_dir = data.get("source_dir")
+    if not source_dir:
+        return None
+    har_path = find_har(source_dir)
+    if not har_path:
+        return None
+    env = data["env"]
+    first_party_hosts = set()
+    for page in (env or {}).get("pages") or []:
+        url = page.get("url")
+        if url:
+            from urllib.parse import urlparse
+            host = urlparse(url).netloc.lower()
+            if host:
+                first_party_hosts.add(host)
+    info = analyse_har_freshness(har_path, first_party_hosts or None)
+    return summarise(info)
 
 
 def context_6_6(data):
@@ -341,12 +439,46 @@ def context_6_6(data):
     return "; ".join(parts) if parts else None
 
 
+def context_6_8(data):
+    """Indice de duplication de bundles JS (audit Lighthouse duplicated-javascript).
+    Tolérant aux deux formats : logical_name ("duplicated-javascript") ou clé brute
+    ("duplicated-javascript-insight" ou "duplicated-javascript").
+    """
+    cwv = data["cwv"]
+    if not cwv:
+        return None
+    # Chercher l'audit dans toutes les entrées (pages/stratégies)
+    for entry in cwv:
+        insights = entry.get("lighthouse_insights")
+        if not insights:
+            continue
+        # Chercher par logical_name (nouveau format) ou par clés brutes (ancien format)
+        dup = (insights.get("duplicated-javascript") or
+               insights.get("duplicated-javascript-insight"))
+        if dup is None:
+            continue
+        score = dup.get("score")
+        item_count = dup.get("itemCount", 0)
+        found_as = dup.get("found_as")
+        if found_as is None:
+            # Ancien format : deviner la clé depuis insights
+            found_as = "duplicated-javascript-insight" if "duplicated-javascript-insight" in insights else "duplicated-javascript"
+        if score == 1 and item_count == 0:
+            return f"Audit Lighthouse '{found_as}' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente"
+        elif score is not None:
+            return f"Audit Lighthouse '{found_as}' : score {score:.2f}, {item_count} item(s) détecté(s) - indice de duplication potentielle de bundles JS"
+        else:
+            return f"Audit Lighthouse '{found_as}' : présent mais sans score (contenu non analysable)"
+    return None
+
+
 CONTEXTS = {
     "1.9": context_1_9, "1.14": context_1_14,
     "1.15": context_1_15, "1.16": context_1_15,  # même champ trafic
-    "5.5": context_5_5, "2.5": context_2_5,
+    "5.5": context_5_5, "2.3": context_2_3, "2.5": context_2_5,
+    "3.5": context_3_5, "3.7": context_3_7,
     "1.4": context_1_4, "1.11": context_1_11,
-    "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6,
+    "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6, "6.8": context_6_8,
 }
 
 # Indices contextuels pour 🏦 0-Diagnostic rapide — jamais une réponse cochée
@@ -504,7 +636,9 @@ def main():
     referentiel = json.loads(REFERENTIEL_PATH.read_text(encoding="utf-8"))
 
     data = load_audit_data(source_dir)
-    if not any(data.values()):
+    # Clés de données réelles (exclut source_dir, qui est toujours non-None)
+    data_keys = ("env", "har", "coverage", "cwv", "headers", "wellknown", "htmlcss")
+    if not any(data[k] for k in data_keys):
         print("⚠ Aucune donnée d'audit trouvée (env-data.json / har-analysis.json / coverage-analysis.json / "
               "cwv.json / security-headers-analysis.json / wellknown-scan.json / html-css-criteria.json) "
               "— tous les critères resteront 'je ne sais pas'.")

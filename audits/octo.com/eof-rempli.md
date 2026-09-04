@@ -22,7 +22,7 @@
 - **0.16** — Le service est-il hébergé dans un pays dont le mix électrique a un impact significatif ? (en fonction de l'emplacement) → **2- < 500 gCO2e / kWh** _(automatique, confidence high — env-data.json: servers[].carbon_intensity_g_kwh = 381 gCO2e/kWh (doublon de 3.3, même donnée))_
 
 
-## 🛖 1 — Produit — potentiel d'optimisation : 30% (4/16 répondus)
+## 🛖 1 — Produit — potentiel d'optimisation : 0% (4/16 répondus)
 
 ### 1.1 — Existe-t-il un moyen simple pour réaliser cette action ?
 
@@ -75,13 +75,13 @@
 
 ### 1.12 — Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?
 
-**Réponse (automatique)** : 💡 Potentiel d'amélioration identifié
-**Confidence** : medium — **Source** : env-data.json: tech_stack.categories['Analytics'] = Swetrix, third_party_share=5.1%
+**Réponse (automatique)** : 🤔 À évaluer
+**Confidence** : medium — **Source** : security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement
 
 ### 1.13 — Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Confidence** : high — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+**Confidence** : high — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]
 
 ### 1.14 — Les écrans principaux sont-ils clairs et bien conçus ?
 
@@ -112,7 +112,8 @@
 
 ### 2.3 — Est-il possible d'optimiser la séparation et la communication entre les composants ?
 
-**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)
+**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
+**Donnée indicative** (low) : Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
 
 ### 2.4 — Le pic de charge peut-il être lissé sur une échelle de temps ?
 
@@ -141,7 +142,8 @@
 
 ### 3.5 — L'infrastructure peut-elle être mutualisée ?
 
-**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)
+**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
+**Donnée indicative** (low) : Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com... — _champ : security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)_
 
 ### 3.6 — Les composants de déploiement (VM, serveur, conteneurs) sont-ils surdimensionnés ?
 
@@ -149,7 +151,8 @@
 
 ### 3.7 — Des outils et des stratégies d'élasticité/d’auto-scaling peuvent-ils être déployés pour réduire la taille de l'infrastructure ?
 
-**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)
+**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
+**Donnée indicative** (low) : Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
 
 ### 3.8 — Tous les environnements sont-ils toujours activés ?
 
@@ -242,7 +245,7 @@
 ### 6.3 — Existe-t-il un processus CI/CD efficace ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : sitemap.xml absent ou sans <lastmod> — _champ : har-analysis.json: http_codes/dominant_http_version (part HTTP/2) ; wellknown-scan.json: sitemap.days_since_lastmod_
+**Donnée indicative** (low) : ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build — _champ : *.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)_
 
 ### 6.4 — Existe-t-il des tests de non-régression (tests unitaires, tests d'intégration, tests de bout en bout) ?
 
@@ -255,7 +258,7 @@
 ### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Best Practices Lighthouse (pire page) : 77%; en-têtes sécurité (pire page) : grade B; security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
+**Donnée indicative** (low) : Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
 
 ### 6.7 — Existe-t-il une documentation complète ?
 
@@ -263,7 +266,8 @@
 
 ### 6.8 — Y a-t-il du code dupliqué dans l'application ?
 
-**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)
+**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
+**Donnée indicative** (low) : Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente — _champ : cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)_
 
 ### 6.9 — L'équipe dispose-t-elle d'une autonomie suffisante pour déployer les outils dont elle a besoin pour observer, mesurer ou optimiser le système ?
 

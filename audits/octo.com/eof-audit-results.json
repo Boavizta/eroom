@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-09-03T14:47:56.894458+00:00",
+  "generated_at": "2026-09-04T06:42:33.540299+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
   "criteres_repondus_auto": 7,
-  "criteres_avec_indice_partiel": 11,
-  "potentiel_optimisation_global_pct": 33.33333333333333,
+  "criteres_avec_indice_partiel": 15,
+  "potentiel_optimisation_global_pct": 16.666666666666664,
   "dimensions": [
     {
       "nom": "🛖 1 — Produit",
-      "score_pct": 30.0,
+      "score_pct": 0.0,
       "repondus": 4,
       "total": 16
     },
@@ -332,10 +332,10 @@
       "critere": "Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?",
       "poids": 1.5,
       "categorie": "automatisable",
-      "reponse": "💡 Potentiel d'amélioration identifié",
-      "score": 1,
+      "reponse": "🤔 À évaluer",
+      "score": 0,
       "confidence": "medium",
-      "source": "env-data.json: tech_stack.categories['Analytics'] = Swetrix, third_party_share=5.1%",
+      "source": "security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement",
       "contexte": null
     },
     {
@@ -347,7 +347,7 @@
       "reponse": "✅ Point fort confirmé",
       "score": 0,
       "confidence": "high",
-      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]",
+      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]",
       "contexte": null
     },
     {
@@ -415,12 +415,12 @@
       "dimension": "🗺️ 2 — Architecture",
       "critere": "Est-il possible d'optimiser la séparation et la communication entre les composants ?",
       "poids": 1.5,
-      "categorie": "aucune_donnee",
+      "categorie": "partiel",
       "reponse": null,
       "score": null,
-      "confidence": null,
-      "source": null,
-      "contexte": null
+      "confidence": "low",
+      "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+      "contexte": "Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication"
     },
     {
       "id": "2.4",
@@ -487,12 +487,12 @@
       "dimension": "🏢 3 — Infrastructure",
       "critere": "L'infrastructure peut-elle être mutualisée ?",
       "poids": 1.5,
-      "categorie": "aucune_donnee",
+      "categorie": "partiel",
       "reponse": null,
       "score": null,
-      "confidence": null,
-      "source": null,
-      "contexte": null
+      "confidence": "low",
+      "source": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
+      "contexte": "Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com..."
     },
     {
       "id": "3.6",
@@ -511,12 +511,12 @@
       "dimension": "🏢 3 — Infrastructure",
       "critere": "Des outils et des stratégies d'élasticité/d’auto-scaling peuvent-ils être déployés pour réduire la taille de l'infrastructure ?",
       "poids": 1.5,
-      "categorie": "aucune_donnee",
+      "categorie": "partiel",
       "reponse": null,
       "score": null,
-      "confidence": null,
-      "source": null,
-      "contexte": null
+      "confidence": "low",
+      "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+      "contexte": "Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier"
     },
     {
       "id": "3.8",
@@ -755,8 +755,8 @@
       "reponse": null,
       "score": null,
       "confidence": "low",
-      "source": "har-analysis.json: http_codes/dominant_http_version (part HTTP/2) ; wellknown-scan.json: sitemap.days_since_lastmod",
-      "contexte": "sitemap.xml absent ou sans <lastmod>"
+      "source": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
+      "contexte": "ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build"
     },
     {
       "id": "6.4",
@@ -792,7 +792,7 @@
       "score": null,
       "confidence": "low",
       "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
-      "contexte": "Best Practices Lighthouse (pire page) : 77%; en-têtes sécurité (pire page) : grade B; security.txt : absent"
+      "contexte": "Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent"
     },
     {
       "id": "6.7",
@@ -811,12 +811,12 @@
       "dimension": "🛠 6 — Facilité de changement",
       "critere": "Y a-t-il du code dupliqué dans l'application ?",
       "poids": 1.0,
-      "categorie": "aucune_donnee",
+      "categorie": "partiel",
       "reponse": null,
       "score": null,
-      "confidence": null,
-      "source": null,
-      "contexte": null
+      "confidence": "low",
+      "source": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
+      "contexte": "Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente"
     },
     {
       "id": "6.9",

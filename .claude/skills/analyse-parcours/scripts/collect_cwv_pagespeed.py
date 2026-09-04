@@ -46,10 +46,10 @@ import urllib.request
 from pathlib import Path
 
 
-PAGESPEED_API = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+PAGESPEED_API = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"  # genericite: ok - URL officielle API PageSpeed Insights (Google)
 
 # Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"  # genericite: ok - declaration de la constante
 
 # Seuils officiels CWV (Google)
 LCP_GOOD = 2.5    # s
@@ -58,6 +58,70 @@ INP_GOOD = 200    # ms
 INP_POOR = 500
 CLS_GOOD = 0.1
 CLS_POOR = 0.25
+
+# Audits Lighthouse Insights pertinents pour l'écoconception.
+# Structure tolérante aux versions : chaque entrée logique accepte plusieurs noms
+# d'audit alias (nouveau et ancien), et l'extracteur retient le premier présent
+# dans la réponse. Les noms `-insight` sont récents (Lighthouse 12+) ; les
+# anciens existaient avant et peuvent reparaître dans des versions futures ou
+# d'autres services. Aucun crash, aucune valeur inventée si aucun alias n'est présent.
+INSIGHT_AUDIT_KEYS = [
+    {
+        "logical_name": "duplicated-javascript",
+        "aliases": ["duplicated-javascript-insight", "duplicated-javascript"],
+        "description": "Critère EOF 6.8 (duplication de bundles JS)"
+    },
+    {
+        "logical_name": "unused-javascript",
+        "aliases": ["unused-javascript"],
+        "description": "Code mort JS (optimisation poids)"
+    },
+    {
+        "logical_name": "render-blocking",
+        "aliases": ["render-blocking-insight", "render-blocking-resources"],
+        "description": "Ressources bloquant le rendu"
+    },
+    {
+        "logical_name": "total-byte-weight",
+        "aliases": ["total-byte-weight"],
+        "description": "Poids réseau total"
+    },
+    {
+        "logical_name": "dom-size",
+        "aliases": ["dom-size-insight", "dom-size"],
+        "description": "Taille du DOM"
+    },
+    {
+        "logical_name": "bootup-time",
+        "aliases": ["bootup-time"],
+        "description": "Temps d'exécution JS"
+    },
+    {
+        "logical_name": "mainthread-work-breakdown",
+        "aliases": ["mainthread-work-breakdown"],
+        "description": "Charge du thread principal"
+    },
+    {
+        "logical_name": "third-parties",
+        "aliases": ["third-parties-insight", "third-party-summary"],
+        "description": "Dépendances tierces"
+    },
+    {
+        "logical_name": "cache",
+        "aliases": ["cache-insight", "uses-long-cache-ttl"],
+        "description": "Durée de vie du cache"
+    },
+    {
+        "logical_name": "font-display",
+        "aliases": ["font-display-insight", "font-display"],
+        "description": "Affichage des polices"
+    },
+    {
+        "logical_name": "image-size-responsive",
+        "aliases": ["image-size-responsive", "uses-responsive-images"],
+        "description": "Résolution des images"
+    },
+]
 
 
 def load_env(project_root):
@@ -203,6 +267,62 @@ def extract_lighthouse_scores(data):
     return out
 
 
+def extract_insight_scores(data):
+    """Extrait les audits Lighthouse Insights pertinents pour l'écoconception.
+
+    Ces audits sont présents dans la même réponse API que les CWV (même appel
+    réseau, pas de coût supplémentaire). Leur présence dépend de la version de
+    Lighthouse et du contenu de la page analysée.
+
+    Retourne un dict avec une entrée par audit trouvé, indexé par logical_name :
+        {
+          "logical_name": {
+            "score": 0-1 ou None,
+            "numericValue": float ou None,
+            "itemCount": int,
+            "found_as": "audit_key_reel"
+          },
+          ...
+        }
+
+    Retourne {} si aucun audit n'est disponible (jamais de valeur inventée).
+    """
+    audits = data.get("lighthouseResult", {}).get("audits", {})
+    if not audits:
+        return {}
+
+    out = {}
+    for entry in INSIGHT_AUDIT_KEYS:
+        logical_name = entry["logical_name"]
+        aliases = entry["aliases"]
+
+        # Retient le premier alias présent dans la réponse
+        found_key = None
+        audit = None
+        for alias in aliases:
+            if alias in audits:
+                found_key = alias
+                audit = audits[alias]
+                break
+
+        if not audit:
+            continue
+
+        score = audit.get("score")
+        numeric = audit.get("numericValue")
+        items = audit.get("details", {}).get("items", [])
+        item_count = len(items) if isinstance(items, list) else 0
+
+        out[logical_name] = {
+            "score": score,
+            "numericValue": numeric,
+            "itemCount": item_count,
+            "found_as": found_key,
+        }
+
+    return out
+
+
 def collect(audit_dir, urls, api_key, strategies=("mobile",)):
     """Collecte les CWV pour chaque URL et chaque stratégie.
 
@@ -237,6 +357,11 @@ def collect(audit_dir, urls, api_key, strategies=("mobile",)):
                 entry.update(lh_scores)
                 print(f"    [{strategy}] -> Lighthouse a11y={lh_scores.get('accessibility_score_pct', '?')} "
                       f"best-practices={lh_scores.get('best_practices_score_pct', '?')}")
+
+            insights = extract_insight_scores(data)
+            if insights:
+                entry["lighthouse_insights"] = insights
+                print(f"    [{strategy}] -> {len(insights)} audit(s) insight disponible(s)")
 
             results.append(entry)
             time.sleep(0.5)  # Éviter de dépasser le quota par minute
@@ -326,13 +451,15 @@ def main():
     if args.check:
         # Test rapide sur une URL simple
         print("[PageSpeed] Vérification clé API...")
-        data = call_pagespeed("https://www.google.com", api_key, "mobile")
+        data = call_pagespeed("https://www.google.com", api_key, "mobile")  # genericite: ok - URL neutre pour tester la clé API
         if data and "loadingExperience" in data:
             print("[PageSpeed] Clé API valide.")
         else:
             print("[PageSpeed] Clé API invalide ou APIs non activées.")
+            # genericite: ok-debut - URL de documentation officielle Google Cloud
             print("Vérifier que PageSpeed Insights API est activée :")
             print("  https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com")
+            # genericite: ok-fin
             sys.exit(1)
         return
 
