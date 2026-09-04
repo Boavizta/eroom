@@ -1205,6 +1205,38 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             "note": "ipinfo indisponible - France par défaut",
         }
 
+    # --- Détection CDN et ajustement de la confiance pays ---
+    # Quand le service est derrière un CDN, l'IP observée est un point de présence
+    # (PoP) proche de l'auditeur, pas l'origine du service. Le pays déduit d'ipinfo
+    # ne reflète alors pas le vrai pays d'hébergement -> confiance dégradée.
+    cdn_detected = False
+    cdn_sources = []
+
+    # Signal 1 : catégorie CDN dans la stack technique
+    if tech_stack:
+        cdn_list = tech_stack.get("categories", {}).get("CDN", [])
+        if cdn_list:
+            cdn_detected = True
+            cdn_sources.append(f"CDN détecté(s) : {', '.join(cdn_list)}.")
+
+    # Signal 2 : en-têtes de cache observés dans le HAR (servers_info multi-infra)
+    if servers_info:
+        cache_seen_hosts = [s["host"] for s in servers_info if s.get("cache_header_seen")]
+        if cache_seen_hosts:
+            cdn_detected = True
+            cdn_sources.append(f"En-têtes de cache vus ({len(cache_seen_hosts)} host(s)).")
+
+    if cdn_detected:
+        server_section["confidence_country"] = CONFIDENCE_LOW
+        note_parts = [
+            "IP observée probablement un PoP CDN (point de présence proche de l'auditeur), "
+            "pas l'origine du service."
+        ]
+        note_parts.extend(cdn_sources)
+        if server_section.get("org"):
+            note_parts.append(f"ASN : {server_section['org']}.")
+        server_section["country_note"] = " ".join(note_parts)
+
     # --- Job e-footprint (depuis HAR) ---
     job_section = har_metrics.get("efootprint", {}) if har_metrics else {
         "data_transferred_bytes": 500 * 1024,
