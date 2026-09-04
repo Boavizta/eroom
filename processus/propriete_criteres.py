@@ -159,7 +159,7 @@ def compute_ownership(lots, all_criteria):
     Retourne (ownership_map, complement_lots, residuel_lots, contextes_by_lot, errors) où :
       - ownership_map: dict {crit_id: [lot_id, ...]}
       - complement_lots: liste des lots déclarant une règle de complément
-      - residuel_lots: dict {lot_id: nature_preuve} des lots résiduels (pas de critères en propre)
+      - residuel_lots: dict {lot_id: provenance} des lots résiduels (pas de critères en propre)
       - contextes_by_lot: dict {lot_id: set(crit_ids)}
       - errors: liste de messages d'erreur (vide si tout est OK)
 
@@ -183,9 +183,9 @@ def compute_ownership(lots, all_criteria):
         if criteres:
             # Détecter les lots résiduels
             if criteres.get("residuel"):
-                natures = lot.get("natures_autorisees", [])
-                if natures:
-                    residuel_lots[lot["id"]] = natures[0]  # Première nature de preuve
+                provenances = lot.get("provenances_autorisees", [])
+                if provenances:
+                    residuel_lots[lot["id"]] = provenances[0]  # Première provenance
             elif "sauf_lots" not in criteres:
                 owned = resolve_criteres_possedes(lot, all_criteria, automatisables, ownership)
                 if owned is None:

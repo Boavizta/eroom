@@ -24,7 +24,7 @@ Usage :
 
 Écrit dans <source_dir>/ :
     eof-audit-results.json  - résumé léger, consommé par generate_report_html.py
-    eof-rempli.md           - référentiel complet lisible, réponses + confidence + source
+    eof-rempli.md           - référentiel complet lisible, réponses + provenance + source
     eof-radar-<domaine>.svg - radar des 6 dimensions (valeurs None = "N/A", jamais un faux 0%)
 """
 import argparse
@@ -85,12 +85,14 @@ def load_audit_data(source_dir):
 
 
 # ---------------------------------------------------------------------------
-# Règles "automatisable" : retournent (reponse, confidence, source) ou (None, None, motif)
+# Règles "automatisable" : retournent (reponse, provenance, source) ou (None, None, motif)
 # ---------------------------------------------------------------------------
 
 def rule_1_12(data):
     """Distingue pistage (marketing, pixels publicitaires, analytics comportemental)
     de l'analytics sobre (sans cookie, sans profilage).
+
+    Provenance : estime (classification taxonomique des domaines en familles pistage/sobre).
     """
     headers = data["headers"]
     har = data["har"]
@@ -102,10 +104,10 @@ def rule_1_12(data):
         categories = ((env or {}).get("tech_stack") or {}).get("categories") or {}
         analytics = categories.get("Analytics")
         if not analytics:
-            return "✅ Point fort confirmé", "medium", "env-data.json: tech_stack.categories — aucune techno 'Analytics' détectée"
+            return "✅ Point fort confirmé", "estime", "env-data.json: tech_stack.categories — aucune techno 'Analytics' détectée"
         tp_share = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("third_party_share")
         extra = f", third_party_share={tp_share:.1%}" if tp_share is not None else ""
-        return ("💡 Potentiel d'amélioration identifié", "medium",
+        return ("💡 Potentiel d'amélioration identifié", "estime",
                 f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra} (CSP absent : heuristique ancienne)")
 
     summary = tracking_summary(inv, har)
@@ -120,38 +122,49 @@ def rule_1_12(data):
 
     # Pistage effectivement chargé -> problème identifié
     if pistage:
-        return ("💡 Potentiel d'amélioration identifié", "medium",
+        return ("💡 Potentiel d'amélioration identifié", "estime",
                 f"security-headers-analysis.json + har-analysis.json: pistage effectivement chargé : {', '.join(pistage)}")
 
     # Pistage déclaré mais absent du HAR -> écart (probablement capture sans consentement)
     if pistage_declare_only:
-        return ("🤔 À évaluer", "medium",
+        return ("🤔 À évaluer", "estime",
                 f"security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR "
                 f"({', '.join(pistage_declare_only)}) — probable capture sans accepter le consentement")
 
     # Seulement analytics sobre -> point fort
     if sobre:
-        return ("✅ Point fort confirmé", "medium",
+        return ("✅ Point fort confirmé", "estime",
                 f"security-headers-analysis.json + har-analysis.json: seulement analytics sobre chargé ({', '.join(sobre)}), "
                 "aucun pistage marketing/publicitaire/comportemental")
 
     # Ni pistage ni analytics sobre
-    return ("✅ Point fort confirmé", "medium",
+    return ("✅ Point fort confirmé", "estime",
             "security-headers-analysis.json + har-analysis.json: aucun pistage ni analytics détecté")
 
 
 def rule_2_1(data):
+    """Détection de technologies IA et blockchain.
+
+    Provenance : estime. La détection de technologies est une empreinte, pas une
+    mesure : l'absence d'empreinte IA ne prouve pas l'absence d'IA, et le
+    rattachement d'une techno à la catégorie "IA" vient du catalogue de l'outil de
+    détection, pas du service audité.
+    """
     env = data["env"]
     ai = (env or {}).get("ai_external_apis") or {}
     techs = ((env or {}).get("tech_stack") or {}).get("technologies") or []
     flagged = [t["name"] for t in techs if t.get("category", "").lower() in ("ia", "intelligence artificielle", "blockchain")]
     if not ai and not flagged:
-        return "✅ Point fort confirmé", "medium", "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée"
+        return "✅ Point fort confirmé", "estime", "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée"
     detail = list(ai.keys()) + flagged
-    return "💡 Potentiel d'amélioration identifié", "medium", f"env-data.json: ai_external_apis/tech_stack = {detail}"
+    return "💡 Potentiel d'amélioration identifié", "estime", f"env-data.json: ai_external_apis/tech_stack = {detail}"
 
 
 def rule_3_3(data):
+    """Intensité carbone de l'hébergement.
+
+    Provenance : collecte (API ipinfo + table de référence intensité carbone par pays).
+    """
     env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
@@ -165,11 +178,15 @@ def rule_3_3(data):
     )
     over = [s for s in servers if (s.get("carbon_intensity_g_kwh") or 0) > seuil]
     if over:
-        return "💡 Potentiel d'amélioration identifié", "high", f"env-data.json: servers[] = {detail} (seuil {seuil} gCO2/kWh dépassé)"
-    return "✅ Point fort confirmé", "high", f"env-data.json: servers[] = {detail} (sous le seuil {seuil} gCO2/kWh)"
+        return "💡 Potentiel d'amélioration identifié", "collecte", f"env-data.json: servers[] = {detail} (seuil {seuil} gCO2/kWh dépassé)"
+    return "✅ Point fort confirmé", "collecte", f"env-data.json: servers[] = {detail} (sous le seuil {seuil} gCO2/kWh)"
 
 
 def rule_5_4(data):
+    """Core Web Vitals (LCP, INP, CLS).
+
+    Provenance : collecte (données terrain Chrome UX Report via API CrUX).
+    """
     cwv = data["cwv"]
     if not cwv:
         return None, None, "cwv.json absent"
@@ -186,26 +203,37 @@ def rule_5_4(data):
                 (cls is None or cls <= CWV_GOOD["cls"])):
             all_good = False
     if poor_pages:
-        return "💡 Potentiel d'amélioration identifié", "high", f"cwv.json: page(s) en zone 'poor' : {', '.join(sorted(set(poor_pages)))}"
+        return "💡 Potentiel d'amélioration identifié", "collecte", f"cwv.json: page(s) en zone 'poor' : {', '.join(sorted(set(poor_pages)))}"
     if all_good:
-        return "✅ Point fort confirmé", "high", "cwv.json: toutes les pages sous les seuils CWV 'good'"
-    return "🤔 À évaluer", "high", "cwv.json: zone intermédiaire ('needs improvement'), aucune page 'poor'"
+        return "✅ Point fort confirmé", "collecte", "cwv.json: toutes les pages sous les seuils CWV 'good'"
+    return "🤔 À évaluer", "collecte", "cwv.json: zone intermédiaire ('needs improvement'), aucune page 'poor'"
 
 
 # --- Extension Phase 1 (2026-09-03) ---------------------------------------
 
 def rule_1_5(data):
+    """Détection de médias à lecture automatique (autoplay).
+
+    Provenance : collecte (parsing HTML, recherche attribut autoplay sur <video>/<audio>).
+    """
     htmlcss = data["htmlcss"]
     pages = (htmlcss or {}).get("pages")
     if not pages:
         return None, None, "html-css-criteria.json absent"
     offenders = [p["url"] for p in pages if p.get("has_autoplay_media")]
     if offenders:
-        return "💡 Potentiel d'amélioration identifié", "high", f"html-css-criteria.json: autoplay détecté sur {offenders}"
-    return "✅ Point fort confirmé", "high", "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
+        return "💡 Potentiel d'amélioration identifié", "collecte", f"html-css-criteria.json: autoplay détecté sur {offenders}"
+    return "✅ Point fort confirmé", "collecte", "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
 
 
 def rule_1_6(data):
+    """Adaptation des ressources (images responsive, media queries CSS).
+
+    Provenance : estime. Les comptages sont mesurés, mais le verdict repose sur des
+    seuils de notre invention (ratio d'images adaptatives >= 0,5 et au moins
+    3 @media queries) que ni le référentiel EOF ni aucune source publique ne fixe.
+    Le chiffre est collecté, la conclusion est déduite.
+    """
     htmlcss = data["htmlcss"]
     pages = (htmlcss or {}).get("pages")
     css = (htmlcss or {}).get("css")
@@ -217,26 +245,30 @@ def rule_1_6(data):
     has_media_queries = (css.get("media_query_count") or 0) >= 3
     source = f"html-css-criteria.json: adaptive_img_ratio par page = {ratios} ; media_query_count = {css.get('media_query_count')}"
     if all_pages_adaptive and has_media_queries:
-        return "✅ Point fort confirmé", "medium", source
+        return "✅ Point fort confirmé", "estime", source
     if not has_any_adaptive_img and not has_media_queries:
-        return "💡 Potentiel d'amélioration identifié", "medium", source
-    return "🤔 À évaluer", "medium", source + " (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)"
+        return "💡 Potentiel d'amélioration identifié", "estime", source
+    return "🤔 À évaluer", "estime", source + " (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)"
 
 
 def rule_1_13(data):
+    """Optimisation des parcours (proxy : score d'accessibilité Lighthouse).
+
+    Provenance : collecte (API PageSpeed Insights, catégorie accessibility).
+    """
     cwv = data["cwv"]
     if not cwv:
         return None, None, "cwv.json absent"
-    scores = [e["accessibility_score_pct"] for e in cwv if e.get("accessibility_score_pct") is not None]
-    if not scores:
+    accessibility_scores = [e["accessibility_score_pct"] for e in cwv if e.get("accessibility_score_pct") is not None]
+    if not accessibility_scores:
         return None, None, "cwv.json: aucun accessibility_score_pct disponible"
-    worst = min(scores)
-    source = f"cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = {worst}, valeurs = {scores}"
+    worst = min(accessibility_scores)
+    source = f"cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = {worst}, valeurs = {accessibility_scores}"
     if worst < 60:
-        return "💡 Potentiel d'amélioration identifié", "high", source
+        return "💡 Potentiel d'amélioration identifié", "collecte", source
     if worst >= 90:
-        return "✅ Point fort confirmé", "high", source
-    return "🤔 À évaluer", "high", source + " (zone 60-90, ambigu)"
+        return "✅ Point fort confirmé", "collecte", source
+    return "🤔 À évaluer", "collecte", source + " (zone 60-90, ambigu)"
 
 
 RULES = {
@@ -257,12 +289,17 @@ RULES = {
 # meilleur au pire. Le cran 1 ("> 750") est le repli si aucun seuil n'est
 # satisfait. Zone [500, 750] non couverte par l'échelle du Sheet source
 # (biais connu, cf. eof-analyse-minimisation-questions.md) : repli sur le
-# cran 1 avec confidence dégradée à "medium" au lieu de "high", pour ne pas
+# cran 1 avec provenance dégradée à "estime" au lieu de "collecte", pour ne pas
 # prétendre à une précision que l'échelle source n'a pas à cet endroit.
 _CARBON_BUCKETS = [(100, 5), (200, 4), (300, 3), (500, 2)]
 
 
 def rule_diag_0_16(data, crans):
+    """Diagnostic rapide 0.16 : intensité carbone hébergement (doublon de 3.3).
+
+    Provenance : collecte (même source que 3.3, API ipinfo + table carbone),
+    dégradée à estime pour la zone [500, 750] gCO2/kWh non couverte par l'échelle.
+    """
     env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
@@ -280,10 +317,12 @@ def rule_diag_0_16(data, crans):
             worst_rank, worst_value = rank, v
     if worst_value is None:
         return None, None, "env-data.json: servers[].carbon_intensity_g_kwh absent"
-    confidence = "medium" if (worst_rank == 1 and worst_value <= 750) else "high"
+    # Dégradation de provenance pour la zone [500, 750] non couverte par l'échelle EOF
+    provenance = "estime" if (worst_rank == 1 and worst_value <= 750) else "collecte"
     reponse = next((c for c in crans if c.strip().startswith(f"{worst_rank}")), crans[worst_rank - 1] if len(crans) >= worst_rank else None)
-    source = f"env-data.json: servers[].carbon_intensity_g_kwh = {worst_value} gCO2e/kWh (doublon de 3.3, même donnée)"
-    return reponse, confidence, source
+    source_suffix = " (repli échelle, zone non couverte [500, 750])" if provenance == "estime" else ""
+    source = f"env-data.json: servers[].carbon_intensity_g_kwh = {worst_value} gCO2e/kWh (doublon de 3.3, même donnée){source_suffix}"
+    return reponse, provenance, source
 
 
 # ---------------------------------------------------------------------------
@@ -514,8 +553,8 @@ def evaluate_criterion(crit, data):
     entry = MAPPING.get(crit["id"])
     result = {
         "id": crit["id"], "dimension": crit["pilier"], "critere": crit["critere"],
-        "poids": crit["poids"], "categorie": "aucune_donnee",
-        "reponse": None, "score": None, "confidence": None, "source": None, "contexte": None,
+        "potentiel_max": crit["potentiel_max"], "categorie": "aucune_donnee",
+        "reponse": None, "coefficient": None, "provenance": None, "source": None, "contexte": None,
     }
     if not entry:
         return result
@@ -523,18 +562,18 @@ def evaluate_criterion(crit, data):
     result["categorie"] = entry["categorie"]
     if entry["categorie"] == "automatisable":
         rule = RULES.get(crit["id"])
-        reponse, confidence, source = rule(data) if rule else (None, None, "règle non implémentée")
+        reponse, provenance, source = rule(data) if rule else (None, None, "règle non implémentée")
         result["source"] = source
         if reponse is not None:
             result["reponse"] = reponse
-            result["score"] = crit["options_evaluation_score"].get(reponse)
-            result["confidence"] = confidence
+            result["coefficient"] = crit["options_evaluation_coefficient"].get(reponse)
+            result["provenance"] = provenance
     elif entry["categorie"] == "partiel":
         ctx_fn = CONTEXTS.get(crit["id"])
         contexte = ctx_fn(data) if ctx_fn else None
         if contexte:
             result["contexte"] = contexte
-            result["confidence"] = entry["confidence_max"]
+            result["provenance"] = entry["provenance_max"]
             result["source"] = entry["champ_donnee"]
     return result
 
@@ -543,11 +582,11 @@ def build_diag_rapide_apercu(referentiel, data):
     questions = []
     for q in referentiel["diagnostic_rapide"]:
         entry = {"id": q["id"], "critere": q["critere"], "niveau_impact": q["niveau_impact"],
-                 "reponse": None, "confidence": None, "source": None, "indice_contextuel": None}
+                 "reponse": None, "provenance": None, "source": None, "indice_contextuel": None}
         if q["id"] == "0.16":
-            reponse, confidence, source = rule_diag_0_16(data, q["crans"])
+            reponse, provenance, source = rule_diag_0_16(data, q["crans"])
             if reponse is not None:
-                entry.update(reponse=reponse, confidence=confidence, source=source)
+                entry.update(reponse=reponse, provenance=provenance, source=source)
         ctx_fn = DIAG_CONTEXTS.get(q["id"])
         if ctx_fn:
             entry["indice_contextuel"] = ctx_fn(data)
@@ -562,14 +601,24 @@ def compute_dimension_scores(criteres_results):
     dimensions = []
     for dim, items in by_dim.items():
         answered = [c for c in items if c["reponse"] is not None]
+        # Formule canonique : somme des potentiels retenus ÷ somme des potentiel_max de TOUS les critères de la dimension
+        total_potentiel_max = sum(c["potentiel_max"] for c in items) or 1e-9
         if answered:
-            total_poids = sum(c["poids"] for c in answered) or 1e-9
-            score_pct = sum(c["score"] * c["poids"] for c in answered) / total_poids * 100
+            potentiel_optimisation_pct = sum(c["coefficient"] * c["potentiel_max"] for c in answered) / total_potentiel_max * 100
         else:
-            score_pct = None
+            potentiel_optimisation_pct = None
+        completude_pct = len(answered) / len(items) * 100 if items else 0
+        # Comptage par provenance
+        repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+        for c in answered:
+            prov = c.get("provenance")
+            if prov in repondus_par_provenance:
+                repondus_par_provenance[prov] += 1
         dimensions.append({
-            "nom": dim, "score_pct": score_pct,
+            "nom": dim, "potentiel_optimisation_pct": potentiel_optimisation_pct,
             "repondus": len(answered), "total": len(items),
+            "completude_pct": completude_pct,
+            "repondus_par_provenance": repondus_par_provenance,
         })
     return dimensions
 
@@ -590,7 +639,7 @@ def build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_aper
         if q["reponse"]:
             lines.append(
                 f"- **{q['id']}** — {q['critere']} → **{q['reponse']}** "
-                f"_(automatique, confidence {q['confidence']} — {q['source']})_"
+                f"_(automatique, provenance {q['provenance']} — {q['source']})_"
             )
         elif q.get("indice_contextuel"):
             lines.append(
@@ -606,15 +655,15 @@ def build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_aper
         if crit["pilier"] != current_dim:
             current_dim = crit["pilier"]
             dim_info = next(d for d in dimensions if d["nom"] == current_dim)
-            score_txt = f"{dim_info['score_pct']:.0f}%" if dim_info["score_pct"] is not None else "sans donnée"
-            lines.append(f"\n## {current_dim} — potentiel d'optimisation : {score_txt} ({dim_info['repondus']}/{dim_info['total']} répondus)\n")
+            potentiel_txt = f"{dim_info['potentiel_optimisation_pct']:.0f}%" if dim_info["potentiel_optimisation_pct"] is not None else "sans donnée"
+            lines.append(f"\n## {current_dim} — potentiel d'optimisation : {potentiel_txt} ({dim_info['repondus']}/{dim_info['total']} répondus)\n")
         lines.append(f"### {crit['id']} — {crit['critere']}\n")
         if r["reponse"]:
             lines.append(f"**Réponse (automatique)** : {r['reponse']}")
-            lines.append(f"**Confidence** : {r['confidence']} — **Source** : {r['source']}")
+            lines.append(f"**Provenance** : {r['provenance']} — **Source** : {r['source']}")
         elif r["contexte"]:
             lines.append("**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)")
-            lines.append(f"**Donnée indicative** ({r['confidence']}) : {r['contexte']} — _champ : {r['source']}_")
+            lines.append(f"**Donnée indicative** ({r['provenance']}) : {r['contexte']} — _champ : {r['source']}_")
         else:
             lines.append("**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)")
         lines.append("")
@@ -649,15 +698,24 @@ def main():
     diag_rapide_apercu = build_diag_rapide_apercu(referentiel, data)
 
     auto_answered = [r for r in results if r["categorie"] == "automatisable" and r["reponse"] is not None]
+    all_answered = [r for r in results if r["reponse"] is not None]
     partiel_with_context = [r for r in results if r["categorie"] == "partiel" and r["contexte"] is not None]
-    total_poids_answered = sum(r["poids"] for r in auto_answered) or None
-    potentiel_global_pct = (
-        sum(r["score"] * r["poids"] for r in auto_answered) / total_poids_answered * 100
-        if total_poids_answered else None
+    # Calcul global : même formule que par dimension, appliquée à tous les critères
+    total_potentiel_max_global = sum(r["potentiel_max"] for r in results) or None
+    potentiel_optimisation_global_pct = (
+        sum(r["coefficient"] * r["potentiel_max"] for r in all_answered) / total_potentiel_max_global * 100
+        if total_potentiel_max_global else None
     )
+    completude_globale_pct = len(all_answered) / len(results) * 100 if results else 0
+    # Comptage par provenance global
+    repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+    for r in all_answered:
+        prov = r.get("provenance")
+        if prov in repondus_par_provenance:
+            repondus_par_provenance[prov] += 1
 
     # Radar : une valeur par dimension, None si aucune réponse (jamais un faux 0%)
-    axes = [(d["nom"], d["score_pct"]) for d in dimensions]
+    axes = [(d["nom"], d["potentiel_optimisation_pct"]) for d in dimensions]
     radar_note = (
         f"{len(auto_answered)}/{len(referentiel['criteres'])} critères répondus automatiquement — "
         "les axes 'N/A' n'ont aucune réponse (jamais un faux 0%)"
@@ -670,9 +728,11 @@ def main():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "domaine": domaine,
         "criteres_total": len(referentiel["criteres"]),
-        "criteres_repondus_auto": len(auto_answered),
+        "criteres_repondus": len(all_answered),
         "criteres_avec_indice_partiel": len(partiel_with_context),
-        "potentiel_optimisation_global_pct": potentiel_global_pct,
+        "completude_globale_pct": completude_globale_pct,
+        "potentiel_optimisation_global_pct": potentiel_optimisation_global_pct,
+        "repondus_par_provenance": repondus_par_provenance,
         "dimensions": dimensions,
         "diagnostic_rapide_apercu": {
             "total_questions": len(referentiel["diagnostic_rapide"]),
@@ -695,8 +755,13 @@ def main():
     print(f"eof-audit-results.json écrit : {results_path}")
     print(f"eof-rempli.md écrit : {md_path}")
     print(f"eof-radar-{domaine}.svg écrit : {radar_path}")
+    # Le potentiel est rapporté à TOUS les critères, pas aux seuls répondus : sans la
+    # complétude affichée juste à côté, un chiffre bas se lit comme un service mature
+    # alors qu'il ne dit que "nous n'avons presque rien regardé".
     print(f"Critères répondus automatiquement : {len(auto_answered)}/{len(referentiel['criteres'])}"
-          + (f" — potentiel d'optimisation global (sur ces réponses) : {potentiel_global_pct:.0f}%" if potentiel_global_pct is not None else ""))
+          f" (complétude {completude_globale_pct:.1f} %)"
+          + (f" — potentiel d'optimisation global, rapporté aux {len(referentiel['criteres'])} critères :"
+             f" {potentiel_optimisation_global_pct:.2f} %" if potentiel_optimisation_global_pct is not None else ""))
 
 
 if __name__ == "__main__":

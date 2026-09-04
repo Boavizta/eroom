@@ -1953,7 +1953,12 @@ def _section_medias(greenit):
 
 
 _CONFIDENCE_LEVELS = ("high", "medium", "low", "default", "default_efootprint",
-                      "default_script", "unjustified")
+                      "default_script", "unjustified",
+                      # Noms canoniques de l'axe provenance (chaîne EOF). Les noms
+                      # ci-dessus restent acceptés en lecture pour que les audits
+                      # déjà produits continuent de s'afficher.
+                      "collecte", "estime", "declare", "precise", "suppose",
+                      "defaut_lib", "defaut_script")
 
 
 def _confidence_badge(conf):
@@ -1967,14 +1972,22 @@ def _confidence_badge(conf):
     mais sans justification/source vérifiable fournie (ex. type d'instance choisi
     sans preuve).
     """
+    # Table canonique avec tous les synonymes acceptés
     mapping = {
         "high":               ("#1e7e34", "#e8f5e9", "✅", "collecté"),
+        "collecte":           ("#1e7e34", "#e8f5e9", "✅", "collecté"),
         "medium":             ("#0f6674", "#e0f4f7", "🔎", "estimé"),
+        "estime":             ("#0f6674", "#e0f4f7", "🔎", "estimé"),
+        "declare":            ("#2a5f99", "#e3f0ff", "📣", "déclaré (public)"),
         "low":                ("#9a4d00", "#fff3e0", "❓", "supposé"),
+        "suppose":            ("#9a4d00", "#fff3e0", "❓", "supposé"),
+        "unjustified":        ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
+        "precise":            ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
         "default":            ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
         "default_efootprint": ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
+        "defaut_lib":         ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
         "default_script":     ("#33383d", "#e4e5e7", "🛠️", "défaut script"),
-        "unjustified":        ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
+        "defaut_script":      ("#33383d", "#e4e5e7", "🛠️", "défaut script"),
     }
     color, bg, emoji, label = mapping.get(conf, ("#5a5a5a", "#eeeeee", "❔", conf or "?"))
     return (
@@ -1982,6 +1995,17 @@ def _confidence_badge(conf):
         f'font-weight:bold;padding:1px 8px;border-radius:4px;font-size:13px;'
         f'white-space:nowrap">{emoji} {label}</span>'
     )
+
+
+def _provenance_de(entree):
+    """Lit l'axe provenance d'une entrée EOF (critère ou question de diagnostic).
+
+    La chaîne EOF écrit `provenance` (collecte > estime > declare > precise).
+    `confidence` est l'ancien nom, gardé en repli pour que les audits produits
+    avant le renommage continuent de s'afficher. Aucune valeur par défaut : une
+    provenance absente reste absente, elle ne devient pas "collecté" en douce.
+    """
+    return entree.get("provenance") or entree.get("confidence")
 
 
 # Domaines connus -> libellé court affiché dans "(↗ source <nom>)". Le nom du
@@ -2708,7 +2732,9 @@ def _section_efootprint(results, topology_svg=None):
   <p style="font-size:15px;color:#666">
     Niveau de confiance : {_confidence_badge("high")} API/HAR
     &nbsp;·&nbsp;
-    {_confidence_badge("medium")} inféré ou déclaré avec justification
+    {_confidence_badge("medium")} inféré
+    &nbsp;·&nbsp;
+    {_confidence_badge("declare")} déclaré publiquement par l'organisation
     &nbsp;·&nbsp;
     {_confidence_badge("low")} valeur type
     &nbsp;·&nbsp;
@@ -2749,7 +2775,8 @@ def _section_eof(results, radar_svg_text=None):
         return ""
 
     total = results.get("criteres_total", 0)
-    n_auto = results.get("criteres_repondus_auto", 0)
+    # Lire criteres_repondus (nouveau, LOT 1) avec repli sur criteres_repondus_auto (ancien)
+    n_repondus = results.get("criteres_repondus") if results.get("criteres_repondus") is not None else results.get("criteres_repondus_auto", 0)
     n_partiel = results.get("criteres_avec_indice_partiel", 0)
     potentiel = results.get("potentiel_optimisation_global_pct")
     dimensions = results.get("dimensions", [])
@@ -2759,7 +2786,7 @@ def _section_eof(results, radar_svg_text=None):
         f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
         f'padding:12px 16px;margin:16px 0;border-radius:4px">'
         f'<b>&#9888; Audit automatique très partiel</b><br>'
-        f'Sur {total} critères détaillés, seuls <b>{n_auto}</b> ont pu être '
+        f'Sur {total} critères détaillés, seuls <b>{n_repondus}</b> ont pu être '
         f'répondus automatiquement depuis les données d’audit (+ {n_partiel} '
         f'indice(s) contextuel(s), jamais une réponse validée). Les autres '
         f'restent <b>"je ne sais pas"</b> par construction : ce sont des '
@@ -2776,7 +2803,7 @@ def _section_eof(results, radar_svg_text=None):
             doublon = ' <span style="color:#888;font-size:12px">(doublon exact de 3.3)</span>' if q["id"] == "0.16" else ""
             return (
                 f'<li>{q["id"]} — {q["critere"]} → <b>{q["reponse"].replace("<", "&lt;")}</b> '
-                f'{_confidence_badge(q["confidence"])}{doublon}</li>'
+                f'{_confidence_badge(_provenance_de(q))}{doublon}</li>'
             )
         if q.get("indice_contextuel"):
             return (
@@ -2797,7 +2824,7 @@ def _section_eof(results, radar_svg_text=None):
   </p>
   <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;margin:12px 0;border-radius:4px">
     <b>&#9888; Un préalable, pas un bonus</b><br>
-    Le référentiel EOF est formel : si le score de ce diagnostic est très
+    Le référentiel EOF est formel : si le résultat de ce diagnostic est très
     faible, il n’est pas nécessaire de poursuivre le détail des 6 dimensions
     ci-dessous. Le potentiel d’optimisation est soit déjà faible, soit trop
     coûteux à atteindre. À évaluer humainement AVANT de lire la suite.
@@ -2810,18 +2837,31 @@ def _section_eof(results, radar_svg_text=None):
         "border-radius:6px;padding:16px;text-align:center"
     )
     potentiel_txt = f"~{potentiel:.0f}%" if potentiel is not None else "n/a"
+
+    # Complétude globale (nouveau champ de la couche processus, optionnel)
+    completude_globale = results.get("completude_globale_pct")
+    completude_kpi = ""
+    if completude_globale is not None:
+        completude_kpi = (
+            f'  <div style="{kpi_style}">'
+            f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Complétude</div>'
+            f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{completude_globale:.0f}%</div>'
+            f'    <div style="font-size:14px;color:#888">critères réellement examinés</div>'
+            f'  </div>'
+        )
     kpis = (
         f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Remplissage automatique</div>'
-        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{n_auto}/{total}</div>'
-        f'    <div style="font-size:14px;color:#888">critères répondus (54 détaillés)</div>'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Critères répondus</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{n_repondus}/{total}</div>'
+        f'    <div style="font-size:14px;color:#888">critères détaillés, quelle que soit la provenance</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
         f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Potentiel d’optimisation</div>'
         f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{potentiel_txt}</div>'
-        f'    <div style="font-size:14px;color:#888">moyenne pondérée, sur les réponses réelles uniquement</div>'
+        f'    <div style="font-size:14px;color:#888">sur tous les critères de chaque dimension</div>'
         f'  </div>'
+        f'{completude_kpi}'
         f'</div>'
     )
 
@@ -2835,17 +2875,24 @@ def _section_eof(results, radar_svg_text=None):
     criteres_list = results.get("criteres", [])
     dim_rows = ""
     for d in dimensions:
-        score_txt = f"{d['score_pct']:.0f}%" if d.get("score_pct") is not None else '<span style="color:#888">sans donnée</span>'
+        # Accepter les deux noms (score_pct ancien, potentiel_optimisation_pct nouveau)
+        pct_val = d.get("potentiel_optimisation_pct") if d.get("potentiel_optimisation_pct") is not None else d.get("score_pct")
+        pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">sans donnée</span>'
+
+        # Afficher la complétude si disponible (nouveaux champs du LOT 1)
+        completude = d.get("completude_pct")
+        completude_txt = f' <span style="color:#888;font-size:0.85em">({completude:.0f}% complétude)</span>' if completude is not None else ""
+
         dim_rows += (
             f'<tr>'
             f'<td style="padding:6px 8px">{d["nom"]}</td>'
             f'<td style="padding:6px 8px;text-align:right">{d["repondus"]}/{d["total"]}</td>'
-            f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{score_txt}</td>'
+            f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{pct_txt}{completude_txt}</td>'
             f'</tr>'
         )
-        # Avec 1 seul critère répondu, score_pct est mathématiquement forcé à 0%
-        # ou 100% (moyenne d'un seul terme) : préciser sur quel critère il repose,
-        # sinon le % donne une fausse impression de verdict global (cf. plan).
+        # Avec 1 seul critère répondu, le pourcentage repose sur un jugement unique :
+        # préciser lequel pour contextualiser le chiffre, sinon le % donne une fausse
+        # impression de verdict global (cf. plan).
         if d.get("repondus") == 1:
             matched = next(
                 (c for c in criteres_list if c.get("dimension") == d["nom"] and c.get("reponse")),
@@ -2854,7 +2901,7 @@ def _section_eof(results, radar_svg_text=None):
             if matched:
                 dim_rows += (
                     f'<tr><td colspan="3" style="padding:0 8px 10px;font-size:13px;color:#888">'
-                    f'(basé sur {matched["id"]} — {matched["critere"]} → {matched["reponse"]})'
+                    f'(repose sur {matched["id"]} — {matched["critere"]} → {matched["reponse"]})'
                     f'</td></tr>'
                 )
     dim_table = f"""<table style="width:100%;border-collapse:collapse;margin-top:12px">
@@ -2875,9 +2922,9 @@ def _section_eof(results, radar_svg_text=None):
   {radar_block}
   {dim_table}
   <p style="font-size:14px;color:#888;margin-top:12px">
-    Un score plus élevé reflète un potentiel d’optimisation plus important (pas une
-    meilleure note). Détail critère par critère, source et confiance de chaque réponse
-    en annexe.
+    Un pourcentage plus élevé signale un potentiel d’optimisation plus important : le
+    service est moins mature sur cette dimension, il ne s’y comporte pas mieux. Détail
+    critère par critère, source et provenance de chaque réponse en annexe.
   </p>
 </section>"""
 
@@ -2915,11 +2962,11 @@ def _methodo_eof(results):
         if c["reponse"]:
             valeur = c["reponse"]
             source = c.get("source") or "—"
-            conf = c.get("confidence")
+            conf = _provenance_de(c)
         elif c.get("contexte"):
             valeur = f'je ne sais pas <span style="color:#888">— indice : {c["contexte"]}</span>'
             source = c.get("source") or "—"
-            conf = c.get("confidence")
+            conf = _provenance_de(c)
         else:
             valeur = "je ne sais pas"
             source = "aucune donnée d’audit (critère organisationnel/produit)"
@@ -2937,18 +2984,20 @@ def _methodo_eof(results):
     return f"""
   <h3 style="margin-top:24px">Détail des 54 critères EOF</h3>
   <p style="font-size:15px;color:#666">
-    {_confidence_badge("high")} déduit d’une mesure directe (CrUX, ipinfo, PageSpeed Insights)
+    {_confidence_badge("collecte")} mesuré par nos scripts (CrUX, ipinfo, PageSpeed Insights, en-têtes HTTP)
     &nbsp;·&nbsp;
-    {_confidence_badge("medium")} déduit d’un signal indirect (détection HAR/tech stack, HTML/CSS re-fetché)
+    {_confidence_badge("estime")} déduit d’un signal indirect ou d’un seuil que nous avons fixé (détection de technologies, HTML/CSS re-fetché)
     &nbsp;·&nbsp;
-    {_confidence_badge("low")} indice contextuel faible (en-têtes sécurité, security.txt/robots.txt/sitemap, HTML/CSS statique), jamais une réponse validée
+    {_confidence_badge("declare")} déclaré publiquement par l’organisation auditée
+    &nbsp;·&nbsp;
+    {_confidence_badge("precise")} coché dans le questionnaire, sans preuve vérifiable
   </p>
   <table style="width:100%;border-collapse:collapse;font-size:14px">
     <thead><tr style="background:{OCTO_PALE}">
       <th style="padding:5px 8px;text-align:left">ID</th>
       <th style="padding:5px 8px;text-align:left">Critère</th>
       <th style="padding:5px 8px;text-align:left">Réponse</th>
-      <th style="padding:5px 8px;text-align:left">Confiance</th>
+      <th style="padding:5px 8px;text-align:left">Provenance</th>
       <th style="padding:5px 8px;text-align:left">Source / donnée exploitée</th>
     </tr></thead>
     <tbody>{rows}</tbody>

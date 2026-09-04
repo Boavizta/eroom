@@ -19,7 +19,7 @@
 - **0.13** — Le backlog produit contient-il des problèmes de performance et des améliorations ? _(niveau d'impact : Déterminant)_
 - **0.14** — Les principales fonctionnalités sont-elles optimisées et efficaces ? _(niveau d'impact : Déterminant)_
 - **0.15** — Existe-t-il une politique relative à la suppression et à l'archivage des données ? _(niveau d'impact : Déterminant)_
-- **0.16** — Le service est-il hébergé dans un pays dont le mix électrique a un impact significatif ? (en fonction de l'emplacement) → **2- < 500 gCO2e / kWh** _(automatique, confidence high — env-data.json: servers[].carbon_intensity_g_kwh = 381 gCO2e/kWh (doublon de 3.3, même donnée))_
+- **0.16** — Le service est-il hébergé dans un pays dont le mix électrique a un impact significatif ? (en fonction de l'emplacement) → **2- < 500 gCO2e / kWh** _(automatique, provenance collecte — env-data.json: servers[].carbon_intensity_g_kwh = 381 gCO2e/kWh (doublon de 3.3, même donnée))_
 
 
 ## 🛖 1 — Produit — potentiel d'optimisation : 0% (4/16 répondus)
@@ -39,17 +39,17 @@
 ### 1.4 — La conception comprend-elle des composants personnalisés plutôt que des composants natifs ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Boutons natifs <button> : 14 ; boutons personnalisés (role="button") : 0 (toutes pages confondues) — _champ : html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons_
+**Donnée indicative** (suppose) : Boutons natifs <button> : 14 ; boutons personnalisés (role="button") : 0 (toutes pages confondues) — _champ : html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons_
 
 ### 1.5 — Y a-t-il des animations, des vidéos, des sons, des cartes (...) qui sont lus automatiquement ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Confidence** : high — **Source** : html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées
+**Provenance** : collecte — **Source** : html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées
 
 ### 1.6 — Est-il possible d'adapter les ressources utilisées par l'application à la configuration matérielle de l'utilisateur ?
 
 **Réponse (automatique)** : 🤔 À évaluer
-**Confidence** : medium — **Source** : html-css-criteria.json: adaptive_img_ratio par page = [0.66, 0.27, 0.0, 0.27, 0.27, 0.71] ; media_query_count = 228 (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)
+**Provenance** : estime — **Source** : html-css-criteria.json: adaptive_img_ratio par page = [0.66, 0.27, 0.0, 0.27, 0.27, 0.71] ; media_query_count = 228 (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)
 
 ### 1.7 — Toutes les fonctionnalités sont-elles utiles, utilisables et utilisées ?
 
@@ -62,7 +62,7 @@
 ### 1.9 — Faut-il un réseau à haut débit pour utiliser l'application ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Poids réel transféré (page repère) : 702 Ko — _champ : env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)_
+**Donnée indicative** (suppose) : Poids réel transféré (page repère) : 702 Ko — _champ : env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)_
 
 ### 1.10 — Le produit utilise-t-il des designs manupulateurs (UX dark patterns) qui augmentent l'utilisation des ressources ?
 
@@ -71,32 +71,32 @@
 ### 1.11 — Est-il possible de modifier les valeurs par défaut (nombre d'éléments affichés, qualité, fréquence de rafraîchissement, etc.) afin de réduire l'utilisation des ressources ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé — _champ : html-css-criteria.json: css.has_prefers_reduced_or_scheme_
+**Donnée indicative** (suppose) : Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé — _champ : html-css-criteria.json: css.has_prefers_reduced_or_scheme_
 
 ### 1.12 — Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?
 
 **Réponse (automatique)** : 🤔 À évaluer
-**Confidence** : medium — **Source** : security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement
+**Provenance** : estime — **Source** : security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement
 
 ### 1.13 — Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Confidence** : high — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]
+**Provenance** : collecte — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]
 
 ### 1.14 — Les écrans principaux sont-ils clairs et bien conçus ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Page la plus lourde : https://octo.com/publications (1003 Ko) ; la plus légère : https://octo.com/recrutement/nos-offres (0 Ko) — _champ : env-data.json: pages[].size_kb (comparaison entre pages du même parcours)_
+**Donnée indicative** (suppose) : Page la plus lourde : https://octo.com/publications (1003 Ko) ; la plus légère : https://octo.com/recrutement/nos-offres (0 Ko) — _champ : env-data.json: pages[].size_kb (comparaison entre pages du même parcours)_
 
 ### 1.15 — Ce service est-il fréquemment utilisé ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (medium) : Trafic estimé : 281,000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)_
+**Donnée indicative** (estime) : Trafic estimé : 281,000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)_
 
 ### 1.16 — Volume (nombre d'utilisateurs)
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (medium) : Trafic estimé : 281,000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year_
+**Donnée indicative** (estime) : Trafic estimé : 281,000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year_
 
 
 ## 🗺️ 2 — Architecture — potentiel d'optimisation : 0% (1/5 répondus)
@@ -104,7 +104,7 @@
 ### 2.1 — Le produit utilise-t-il des technologies gourmandes ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Confidence** : medium — **Source** : env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée
+**Provenance** : estime — **Source** : env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée
 
 ### 2.2 — Il n'y a pas de stratégie de compatibilité.
 
@@ -113,7 +113,7 @@
 ### 2.3 — Est-il possible d'optimiser la séparation et la communication entre les composants ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
+**Donnée indicative** (suppose) : Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
 
 ### 2.4 — Le pic de charge peut-il être lissé sur une échelle de temps ?
 
@@ -122,10 +122,10 @@
 ### 2.5 — Y a-t-il des calculs ou des requêtes lourds dont les résultats peuvent être mis en cache ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : https://api.analytics.octo.tools/log/hb ×54; https://api.analytics.octo.tools/log/ ×18; https://octo.com/style.css?v=2026-6-10-1-1 ×11 — _champ : audit/har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)_
+**Donnée indicative** (suppose) : https://api.analytics.octo.tools/log/hb ×54; https://api.analytics.octo.tools/log/ ×18; https://octo.com/style.css?v=2026-6-10-1-1 ×11 — _champ : har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)_
 
 
-## 🏢 3 — Infrastructure — potentiel d'optimisation : 100% (1/8 répondus)
+## 🏢 3 — Infrastructure — potentiel d'optimisation : 12% (1/8 répondus)
 
 ### 3.1 — La facture peut-elle être réduite ?
 
@@ -138,12 +138,12 @@
 ### 3.3 — Le service est-il hébergé dans une région où le mix électrique a un impact important ?
 
 **Réponse (automatique)** : 💡 Potentiel d'amélioration identifié
-**Confidence** : high — **Source** : env-data.json: servers[] = octo.com (DE, 381 gCO2/kWh) (seuil 250 gCO2/kWh dépassé)
+**Provenance** : collecte — **Source** : env-data.json: servers[] = octo.com (DE, 381 gCO2/kWh) (seuil 250 gCO2/kWh dépassé)
 
 ### 3.5 — L'infrastructure peut-elle être mutualisée ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com... — _champ : security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)_
+**Donnée indicative** (suppose) : Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com... — _champ : security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)_
 
 ### 3.6 — Les composants de déploiement (VM, serveur, conteneurs) sont-ils surdimensionnés ?
 
@@ -152,7 +152,7 @@
 ### 3.7 — Des outils et des stratégies d'élasticité/d’auto-scaling peuvent-ils être déployés pour réduire la taille de l'infrastructure ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
+**Donnée indicative** (suppose) : Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier — _champ : security-headers-analysis.json: Content-Security-Policy (famille paas_backend)_
 
 ### 3.8 — Tous les environnements sont-ils toujours activés ?
 
@@ -207,12 +207,12 @@
 ### 5.4 — Les indicateurs de performance sont-ils médiocres ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Confidence** : high — **Source** : cwv.json: toutes les pages sous les seuils CWV 'good'
+**Provenance** : collecte — **Source** : cwv.json: toutes les pages sous les seuils CWV 'good'
 
 ### 5.5 — Les cas d'utilisation les plus critiques (parcours utilisateurs les plus fréquents) sont-ils optimisés ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : https://octo.com/ : JS inutilisé 79.02%; https://octo.com/recrutement : JS inutilisé 71.68% — _champ : audit/coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)_
+**Donnée indicative** (suppose) : https://octo.com/ : JS inutilisé 79.02%; https://octo.com/recrutement : JS inutilisé 71.68% — _champ : coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)_
 
 ### 5.6 — La pile technique (Java, JS, Python, PHP, etc.)est-elle pas à jour ?
 
@@ -236,7 +236,7 @@
 ### 6.1 — Existe-t-il un dispositif d'observabilité efficace pour le produit ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Score en-têtes sécurité (proxy indirect de maturité prod) : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn — _champ : security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)_
+**Donnée indicative** (suppose) : Score en-têtes sécurité (proxy indirect de maturité prod) : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn — _champ : security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)_
 
 ### 6.2 — Existe-t-il des revues de code et/ou une programmation en binôme  ( pair programming)?
 
@@ -245,7 +245,7 @@
 ### 6.3 — Existe-t-il un processus CI/CD efficace ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build — _champ : *.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)_
+**Donnée indicative** (suppose) : ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build — _champ : *.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)_
 
 ### 6.4 — Existe-t-il des tests de non-régression (tests unitaires, tests d'intégration, tests de bout en bout) ?
 
@@ -258,7 +258,7 @@
 ### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
+**Donnée indicative** (suppose) : Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
 
 ### 6.7 — Existe-t-il une documentation complète ?
 
@@ -267,7 +267,7 @@
 ### 6.8 — Y a-t-il du code dupliqué dans l'application ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (low) : Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente — _champ : cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)_
+**Donnée indicative** (suppose) : Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente — _champ : cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)_
 
 ### 6.9 — L'équipe dispose-t-elle d'une autonomie suffisante pour déployer les outils dont elle a besoin pour observer, mesurer ou optimiser le système ?
 

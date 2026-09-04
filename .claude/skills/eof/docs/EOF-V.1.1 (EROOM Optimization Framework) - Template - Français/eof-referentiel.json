@@ -7,7 +7,7 @@
       "explication": "S'il existe déjà un moyen de le faire, le moyen numérique apporte-t-il une valeur ajoutée à l'utilisateur ?",
       "methode": "Le critère est validé si :\nL'équipe a identifié une solution non numérique ou existante plus simple et démontré que la version numérique apporte clairement une valeur ajoutée par rapport à celle-ci (gain de temps, accessibilité, réduction de l'impact matériel).",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -15,7 +15,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -30,7 +30,7 @@
       "explication": "Le produit risque de ne pas être bien conçu si les utilisateurs cibles ne sont pas bien connus, ou mieux encore, impliqués dans le projet. Par exemple, les parcours utilisateurs pourraient être fastidieux ou la stratégie de compatibilité pourrait être inadéquate.",
       "methode": "Le critère est validé si :\nLes besoins et les contextes des utilisateurs sont documentés à l'aide de personas, d'entretiens, d'analyses d'utilisation, et les appareils courants sont bien connus et pris en compte dans la conception.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -38,7 +38,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -53,7 +53,7 @@
       "explication": "Les nouvelles fonctionnalités alourdissent l'application. Sur les appareils plus anciens, les utilisateurs peuvent préférer conserver un produit plus simple, plus performant et moins gourmand en ressources.",
       "methode": "Le critère est validé si :\nLes tests montrent que la mise à jour ne dégrade pas les performances sur les appareils plus anciens ou modestes, et que le produit propose des modes optionnels ou allégés lorsque cela est nécessaire.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -61,7 +61,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -76,7 +76,7 @@
       "explication": "Les composants système (boutons, menus, formulaires, etc.) sont presque toujours plus efficaces que ceux créés sur mesure. Sans parler de leur accessibilité et de leur compatibilité.",
       "methode": "Le critère est validé si :\nLes composants natifs sont préférés ou justifiés ; les composants personnalisés ne sont utilisés qu'en cas de nécessité et offrent des performances et une accessibilité équivalentes ou supérieures à celles des composants natifs.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -84,7 +84,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -99,7 +99,7 @@
       "explication": "La lecture de ce type de contenu sans aucune action de la part de l'utilisateur est gênante et utilise des ressources telles que la bande passante et le processeur graphique.",
       "methode": "Le critère est validé si :\nAucun média n'est lancé sans action de l'utilisateur, ou la lecture automatique est techniquement nécessaire et optimisée (légère, désactivée par défaut, contrôlée par l'utilisateur).",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -107,7 +107,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -122,7 +122,7 @@
       "explication": "Tout le monde ne dispose pas d'un appareil capable d'exécuter des contenus gourmands en ressources informatiques (comme les contenus multimédias, etc.).\nQue se passe-t-il si un utilisateur tente d'exécuter un contenu gourmand en ressources informatiques sur un appareil inadapté ? Dans ce cas, idéalement, le service ne devrait pas bloquer l'accès et devrait exécuter les fonctions de base.",
       "methode": "Le critère est validé si :\nL'application détecte des conditions matérielles limitées et passe automatiquement à des comportements plus légers (qualité réduite, rendu simplifié, processus lourds désactivés).",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -130,7 +130,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -145,7 +145,7 @@
       "explication": "Simplifier le produit en supprimant les fonctionnalités inutilisées permettra de réduire la consommation de ressources.",
       "methode": "Le critère est validé si :\nLes données d'utilisation (analyses, journaux, commentaires) montrent que chaque fonctionnalité est réellement utilisée et apporte une valeur ajoutée évidente, et que les fonctionnalités inutilisées ou redondantes sont identifiées et supprimées afin de réduire la consommation de ressources.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -153,7 +153,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -168,7 +168,7 @@
       "explication": "La plupart des impacts des services numériques se font sentir du côté des appareils clients. Il est très important de ne pas pousser ces appareils à l'obsolescence en rompant leur compatibilité.",
       "methode": "Le critère est validé si :\nL'application fonctionne correctement sur les appareils les plus anciens du groupe cible, sans imposer de mises à niveau inutiles ni causer de problèmes de performances qui accélèrent l'obsolescence.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -176,7 +176,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -191,7 +191,7 @@
       "explication": "Une bande passante élevée implique une utilisation importante des ressources. Cela indique que certaines optimisations sont possibles pour réduire le nombre et/ou la taille des requêtes.",
       "methode": "Le critère est validé si :\nL'application reste utilisable sur des connexions à faible bande passante, grâce à des requêtes optimisées, des tailles de fichiers multimédias réduites, des stratégies de mise en cache ou un mode allégé.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -199,7 +199,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -214,7 +214,7 @@
       "explication": "Les mauvaises pratiques en matière d'expérience utilisateur comprennent le défilement infini, les abonnements pré-cochés, la difficulté à se désabonner, etc.",
       "methode": "Le critère est validé si :\nAucun motif trompeur n'est présent et la conception évite les mécanismes tels que le défilement infini, la lecture automatique forcée ou les flux de désabonnement cachés qui augmentent artificiellement le chargement des pages et l'utilisation des données.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -222,7 +222,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -237,7 +237,7 @@
       "explication": "Les utilisateurs ne modifient généralement pas les valeurs par défaut. Définir des valeurs par défaut plus sobres peut permettre de réduire la consommation de ressources.",
       "methode": "Le critère est validé si :\nLes valeurs par défaut sont définies sur des options sobres et économes en ressources, et les utilisateurs peuvent facilement ajuster les paramètres (qualité, nombre d'affichages, fréquence) vers des modes plus exigeants uniquement si nécessaire.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -245,7 +245,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -260,7 +260,7 @@
       "explication": "Les outils d'analyse et de suivi marketing sont souvent responsables de plus d'un tiers des requêtes sur les sites web. Limiter le nombre d'outils et de partenaires permettrait de réduire l'utilisation des ressources et d'améliorer la confidentialité.",
       "methode": "Le critère est validé si :\nLe suivi est strictement limité au strict nécessaire, le nombre de traceurs/outils est réduit au minimum et chaque demande de suivi est justifiée. La suppression des traceurs inutiles réduit la charge réseau et améliore la confidentialité.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -268,7 +268,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -283,7 +283,7 @@
       "explication": "Des parcours utilisateur efficaces avec peu d'écrans réduisent l'utilisation des ressources et améliorent la satisfaction et la productivité des utilisateurs.",
       "methode": "Le critère est validé si :\nLes principaux flux de travail nécessitent un nombre minimal d'étapes/d'écrans, sans navigation redondante, ce qui améliore l'efficacité et réduit le nombre de requêtes serveur ou client.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -291,7 +291,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -306,7 +306,7 @@
       "explication": "Les écrans les plus utilisés doivent être légers en termes d'informations affichées et de supports afin de réduire l'utilisation des ressources.",
       "methode": "Le critère est validé si :\nLes écrans les plus fréquemment utilisés ne contiennent que les informations nécessaires, utilisent des supports légers et évitent les scripts ou composants lourds qui augmentent le coût de rendu.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -314,7 +314,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -329,7 +329,7 @@
       "explication": "Un service rarement utilisé mais fonctionnant en continu peut avoir un impact environnemental inutile.\nÀ l'inverse, un service fréquemment utilisé justifie sa consommation de ressources.\nComprendre la fréquence d'utilisation permet d'évaluer si le service doit rester tel quel, être simplifié, être partiellement mis hors service ou passer à une exécution à la demande.",
       "methode": "Le critère est validé si le service présente une utilisation régulière et significative, en adéquation avec son empreinte en termes de ressources.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -337,7 +337,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -352,7 +352,7 @@
       "explication": "Connaître le nombre d'utilisateurs actifs permet de contextualiser l'impact environnemental et de déterminer si l'ampleur du service correspond à son audience réelle.\nUne infrastructure importante desservant une population réduite peut indiquer un surdimensionnement, tandis qu'une utilisation élevée peut justifier pleinement les ressources allouées.",
       "methode": "Le critère est validé si le volume d'utilisateurs du produit justifie son utilisation des ressources et son architecture.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -360,7 +360,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -375,7 +375,7 @@
       "explication": "Si le produit utilise des technologies lourdes telles que l'IA générative ou la blockchain, il peut être possible de le remplacer ou d'utiliser des implémentations plus efficaces.",
       "methode": "Le critère est validé si la pile technique du projet ne comprend pas d'éléments lourds (tels que  LLM ou blockchain basée sur la preuve) pouvant être remplacés par des alternatives plus légères.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -383,7 +383,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -398,7 +398,7 @@
       "explication": "Le service doit être compatible avec tous les appareils dont disposent les utilisateurs afin d'éviter que ces appareils ne deviennent obsolètes.",
       "methode": "Il existe un potentiel d'amélioration si le projet n'utilise pas d'outils d'élasticité et si la charge n'est pas constante.\n Le service n'est pas compatible avec tous les appareils ciblés ou la liste des appareils ciblés n'est pas connue.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -406,7 +406,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -421,7 +421,7 @@
       "explication": "Les choix architecturaux peuvent permettre une stratégie de mise à l'échelle efficace qui réduit l'utilisation des ressources, mais peuvent également entraîner une certaine surcharge si la séparation et le couplage des composants ne sont pas bien optimisés.",
       "methode": "Il existe un potentiel d'amélioration si les composants dépendent trop les uns des autres ou si leur communication entraîne des ralentissements, des erreurs ou une complexité inutile.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -429,7 +429,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -444,7 +444,7 @@
       "explication": "Le déplacement des tâches dans le temps à l'aide du traitement par lots ou de courtiers de messages permet de lisser la charge et d'alléger l'infrastructure, car la charge maximale est moins importante.",
       "methode": "Il existe un potentiel d'amélioration si le projet n'utilise pas d'outils d'élasticité et si la charge n'est pas constante.\nL'application présente des pics de charge et les tâches ne doivent pas être exécutées immédiatement (il ne s'agit pas, par exemple, d'afficher des pages).",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -452,7 +452,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -467,7 +467,7 @@
       "explication": "Si, au sein du système, certains calculs et requêtes lourds renvoient plusieurs fois les mêmes résultats, il peut être possible de les mettre en cache. Cela permettra d'économiser des ressources et d'améliorer les performances.",
       "methode": "Il existe un potentiel d'amélioration si le projet n'utilise pas d'outils élastiques (mécanismes d’auto-scaling) et si la charge n'est pas constante.\n l'application effectue des calculs lourds, dont le résultat est utilisé plusieurs fois.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -475,7 +475,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -490,7 +490,7 @@
       "explication": "Le déploiement d'une stratégie FinOps/GreenOps permettra au produit d'utiliser moins de ressources.\nPresque toutes les pratiques FinOps (localisation des composants sous-utilisés, utilisation d'instances spot, ajustement de la taille des composants, utilisation de services gérés, etc.) permettent de réduire l'utilisation des ressources et, par conséquent, l'impact environnemental. Une stratégie visant à réduire l'impact environnemental est appelée GreenOps.",
       "methode": "Le point fort est confirmée si une stratégie est en place, sinon il existe un potentiel d'amélioration.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -498,7 +498,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -513,7 +513,7 @@
       "explication": "Surveillance des émissions de carbone et de l'intensité carbone ? Connaissez-vous les indices PUE et WUE de votre centre de données ? Envisagez-vous de déménager vers des sites plus écologiques ?",
       "methode": "Le point fort est confirmée si un suivi satisfaisant est en place, sinon il existe un potentiel d'amélioration.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -521,7 +521,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -536,7 +536,7 @@
       "explication": "Le mix électrique local est très important : le choix de la bonne région a un effet considérable sur les impacts liés à l'utilisation du service.",
       "methode": "Il existe un potentiel d'amélioration si le service n'est pas hébergé en France (ou dans un autre pays dont le mix électrique a un faible impact).",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -544,7 +544,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -559,7 +559,7 @@
       "explication": "L'utilisation d'un hébergement mutualisé (via VM, conteneurs, services gérés, *aaS) permet de réduire l'utilisation des ressources, car celles-ci sont partagées avec d'autres produits.",
       "methode": "Il existe un potentiel d'amélioration si l'infrastructure du projet n'est pas, ou pas entièrement, mutualisée.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -567,7 +567,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -582,7 +582,7 @@
       "explication": "Utilisez des outils/méthodologies d'observabilité pour vérifier la charge des machines virtuelles/serveurs (CPU/RAM). Elle doit être d'au moins 70 %.",
       "methode": "Il existe un potentiel d'amélioration si certains composants ont une charge (CPU ou RAM) inférieure à 70 %.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -590,7 +590,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -605,7 +605,7 @@
       "explication": "Grâce à des outils tels que les tâches cron, les orchestrateurs, les conteneurs ou les fonctions en tant que service, il est possible d'ajuster le nombre de composants déployés.\nAinsi, si la charge est faible, le nombre de composants est faible.",
       "methode": "Il existe un potentiel d'amélioration si le projet n'utilise pas d'outils d’auto-scalin contrôlés (c'est-à-dire pas en mode barre libre, mais avec une limite raisonnable) et si la charge n'est pas constante.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -613,7 +613,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -628,7 +628,7 @@
       "explication": "Les environnements qui ne sont pas utilisés (par exemple ceux qui ne sont pas en production la nuit ou le week-end) peuvent être désactivés.",
       "methode": "Il existe un potentiel d'amélioration si le produit dispose d'environnements d'exécution qui ne sont pas utilisés pendant une période significative (comme la nuit ou le week-end).",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -636,7 +636,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -651,7 +651,7 @@
       "explication": "Il n'est généralement pas nécessaire d'avoir autant de composants (VM, conteneurs) dans les environnements de test, sauf pour les tests de charge.",
       "methode": "Il existe un potentiel d'amélioration si certains environnements de test sont aussi grands que ceux de production.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -659,7 +659,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -674,7 +674,7 @@
       "explication": "Sans suppression ou archivage automatisés, les données s'accumulent inutilement et augmentent l'utilisation de l'espace de stockage. Les règles de conservation et les politiques d'archivage limitent la croissance des données et réduisent l'impact environnemental.",
       "methode": "Le critère est validé si des mécanismes automatiques de suppression et d'archivage existent et sont effectivement appliqués.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -682,7 +682,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -697,7 +697,7 @@
       "explication": "Une base de données non optimisée nécessite davantage de ressources CPU, de mémoire ou d'E/S pour fournir le même niveau de service, ce qui augmente la consommation d'énergie. Un indexage approprié, une bonne modélisation des données et une maintenance régulière contribuent à réduire l'utilisation inutile des ressources.",
       "methode": "Le critère est validé si une stratégie est appliquée pour optimiser les performances de la base de données.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -705,7 +705,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -720,7 +720,7 @@
       "explication": "Si les besoins en stockage de produits sont importants, il peut être avantageux de spécialiser les technologies de stockage :\n- PG/MYSQL/Oracle/SQLServer ou relationnel-objet\n- MongoDB pour les documents orientés.\n- Base de données en colonnes pour l'analyse.\n- Base de données spécialisée (vecteur, séries chronologiques).",
       "methode": "Il existe un potentiel d'amélioration si le projet n'utilise pas d'outils d'élasticité (d'auto-scalling) et si la charge n'est pas constante.\nLe projet présente des besoins de stockage spécifiques qui seraient mieux pris en charge par un autre système de stockage, et le volume est important (> plusieurs centaines de Go).",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -728,7 +728,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -743,7 +743,7 @@
       "explication": "En général, il n'est pas nécessaire d'avoir autant de données dans les environnements de test qu'en production.",
       "methode": "Il existe un potentiel d'amélioration si certaines bases de données de test sont aussi volumineuses que celles de production.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -751,7 +751,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -766,7 +766,7 @@
       "explication": "Si les données sont dupliquées et que cela ne fait pas partie de la stratégie produit en matière de haute disponibilité, cela indique généralement une opportunité d'optimisation, sauf lorsque la duplication résulte d'une dénormalisation intentionnelle motivée par des considérations de performance.",
       "methode": "Le critère est validé si l'équipe a identifié les données dupliquées et déterminé si cela est justifié ou non.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -774,7 +774,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -789,7 +789,7 @@
       "explication": "Les données rarement consultées peuvent être transférées vers un niveau de stockage plus économe en énergie, mais plus lent (« stockage à froid »).\nPar exemple, les transactions datant de plus de trois mois dans un service bancaire peuvent être supprimées de la base de données principale et archivées.\nL'utilisateur peut toujours les récupérer, mais via un processus plus lent, ce qui est acceptable compte tenu de leur utilisation peu fréquente.\nPar exemple : les SSD ont un impact carbone 2 à 3 fois plus élevé que les disques durs mécaniques (HDD) de capacité équivalente",
       "methode": "Le critère est validé si les données rarement consultées ont déjà été transférées vers un stockage froid ou hiérarchisé approprié.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -797,7 +797,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -812,7 +812,7 @@
       "explication": "L'analyse statique permet d'identifier les problèmes de performance et d'efficacité.\nElle contribue également à améliorer la qualité et facilite la modification des produits.",
       "methode": "Une amélioration est identifiée si les outils d'analyse statistique en place ont révélé des gains d'efficacité potentiels.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -820,7 +820,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -835,7 +835,7 @@
       "explication": "Si une campagne de tests de charge ou de résistance a révélé des problèmes d'efficacité, il peut être possible d'améliorer le produit.",
       "methode": "Une amélioration est identifiée si une campagne de tests de charge ou de résistance a révélé des problèmes d'efficacité.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -843,7 +843,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -858,7 +858,7 @@
       "explication": "Une amélioration est identifiée si l'équipe a identifié des gains d'efficacité.",
       "methode": "Le critère est validé si les tâches identifiées par l'équipe (problèmes, tickets, etc.) comportent des points permettant d'améliorer les performances/l'efficacité.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -866,7 +866,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -881,7 +881,7 @@
       "explication": "Une mauvaise performance implique un potentiel d'optimisation. Les indicateurs de performance comprennent la latence, les requêtes par seconde, les indicateurs Core Web Vitals, etc.",
       "methode": "Une amélioration est identifiée si les indicateurs de performance ne correspondent pas à l'ambition du projet (par exemple, plus de 2 secondes pour afficher une page web).",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -889,7 +889,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -904,7 +904,7 @@
       "explication": "Les parcours utilisateur les plus fréquents sont essentiels pour l'ensemble des ressources utilisées par l'application. L'application d'optimisations sur ces chemins de code devrait donner de bons résultats.",
       "methode": "Une amélioration est identifiée si aucune étude n'a été menée pour améliorer les performances/l'efficacité des chemins de code les plus utilisés.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -912,7 +912,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -927,7 +927,7 @@
       "explication": "La mise à jour des outils (tels que la machine virtuelle Java) permet d'améliorer àmoindre coût les performances et l'efficacité.",
       "methode": "Une amélioration est identifiée si la base technique du projet n'est pas à jour au moins jusqu'à la dernière version LTS.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -935,7 +935,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -950,7 +950,7 @@
       "explication": "Les composants d'optimisation (tels que la  machine virtuelle Java) permettent d'améliorer les performances et l'efficacité.",
       "methode": "Une amélioration est identifiée si aucune étude n'a été menée pour vérifier si l'efficacité des composants déployés pourrait être améliorée en modifiant leur configuration.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -958,7 +958,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -973,7 +973,7 @@
       "explication": "La mise à jour des dépendances du projet (comme le Spring Framework en Java) peut permettre d'améliorer les performances et l'efficacité.",
       "methode": "Une amélioration est identifiée si les principales dépendances du projet ne sont pas à jour par rapport à la dernière version stable.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -981,7 +981,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -996,7 +996,7 @@
       "explication": "Le service doit être compatible avec tous les appareils dont disposent les utilisateurs afin d'éviter que ces appareils ne deviennent obsolètes.",
       "methode": "Une amélioration est identifiée si l'équipe a détecté des problèmes de compatibilité.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "✅ Point fort confirmé",
         "💡 Potentiel d'amélioration identifié",
@@ -1004,7 +1004,7 @@
         "🤔 À évaluer",
         "⌛️ Évaluation en cours"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "✅ Point fort confirmé": 0,
         "💡 Potentiel d'amélioration identifié": 1,
         "🚫 Non applicable": 0,
@@ -1019,13 +1019,13 @@
       "explication": "Sans un minimum de connaissances sur le comportement du produit en cours d'exécution, il est difficile d'identifier les optimisations possibles. L'absence de surveillance implique un faible potentiel d'optimisation.",
       "methode": "Le critère est validé si des outils d'observabilité sont en place.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1038,13 +1038,13 @@
       "explication": "Les revues de code et la programmation en binôme garantissent un niveau minimum de connaissances communes sur la base de code et une qualité minimale.",
       "methode": "Le critère est validé si des revues de code et de la programmation en binôme sont effectuées sur la majeure partie du code du projet.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1057,13 +1057,13 @@
       "explication": "La présence d'un CI/CD est un bon indicateur de la facilité avec laquelle il sera possible de travailler sur l'application en toute confiance.",
       "methode": "Le critère est validé si les projets sont régulièrement construits et testés automatiquement via un outil CI/CD.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1076,13 +1076,13 @@
       "explication": "La présence de tests de non-régression permet aux programmeurs de modifier le logiciel tout en étant assurés de l'absence de problèmes induits par leur travail.",
       "methode": "Le critère est validé si le projet dispose d'un ensemble complet de tests automatisés couvrant les parties les plus importantes du code source.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1095,13 +1095,13 @@
       "explication": "Les pratiques de découplage telles que l'injection de dépendances ou l'architecture hexagonale/propre/en oignon permettent des changements techniques plus efficaces et ambitieux.\nC'est le « D » (inversion des dépendances) des 5 principes fondamentaux.",
       "methode": "Le critère est validé s'il est possible de modifier les aspects techniques du produit sans modifier le code fonctionnel.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1114,13 +1114,13 @@
       "explication": "Comme la couverture de code, la complexité cyclomatique, le nombre de problèmes, le nombre de problèmes de livraison, le nombre de retours en arrière, le délai de modification, la fréquence de déploiement, le pourcentage d'échecs de modification, le temps de récupération après un déploiement échoué.",
       "methode": "Le critère est validé si des mesures de qualité logicielle sont en place.",
       "niveau_impact": "Déterminant",
-      "poids": 2.0,
+      "potentiel_max": 2.0,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1133,13 +1133,13 @@
       "explication": "La présence d'une documentation pertinente permet des changements plus ambitieux.",
       "methode": "Le critère est validé si le projet dispose d'une documentation claire et utilisable.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1152,13 +1152,13 @@
       "explication": "Le code dupliqué peut être supprimé afin de simplifier la maintenance des produits.",
       "methode": "Le critère est validé s'il n'y a pas de code dupliqué injustifié dans le projet.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1171,13 +1171,13 @@
       "explication": "La facilité de changement augmente lorsque les équipes peuvent compter sur les outils dont elles ont besoin pour surveiller les performances, mesurer l'impact ou analyser les comportements.\nCette autonomie peut provenir de la possibilité d'installer des outils personnalisés ou de s'appuyer sur des outils intégrés complets fournis par la plateforme.\nCe qui importe, ce n'est pas l'endroit où l'infrastructure est hébergée, mais la capacité de l'équipe à l'utiliser efficacement pour soutenir l'optimisation.",
       "methode": "Le critère est validé si l'équipe peut utiliser ou déployer les outils dont elle a besoin pour observer, mesurer et optimiser le système.",
       "niveau_impact": "Modéré",
-      "poids": 1.0,
+      "potentiel_max": 1.0,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1
@@ -1190,13 +1190,13 @@
       "explication": "Les exigences de haute disponibilité peuvent réduire la capacité de l'équipe à modifier, migrer ou optimiser les composants.\nLes services qui doivent maintenir une disponibilité stricte laissent moins de possibilités pour les fenêtres de maintenance, les changements architecturaux ou l'optimisation des ressources.\nComprendre ces contraintes aide à évaluer la facilité avec laquelle le système peut évoluer vers un impact environnemental moindre.",
       "methode": "Le critère est validé si les contraintes de disponibilité du système permettent encore à l'équipe de modifier ou d'optimiser les composants sans difficulté majeure.",
       "niveau_impact": "Significatif",
-      "poids": 1.5,
+      "potentiel_max": 1.5,
       "options_evaluation": [
         "🟢 Facile à modifier",
         "🟡 Effort modéré",
         "🔴 Difficile à changer"
       ],
-      "options_evaluation_score": {
+      "options_evaluation_coefficient": {
         "🟢 Facile à modifier": 0,
         "🟡 Effort modéré": 0.5,
         "🔴 Difficile à changer": 1

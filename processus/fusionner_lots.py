@@ -15,25 +15,25 @@ produisent le même fichier, au champ d'horodatage près (idempotence).
 
 RÈGLES DE FUSION (impératives, non négociables)
 -----------------------------------------------
-1. Précédence par nature de preuve (lue depuis le manifeste) :
-   mesure > auto_declare_public > declare_qcm
-   Une nature plus haute ne peut JAMAIS être écrasée par une nature plus basse.
+1. Précédence par provenance (lue depuis le manifeste) :
+   collecte > estime > declare > precise
+   Une provenance haute ne peut JAMAIS être écrasée par une provenance plus basse.
 
-2. Divergence (deux natures DIFFÉRENTES avec réponses DIFFÉRENTES) :
-   - Conserver la réponse de la nature la plus haute en précédence (avec son score)
-   - Mettre confidence=low
-   - Consigner l'écart dans le contexte (quelles natures, quelles réponses, laquelle retenue)
+2. Divergence (deux provenances DIFFÉRENTES avec réponses DIFFÉRENTES) :
+   - Conserver la réponse de la provenance la plus haute en précédence (avec son coefficient)
+   - Marquer la divergence explicitement
+   - Consigner l'écart dans le contexte (quelles provenances, quelles réponses, laquelle retenue)
 
-3. Conflit (même nature, réponses différentes) : REFUSER la fusion, exit 1.
+3. Conflit (même provenance, réponses différentes) : REFUSER la fusion, exit 1.
    Le manifeste garantit que chaque critère appartient à un seul lot. Si deux lots
-   portent le même critère avec la même nature, c'est un défaut de conception.
+   portent le même critère avec la même provenance, c'est un défaut de conception.
 
 4. Absence de donnée : reponse=null, categorie=aucune_donnee, RIEN d'inventé.
 
 5. Validation bloquante : chaque fichier de lot passe par valider_sortie_lot.py.
    Un fichier non conforme est REFUSÉ, jamais fusionné.
 
-6. Enrichissement depuis le référentiel : poids, dimension, libellé du critère sont
+6. Enrichissement depuis le référentiel : potentiel_max, dimension, libellé du critère sont
    ajoutés par CE SCRIPT depuis le référentiel, jamais lus depuis un fichier de lot.
 
 7. Idempotence : deux exécutions sur les mêmes lots = même fichier (hors horodatage).
@@ -112,9 +112,9 @@ def load_manifeste():
     if errors:
         return None, None, errors
 
-    precedence = data.get("conventions", {}).get("precedence_nature_preuve")
+    precedence = data.get("conventions", {}).get("precedence_provenance")
     if not isinstance(precedence, list) or not precedence:
-        return None, None, ["Manifeste : clé conventions.precedence_nature_preuve manquante ou invalide"]
+        return None, None, ["Manifeste : clé conventions.precedence_provenance manquante ou invalide"]
 
     return data, precedence, []
 
@@ -156,11 +156,11 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
 
     Args:
         entries_by_id: dict {id: [entry1, entry2, ...]}
-        precedence_list: liste ordonnée des natures de preuve (plus haute d'abord)
+        precedence_list: liste ordonnée des provenances (plus haute d'abord)
         ref_criteres: dict {id: critere_complet} depuis le référentiel
         ref_diagnostic: dict {id: question} depuis le diagnostic rapide
         ownership_map: dict {crit_id: [lot_id, ...]} pour le contrôle de propriété
-        residuel_lots: dict {lot_id: nature_preuve} des lots résiduels
+        residuel_lots: dict {lot_id: provenance} des lots résiduels
         known_lot_ids: set des lot_id valides depuis le manifeste
 
     Returns:
@@ -169,8 +169,8 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
     merged = []
     errors = []
 
-    # Créer un mapping nature -> priorité (plus bas = plus haute priorité)
-    nature_priority = {nature: idx for idx, nature in enumerate(precedence_list)}
+    # Créer un mapping provenance -> priorité (plus bas = plus haute priorité)
+    provenance_priority = {provenance: idx for idx, provenance in enumerate(precedence_list)}
 
     for cid, entries in sorted(entries_by_id.items()):
         # Référence du critère
@@ -216,45 +216,45 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
                     "id": cid,
                     "categorie": "aucune_donnee",
                     "reponse": None,
-                    "score": None,
-                    "confidence": None,
+                    "coefficient": None,
+                    "provenance": None,
                     "source": None,
                     "contexte": None,
-                    "nature_preuve": None,
+                    "sans_objet": None,
                 }
             merged.append(base)
             continue
 
-        # Grouper par nature de preuve
-        by_nature = defaultdict(list)
+        # Grouper par provenance
+        by_provenance = defaultdict(list)
         for e in with_reponse:
-            nature = e.get("nature_preuve")
-            by_nature[nature].append(e)
+            provenance = e.get("provenance")
+            by_provenance[provenance].append(e)
 
-        # Trouver la nature la plus haute présente
-        highest_nature = None
-        for nature in precedence_list:
-            if nature in by_nature:
-                highest_nature = nature
+        # Trouver la provenance la plus haute présente
+        highest_provenance = None
+        for provenance in precedence_list:
+            if provenance in by_provenance:
+                highest_provenance = provenance
                 break
 
-        if highest_nature is None:
-            errors.append(f"Critère {cid} : aucune nature de preuve reconnue")
+        if highest_provenance is None:
+            errors.append(f"Critère {cid} : aucune provenance reconnue")
             continue
 
-        entries_highest = by_nature[highest_nature]
+        entries_highest = by_provenance[highest_provenance]
 
-        # Vérifier les conflits à nature égale
+        # Vérifier les conflits à provenance égale
         unique_reponses = set(e.get("reponse") for e in entries_highest)
         if len(unique_reponses) > 1:
             lot_ids = [e.get("_lot_id", "?") for e in entries_highest]
             errors.append(
-                f"Critère {cid} : conflit à nature égale ({highest_nature}) - "
+                f"Critère {cid} : conflit à provenance égale ({highest_provenance}) - "
                 f"réponses divergentes : {unique_reponses} - lots : {lot_ids}"
             )
             continue
 
-        # Prendre la première entrée de la nature la plus haute
+        # Prendre la première entrée de la provenance la plus haute
         base = entries_highest[0].copy()
 
         # Vérifier que la réponse existe dans options_evaluation du référentiel
@@ -266,30 +266,30 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
             )
             continue
 
-        # Vérifier les divergences entre natures différentes
-        other_natures = [n for n in by_nature if n != highest_nature]
-        if other_natures:
-            # Collecter toutes les réponses des autres natures
+        # Vérifier les divergences entre provenances différentes
+        other_provenances = [p for p in by_provenance if p != highest_provenance]
+        if other_provenances:
+            # Collecter toutes les réponses des autres provenances
             other_reponses = set()
-            for nature in other_natures:
-                for e in by_nature[nature]:
+            for provenance in other_provenances:
+                for e in by_provenance[provenance]:
                     other_reponses.add(e.get("reponse"))
 
             # Y a-t-il une divergence (réponse différente) ?
             if base["reponse"] not in other_reponses:
-                # Divergence détectée : conserver la réponse de la nature la plus haute
-                # mais mettre confidence à low et consigner l'écart
-                base["confidence"] = "low"
+                # Divergence détectée : conserver la réponse de la provenance la plus haute
+                # et consigner l'écart
+                base["divergence"] = True
 
                 # Construire le contexte explicatif
                 divergence_details = []
-                for nature in [highest_nature] + other_natures:
-                    for e in by_nature[nature]:
-                        divergence_details.append(f"{nature}: '{e.get('reponse')}'")
+                for provenance in [highest_provenance] + other_provenances:
+                    for e in by_provenance[provenance]:
+                        divergence_details.append(f"{provenance}: '{e.get('reponse')}'")
 
                 base["contexte"] = (
-                    f"Divergence entre natures de preuve - {'; '.join(divergence_details)} - "
-                    f"réponse retenue (nature la plus haute) : {highest_nature}"
+                    f"Divergence entre provenances - {'; '.join(divergence_details)} - "
+                    f"réponse retenue (provenance la plus haute) : {highest_provenance}"
                 )
 
         # Concaténer les contextes additionnels des lots non propriétaires
@@ -306,7 +306,7 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
 
 def enrich_from_referentiel(entries, ref_criteres, ref_diagnostic):
     """
-    Enrichit les entrées avec les données du référentiel (poids, dimension, libellé).
+    Enrichit les entrées avec les données du référentiel (potentiel_max, dimension, libellé).
     Produit UNE entrée pour CHAQUE critère du référentiel, même ceux sans lot.
 
     Args:
@@ -333,30 +333,32 @@ def enrich_from_referentiel(entries, ref_criteres, ref_diagnostic):
                 "id": cid,
                 "dimension": ref.get("pilier", ""),
                 "critere": ref.get("critere", ""),
-                "poids": ref.get("poids", 0),
+                "potentiel_max": ref.get("potentiel_max", 0),
                 "categorie": entry.get("categorie", "aucune_donnee"),
                 "reponse": entry.get("reponse"),
-                "score": entry.get("score"),
-                "confidence": entry.get("confidence"),
+                "coefficient": entry.get("coefficient"),
+                "provenance": entry.get("provenance"),
                 "source": entry.get("source"),
                 "contexte": entry.get("contexte"),
+                "sans_objet": entry.get("sans_objet"),
             }
-            # Ajouter nature_preuve si présente
-            if "nature_preuve" in entry:
-                enriched_entry["nature_preuve"] = entry["nature_preuve"]
+            # Ajouter divergence si présente
+            if entry.get("divergence"):
+                enriched_entry["divergence"] = True
         else:
             # Aucune entrée : créer une entrée vide
             enriched_entry = {
                 "id": cid,
                 "dimension": ref.get("pilier", ""),
                 "critere": ref.get("critere", ""),
-                "poids": ref.get("poids", 0),
+                "potentiel_max": ref.get("potentiel_max", 0),
                 "categorie": "aucune_donnee",
                 "reponse": None,
-                "score": None,
-                "confidence": None,
+                "coefficient": None,
+                "provenance": None,
                 "source": None,
                 "contexte": None,
+                "sans_objet": None,
             }
 
         enriched.append(enriched_entry)
@@ -370,12 +372,14 @@ def compute_metrics(criteres, ref_criteres):
 
     Returns:
         dict avec :
-          - criteres_repondus_auto : nombre de critères avec réponse automatisable
+          - criteres_repondus : nombre de critères avec réponse (toutes provenances)
           - criteres_avec_indice_partiel : nombre avec indice partiel
           - potentiel_optimisation_global_pct : pourcentage global
-          - dimensions : liste des 6 dimensions avec scores
+          - completude_globale_pct : part des critères examinés sur le total
+          - dimensions : liste des 6 dimensions avec potentiels
+          - repondus_par_provenance : répartition des critères répondus par provenance
     """
-    # Définir les 6 dimensions avec leurs poids totaux
+    # Définir les 6 dimensions
     dimension_names = [
         "🛖 1 — Produit",
         "🗺️ 2 — Architecture",
@@ -385,22 +389,28 @@ def compute_metrics(criteres, ref_criteres):
         "🛠 6 — Facilité de changement",
     ]
 
-    # Calculer les totaux depuis le référentiel
-    dimension_totals = {name: 0 for name in dimension_names}
+    # Calculer les totaux depuis le référentiel (TOUS les critères)
+    dimension_totals_potentiel = {name: 0.0 for name in dimension_names}
     dimension_counts = {name: 0 for name in dimension_names}
 
     for cid, ref in ref_criteres.items():
         pilier = ref.get("pilier", "")
         if pilier in dimension_names:
             dimension_counts[pilier] += 1
-            dimension_totals[pilier] += ref.get("poids", 0)
+            dimension_totals_potentiel[pilier] += ref.get("potentiel_max", 0)
 
-    # Agréger les scores par dimension
-    dimension_scores = {name: {"poids_repondu": 0, "score_pondere": 0, "repondus": 0}
-                        for name in dimension_names}
+    # Agréger les potentiels et complétudes par dimension
+    dimension_metrics = {name: {
+        "potentiel_retenu": 0.0,
+        "potentiel_total": dimension_totals_potentiel[name],
+        "repondus": 0,
+        "sans_objet_count": 0,
+        "repondus_par_provenance": {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+    } for name in dimension_names}
 
-    criteres_repondus_auto = 0
+    criteres_repondus = 0
     criteres_avec_indice_partiel = 0
+    repondus_par_provenance_global = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
 
     for c in criteres:
         pilier = c.get("dimension", "")
@@ -409,53 +419,91 @@ def compute_metrics(criteres, ref_criteres):
 
         categorie = c.get("categorie")
         reponse = c.get("reponse")
-        score = c.get("score")
-        poids = c.get("poids", 0)
+        coefficient = c.get("coefficient")
+        potentiel_max = c.get("potentiel_max", 0)
+        provenance = c.get("provenance")
+        sans_objet = c.get("sans_objet")
 
-        if categorie == "automatisable" and reponse is not None:
-            criteres_repondus_auto += 1
-            dimension_scores[pilier]["repondus"] += 1
-            dimension_scores[pilier]["poids_repondu"] += poids
-            if score is not None:
-                dimension_scores[pilier]["score_pondere"] += score * poids
+        # Mécanisme sans_objet : retire du numérateur ET du dénominateur
+        if sans_objet:
+            dimension_metrics[pilier]["sans_objet_count"] += 1
+            dimension_metrics[pilier]["potentiel_total"] -= potentiel_max
+            continue
+
+        # TOUTE réponse compte, quelle que soit sa provenance ou catégorie
+        if reponse is not None:
+            criteres_repondus += 1
+            dimension_metrics[pilier]["repondus"] += 1
+
+            # Compter par provenance
+            if provenance in repondus_par_provenance_global:
+                repondus_par_provenance_global[provenance] += 1
+                dimension_metrics[pilier]["repondus_par_provenance"][provenance] += 1
+
+            # Calcul du potentiel retenu
+            if coefficient is not None:
+                potentiel_retenu = coefficient * potentiel_max
+                dimension_metrics[pilier]["potentiel_retenu"] += potentiel_retenu
 
         if categorie == "partiel" and c.get("contexte"):
             criteres_avec_indice_partiel += 1
 
     # Calculer les pourcentages par dimension
     dimensions = []
-    poids_total_repondu = 0
-    score_total_pondere = 0
+    potentiel_total_global = 0.0
+    potentiel_retenu_global = 0.0
+    criteres_examines_global = 0
+    criteres_totaux_global = len(ref_criteres)
 
     for name in dimension_names:
-        stats = dimension_scores[name]
-        poids_repondu = stats["poids_repondu"]
-        score_pondere = stats["score_pondere"]
+        stats = dimension_metrics[name]
+        potentiel_total = stats["potentiel_total"]
+        potentiel_retenu = stats["potentiel_retenu"]
+        repondus = stats["repondus"]
+        total_criteres = dimension_counts[name] - stats["sans_objet_count"]
 
-        if poids_repondu > 0:
-            score_pct = (score_pondere / poids_repondu) * 100
-            poids_total_repondu += poids_repondu
-            score_total_pondere += score_pondere
+        # Potentiel d'optimisation : dénominateur = TOUS les critères de la dimension, hors sans_objet
+        if potentiel_total > 0:
+            potentiel_optimisation_pct = (potentiel_retenu / potentiel_total) * 100
         else:
-            score_pct = None
+            potentiel_optimisation_pct = None
+
+        # Complétude : part des critères examinés
+        if total_criteres > 0:
+            completude_pct = (repondus / total_criteres) * 100
+        else:
+            completude_pct = None
 
         dimensions.append({
             "nom": name,
-            "score_pct": score_pct,
-            "repondus": stats["repondus"],
-            "total": dimension_counts[name],
+            "potentiel_optimisation_pct": potentiel_optimisation_pct,
+            "completude_pct": completude_pct,
+            "repondus": repondus,
+            "total": total_criteres,
+            "repondus_par_provenance": stats["repondus_par_provenance"],
         })
 
+        potentiel_total_global += potentiel_total
+        potentiel_retenu_global += potentiel_retenu
+        criteres_examines_global += repondus
+
     # Calcul global
-    if poids_total_repondu > 0:
-        potentiel_global_pct = (score_total_pondere / poids_total_repondu) * 100
+    if potentiel_total_global > 0:
+        potentiel_optimisation_global_pct = (potentiel_retenu_global / potentiel_total_global) * 100
     else:
-        potentiel_global_pct = None
+        potentiel_optimisation_global_pct = None
+
+    if criteres_totaux_global > 0:
+        completude_globale_pct = (criteres_examines_global / criteres_totaux_global) * 100
+    else:
+        completude_globale_pct = None
 
     return {
-        "criteres_repondus_auto": criteres_repondus_auto,
+        "criteres_repondus": criteres_repondus,
         "criteres_avec_indice_partiel": criteres_avec_indice_partiel,
-        "potentiel_optimisation_global_pct": potentiel_global_pct,
+        "potentiel_optimisation_global_pct": potentiel_optimisation_global_pct,
+        "completude_globale_pct": completude_globale_pct,
+        "repondus_par_provenance": repondus_par_provenance_global,
         "dimensions": dimensions,
     }
 
@@ -476,7 +524,7 @@ def build_diagnostic_rapide_apercu(entries_by_id, ref_diagnostic):
                 "critere": ref.get("critere", ""),
                 "niveau_impact": ref.get("niveau_impact", ""),
                 "reponse": entry.get("reponse"),
-                "confidence": entry.get("confidence"),
+                "provenance": entry.get("provenance"),
                 "source": entry.get("source"),
                 "indice_contextuel": entry.get("contexte"),
             }
@@ -486,7 +534,7 @@ def build_diagnostic_rapide_apercu(entries_by_id, ref_diagnostic):
                 "critere": ref.get("critere", ""),
                 "niveau_impact": ref.get("niveau_impact", ""),
                 "reponse": None,
-                "confidence": None,
+                "provenance": None,
                 "source": None,
                 "indice_contextuel": None,
             }
@@ -555,7 +603,7 @@ def main():
             print(f"    {err}")
         return 1
 
-    print(f"[info] Précédence des natures de preuve : {' > '.join(precedence)}")
+    print(f"[info] Précédence des provenances : {' > '.join(precedence)}")
 
     # Calculer l'ownership depuis le manifeste
     lots = manifeste_data.get("lots", [])
@@ -648,7 +696,9 @@ def main():
     # Calcul des métriques
     print("[métriques] Calcul des agrégats...")
     metrics = compute_metrics(enriched, ref_criteres)
-    print(f"[OK] Critères répondus : {metrics['criteres_repondus_auto']}/{len(ref_criteres)}")
+    print(f"[OK] Critères répondus : {metrics['criteres_repondus']}/{len(ref_criteres)}")
+    if metrics["completude_globale_pct"] is not None:
+        print(f"[OK] Complétude globale : {metrics['completude_globale_pct']:.1f}%")
     if metrics["potentiel_optimisation_global_pct"] is not None:
         print(f"[OK] Potentiel d'optimisation global : {metrics['potentiel_optimisation_global_pct']:.1f}%")
 
@@ -660,9 +710,11 @@ def main():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "domaine": domaine,
         "criteres_total": len(ref_criteres),
-        "criteres_repondus_auto": metrics["criteres_repondus_auto"],
+        "criteres_repondus": metrics["criteres_repondus"],
         "criteres_avec_indice_partiel": metrics["criteres_avec_indice_partiel"],
+        "completude_globale_pct": metrics["completude_globale_pct"],
         "potentiel_optimisation_global_pct": metrics["potentiel_optimisation_global_pct"],
+        "repondus_par_provenance": metrics["repondus_par_provenance"],
         "dimensions": metrics["dimensions"],
         "diagnostic_rapide_apercu": diagnostic_apercu,
         "criteres": enriched,
@@ -683,8 +735,10 @@ def main():
     print()
     print("=" * 68)
     print("[SUCCÈS] Fusion terminée")
-    print(f"  Fichier produit  : {output_path}")
-    print(f"  Critères répondus : {metrics['criteres_repondus_auto']}/{len(ref_criteres)}")
+    print(f"  Fichier produit   : {output_path}")
+    print(f"  Critères répondus : {metrics['criteres_repondus']}/{len(ref_criteres)}")
+    if metrics["completude_globale_pct"] is not None:
+        print(f"  Complétude globale : {metrics['completude_globale_pct']:.1f}%")
     if metrics["potentiel_optimisation_global_pct"] is not None:
         print(f"  Potentiel global  : {metrics['potentiel_optimisation_global_pct']:.1f}%")
     print("=" * 68)

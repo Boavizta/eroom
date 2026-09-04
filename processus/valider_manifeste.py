@@ -163,6 +163,34 @@ def check_manifest(manifest_path):
         print("[OK] Tous les identifiants de lot sont uniques.")
 
     # -----------------------------------------------------------------------
+    # Contrôle 1b : Validation stricte des clés de chaque lot
+    # -----------------------------------------------------------------------
+    ALLOWED_LOT_KEYS = {
+        "id", "vague", "libelle", "executeur", "etat", "scripts", "scripts_a_ecrire",
+        "prompt", "arguments", "arguments_verifies", "depends_on", "entrees",
+        "sorties_donnees", "sortie_de_lot", "provenances_autorisees", "criteres_possedes",
+        "contextes_autorises", "rejouable_seul", "prerequis_humain", "contrainte",
+        "note", "retour_attendu", "type", "decision"
+    }
+
+    unknown_keys_violations = []
+    for lot in lots:
+        lot_id = lot.get("id", "?")
+        unknown_keys = set(lot.keys()) - ALLOWED_LOT_KEYS
+        if unknown_keys:
+            for key in sorted(unknown_keys):
+                unknown_keys_violations.append((lot_id, key))
+
+    if unknown_keys_violations:
+        print(f"[ERREUR] {len(unknown_keys_violations)} clé(s) inconnue(s) dans des lots (validation stricte) :")
+        for lot_id, key in unknown_keys_violations:
+            print(f"    - lot '{lot_id}' : clé inconnue '{key}'")
+        print()
+        errors += len(unknown_keys_violations)
+    else:
+        print("[OK] Toutes les clés des lots sont reconnues.")
+
+    # -----------------------------------------------------------------------
     # Contrôle 2 : Graphe de dépendances valide
     # -----------------------------------------------------------------------
     lot_ids_set = set(lot_ids)
@@ -341,49 +369,49 @@ def check_manifest(manifest_path):
         print(f"[info] {len(residuel_lots)} lot(s) résiduel(s) : {', '.join(residuel_lots.keys())}")
 
     # -----------------------------------------------------------------------
-    # Contrôle 4d : Unicité des lots résiduels par nature de preuve
+    # Contrôle 4d : Unicité des lots résiduels par provenance
     # -----------------------------------------------------------------------
-    residuel_by_nature = {}
-    for lot_id, nature in residuel_lots.items():
-        if nature not in residuel_by_nature:
-            residuel_by_nature[nature] = []
-        residuel_by_nature[nature].append(lot_id)
+    residuel_by_provenance = {}
+    for lot_id, provenance in residuel_lots.items():
+        if provenance not in residuel_by_provenance:
+            residuel_by_provenance[provenance] = []
+        residuel_by_provenance[provenance].append(lot_id)
 
-    residuel_collisions = {nature: lots for nature, lots in residuel_by_nature.items() if len(lots) > 1}
+    residuel_collisions = {provenance: lots for provenance, lots in residuel_by_provenance.items() if len(lots) > 1}
     if residuel_collisions:
-        print(f"[ERREUR] {len(residuel_collisions)} nature(s) avec plusieurs lots résiduels (ambiguïté d'ordre) :")
-        for nature, lot_ids in residuel_collisions.items():
-            print(f"    - nature '{nature}' : {', '.join(lot_ids)}")
+        print(f"[ERREUR] {len(residuel_collisions)} provenance(s) avec plusieurs lots résiduels (ambiguïté d'ordre) :")
+        for provenance, lot_ids in residuel_collisions.items():
+            print(f"    - provenance '{provenance}' : {', '.join(lot_ids)}")
         print()
         errors += len(residuel_collisions)
     else:
         if residuel_lots:
-            print("[OK] Chaque nature de preuve a au plus un lot résiduel.")
+            print("[OK] Chaque provenance a au plus un lot résiduel.")
 
     # -----------------------------------------------------------------------
-    # Contrôle 6 : Natures de preuve
+    # Contrôle 6 : Provenances
     # -----------------------------------------------------------------------
-    precedence = conventions.get("precedence_nature_preuve", [])
-    nature_violations = []
+    precedence = conventions.get("precedence_provenance", [])
+    provenance_violations = []
 
     for lot in lots:
-        natures = lot.get("natures_autorisees", [])
-        for nature in natures:
-            if nature not in precedence:
-                nature_violations.append((lot["id"], nature))
+        provenances = lot.get("provenances_autorisees", [])
+        for provenance in provenances:
+            if provenance not in precedence:
+                provenance_violations.append((lot["id"], provenance))
 
         sortie = lot.get("sortie_de_lot")
-        if sortie and not natures:
-            nature_violations.append((lot["id"], "aucune nature déclarée pour un lot de jugement"))
+        if sortie and not provenances:
+            provenance_violations.append((lot["id"], "aucune provenance déclarée pour un lot de jugement"))
 
-    if nature_violations:
-        print(f"[ERREUR] {len(nature_violations)} nature(s) de preuve invalide(s) :")
-        for lot_id, nature in nature_violations:
-            print(f"    - lot '{lot_id}' : {nature}")
+    if provenance_violations:
+        print(f"[ERREUR] {len(provenance_violations)} provenance(s) invalide(s) :")
+        for lot_id, provenance in provenance_violations:
+            print(f"    - lot '{lot_id}' : {provenance}")
         print()
-        errors += len(nature_violations)
+        errors += len(provenance_violations)
     else:
-        print("[OK] Toutes les natures de preuve sont valides.")
+        print("[OK] Toutes les provenances sont valides.")
 
     # -----------------------------------------------------------------------
     # Contrôle 7 : Sorties de lot uniques

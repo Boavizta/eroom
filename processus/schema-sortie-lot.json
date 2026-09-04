@@ -26,7 +26,7 @@
     },
     "criteres": {
       "type": "array",
-      "description": "Liste des critères jugés par ce lot. Un critère peut être partiellement renseigné (contexte seulement) ou entièrement tranché (reponse + score). Le script de fusion consolide ces entrées multiples en un seul verdict par critère.",
+      "description": "Liste des critères jugés par ce lot. Un critère peut être partiellement renseigné (contexte seulement) ou entièrement tranché (reponse + coefficient). Le script de fusion consolide ces entrées multiples en un seul verdict par critère.",
       "items": {
         "type": "object",
         "required": ["id", "categorie"],
@@ -41,14 +41,14 @@
             "type": ["string", "null"],
             "description": "Libellé exact de l'option cochée, issu du vocabulaire du référentiel POUR CE CRITÈRE (options_evaluation ou crans selon le type). Si null, le critère reste non tranché (indice contextuel seul)."
           },
-          "score": {
+          "coefficient": {
             "type": ["number", "null"],
-            "description": "Score numérique associé à la réponse, selon le mapping options_evaluation_score du référentiel. Doit être null si et seulement si reponse est null. Si reponse est non null, doit valoir EXACTEMENT le score défini par le référentiel pour ce libellé."
+            "description": "Coefficient numérique associé à la réponse, selon le mapping options_evaluation_coefficient du référentiel. Doit être null si et seulement si reponse est null. Si reponse est non null, doit valoir EXACTEMENT le coefficient défini par le référentiel pour ce libellé."
           },
-          "confidence": {
+          "provenance": {
             "type": ["string", "null"],
-            "description": "Degré de confiance dans le verdict ou l'indice : 'high' (mesure directe, source officielle), 'medium' (inférence robuste, source tierce fiable), 'low' (indice faible, proxy indirect). Requis si reponse ou contexte sont non null.",
-            "enum": ["high", "medium", "low", null]
+            "description": "Provenance du verdict ou de l'indice : 'collecte' (mesuré par nos scripts : HAR, en-têtes HTTP, API), 'estime' (déduit par un LLM à partir d'indices réels), 'declare' (déclaré publiquement par l'organisation auditée : page d'accessibilité, mentions légales), 'precise' (coché par le client dans le questionnaire, sans preuve). Requis si reponse ou contexte sont non null. Détermine la précédence de fusion : collecte > estime > declare > precise.",
+            "enum": ["collecte", "estime", "declare", "precise", null]
           },
           "source": {
             "type": ["string", "null"],
@@ -64,10 +64,9 @@
             "description": "Type de donnée utilisée pour juger ce critère : 'automatisable' (verdict tranché par mesure ou règle déterministe), 'partiel' (indice faible, contexte seul), 'aucune_donnee' (aucune donnée disponible pour ce critère dans ce lot). Vocabulaire imposé, hérité de la table de correspondance EOF.",
             "enum": ["automatisable", "partiel", "aucune_donnee"]
           },
-          "nature_preuve": {
-            "type": ["string", "null"],
-            "description": "Nature de la preuve à l'origine du verdict : 'mesure' (HAR, en-têtes HTTP, API), 'auto_declare_public' (page d'accessibilité, mentions légales, déclaration publiée par l'organisation auditée), 'declare_qcm' (réponse au questionnaire rempli par le client). Requis si reponse ou contexte sont non null. Détermine la précédence de fusion : mesure > auto-déclaré public > déclaré au QCM.",
-            "enum": ["mesure", "auto_declare_public", "declare_qcm", null]
+          "sans_objet": {
+            "type": ["boolean", "null"],
+            "description": "Indique si le critère est sans objet pour ce service audité : true retire le critère du numérateur ET du dénominateur du calcul de potentiel d'optimisation. Distinct de la réponse '🚫 Non applicable' qui laisse le potentiel_max au dénominateur."
           }
         },
         "allOf": [
@@ -79,9 +78,9 @@
               "required": ["reponse"]
             },
             "then": {
-              "required": ["confidence", "source", "nature_preuve"],
+              "required": ["provenance", "source"],
               "properties": {
-                "score": { "type": "number" }
+                "coefficient": { "type": "number" }
               }
             }
           },
@@ -93,7 +92,7 @@
               "required": ["contexte"]
             },
             "then": {
-              "required": ["confidence", "source", "nature_preuve"]
+              "required": ["provenance", "source"]
             }
           },
           {
@@ -104,7 +103,7 @@
             },
             "then": {
               "properties": {
-                "score": { "type": "null" }
+                "coefficient": { "type": "null" }
               }
             }
           }

@@ -138,7 +138,7 @@ def _demo(output_path):
     svg_text = radar_svg(
         axes,
         title="Radar EROOM — test complet (6 axes, valeurs fictives)",
-        note="Exemple avec des scores fictifs, uniquement pour valider le rendu visuel",
+        note="Exemple avec des valeurs fictives de potentiel d'optimisation, uniquement pour valider le rendu visuel",
     )
     with open(output_path, "w") as f:
         f.write(svg_text)

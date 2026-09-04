@@ -34,6 +34,11 @@ coverage-analysis.json
 # règle avant le 28/08/2026 : simple oubli, pas un choix délibéré).
 cwv.json
 
+# Copies de sauvegarde laissees par un outil ou un agent avant edition. Le motif
+# couvre *.bak, *.bak2, *.bak.2026-09-04, etc. Elles sont redondantes : l'original
+# est toujours recuperable par `git show HEAD:<chemin>`.
+*.bak*
+
 # Fichiers internes analyse
 .analysis_start
 .cost-start-ts

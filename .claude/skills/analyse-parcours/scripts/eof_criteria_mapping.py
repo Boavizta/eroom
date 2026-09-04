@@ -41,15 +41,16 @@ abandonnés (jamais de valeur inventée à la place) :
   refait donc un fetch HTTP direct des mêmes URLs déjà auditées (pas un
   nouveau périmètre de pages, juste une source de contenu différente).
 
-Politique de sortie, stricte, pour ne jamais fabriquer un score :
+Politique de sortie, stricte, pour ne jamais fabriquer un potentiel artificiellement :
 - "automatisable" -> la règle peut cocher une option précise du menu à 5
   (`options_evaluation` de `eof-referentiel.json`). Si le signal est ambigu
   au moment de l'exécution (ex. valeur pile au seuil), retomber sur
   "🤔 À évaluer", jamais deviner.
 - "partiel"        -> JAMAIS de case cochée automatiquement. La donnée n'est
   qu'un indice contextuel affiché en annexe ("donnée indicative : ...",
-  confidence toujours "low" ou "medium", jamais "high"), le critère reste
-  "je ne sais pas" dans le référentiel rempli.
+  provenance toujours "suppose" ou "estime", JAMAIS "collecte"), le critère
+  reste "je ne sais pas" dans le référentiel rempli. Un indice présenté comme
+  collecté ferait croire à une mesure là où il n'y a qu'un signal faible.
 - absent de MAPPING -> "aucune_donnee" par défaut : aucun champ ne le
   renseigne, le critère reste "je ne sais pas", sans entrée dédiée ici (44
   critères dans ce cas — lister leurs ids un par un n'apporterait rien).
@@ -75,7 +76,7 @@ MAPPING = {
             "'✅ Point fort confirmé'. "
             "Si aucun CSP n'est disponible, repli sur l'ancienne heuristique tech_stack."
         ),
-        "confidence_max": "medium",
+        "provenance_max": "estime",
         "note": "Détecte uniquement ce qui transite côté client (HAR) ; un tracking côté serveur (ex. logs) est invisible. L'analytics sobre (Swetrix, Plausible, Matomo...) est volontairement exclu du pistage.",
     },
     "2.1": {
@@ -90,7 +91,7 @@ MAPPING = {
             "si l'usage est justifié, seulement sa présence - jamais '🚫 Non "
             "applicable' automatique)."
         ),
-        "confidence_max": "medium",
+        "provenance_max": "estime",
         "note": "Un appel IA fait côté backend (jamais visible dans le HAR client) est invisible à cette règle - un 'aucun signal' n'est jamais une preuve d'absence.",
     },
     "2.3": {
@@ -98,7 +99,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
         "regle": "La présence de domaines PaaS backend distincts déclarés dans le CSP (famille paas_backend de csp_inventory) est un indice de composants séparés - ne prouve ni l'optimisation de leur couplage ni l'efficacité de leur communication.",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité. Angle mort structurel : un backend auto-hébergé derrière un reverse proxy 1st-party est invisible ici.",
     },
     "2.5": {
@@ -112,7 +113,7 @@ MAPPING = {
             "analytics appelé à chaque interaction produit le même motif sans "
             "être un problème de cache."
         ),
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Risque réel de confondre un beacon de mesure d'audience (comportement normal) avec un calcul serveur recalculé par erreur - afficher l'URL et le count en annexe, jamais cocher automatiquement.",
     },
     "3.3": {
@@ -125,15 +126,15 @@ MAPPING = {
             "'💡 Potentiel d'amélioration identifié'. Si tous sont en dessous -> "
             "'✅ Point fort confirmé'."
         ),
-        "confidence_max": "high",
-        "note": "La donnée carbon_intensity (ipinfo + table carbone) est déjà confidence 'high' en source ; ne couvre que les serveurs identifiés depuis le HAR, jamais une infra invisible (BDD/service auto-hébergé derrière l'applicatif).",
+        "provenance_max": "collecte",
+        "note": "La donnée carbon_intensity (ipinfo + table carbone) est déjà provenance 'collecte' en source ; ne couvre que les serveurs identifiés depuis le HAR, jamais une infra invisible (BDD/service auto-hébergé derrière l'applicatif).",
     },
     "3.5": {
         "critere_court": "L'infrastructure peut-elle être mutualisée ?",
         "categorie": "partiel",
         "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
         "regle": "La présence de domaines PaaS/CDN/cloud mutualisé déclarés dans le CSP est un indice d'infrastructure mutualisée - ne prouve pas que TOUTE l'infrastructure l'est, ni l'absence de serveurs dédiés ailleurs.",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Inventaire déclaré (CSP), pas observé. Un domaine cloud autorisé n'est pas nécessairement sollicité. Angle mort structurel : une infra auto-hébergée derrière un reverse proxy 1st-party est invisible ici.",
     },
     "3.7": {
@@ -141,7 +142,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
         "regle": "La présence de domaines PaaS backend déclarés dans le CSP est un indice de plate-forme supportant l'élasticité - ne prouve pas que l'auto-scaling est configuré, ni que la charge varie suffisamment pour le justifier.",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité, et même sollicité, rien ne dit que l'élasticité est activée. Angle mort structurel : un Kubernetes auto-hébergé est invisible ici.",
     },
     "5.4": {
@@ -156,7 +157,7 @@ MAPPING = {
             "'✅ Point fort confirmé'. Zone intermédiaire ('needs improvement') "
             "sans aucune page 'poor' -> '🤔 À évaluer' (ambigu, ne pas trancher)."
         ),
-        "confidence_max": "high",
+        "provenance_max": "collecte",
         "note": "Données CrUX terrain réelles (source='crux'), pas un lab test - déjà la mesure la plus fiable de tout le mapping.",
     },
     "1.9": {
@@ -164,7 +165,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
         "regle": "Un poids de page élevé est un indice indirect de besoin de bande passante - une page lourde n'implique pas forcément un besoin de haut débit (dépend aussi de la tolérance au temps de chargement de l'usage).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Proxy de poids, pas une mesure du besoin réel de débit.",
     },
     "1.14": {
@@ -172,7 +173,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
         "regle": "Une page nettement plus lourde que les autres du même parcours est un indice de conception moins légère - ne juge pas la qualité de conception elle-même (contenu justifié vs superflu).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Proxy de poids, pas de \"clarté de conception\".",
     },
     "1.15": {
@@ -180,7 +181,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
         "regle": "Donne un ordre de grandeur de fréquentation, pas un jugement de proportionnalité entre usage et ressources consommées (qui suppose de connaître l'architecture déployée).",
-        "confidence_max": "medium",
+        "provenance_max": "estime",
         "note": "Source tierce à marge large (cf. étape 20c d'efootprint) - un chiffre, pas une comparaison.",
     },
     "1.16": {
@@ -188,7 +189,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "env-data.json: traffic.visits_per_year",
         "regle": "Même champ que 1.15 : donne le chiffre de trafic, pas la comparaison à l'infrastructure réellement déployée (dimensionnement serveur non mesuré de façon fiable, cf. efootprint-synthese-python.json où server_type/instance_type sont souvent des défauts de script, pas des observations).",
-        "confidence_max": "medium",
+        "provenance_max": "estime",
         "note": "Ne jamais croiser avec server_type/instance_type d'efootprint-synthese-python.json si leur source est 'default_script' - ce serait fabriquer un jugement à partir d'un défaut technique, pas d'une mesure.",
     },
     "1.5": {
@@ -200,7 +201,7 @@ MAPPING = {
             "'✅ Point fort confirmé'. Au moins une page concernée -> "
             "'💡 Potentiel d'amélioration identifié'."
         ),
-        "confidence_max": "high",
+        "provenance_max": "collecte",
         "note": "Ne détecte que l'attribut HTML autoplay au chargement, pas un autoplay déclenché en JS après coup (angle mort connu).",
     },
     "1.6": {
@@ -215,7 +216,7 @@ MAPPING = {
             "sans image adaptative) -> '🤔 À évaluer' (contrainte déterministe : deux "
             "signaux discordants ne sont jamais tranchés au doigt mouillé)."
         ),
-        "confidence_max": "medium",
+        "provenance_max": "estime",
         "note": "Deux proxys distincts (images responsive, CSS adaptative) fusionnés prudemment ; ne mesure pas l'adaptation JS (ex. qualité vidéo dynamique).",
     },
     "1.13": {
@@ -228,7 +229,7 @@ MAPPING = {
             "'💡 Potentiel d'amélioration identifié'. Zone 60-90 sans aucune page "
             "< 60 -> '🤔 À évaluer' (ambigu, ne pas trancher)."
         ),
-        "confidence_max": "high",
+        "provenance_max": "collecte",
         "note": "Proxy accessibilité (pas directement 'fluidité de parcours') — le référentiel n'a pas de critère a11y dédié dans les 54, celui-ci est le plus proche sémantiquement. À corroborer humainement.",
     },
     "1.4": {
@@ -236,7 +237,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
         "regle": "Un ratio custom/natif élevé est un indice de composants réinventés plutôt que natifs - ne couvre que les boutons (proxy partiel, pas tous les composants UI personnalisés).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Détection HTML statique uniquement (post-hydratation React/Vue le DOM réel diffère potentiellement) — indice, jamais une preuve.",
     },
     "1.11": {
@@ -244,7 +245,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
         "regle": "Présence de @media (prefers-reduced-motion) ou (prefers-color-scheme) dans le CSS chargé est un indice de sobriété par défaut - l'absence n'est pas une preuve d'absence de sobriété (peut être géré autrement, ex. JS).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Détection syntaxique simple (présence de la règle), pas de vérification que le comportement réel change en conséquence.",
     },
     "6.1": {
@@ -252,7 +253,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
         "regle": "Un score sécurité élevé (grade A/B) est un indice indirect de maturité opérationnelle générale, jamais une preuve d'observabilité (métriques/logs/traces) - donnée totalement invisible côté client.",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Proxy très indirect (rigueur sécurité != observabilité) ; affiché en annexe seulement, jamais coché.",
     },
     "6.3": {
@@ -260,7 +261,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
         "regle": "Fraîcheur de déploiement (âge de la ressource la plus récente) et atomicité (dispersion des Last-Modified entre ressources de code) sont des indices indirects de maturité de déploiement - ne mesurent ni la fréquence de déploiement réelle ni l'existence d'un pipeline CI/CD (le contenu peut être mis à jour manuellement).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Une dispersion serrée peut résulter d'un dépôt manuel de l'arborissance complète, et un déploiement récent ne dit rien de la fréquence des déploiements.",
     },
     "6.6": {
@@ -268,7 +269,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
         "regle": "Un score Best Practices élevé et/ou un security.txt bien formé sont des indices de pratiques de qualité outillées - ne prouvent jamais l'existence d'indicateurs de qualité suivis en interne (SonarQube, etc., invisibles côté client).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Trois proxys faibles combinés en annexe informative seulement, jamais un critère cochable automatiquement.",
     },
     "6.8": {
@@ -276,7 +277,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
         "regle": "L'absence de duplication détectée par Lighthouse (score=1, 0 items) ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente de bundles JS côté client - un indice faible, jamais une validation.",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Détection côté client uniquement (JS chargé dans le HAR), angle mort sur le code backend et sur la duplication interne au sein d'un même bundle.",
     },
     "5.5": {
@@ -284,7 +285,7 @@ MAPPING = {
         "categorie": "partiel",
         "champ_donnee": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
         "regle": "Suppose que les pages effectivement auditées sont les parcours les plus fréquents du site - hypothèse non vérifiée par les données disponibles (pas de classement de fréquentation par page).",
-        "confidence_max": "low",
+        "provenance_max": "suppose",
         "note": "Le \"critique\"/\"fréquent\" n'est jamais mesuré : seul le contenu des pages auditées l'est.",
     },
 }

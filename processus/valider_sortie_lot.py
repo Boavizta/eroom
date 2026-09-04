@@ -18,12 +18,12 @@ incomplet qu'un rapport faux.
 CE QU'IL VALIDE, EXHAUSTIVEMENT
 -------------------------------
   - Structure JSON : métadonnées racine (lot_id, genere_le, entrees, criteres)
-  - Champs requis et champs interdits (poids, dimension, critere)
+  - Champs requis et champs interdits (poids, potentiel_max, dimension, critere)
   - `id` existe au référentiel EOF (54 critères) ou au diagnostic rapide (16 questions)
   - `reponse` appartient au vocabulaire du référentiel POUR CE CRITÈRE
-  - `score` cohérent avec options_evaluation_score du référentiel
-  - Cohérence `reponse`/`score` : null ensemble ou non-null ensemble
-  - Cohérence `confidence`/`source`/`nature_preuve` : requis si reponse ou contexte non null
+  - `coefficient` cohérent avec options_evaluation_coefficient du référentiel
+  - Cohérence `reponse`/`coefficient` : null ensemble ou non-null ensemble
+  - Cohérence `provenance`/`source` : requis si reponse ou contexte non null
   - Pas d'`id` en doublon dans un même fichier
   - Pas de champs inconnus (validation stricte)
 
@@ -59,12 +59,11 @@ REFERENTIEL_PATH = (
 SCHEMA_PATH = PROJECT_ROOT / "processus" / "schema-sortie-lot.json"
 
 # Champs interdits dans une entrée de critère (viennent du référentiel, pas du lot)
-FORBIDDEN_FIELDS = {"poids", "dimension", "critere", "pilier"}
+FORBIDDEN_FIELDS = {"poids", "potentiel_max", "dimension", "critere", "pilier"}
 
 # Vocabulaire fermé, hérité du projet
-CONFIDENCE_VALUES = {"high", "medium", "low", None}
+PROVENANCE_VALUES = {"collecte", "estime", "declare", "precise", None}
 CATEGORIE_VALUES = {"automatisable", "partiel", "aucune_donnee"}
-NATURE_PREUVE_VALUES = {"mesure", "auto_declare_public", "declare_qcm", None}
 
 
 # ---------------------------------------------------------------------------
@@ -158,8 +157,8 @@ def validate_entry_fields(entry, index):
 
     required = {"id", "categorie"}
     allowed = {
-        "id", "reponse", "score", "confidence", "source",
-        "contexte", "categorie", "nature_preuve"
+        "id", "reponse", "coefficient", "provenance", "source",
+        "contexte", "categorie", "sans_objet"
     }
 
     missing = required - set(entry.keys())
@@ -190,16 +189,10 @@ def validate_entry_fields(entry, index):
             f"valeur hors vocabulaire : '{entry['categorie']}' (attendu : {', '.join(sorted(str(v) for v in CATEGORIE_VALUES))})"
         ))
 
-    if "confidence" in entry and entry["confidence"] not in CONFIDENCE_VALUES:
+    if "provenance" in entry and entry["provenance"] not in PROVENANCE_VALUES:
         violations.append((
-            f"{prefix}.confidence",
-            f"valeur hors vocabulaire : '{entry['confidence']}' (attendu : high, medium, low ou null)"
-        ))
-
-    if "nature_preuve" in entry and entry["nature_preuve"] not in NATURE_PREUVE_VALUES:
-        violations.append((
-            f"{prefix}.nature_preuve",
-            f"valeur hors vocabulaire : '{entry['nature_preuve']}' (attendu : mesure, auto_declare_public, declare_qcm ou null)"
+            f"{prefix}.provenance",
+            f"valeur hors vocabulaire : '{entry['provenance']}' (attendu : collecte, estime, declare, precise ou null)"
         ))
 
     return violations
@@ -224,37 +217,34 @@ def validate_coherence(entry, index, ref_criteres, ref_diagnostic):
         return violations  # impossible de valider reponse/score sans référentiel
 
     reponse = entry.get("reponse")
-    score = entry.get("score")
+    coefficient = entry.get("coefficient")
     contexte = entry.get("contexte")
-    confidence = entry.get("confidence")
+    provenance = entry.get("provenance")
     source = entry.get("source")
-    nature_preuve = entry.get("nature_preuve")
 
-    # Cohérence reponse / score (dépend du type de critère)
+    # Cohérence reponse / coefficient (dépend du type de critère)
     is_diagnostic = cid in ref_diagnostic
 
-    if reponse is None and score is not None:
-        violations.append((f"{prefix}.score", "doit être null si reponse est null"))
+    if reponse is None and coefficient is not None:
+        violations.append((f"{prefix}.coefficient", "doit être null si reponse est null"))
 
     if reponse is not None:
-        # Pour le diagnostic rapide, score doit être null (pas de score au référentiel)
-        # Pour les critères du référentiel, score doit être non-null
-        if is_diagnostic and score is not None:
+        # Pour le diagnostic rapide, coefficient doit être null (pas de coefficient au référentiel)
+        # Pour les critères du référentiel, coefficient doit être non-null
+        if is_diagnostic and coefficient is not None:
             violations.append((
-                f"{prefix}.score",
-                "doit être null pour une question du diagnostic rapide (pas de score défini au référentiel)"
+                f"{prefix}.coefficient",
+                "doit être null pour une question du diagnostic rapide (pas de coefficient défini au référentiel)"
             ))
-        elif not is_diagnostic and score is None:
-            violations.append((f"{prefix}.score", "doit être non-null si reponse est non-null"))
+        elif not is_diagnostic and coefficient is None:
+            violations.append((f"{prefix}.coefficient", "doit être non-null si reponse est non-null"))
 
-    # Cohérence reponse / confidence / source / nature_preuve
+    # Cohérence reponse / provenance / source
     if reponse is not None or contexte:
-        if confidence is None:
-            violations.append((f"{prefix}.confidence", "requis si reponse ou contexte non null"))
+        if provenance is None:
+            violations.append((f"{prefix}.provenance", "requis si reponse ou contexte non null"))
         if not source:
             violations.append((f"{prefix}.source", "requis et non vide si reponse ou contexte non null"))
-        if nature_preuve is None:
-            violations.append((f"{prefix}.nature_preuve", "requis si reponse ou contexte non null"))
 
     # Validation du vocabulaire de reponse (si non null)
     if reponse is not None:
@@ -267,13 +257,13 @@ def validate_coherence(entry, index, ref_criteres, ref_diagnostic):
                     f"'{reponse}' hors vocabulaire pour ce critère (attendu : {', '.join(options)})"
                 ))
 
-            # Validation du score
-            score_map = ref_criteres[cid].get("options_evaluation_score", {})
-            expected_score = score_map.get(reponse)
-            if expected_score is not None and score != expected_score:
+            # Validation du coefficient
+            coefficient_map = ref_criteres[cid].get("options_evaluation_coefficient", {})
+            expected_coefficient = coefficient_map.get(reponse)
+            if expected_coefficient is not None and coefficient != expected_coefficient:
                 violations.append((
-                    f"{prefix}.score",
-                    f"incohérent avec options_evaluation_score : attendu {expected_score}, trouvé {score}"
+                    f"{prefix}.coefficient",
+                    f"incohérent avec options_evaluation_coefficient : attendu {expected_coefficient}, trouvé {coefficient}"
                 ))
 
         # Questions du diagnostic rapide (0.1-0.16) : crans
