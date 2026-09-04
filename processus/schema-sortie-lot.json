@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-eroom.local/schemas/sortie-lot-eof.json",
+  "title": "Contrat de sortie d'un lot d'audit EOF",
+  "description": "Format strict pour les fichiers de sortie de lots multi-agents. Tout lot (agent, script, humain) produisant des verdicts EOF doit respecter ce contrat. Le script de fusion refuse tout fichier non conforme au lieu de le fusionner.",
+  "type": "object",
+  "required": ["lot_id", "genere_le", "entrees", "criteres"],
+  "additionalProperties": false,
+  "properties": {
+    "lot_id": {
+      "type": "string",
+      "description": "Identifiant unique du lot (ex: 'lot-mesures-har', 'lot-qcm-client', 'lot-osint-accessibilite'). Utilisé pour tracer l'origine de chaque verdict dans le rapport final.",
+      "minLength": 1
+    },
+    "genere_le": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Horodatage ISO 8601 de génération du fichier (ex: '2026-09-04T12:34:56+00:00'). Permet de détecter les sorties périmées."
+    },
+    "entrees": {
+      "type": "array",
+      "description": "Liste des chemins de fichiers ou URLs publiques réellement lus par le lot. Peut être vide pour un lot déclaratif (QCM rempli à la main). Traçabilité : permet de relier un verdict à ses sources de données.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "criteres": {
+      "type": "array",
+      "description": "Liste des critères jugés par ce lot. Un critère peut être partiellement renseigné (contexte seulement) ou entièrement tranché (reponse + score). Le script de fusion consolide ces entrées multiples en un seul verdict par critère.",
+      "items": {
+        "type": "object",
+        "required": ["id", "categorie"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifiant du critère au référentiel EOF (ex: '1.5', '3.3') ou au diagnostic rapide (ex: '0.1', '0.16'). Doit exister dans le référentiel, sinon rejet.",
+            "pattern": "^[0-9]+\\.[0-9]+$"
+          },
+          "reponse": {
+            "type": ["string", "null"],
+            "description": "Libellé exact de l'option cochée, issu du vocabulaire du référentiel POUR CE CRITÈRE (options_evaluation ou crans selon le type). Si null, le critère reste non tranché (indice contextuel seul)."
+          },
+          "score": {
+            "type": ["number", "null"],
+            "description": "Score numérique associé à la réponse, selon le mapping options_evaluation_score du référentiel. Doit être null si et seulement si reponse est null. Si reponse est non null, doit valoir EXACTEMENT le score défini par le référentiel pour ce libellé."
+          },
+          "confidence": {
+            "type": ["string", "null"],
+            "description": "Degré de confiance dans le verdict ou l'indice : 'high' (mesure directe, source officielle), 'medium' (inférence robuste, source tierce fiable), 'low' (indice faible, proxy indirect). Requis si reponse ou contexte sont non null.",
+            "enum": ["high", "medium", "low", null]
+          },
+          "source": {
+            "type": ["string", "null"],
+            "description": "Origine du verdict ou de l'indice : chemin de fichier (ex: 'audit/har-analysis.json'), URL publique (ex: 'https://example.com/accessibilite'), ou référence de ligne de QCM (ex: 'QCM question 3'). Requis si reponse ou contexte sont non null. Chaine non vide.",
+            "minLength": 1
+          },
+          "contexte": {
+            "type": ["string", "null"],
+            "description": "Phrase française d'indice contextuel, quand le critère n'est pas tranché mais qu'un signal existe. Affiché en annexe du rapport pour aider le jugement humain. Ne remplace jamais un verdict : si le signal est ambigu, laisser reponse à null."
+          },
+          "categorie": {
+            "type": "string",
+            "description": "Type de donnée utilisée pour juger ce critère : 'automatisable' (verdict tranché par mesure ou règle déterministe), 'partiel' (indice faible, contexte seul), 'aucune_donnee' (aucune donnée disponible pour ce critère dans ce lot). Vocabulaire imposé, hérité de la table de correspondance EOF.",
+            "enum": ["automatisable", "partiel", "aucune_donnee"]
+          },
+          "nature_preuve": {
+            "type": ["string", "null"],
+            "description": "Nature de la preuve à l'origine du verdict : 'mesure' (HAR, en-têtes HTTP, API), 'auto_declare_public' (page d'accessibilité, mentions légales, déclaration publiée par l'organisation auditée), 'declare_qcm' (réponse au questionnaire rempli par le client). Requis si reponse ou contexte sont non null. Détermine la précédence de fusion : mesure > auto-déclaré public > déclaré au QCM.",
+            "enum": ["mesure", "auto_declare_public", "declare_qcm", null]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "reponse": { "type": "string" }
+              },
+              "required": ["reponse"]
+            },
+            "then": {
+              "required": ["confidence", "source", "nature_preuve"],
+              "properties": {
+                "score": { "type": "number" }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "contexte": { "type": "string" }
+              },
+              "required": ["contexte"]
+            },
+            "then": {
+              "required": ["confidence", "source", "nature_preuve"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "reponse": { "type": "null" }
+              }
+            },
+            "then": {
+              "properties": {
+                "score": { "type": "null" }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,454 @@
+{
+  "version": 1,
+  "libelle": "Manifeste des lots du processus d'audit EOF",
+  "but": "Decrire le decoupage du travail d'audit en lots independants, sous forme de donnee lisible par machine, afin que l'orchestrateur puisse etre remplace sans reecrire le processus. Aucun mecanisme propre a un harnais particulier n'apparait ici : un lot est execute par un script, par un agent LLM quelconque, ou par un humain.",
+  "referentiel": ".claude/skills/eof/docs/EOF-V.1.1 (EROOM Optimization Framework) - Template - Français/eof-referentiel.json",
+  "schema_sortie_lot": "processus/schema-sortie-lot.json",
+  "conventions": {
+    "repertoire_audit": "audits/<domaine>",
+    "sortie_de_lot": "audits/<domaine>/lots/<lot_id>.json",
+    "precedence_nature_preuve": ["mesure", "auto_declare_public", "declare_qcm"],
+    "regle_de_precedence": "Une nature plus haute ne peut jamais etre ecrasee par une nature plus basse. En cas de divergence entre deux natures sur un meme critere, le critere sort en 'a evaluer' avec l'ecart explicite, et les trois couches restent distinguables jusqu'au radar.",
+    "propriete_disjointe": "Posseder un critere, c'est avoir le droit d'y poser une reponse. Chaque critere du referentiel appartient a exactement un lot de jugement : deux lots ne peuvent donc pas se contredire, et l'ordre d'execution des lots n'influence pas le resultat. Le script de validation refuse un manifeste ou un critere est possede par deux lots, ou par aucun.",
+    "contribution_de_contexte": "Contribuer un contexte n'est PAS posseder. Un lot peut ecrire un contexte sur un critere qu'il ne possede pas : c'est de la matiere pour le lot proprietaire, pas un verdict. Un lot qui pose une reponse sur un critere qu'il ne possede pas doit etre refuse a la fusion. C'est ce qui distingue les criteres automatisables, tranches par script, des criteres seulement partiels, ou le script ne fournit qu'un indice et laisse le verdict au lot de dimension.",
+    "propriete_residuelle": "Un lot de propriete residuelle ne possede aucun critere en exclusivite : il peut repondre sur n'importe quel critere reste sans verdict apres les lots proprietaires. Sa reponse est retenue si aucun lot proprietaire n'a pose de reponse. En cas de divergence avec un lot proprietaire, la reponse du proprietaire est conservee, la confiance passe a low, et le contexte consigne l'ecart. Un seul lot residuel par nature de preuve : sinon l'ordre de lecture influencerait le resultat. La precedence des natures reste la seule regle d'arbitrage.",
+    "absence_de_donnee": "L'absence d'un signal est une donnee, jamais un pire cas par defaut. Un lot qui ne trouve rien ecrit une entree sans reponse, avec un contexte qui dit ce qui a ete cherche.",
+    "rejeu": "Tout lot est rejouable seul et idempotent : ecraser son fichier de sortie puis relancer la fusion suffit, sans refaire les autres lots."
+  },
+  "vagues": [
+    {
+      "id": "0-collecte",
+      "libelle": "Collecte des preuves, decoupee par source",
+      "executeur_par_defaut": "script",
+      "note": "Aucun LLM. Une meme sonde alimente des criteres de plusieurs dimensions : la collecte est donc mutualisee en amont, et non refaite par chaque lot de jugement."
+    },
+    {
+      "id": "1-jugement-automatique",
+      "libelle": "Jugement deterministe des criteres automatisables",
+      "executeur_par_defaut": "script"
+    },
+    {
+      "id": "2-jugement-porte",
+      "libelle": "Diagnostic rapide et facilite de changement, avant la porte go/no-go",
+      "executeur_par_defaut": "llm"
+    },
+    {
+      "id": "3-jugement-dimensions",
+      "libelle": "Jugement detaille des dimensions 1 a 5",
+      "executeur_par_defaut": "llm"
+    },
+    {
+      "id": "4-questionnaire",
+      "libelle": "Generation puis relecture du questionnaire a cocher",
+      "executeur_par_defaut": "script"
+    },
+    {
+      "id": "5-consolidation",
+      "libelle": "Fusion et production des livrables",
+      "executeur_par_defaut": "script"
+    }
+  ],
+  "lots": [
+    {
+      "id": "collecte-har-coverage",
+      "vague": "0-collecte",
+      "libelle": "HAR, couverture de code, en-tetes, criteres HTML/CSS",
+      "executeur": "script",
+      "etat": "existant",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/har_metrics.py",
+        ".claude/skills/analyse-parcours/scripts/coverage_metrics.py",
+        ".claude/skills/analyse-parcours/scripts/analyze_security_headers.py",
+        ".claude/skills/analyse-parcours/scripts/parse_html_criteria.py"
+      ],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": [],
+      "entrees": ["audits/<domaine>/donnees-brutes-potentiellement-sensibles/"],
+      "sorties_donnees": [
+        "audits/<domaine>/audit/har-analysis.json",
+        "audits/<domaine>/audit/coverage-analysis.json",
+        "audits/<domaine>/security-headers-analysis.json",
+        "audits/<domaine>/html-css-criteria.json"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": ["mesure"],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "prerequis_humain": "La capture HAR doit avoir ete faite APRES acceptation du consentement aux cookies, sinon les traceurs reels sont absents et la mesure n'est qu'un plancher.",
+      "note": "Lot de collecte : il produit des donnees, pas des verdicts, donc pas de fichier de sortie de lot au format du schema."
+    },
+    {
+      "id": "collecte-reseau-osint",
+      "vague": "0-collecte",
+      "libelle": "DNS, TLS, journaux de transparence de certificats, points bien connus",
+      "executeur": "script",
+      "etat": "partiellement_a_ecrire",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/scan_wellknown.py"
+      ],
+      "scripts_a_ecrire": [
+        "sonde DNS (TXT, MX, NS, A) : compte les liens techniques vers d'autres systemes",
+        "sonde des versions TLS acceptees : verifier qu'un chiffrement a reellement ete negocie, jamais se fier au bloc SSL-Session qu'openssl imprime meme en cas d'echec de poignee de main",
+        "sonde des journaux de transparence de certificats : inventaire des environnements sans jamais contacter le domaine audite",
+        "sonde des sous-domaines hors production : candidats issus des journaux de transparence, validation par signature de contenu et jamais par code HTTP, avec une sonde de controle sur un nom absurde pour detecter un joker DNS"
+      ],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": [],
+      "entrees": ["audits/<domaine>/env-data.json"],
+      "sorties_donnees": [
+        "audits/<domaine>/wellknown-scan.json",
+        "audits/<domaine>/reseau-osint.json"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": ["mesure"],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "note": "Isole des autres lots de collecte parce que ses dependances reseau sont externes et faillibles : un service de journaux de certificats indisponible ne doit pas obliger a rejouer la capture HAR."
+    },
+    {
+      "id": "collecte-pages-publiques",
+      "vague": "0-collecte",
+      "libelle": "Pages publiees par l'organisation auditee",
+      "executeur": "script",
+      "etat": "a_ecrire",
+      "scripts": [],
+      "scripts_a_ecrire": [
+        "une sonde unique parametree par un catalogue de familles d'URL candidates : accessibilite, eco-conception, protection des donnees, mentions legales, gestion des cookies, plan du site, rapport extra-financier"
+      ],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": [],
+      "entrees": [],
+      "sorties_donnees": [
+        "audits/<domaine>/pages-publiques/",
+        "audits/<domaine>/pages-publiques/inventaire.json"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": ["auto_declare_public"],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "contrainte": "Controle de signature obligatoire contre la page d'accueil (taille et titre) : un site peut repondre 200 avec sa page d'accueil sur toute URL inexistante. Un code 200 ne prouve donc rien.",
+      "note": "Une seule sonde parametree, pas une par famille : le schema de verification est identique, seul le catalogue d'URL change."
+    },
+    {
+      "id": "collecte-metriques-externes",
+      "vague": "0-collecte",
+      "libelle": "Environnement, trafic, performances mesurees par des tiers",
+      "executeur": "script",
+      "etat": "existant",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/collect_env_data.py",
+        ".claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py",
+        ".claude/skills/analyse-parcours/scripts/detect_tech.py",
+        ".claude/skills/analyse-parcours/scripts/similarweb_api.py"
+      ],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": ["collecte-har-coverage"],
+      "entrees": ["audits/<domaine>/donnees-brutes-potentiellement-sensibles/"],
+      "sorties_donnees": [
+        "audits/<domaine>/env-data.json",
+        "audits/<domaine>/cwv.json"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": ["mesure"],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "contrainte": "Les cles d'API vivent dans le fichier d'environnement a la racine du projet, jamais dans le manifeste ni dans un prompt.",
+      "note": "Derriere un reseau de diffusion de contenu, l'adresse IP observee est un point de presence proche de l'auditeur et non l'origine du service : le pays deduit porte alors une confiance degradee et une note explicative."
+    },
+    {
+      "id": "jugement-automatique",
+      "vague": "1-jugement-automatique",
+      "libelle": "Verdicts et indices deterministes",
+      "executeur": "script",
+      "etat": "existant",
+      "scripts": [".claude/skills/analyse-parcours/scripts/run_eof.py"],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": [
+        "collecte-har-coverage",
+        "collecte-reseau-osint",
+        "collecte-metriques-externes"
+      ],
+      "entrees": ["audits/<domaine>/"],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-automatique.json",
+      "natures_autorisees": ["mesure"],
+      "criteres_possedes": {
+        "source": ".claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py",
+        "regle": "les criteres dont la table de correspondance declare la categorie automatisable, et eux seuls : ce sont les criteres qu'un script tranche"
+      },
+      "contextes_autorises": {
+        "source": ".claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py",
+        "regle": "les criteres de categorie partiel : le script y ecrit un contexte, jamais une reponse, et le verdict reste au lot de dimension"
+      },
+      "rejouable_seul": true,
+      "note": "Un indice de categorie partielle ne compte pas dans le poids couvert : c'est un contexte pour le jugement, pas un verdict. Ne jamais presenter l'ajout d'indices comme un gain de couverture."
+    },
+    {
+      "id": "jugement-diagnostic-rapide",
+      "vague": "2-jugement-porte",
+      "libelle": "Diagnostic rapide, 16 questions toutes determinantes",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-diagnostic-rapide.md",
+      "depends_on": ["jugement-automatique", "collecte-pages-publiques"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json",
+        "audits/<domaine>/env-data.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-diagnostic-rapide.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "0."},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation, jamais le contenu du fichier produit",
+      "note": "Passe en premier parce qu'il alimente la porte go/no-go."
+    },
+    {
+      "id": "jugement-dimension-6",
+      "vague": "2-jugement-porte",
+      "libelle": "Dimension 6, facilite de changement",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["jugement-automatique", "collecte-reseau-osint"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/reseau-osint.json",
+        "audits/<domaine>/pages-publiques/inventaire.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-6.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "6.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation",
+      "note": "Deuxieme entree de la porte : si le diagnostic est mauvais et que le changement est difficile, l'audit detaille n'a pas d'objet."
+    },
+    {
+      "id": "porte-go-no-go",
+      "vague": "2-jugement-porte",
+      "libelle": "Decision de poursuite de l'audit detaille",
+      "executeur": "humain",
+      "etat": "a_ecrire",
+      "type": "porte",
+      "scripts_a_ecrire": [
+        "un script qui imprime l'etat des 16 questions du diagnostic rapide, celui des criteres de la dimension 6, et le poids couvert : il n'arbitre pas, il donne a voir"
+      ],
+      "depends_on": ["jugement-diagnostic-rapide", "jugement-dimension-6"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-diagnostic-rapide.json",
+        "audits/<domaine>/lots/jugement-dimension-6.json"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": [],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "decision": "Poursuivre vers la vague 3, ou arreter l'audit et livrer le diagnostic seul.",
+      "note": "Aucun seuil chiffre : arreter un audit est un jugement de mission, et un seuil invente sur un seul service de test serait faux ailleurs."
+    },
+    {
+      "id": "jugement-dimension-1",
+      "vague": "3-jugement-dimensions",
+      "libelle": "Dimension 1, produit",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["porte-go-no-go"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json",
+        "audits/<domaine>/audit/har-analysis.json",
+        "audits/<domaine>/env-data.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-1.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "1.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation"
+    },
+    {
+      "id": "jugement-dimension-2",
+      "vague": "3-jugement-dimensions",
+      "libelle": "Dimension 2",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["porte-go-no-go"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json",
+        "audits/<domaine>/audit/har-analysis.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-2.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "2.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation"
+    },
+    {
+      "id": "jugement-dimension-3",
+      "vague": "3-jugement-dimensions",
+      "libelle": "Dimension 3",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["porte-go-no-go"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json",
+        "audits/<domaine>/reseau-osint.json",
+        "audits/<domaine>/env-data.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-3.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "3.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation",
+      "note": "La numerotation du referentiel saute de 3.3 a 3.5 : la dimension compte 8 criteres, il n'y a pas de critere 3.4."
+    },
+    {
+      "id": "jugement-dimension-4",
+      "vague": "3-jugement-dimensions",
+      "libelle": "Dimension 4",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["porte-go-no-go"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-4.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "4.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation"
+    },
+    {
+      "id": "jugement-dimension-5",
+      "vague": "3-jugement-dimensions",
+      "libelle": "Dimension 5",
+      "executeur": "llm",
+      "etat": "a_ecrire",
+      "prompt": "processus/prompts/jugement-dimension.md",
+      "depends_on": ["porte-go-no-go"],
+      "entrees": [
+        "audits/<domaine>/lots/jugement-automatique.json",
+        "audits/<domaine>/pages-publiques/inventaire.json",
+        "audits/<domaine>/cwv.json",
+        "audits/<domaine>/audit/har-analysis.json"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/jugement-dimension-5.json",
+      "natures_autorisees": ["mesure", "auto_declare_public"],
+      "criteres_possedes": {"prefixe_id": "5.", "sauf_lots": ["jugement-automatique"]},
+      "rejouable_seul": true,
+      "retour_attendu": "une seule ligne de confirmation"
+    },
+    {
+      "id": "generation-questionnaire",
+      "vague": "4-questionnaire",
+      "libelle": "Emission des deux fichiers a cocher, sur le residu reel",
+      "executeur": "script",
+      "etat": "a_ecrire",
+      "scripts_a_ecrire": [
+        "un generateur qui lit les resultats fusionnes, retient les criteres sans verdict, les trie par poids et selon la sequence de la porte, puis emet deux fichiers a cocher : un produit et usage, un technique"
+      ],
+      "depends_on": [
+        "jugement-dimension-1",
+        "jugement-dimension-2",
+        "jugement-dimension-3",
+        "jugement-dimension-4",
+        "jugement-dimension-5"
+      ],
+      "entrees": ["audits/<domaine>/eof-audit-results.json"],
+      "sorties_donnees": [
+        "audits/<domaine>/questionnaire-produit-usage.md",
+        "audits/<domaine>/questionnaire-technique.md"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": [],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "contrainte": "Le questionnaire est genere, jamais redige a la main : la couverture automatique differe d'un service a l'autre, donc un questionnaire fige serait faux au service suivant. Le travail de conception porte sur la bibliotheque de blocs de questions et les regles d'ordonnancement, pas sur un livrable.",
+      "note": "Deux fichiers separes, l'un pour le metier et l'autre pour la technique : un fichier unique et long est abandonne en route. Les deux sont ordonnes pour permettre la decision de la porte avant d'avoir tout rempli."
+    },
+    {
+      "id": "relecture-questionnaire",
+      "vague": "4-questionnaire",
+      "libelle": "Lecture des reponses cochees",
+      "executeur": "script",
+      "etat": "a_ecrire",
+      "scripts_a_ecrire": [
+        "un analyseur qui lit les fichiers coches, verifie qu'un bloc porte une seule case cochee, signale les blocs vides, et emet un fichier de sortie de lot"
+      ],
+      "depends_on": ["generation-questionnaire"],
+      "entrees": [
+        "audits/<domaine>/questionnaire-produit-usage.md",
+        "audits/<domaine>/questionnaire-technique.md"
+      ],
+      "sortie_de_lot": "audits/<domaine>/lots/relecture-questionnaire.json",
+      "natures_autorisees": ["declare_qcm"],
+      "criteres_possedes": {
+        "residuel": true,
+        "regle": "aucun critere en propre : ce lot peut repondre sur n'importe quel critere reste sans verdict apres les vagues precedentes, et sa reponse ne prime jamais sur celle d'un lot proprietaire"
+      },
+      "rejouable_seul": true,
+      "prerequis_humain": "Les fichiers doivent avoir ete remplis par le service audite.",
+      "note": "Une case vide reste vide : aucune reponse par defaut, aucun pire cas."
+    },
+    {
+      "id": "fusion",
+      "vague": "5-consolidation",
+      "libelle": "Fusion des lots par precedence de nature de preuve",
+      "executeur": "script",
+      "etat": "a_ecrire",
+      "scripts_a_ecrire": ["processus/fusionner_lots.py"],
+      "depends_on": [
+        "jugement-automatique",
+        "jugement-diagnostic-rapide",
+        "jugement-dimension-6",
+        "jugement-dimension-1",
+        "jugement-dimension-2",
+        "jugement-dimension-3",
+        "jugement-dimension-4",
+        "jugement-dimension-5",
+        "relecture-questionnaire"
+      ],
+      "entrees": ["audits/<domaine>/lots/"],
+      "sorties_donnees": ["audits/<domaine>/eof-audit-results.json"],
+      "sortie_de_lot": null,
+      "natures_autorisees": [],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "contrainte": "Aucun LLM dans la boucle d'agregation. Chaque fichier de lot est valide contre le schema avant fusion : une sortie non conforme est refusee et relancee, jamais fusionnee. Un lot absent laisse ses criteres sans reponse, il ne les invente pas. Le poids, la dimension et le libelle de chaque critere viennent du referentiel, jamais d'un fichier de lot.",
+      "note": "Rejouer un lot consiste a ecraser son fichier puis a relancer la fusion."
+    },
+    {
+      "id": "livrables",
+      "vague": "5-consolidation",
+      "libelle": "Grille remplie, radar a deux couches, jauge de completude",
+      "executeur": "script",
+      "etat": "partiellement_a_ecrire",
+      "scripts": [".claude/skills/analyse-parcours/scripts/generate_report_html.py"],
+      "scripts_a_ecrire": [
+        "le radar a deux couches : couche pleine pour le mesure, couche hachuree pour le declare, plus une jauge du pourcentage de poids couvert"
+      ],
+      "arguments": null,
+      "arguments_verifies": false,
+      "depends_on": ["fusion"],
+      "entrees": ["audits/<domaine>/eof-audit-results.json"],
+      "sorties_donnees": [
+        "audits/<domaine>/eof-rempli.md",
+        "audits/<domaine>/eof-radar-<domaine>.svg"
+      ],
+      "sortie_de_lot": null,
+      "natures_autorisees": [],
+      "criteres_possedes": null,
+      "rejouable_seul": true,
+      "contrainte": "Les trois natures de preuve restent distinguables sur le radar. Aucun chiffre invente, aucune valeur par defaut pour un critere sans reponse : la jauge de completude dit ce qui manque au lieu de le combler."
+    }
+  ]
+}
