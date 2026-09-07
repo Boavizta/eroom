@@ -44,6 +44,12 @@ Usage :
 Le répertoire d'audit contient :
   - lots/*.json        : fichiers de sortie de lots, validés avant fusion
   - eof-audit-results.json : sortie consolidée (ÉCRASÉE par ce script)
+  - eof-radar-<domaine>.svg : radar à deux couches (ÉCRASÉ par ce script)
+
+⚠️ Le radar est réécrit ICI, et pas seulement par run_eof.py. Sans cela, fusionner
+les réponses du service audité mettait à jour les chiffres et laissait sur le disque
+l'image de l'audit automatique seul : la couche hachurée, celle du déclaratif, ne
+pouvait jamais apparaître. Le lecteur voyait un radar plus pauvre que la donnée.
 
 Code de sortie : 0 si fusion réussie, 1 sinon.
 
@@ -74,6 +80,12 @@ VALIDATEUR_PATH = PROJECT_ROOT / "processus" / "valider_sortie_lot.py"
 
 # Importer les fonctions de résolution de propriété depuis le module partagé
 from propriete_criteres import compute_ownership
+
+# Le radar est dessiné par le même module que pour l'autre producteur, jamais
+# recopié ici. Ce script atteignait déjà le skill `eof` pour son référentiel : la
+# dépendance existe, elle ne s'aggrave pas.
+sys.path.insert(0, str(PROJECT_ROOT / ".claude/skills/eof/scripts"))
+from generate_radar_svg import build_radar_from_results  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -741,6 +753,18 @@ def main():
     except OSError as exc:
         print("ÉCHEC")
         print(f"[erreur] Impossible d'écrire le fichier : {exc}")
+        return 1
+
+    radar_path = audit_dir / f"eof-radar-{domaine}.svg"
+    print(f"[écriture] {radar_path} ... ", end="")
+    try:
+        radar_path.write_text(
+            build_radar_from_results(audit_results, domaine), encoding="utf-8"
+        )
+        print("OK")
+    except OSError as exc:
+        print("ÉCHEC")
+        print(f"[erreur] Impossible d'écrire le radar : {exc}")
         return 1
 
     print()

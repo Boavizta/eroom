@@ -366,7 +366,7 @@ NE_DOIT_PAS_ALERTER = [
     ("un None dans un commentaire HTML", "<!-- ancien libellé : None -->"),
     ("du français qui contient les lettres", "<p>Informations infimes, aucune inférence</p>"),
     ("un pourcentage suivi d'un mot", "<p>12,5 % des critères, 90 % du total</p>"),
-    ("le libellé de remplacement du radar", '<text fill="#999">N/A</text>'),
+    ("le libellé de remplacement du radar", '<text fill="#5F5F5F">aucune réponse</text>'),
     ("une accolade seule dans du texte", "<p>La dimension {5} n'existe pas</p>"),
     (
         "un None exempté avec sa raison",
@@ -531,7 +531,7 @@ def main(argv=None):
             print("Le lecteur du rapport voit ces caractères à l'écran. Trois issues,")
             print("dans cet ordre de préférence :")
             print("  1. traiter le cas d'absence à la source, avec un libellé lisible")
-            print("     (le radar affiche \"N/A\" au lieu d'interpoler un faux 0 %) ;")
+            print("     (le radar affiche \"aucune réponse\" au lieu d'un faux 0 %) ;")
             print("  2. corriger le gabarit si l'emplacement n'a jamais été substitué ;")
             print("  3. si l'occurrence est légitime, l'exempter avec sa raison :")
             print("     <!-- valeurs: ok - <raison> -->")

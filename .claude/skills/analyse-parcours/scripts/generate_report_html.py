@@ -2142,8 +2142,9 @@ def load_eof_results(audit_dir):
 
 
 def load_eof_radar_svg(audit_dir):
-    """Cherche un eof-radar-*.svg (audit_dir ou parent), produit par
-    `run_eof.py` (radar_svg() du skill eof, dimensions 'N/A' incluses)."""
+    """Cherche un eof-radar-*.svg (audit_dir ou parent), produit par `run_eof.py` ou
+    par `processus/fusionner_lots.py` (build_radar_from_results() du skill eof :
+    deux couches, décompte par axe, jauge de couverture)."""
     audit_dir = Path(audit_dir)
     for parent in (audit_dir, audit_dir.parent):
         candidates = sorted(parent.glob("eof-radar-*.svg"))
@@ -2774,8 +2775,8 @@ def _section_eof(results, radar_svg_text=None):
     La grande majorité des 54 critères détaillés ne peut PAS être déduite
     des données d'audit (questions organisationnelles/produit) : le ratio
     réel observé est faible (quelques critères sur 54), affiché tel quel,
-    jamais maquillé. Une dimension sans aucune réponse affiche "sans
-    donnée", jamais un faux 0 % (cf. radar_svg() du skill eof)."""
+    jamais maquillé. Une dimension sans aucune réponse est marquée "aucune
+    réponse", jamais un faux 0 % (cf. radar_svg() du skill eof)."""
     if not results:
         return ""
 
@@ -2882,7 +2883,10 @@ def _section_eof(results, radar_svg_text=None):
     for d in dimensions:
         # Accepter les deux noms (score_pct ancien, potentiel_optimisation_pct nouveau)
         pct_val = d.get("potentiel_optimisation_pct") if d.get("potentiel_optimisation_pct") is not None else d.get("score_pct")
-        pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">sans donnée</span>'
+        # Même libellé que le radar juste au-dessus : deux mots différents pour le
+        # même état ("sans donnée" ici, "aucune réponse" sur la figure) laisseraient
+        # croire au lecteur qu'ils désignent deux situations distinctes.
+        pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">aucune réponse</span>'
 
         # Afficher la complétude si disponible (nouveaux champs du LOT 1)
         completude = d.get("completude_pct")

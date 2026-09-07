@@ -35,7 +35,10 @@ Usage :
 Écrit dans <source_dir>/ :
     eof-audit-results.json  - résumé léger, consommé par generate_report_html.py
     eof-rempli.md           - référentiel complet lisible, réponses + provenance + source
-    eof-radar-<domaine>.svg - radar des 6 dimensions (valeurs None = "N/A", jamais un faux 0%)
+    eof-radar-<domaine>.svg - radar des 6 dimensions à deux couches (ce que nous avons
+        établi en plein, ce que le service audité a déclaré en hachuré), avec le nombre de
+        critères renseignés sous chaque axe et une jauge de ce qui est renseigné en tout.
+        Une dimension sans aucune réponse est marquée "aucune réponse", jamais 0 %.
     lots/jugement-automatique.json - la sortie de lot que processus/manifeste-lots.json
         déclare, consommée par processus/fusionner_lots.py et contrôlée par
         processus/valider_sortie_lot.py. N'y figurent que les critères sur lesquels ce lot
@@ -54,7 +57,7 @@ from csp_inventory import inventory_from_headers_analysis, tracking_summary  # n
 from deploy_freshness import analyse_har_freshness, find_har, summarise  # noqa: E402
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent / "eof" / "scripts"))
-from generate_radar_svg import radar_svg  # noqa: E402
+from generate_radar_svg import build_radar_from_results  # noqa: E402
 
 REFERENTIEL_PATH = (
     SCRIPT_DIR.parent.parent / "eof" / "docs"
@@ -863,16 +866,6 @@ def main():
         if prov in repondus_par_provenance:
             repondus_par_provenance[prov] += 1
 
-    # Radar : une valeur par dimension, None si aucune réponse (jamais un faux 0%)
-    axes = [(d["nom"], d["potentiel_optimisation_pct"]) for d in dimensions]
-    radar_note = (
-        f"{len(auto_answered)}/{len(referentiel['criteres'])} critères répondus automatiquement — "
-        "les axes 'N/A' n'ont aucune réponse (jamais un faux 0%)"
-    )
-    svg_text = radar_svg(axes, title=f"EOF — potentiel d'optimisation ({domaine})", note=radar_note)
-    radar_path = source_dir / f"eof-radar-{domaine}.svg"
-    radar_path.write_text(svg_text, encoding="utf-8")
-
     # Un seul horodatage pour les deux artefacts : le fichier de lot et le résumé d'audit
     # sortent du même passage, deux instants différents laisseraient croire le contraire.
     genere_le = datetime.now(timezone.utc).isoformat()
@@ -900,6 +893,14 @@ def main():
 
     results_path = source_dir / "eof-audit-results.json"
     results_path.write_text(json.dumps(audit_results, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Radar à deux couches, construit depuis le résultat d'audit lui-même et non
+    # depuis les variables locales de ce script : c'est le même point d'entrée que
+    # celui de `processus/fusionner_lots.py`, l'autre producteur du même fichier.
+    # Les deux tenaient déjà deux arithmétiques jumelles ; leur laisser deux façons
+    # de dessiner garantissait qu'un jour l'une montrerait autre chose que l'autre.
+    radar_path = source_dir / f"eof-radar-{domaine}.svg"
+    radar_path.write_text(build_radar_from_results(audit_results, domaine), encoding="utf-8")
 
     md_text = build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_apercu)
     md_path = source_dir / "eof-rempli.md"

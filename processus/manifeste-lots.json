@@ -431,11 +431,12 @@
       "vague": "5-consolidation",
       "libelle": "Grille remplie, radar a deux couches, jauge de completude",
       "executeur": "script",
-      "etat": "partiellement_a_ecrire",
-      "scripts": [".claude/skills/analyse-parcours/scripts/generate_report_html.py"],
-      "scripts_a_ecrire": [
-        "le radar a deux couches : couche pleine pour la provenance collecte, couche hachuree pour les provenances declare et precise, plus une jauge du pourcentage de potentiel couvert"
+      "etat": "existant",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/generate_report_html.py",
+        ".claude/skills/eof/scripts/generate_radar_svg.py"
       ],
+      "scripts_a_ecrire": [],
       "arguments": null,
       "arguments_verifies": false,
       "depends_on": ["fusion"],
@@ -448,7 +449,7 @@
       "provenances_autorisees": [],
       "criteres_possedes": null,
       "rejouable_seul": true,
-      "contrainte": "Les quatre provenances restent distinguables sur le radar. Aucun chiffre invente, aucune valeur par defaut pour un critere sans reponse : la jauge de completude dit ce qui manque au lieu de le combler."
+      "contrainte": "Les cinq provenances restent distinguables sur le radar : les deux couches en separent l'origine (couche pleine pour collecte, estime et suppose, qui viennent toutes de nous ; couche hachuree pour declare et precise, que le service audite a repondus lui-meme) et une ligne de decompte sous la figure donne le detail des cinq. Aucun chiffre invente, aucune valeur par defaut pour un critere sans reponse : la jauge de completude dit ce qui manque au lieu de le combler, et une dimension sans aucune reponse est marquee 'aucune reponse', jamais 0 %."
     }
   ]
 }
