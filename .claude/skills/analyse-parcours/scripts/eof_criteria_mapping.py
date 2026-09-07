@@ -116,6 +116,20 @@ MAPPING = {
         "provenance_max": "suppose",
         "note": "Risque réel de confondre un beacon de mesure d'audience (comportement normal) avec un calcul serveur recalculé par erreur - afficher l'URL et le count en annexe, jamais cocher automatiquement.",
     },
+    "3.2": {
+        "critere_court": "Existe-t-il un système de suivi de l'impact environnemental de l'infrastructure ?",
+        "categorie": "partiel",
+        "champ_donnee": "pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)",
+        "regle": (
+            "Une déclaration publique de suivi ou de mesure d'impact environnemental "
+            "est un indice que l'organisation s'intéresse au sujet - ne prouve pas "
+            "que ce suivi couvre l'infrastructure (émissions carbone, PUE/WUE datacenter) "
+            "plutôt que simplement les pages du site. Le critère 3.2 porte explicitement "
+            "sur la surveillance de l'infrastructure, pas des contenus."
+        ),
+        "provenance_max": "declare",
+        "note": "Première utilisation de provenance 'declare' : la page est publiée par l'organisation elle-même, ce n'est ni une mesure (collecte) ni une déduction (estime) mais une déclaration publique officielle.",
+    },
     "3.3": {
         "critere_court": "L'hébergement est-il situé dans une région où le mix électrique est fortement carboné ?",
         "categorie": "automatisable",

@@ -1,0 +1,33 @@
+{
+  "pages_publiques_dir_exists": true,
+  "files_searched": [
+    "eco-conception",
+    "ecoconception",
+    "numérique-responsable",
+    "numerique-responsable",
+    "rse-numerique",
+    "declaration-environnementale",
+    "empreinte-environnementale"
+  ],
+  "files_found": [
+    "eco-conception.html"
+  ],
+  "files_analyzed": [
+    {
+      "filename": "eco-conception.html",
+      "read_success": true,
+      "read_error": null,
+      "declarations": {
+        "declarations_suivi": [
+          {
+            "phrase": "Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement.",
+            "mot_cle_trouve": "consommation d'énergie"
+          }
+        ],
+        "parse_success": true,
+        "parse_error": null
+      }
+    }
+  ],
+  "status": "success"
+}

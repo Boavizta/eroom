@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-04T20:32:28.147856+00:00",
+  "generated_at": "2026-09-07T13:16:29.702187+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
   "criteres_repondus": 7,
-  "criteres_avec_indice_partiel": 15,
+  "criteres_avec_indice_partiel": 16,
   "completude_globale_pct": 12.962962962962962,
   "potentiel_optimisation_global_pct": 1.875,
   "repondus_par_provenance": {
@@ -512,12 +512,12 @@
       "dimension": "🏢 3 — Infrastructure",
       "critere": "Il n'existe aucun système de suivi de l'impact environnemental.",
       "potentiel_max": 1.5,
-      "categorie": "aucune_donnee",
+      "categorie": "partiel",
       "reponse": null,
       "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "provenance": "declare",
+      "source": "pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)",
+      "contexte": "Déclaration sur eco-conception.html : \"Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement.\""
     },
     {
       "id": "3.3",

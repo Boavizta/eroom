@@ -13,11 +13,15 @@ initiale (2026-09-03) avait montré que 10 étaient exploitables (4
 "automatisable", 6 "partiel"). Extension Phase 1 (même jour, plan
 `eof-questionnaire`) : 18 exploitables (7 "automatisable" avec case cochée :
 1.12, 2.1, 3.3, 5.4, 1.5, 1.6, 1.13 ; 11 "partiel" avec indice contextuel
-jamais coché) — les 36 autres restent "je ne sais pas" par construction,
-cf. `eof_criteria_mapping.py`. Les 16 questions de 🏦 0-Diagnostic rapide ne
-sont JAMAIS remplies automatiquement (échelle 1-5 différente, décision
-explicite), SAUF 0.16 : elles apparaissent en aperçu, avec pour 0.4 et 0.10
-un indice contextuel affiché à titre indicatif (jamais une réponse cochée).
+jamais coché). Extension Phase 2 (2026-09-07, pages publiques) : 23
+exploitables (7 "automatisable" inchangé ; 16 "partiel", dont 3.2 ajouté par
+cette phase et 4 déjà présents depuis la Phase 1 sans que ce commentaire ait
+été mis à jour). Les 31 autres restent "je ne sais pas" par construction,
+cf. `eof_criteria_mapping.py`. Les 16 questions de 🏦
+0-Diagnostic rapide ne sont JAMAIS remplies automatiquement (échelle 1-5
+différente, décision explicite), SAUF 0.16 : elles apparaissent en aperçu,
+avec pour 0.4 et 0.10 un indice contextuel affiché à titre indicatif (jamais
+une réponse cochée).
 
 Usage :
     python3 run_eof.py <source_dir>
@@ -77,9 +81,11 @@ def load_audit_data(source_dir):
     headers = load_json(find_first(source_dir / "security-headers-analysis.json", audit_dir / "security-headers-analysis.json"))
     wellknown = load_json(find_first(source_dir / "wellknown-scan.json", audit_dir / "wellknown-scan.json"))
     htmlcss = load_json(find_first(source_dir / "html-css-criteria.json", audit_dir / "html-css-criteria.json"))
+    pages_publiques = load_json(find_first(source_dir / "pages-publiques-criteria.json", audit_dir / "pages-publiques-criteria.json"))
     return {
         "env": env, "har": har, "coverage": coverage, "cwv": cwv,
         "headers": headers, "wellknown": wellknown, "htmlcss": htmlcss,
+        "pages_publiques": pages_publiques,
         "source_dir": source_dir,  # exposé pour deploy_freshness (nécessite le chemin du .har, pas le JSON)
     }
 
@@ -511,10 +517,53 @@ def context_6_8(data):
     return None
 
 
+def context_3_2(data):
+    """Indice de déclaration publique de suivi d'impact environnemental."""
+    pages_publiques = data["pages_publiques"]
+    if not pages_publiques:
+        return None
+
+    status = pages_publiques.get("status")
+    if status == "no_directory":
+        return None
+
+    if status == "no_files":
+        motifs = ", ".join(pages_publiques.get("files_searched", []))
+        return f"Aucune page publique d'éco-conception trouvée (motifs cherchés : {motifs})"
+
+    # Compiler toutes les déclarations trouvées
+    all_declarations = []
+
+    for file_analysis in pages_publiques.get("files_analyzed", []):
+        if not file_analysis.get("read_success"):
+            continue
+        decl = file_analysis.get("declarations")
+        if not decl or not decl.get("parse_success"):
+            continue
+
+        all_declarations.extend(decl.get("declarations_suivi", []))
+
+    if not all_declarations:
+        return "Page publique d'éco-conception trouvée, mais aucune déclaration de suivi d'impact détectée"
+
+    # Prendre la première déclaration (phrase complète, casse d'origine)
+    premiere = all_declarations[0]["phrase"]
+
+    # Si la phrase est très longue (> 200 caractères), couper à une frontière de mot
+    if len(premiere) > 200:
+        coupe = premiere[:197].rfind(' ')
+        if coupe > 100:  # Ne couper que si on garde au moins 100 caractères
+            premiere = premiere[:coupe] + "..."
+
+    filename = pages_publiques.get("files_found", ["page publique"])[0]
+    return f"Déclaration sur {filename} : \"{premiere}\""
+
+
 CONTEXTS = {
     "1.9": context_1_9, "1.14": context_1_14,
     "1.15": context_1_15, "1.16": context_1_15,  # même champ trafic
     "5.5": context_5_5, "2.3": context_2_3, "2.5": context_2_5,
+    "3.2": context_3_2,
     "3.5": context_3_5, "3.7": context_3_7,
     "1.4": context_1_4, "1.11": context_1_11,
     "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6, "6.8": context_6_8,
@@ -686,11 +735,11 @@ def main():
 
     data = load_audit_data(source_dir)
     # Clés de données réelles (exclut source_dir, qui est toujours non-None)
-    data_keys = ("env", "har", "coverage", "cwv", "headers", "wellknown", "htmlcss")
+    data_keys = ("env", "har", "coverage", "cwv", "headers", "wellknown", "htmlcss", "pages_publiques")
     if not any(data[k] for k in data_keys):
         print("⚠ Aucune donnée d'audit trouvée (env-data.json / har-analysis.json / coverage-analysis.json / "
-              "cwv.json / security-headers-analysis.json / wellknown-scan.json / html-css-criteria.json) "
-              "— tous les critères resteront 'je ne sais pas'.")
+              "cwv.json / security-headers-analysis.json / wellknown-scan.json / html-css-criteria.json / "
+              "pages-publiques-criteria.json) — tous les critères resteront 'je ne sais pas'.")
 
     results = [evaluate_criterion(c, data) for c in referentiel["criteres"]]
     results_by_id = {r["id"]: r for r in results}

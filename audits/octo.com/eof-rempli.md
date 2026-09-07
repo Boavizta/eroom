@@ -133,7 +133,8 @@
 
 ### 3.2 — Il n'existe aucun système de suivi de l'impact environnemental.
 
-**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)
+**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
+**Donnée indicative** (declare) : Déclaration sur eco-conception.html : "Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement." — _champ : pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)_
 
 ### 3.3 — Le service est-il hébergé dans une région où le mix électrique a un impact important ?
 
