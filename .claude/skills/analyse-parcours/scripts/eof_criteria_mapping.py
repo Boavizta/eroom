@@ -14,15 +14,27 @@ Reconnaissance de départ (54 critères passés en revue un par un) : 4 sont
 automatisables depuis les données déjà collectées, 6 donnent un indice
 faible/indirect (jamais une validation), et 44 sont des questions
 organisationnelles ou produit qu'aucune donnée technique d'audit ne peut
-renseigner (+ 0.16, seule exception "🏦 0-Diagnostic rapide", traitée à part
-dans run_eof.py). Ce n'est pas un défaut de ce fichier : c'est la nature du
+renseigner. Ce n'est pas un défaut de ce fichier : c'est la nature du
 référentiel EOF, largement humain par construction.
 
 Extension Phase 1 (2026-09-03, cf. plan `eof-questionnaire`) : +3
 automatisables (1.5, 1.6, 1.13, via `parse_html_criteria.py` et l'extension
 accessibility/best-practices de `collect_cwv_pagespeed.py`) et +5 indices
 (1.4, 1.11, 6.1, 6.3, 6.6, via `parse_html_criteria.py`,
-`analyze_security_headers.py`, `scan_wellknown.py`). Deux volets prévus par
+`analyze_security_headers.py`, `scan_wellknown.py`).
+
+Extension Phase 2 (2026-09-07) : ajout de 0.16 comme automatisable (exception
+unique au diagnostic rapide, doublon exact de 3.3).
+
+Total actuel du MAPPING : **24 entrées, 8 automatisables et 16 partiels**.
+⚠️ Ces deux chiffres portent sur le MAPPING, pas sur les 54 critères détaillés :
+0.16 est une question du diagnostic rapide, elle ne fait pas partie des 54. Les
+deux décomptes à ne jamais mélanger, sous peine de fabriquer un total faux :
+  - sur les **54 critères détaillés** : 23 exploitables (7 automatisables,
+    16 partiels), donc **31 sans donnée**. Inchangé par l'ajout de 0.16.
+  - sur les **16 questions du diagnostic rapide** : 1 exploitable (0.16),
+    donc 15 sans donnée.
+Deux volets prévus par
 le plan initial se sont révélés irréalisables en pratique et ont été
 abandonnés (jamais de valeur inventée à la place) :
 - 1.1 (Lighthouse a11y/Best Practices) supposait des données déjà collectées
@@ -62,6 +74,18 @@ HORS de ce plan").
 """
 
 MAPPING = {
+    "0.16": {
+        "critere_court": "Le service est-il hébergé dans un pays dont le mix électrique a un impact significatif ? (en fonction de l'emplacement)",
+        "categorie": "automatisable",
+        "champ_donnee": "env-data.json: servers[].carbon_intensity_g_kwh (doublon exact de 3.3, même donnée source)",
+        "regle": (
+            "Même règle que 3.3 : si au moins un serveur de la liste a carbon_intensity_g_kwh "
+            "au-dessus du seuil (~250 gCO2/kWh, mix électrique européen moyen) -> "
+            "échelle 1-5 correspondante. Si tous sont en dessous -> échelon bas de l'échelle."
+        ),
+        "provenance_max": "collecte",
+        "note": "Doublon exact du critère 3.3 : même donnée mesurée (intensité carbone du mix électrique du pays d'hébergement), même source (env-data.json: servers[].carbon_intensity_g_kwh). Exception unique au diagnostic rapide (16 questions jamais remplies automatiquement).",
+    },
     "1.12": {
         "critere_court": "Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?",
         "categorie": "automatisable",

@@ -7,8 +7,8 @@
   "conventions": {
     "repertoire_audit": "audits/<domaine>",
     "sortie_de_lot": "audits/<domaine>/lots/<lot_id>.json",
-    "precedence_provenance": ["collecte", "estime", "declare", "precise"],
-    "regle_de_precedence": "Une provenance haute ne peut jamais etre ecrasee par une provenance plus basse. En cas de divergence entre deux provenances sur un meme critere, le critere sort avec l'ecart explicite dans le contexte, et les provenances restent distinguables jusqu'au radar.",
+    "precedence_provenance": ["collecte", "estime", "declare", "precise", "suppose"],
+    "regle_de_precedence": "Une provenance haute ne peut jamais etre ecrasee par une provenance plus basse. En cas de divergence entre deux provenances sur un meme critere, le critere sort avec l'ecart explicite dans le contexte, et les provenances restent distinguables jusqu'au radar. La provenance 'suppose' designe une deduction depuis un indice faible : elle est placee en derniere position de precedence car une case cochee par le client sans preuve (precise) vaut davantage - le client connait son equipe alors que nous devinons depuis un signal qui parle souvent d'autre chose.",
     "propriete_disjointe": "Posseder un critere, c'est avoir le droit d'y poser une reponse. Chaque critere du referentiel appartient a exactement un lot de jugement : deux lots ne peuvent donc pas se contredire, et l'ordre d'execution des lots n'influence pas le resultat. Le script de validation refuse un manifeste ou un critere est possede par deux lots, ou par aucun.",
     "contribution_de_contexte": "Contribuer un contexte n'est PAS posseder. Un lot peut ecrire un contexte sur un critere qu'il ne possede pas : c'est de la matiere pour le lot proprietaire, pas un verdict. Un lot qui pose une reponse sur un critere qu'il ne possede pas doit etre refuse a la fusion. C'est ce qui distingue les criteres automatisables, tranches par script, des criteres seulement partiels, ou le script ne fournit qu'un indice et laisse le verdict au lot de dimension.",
     "propriete_residuelle": "Un lot de propriete residuelle ne possede aucun critere en exclusivite : il peut repondre sur n'importe quel critere reste sans verdict apres les lots proprietaires. Sa reponse est retenue si aucun lot proprietaire n'a pose de reponse. En cas de divergence avec un lot proprietaire, la reponse du proprietaire est conservee (provenance la plus haute en precedence), le champ divergence passe a true, et le contexte consigne l'ecart entre les provenances. Un seul lot residuel par provenance : sinon l'ordre de lecture influencerait le resultat. La precedence des provenances reste la seule regle d'arbitrage.",
@@ -175,7 +175,7 @@
       ],
       "entrees": ["audits/<domaine>/"],
       "sortie_de_lot": "audits/<domaine>/lots/jugement-automatique.json",
-      "provenances_autorisees": ["collecte"],
+      "provenances_autorisees": ["collecte", "estime", "declare", "suppose"],
       "criteres_possedes": {
         "source": ".claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py",
         "regle": "les criteres dont la table de correspondance declare la categorie automatisable, et eux seuls : ce sont les criteres qu'un script tranche"
@@ -202,7 +202,7 @@
       ],
       "sortie_de_lot": "audits/<domaine>/lots/jugement-diagnostic-rapide.json",
       "provenances_autorisees": ["collecte", "estime", "declare"],
-      "criteres_possedes": {"prefixe_id": "0."},
+      "criteres_possedes": {"prefixe_id": "0.", "sauf_lots": ["jugement-automatique"]},
       "rejouable_seul": true,
       "retour_attendu": "une seule ligne de confirmation, jamais le contenu du fichier produit",
       "note": "Passe en premier parce qu'il alimente la porte go/no-go."

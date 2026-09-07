@@ -16,7 +16,7 @@ produisent le même fichier, au champ d'horodatage près (idempotence).
 RÈGLES DE FUSION (impératives, non négociables)
 -----------------------------------------------
 1. Précédence par provenance (lue depuis le manifeste) :
-   collecte > estime > declare > precise
+   collecte > estime > declare > precise > suppose
    Une provenance haute ne peut JAMAIS être écrasée par une provenance plus basse.
 
 2. Divergence (deux provenances DIFFÉRENTES avec réponses DIFFÉRENTES) :
@@ -405,12 +405,12 @@ def compute_metrics(criteres, ref_criteres):
         "potentiel_total": dimension_totals_potentiel[name],
         "repondus": 0,
         "sans_objet_count": 0,
-        "repondus_par_provenance": {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+        "repondus_par_provenance": {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
     } for name in dimension_names}
 
     criteres_repondus = 0
     criteres_avec_indice_partiel = 0
-    repondus_par_provenance_global = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+    repondus_par_provenance_global = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
 
     for c in criteres:
         pilier = c.get("dimension", "")

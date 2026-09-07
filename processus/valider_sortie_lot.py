@@ -62,7 +62,7 @@ SCHEMA_PATH = PROJECT_ROOT / "processus" / "schema-sortie-lot.json"
 FORBIDDEN_FIELDS = {"poids", "potentiel_max", "dimension", "critere", "pilier"}
 
 # Vocabulaire fermé, hérité du projet
-PROVENANCE_VALUES = {"collecte", "estime", "declare", "precise", None}
+PROVENANCE_VALUES = {"collecte", "estime", "declare", "precise", "suppose", None}
 CATEGORIE_VALUES = {"automatisable", "partiel", "aucune_donnee"}
 
 
@@ -190,9 +190,11 @@ def validate_entry_fields(entry, index):
         ))
 
     if "provenance" in entry and entry["provenance"] not in PROVENANCE_VALUES:
+        # Construire la liste des valeurs attendues depuis PROVENANCE_VALUES
+        expected_values = sorted([str(v) if v is not None else "null" for v in PROVENANCE_VALUES if v is not None]) + ["null"]
         violations.append((
             f"{prefix}.provenance",
-            f"valeur hors vocabulaire : '{entry['provenance']}' (attendu : collecte, estime, declare, precise ou null)"
+            f"valeur hors vocabulaire : '{entry['provenance']}' (attendu : {', '.join(expected_values)})"
         ))
 
     return violations

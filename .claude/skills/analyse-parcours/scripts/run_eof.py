@@ -17,7 +17,13 @@ jamais coché). Extension Phase 2 (2026-09-07, pages publiques) : 23
 exploitables (7 "automatisable" inchangé ; 16 "partiel", dont 3.2 ajouté par
 cette phase et 4 déjà présents depuis la Phase 1 sans que ce commentaire ait
 été mis à jour). Les 31 autres restent "je ne sais pas" par construction,
-cf. `eof_criteria_mapping.py`. Les 16 questions de 🏦
+cf. `eof_criteria_mapping.py`.
+⚠️ Ces chiffres portent sur les 54 critères détaillés et RESTENT justes après
+l'ajout de 0.16 au MAPPING le 2026-09-07 : 0.16 est une question du diagnostic
+rapide, pas l'un des 54. Le MAPPING compte donc 8 automatisables quand ce
+commentaire en annonce 7, et les deux sont exacts dans leur périmètre. Ne pas
+"corriger" l'un d'après l'autre.
+Les 16 questions de 🏦
 0-Diagnostic rapide ne sont JAMAIS remplies automatiquement (échelle 1-5
 différente, décision explicite), SAUF 0.16 : elles apparaissent en aperçu,
 avec pour 0.4 et 0.10 un indice contextuel affiché à titre indicatif (jamais
