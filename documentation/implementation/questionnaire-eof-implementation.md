@@ -330,11 +330,27 @@ python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py /tmp/a
 
 Attendu sur l'audit vide : **62 blocs posés**, la bibliothèque entière, et **aucun rappel de mesure affiché**.
 
+## Les trois emprunts sont faits
+
+| Emprunt | Commit | Ce que le client voit |
+|---|---|---|
+| 1, le rappel des mesures | `9ba4f5b`, textes réécrits pour lui en `e091e98` | sous la question, le fait déjà mesuré, à confirmer ou corriger |
+| 2, les questions en affirmations | `2f4205d`, relu en `009a647` | les 62 questions écrites dans ses mots, sans aucun acronyme interne |
+| 3, les titres et l'interlocuteur | `431e127`, relu en `009a647` | `## 3 sur 41 - Disponibilité du code source (à voir avec l'équipe de développement)` |
+
+La plomberie interne du Markdown (`Critères EOF couverts`, `Potentiel débloqué`) est passée en
+commentaires HTML en `f28bf8e` : elle n'est plus lue par le client.
+
+⚠️ **Les textes de mesure viennent du dossier d'audit, pas du code de génération.** Un dossier
+d'audit produit avant `e091e98` publie donc encore les anciens textes, avec leurs acronymes
+internes. Les rafraîchir se fait **sans appel réseau**, en rejouant `run_eof.py` sur une copie du
+dossier : il ne relit que des fichiers déjà sur le disque. Vérifié, aucun verdict ne change et le
+radar reste identique à l'octet ; seuls les 16 textes de contexte sont réécrits.
+
 ## Prochaines étapes
 
-1. **Emprunt 1, le rappel des mesures dans la question.** Spécifié ci-dessus, exécutable tel quel. Sonnet suffit.
-2. **Emprunt 2, la reformulation des 62 questions en affirmations concrètes.** Zéro code.
-3. **Emprunt 3, les titres thématiques avec indication de l'interlocuteur.**
+1. **Chantier 13, le radar à deux couches** : mesuré en hachuré, déclaré en plein, plus une jauge de complétude. Le plus urgent côté rendu, et chaque question répondue l'aggrave.
+2. **Chantier 31** : 7 fichiers Python impriment un séparateur `=` fabriqué à l'exécution, que la synthèse vocale lit lettre par lettre. `grep '====='` ne les trouve pas, chercher `'"=" \*'`.
 
 ⛔ **Ce qui est clos et ne doit pas être rouvert** :
 
