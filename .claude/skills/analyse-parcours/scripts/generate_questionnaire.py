@@ -107,13 +107,36 @@ def load_referentiel(path):
 
 
 def load_audit_results(audit_dir):
-    """Charge les résultats d'audit existants."""
+    """Charge les résultats d'audit existants et extrait les contextes."""
     path = audit_dir / "eof-audit-results.json"
     if not path.exists():
         raise FileNotFoundError(f"eof-audit-results.json introuvable dans {audit_dir}")
 
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    # Extraire les contextes pour l'emprunt 1
+    # Clé = id du critère ou de la question, valeur = texte du contexte
+    contextes = {}
+
+    # Critères détaillés (1.x à 6.x)
+    for c in data.get("criteres", []):
+        cid = c["id"]
+        ctx = c.get("contexte")
+        # Piège 1 : une clé peut exister et valoir null
+        if ctx is not None and isinstance(ctx, str) and ctx.strip():
+            contextes[cid] = ctx.strip()
+
+    # Questions diagnostic rapide (0.x)
+    diag_apercu = data.get("diagnostic_rapide_apercu", {})
+    for q in diag_apercu.get("questions", []):
+        qid = q["id"]
+        indice = q.get("indice_contextuel")
+        # Piège 1 : une clé peut exister et valoir null
+        if indice is not None and isinstance(indice, str) and indice.strip():
+            contextes[qid] = indice.strip()
+
+    return data, contextes
 
 
 def load_blocs(scripts_dir):
@@ -287,12 +310,14 @@ def get_options_for_direct_bloc(bloc, criteres_ref, diag_rapide_ref):
 
 
 def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_ref,
-                         audit_results, residu):
+                         audit_results, residu, contextes):
     """
     Formate un bloc en Markdown.
 
     Respecte les consignes de style : séparateurs en "-----", guillemets droits,
     pas de tiret long.
+
+    Paramètre contextes : dict {id_critere: texte_contexte} pour l'emprunt 1.
     """
     lines = []
 
@@ -311,6 +336,32 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
     # Aide en italique si présente
     if bloc.get("aide"):
         lines.append(f"*{bloc['aide']}*")
+        lines.append("")
+
+    # Emprunt 1 : Rappel des faits mesurés
+    # Inséré après la question et l'aide, avant la note et les cases à cocher
+    # Piège 3 (bloc composé) : afficher TOUS les faits mesurés non vides,
+    # en fusionnant les doublons strictement identiques
+    faits_mesures = []
+    for cid in criteres:
+        if cid in contextes:
+            fait = contextes[cid]
+            # Fusionner les doublons : n'ajouter que si pas déjà présent
+            if fait not in faits_mesures:
+                faits_mesures.append(fait)
+
+    if faits_mesures:
+        # Piège 5 : l'absence doit être silencieuse, mais ici on a au moins un fait
+        lines.append("> **Ce que nous avons mesuré :**")
+        if len(faits_mesures) == 1:
+            # Un seul fait : pas de puce
+            lines.append(f"> {faits_mesures[0]}")
+        else:
+            # Plusieurs faits : en puces
+            for fait in faits_mesures:
+                lines.append(f"> - {fait}")
+        lines.append(">")
+        lines.append("> Confirmez, ou corrigez si notre mesure est incomplète.")
         lines.append("")
 
     # Note en blockquote gras si présente
@@ -355,7 +406,7 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
 
 
 def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref,
-                                 diag_rapide_ref, output_dir):
+                                 diag_rapide_ref, output_dir, contextes):
     """Génère un fichier de questionnaire (produit-usage ou technique)."""
     residu = compute_residu(audit_results, criteres_ref, diag_rapide_ref)
     blocs_tries = select_and_sort_blocs(blocs_data, residu, criteres_ref,
@@ -406,7 +457,7 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
         for bloc, potentiel, criteres in blocs_porte:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
-                                             audit_results, residu))
+                                             audit_results, residu, contextes))
             num += 1
 
     if blocs_detail:
@@ -418,7 +469,7 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
         for bloc, potentiel, criteres in blocs_detail:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
-                                             audit_results, residu))
+                                             audit_results, residu, contextes))
             num += 1
 
     # Écrire le fichier
@@ -488,11 +539,11 @@ def autotest():
 
             # Générer
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("produit-usage", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
                 echecs.append(("Bloc direct critère détaillé", "Aucun fichier généré"))
@@ -554,11 +605,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("produit-usage", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
                 echecs.append(("Bloc direct diagnostic rapide", "Aucun fichier généré"))
@@ -617,11 +668,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("technique", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             # Le critère doit être dans le résidu et le bloc doit être généré
             if result is None:
@@ -691,11 +742,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("technique", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
                 echecs.append(("Bloc composé avec déjà tranché", "Aucun fichier généré"))
@@ -754,11 +805,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("produit-usage", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
                 echecs.append(("Nettoyage je ne sais pas", "Aucun fichier généré"))
@@ -812,11 +863,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("produit-usage", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result:
                 content = result.read_text(encoding="utf-8")
@@ -864,11 +915,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("produit-usage", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result:
                 content = result.read_text(encoding="utf-8")
@@ -951,11 +1002,11 @@ def autotest():
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit = load_audit_results(tmpdir)
+            audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
             result = generate_questionnaire_file("technique", blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir)
+                                                criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
                 echecs.append(("Rendu clé note", "Aucun fichier généré"))
@@ -973,6 +1024,472 @@ def autotest():
                         echecs.append(("Rendu clé note", "Note présente pour bloc sans note (ne devrait pas)"))
     except Exception as exc:
         echecs.append(("Rendu clé note", f"Exception : {exc}"))
+
+    # Cas 9 : Emprunt 1 - Critère avec contexte null
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "5.1",
+                        "pilier": "👨‍💻 5 — Algo & Code",
+                        "critere": "Test 5.1",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-contexte-null",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "5.1",
+                        "question": "Question 5.1 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # Critère avec contexte = null
+            audit_data = {
+                "criteres": [{"id": "5.1", "reponse": None, "contexte": None}],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("technique", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - contexte null", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Aucun rappel ne doit être affiché
+                if "> **Ce que nous avons mesuré :**" in content:
+                    echecs.append(("Emprunt 1 - contexte null", "Rappel affiché alors que contexte est null"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - contexte null", f"Exception : {exc}"))
+
+    # Cas 10 : Emprunt 1 - Critère avec contexte vide
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "5.2",
+                        "pilier": "👨‍💻 5 — Algo & Code",
+                        "critere": "Test 5.2",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-contexte-vide",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "5.2",
+                        "question": "Question 5.2 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # Critère avec contexte = "   " (espaces uniquement)
+            audit_data = {
+                "criteres": [{"id": "5.2", "reponse": None, "contexte": "   "}],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("technique", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - contexte vide", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Aucun rappel ne doit être affiché
+                if "> **Ce que nous avons mesuré :**" in content:
+                    echecs.append(("Emprunt 1 - contexte vide", "Rappel affiché alors que contexte est vide"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - contexte vide", f"Exception : {exc}"))
+
+    # Cas 11 : Emprunt 1 - Bloc composé avec un seul contexte
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "2.1",
+                        "pilier": "🗺️ 2 — Architecture",
+                        "critere": "Test 2.1",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    },
+                    {
+                        "id": "2.2",
+                        "pilier": "🗺️ 2 — Architecture",
+                        "critere": "Test 2.2",
+                        "potentiel_max": 1.5,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-compose-un-contexte",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test composé",
+                        "type": "compose",
+                        "question": "Question composée ?",
+                        "options": [
+                            {"libelle": "Option A", "reponses": {"2.1": "✅ Point fort confirmé", "2.2": "✅ Point fort confirmé"}},
+                            {"libelle": "Option B", "reponses": {"2.1": "💡 Potentiel d'amélioration identifié"}}
+                        ]
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # 2.1 avec contexte, 2.2 sans contexte
+            audit_data = {
+                "criteres": [
+                    {"id": "2.1", "reponse": None, "contexte": "Fait mesuré pour 2.1"},
+                    {"id": "2.2", "reponse": None, "contexte": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("technique", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - bloc composé un contexte", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Un rappel avec le seul fait doit être affiché (sans puce car un seul)
+                if "> **Ce que nous avons mesuré :**" not in content:
+                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Aucun rappel affiché"))
+                elif "> Fait mesuré pour 2.1" not in content:
+                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Fait 2.1 absent du rappel"))
+                # Vérifier qu'il n'y a pas de puce (un seul fait)
+                elif "> - Fait mesuré pour 2.1" in content:
+                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Puce présente alors qu'un seul fait (attendu : sans puce)"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - bloc composé un contexte", f"Exception : {exc}"))
+
+    # Cas 12 : Emprunt 1 - Bloc composé avec deux contextes identiques (fusion)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "3.1",
+                        "pilier": "🏢 3 — Infrastructure",
+                        "critere": "Test 3.1",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    },
+                    {
+                        "id": "3.2",
+                        "pilier": "🏢 3 — Infrastructure",
+                        "critere": "Test 3.2",
+                        "potentiel_max": 1.5,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-compose-fusion",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test composé fusion",
+                        "type": "compose",
+                        "question": "Question composée ?",
+                        "options": [
+                            {"libelle": "Option A", "reponses": {"3.1": "✅ Point fort confirmé", "3.2": "✅ Point fort confirmé"}},
+                            {"libelle": "Option B", "reponses": {"3.1": "💡 Potentiel d'amélioration identifié"}}
+                        ]
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # 3.1 et 3.2 avec le MÊME contexte
+            audit_data = {
+                "criteres": [
+                    {"id": "3.1", "reponse": None, "contexte": "Fait identique pour les deux"},
+                    {"id": "3.2", "reponse": None, "contexte": "Fait identique pour les deux"}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("technique", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - bloc composé fusion", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Le fait doit apparaître une seule fois (fusion des doublons)
+                if "> **Ce que nous avons mesuré :**" not in content:
+                    echecs.append(("Emprunt 1 - bloc composé fusion", "Aucun rappel affiché"))
+                elif content.count("Fait identique pour les deux") > 1:
+                    echecs.append(("Emprunt 1 - bloc composé fusion", f"Doublon non fusionné (apparaît {content.count('Fait identique pour les deux')} fois)"))
+                # Vérifier qu'il n'y a pas de puce (un seul fait après fusion)
+                elif "> - Fait identique pour les deux" in content:
+                    echecs.append(("Emprunt 1 - bloc composé fusion", "Puce présente alors qu'un seul fait après fusion (attendu : sans puce)"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - bloc composé fusion", f"Exception : {exc}"))
+
+    # Cas 13 : Emprunt 1 - Question 0.x avec indice_contextuel
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [],
+                "diagnostic_rapide": [
+                    {
+                        "id": "0.5",
+                        "critere": "Test diagnostic",
+                        "crans": ["Cran 1", "Cran 2"],
+                        "niveau_impact": "Déterminant"
+                    }
+                ]
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-diag-indice",
+                        "fichier": "produit-usage",
+                        "phase": "porte",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "0.5",
+                        "question": "Question 0.5 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # Question 0.5 avec indice_contextuel
+            audit_data = {
+                "criteres": [],
+                "diagnostic_rapide_apercu": {
+                    "questions": [
+                        {"id": "0.5", "reponse": None, "indice_contextuel": "Indice de contexte pour 0.5"}
+                    ]
+                }
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("produit-usage", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - question 0.x avec indice", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Le rappel doit être affiché
+                if "> **Ce que nous avons mesuré :**" not in content:
+                    echecs.append(("Emprunt 1 - question 0.x avec indice", "Aucun rappel affiché"))
+                elif "Indice de contexte pour 0.5" not in content:
+                    echecs.append(("Emprunt 1 - question 0.x avec indice", "Indice contextuel absent du rappel"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - question 0.x avec indice", f"Exception : {exc}"))
+
+    # Cas 14 : Emprunt 1 - Audit avec tous les contextes vides
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "1.1",
+                        "pilier": "🛖 1 — Produit",
+                        "critere": "Test 1.1",
+                        "potentiel_max": 2.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    },
+                    {
+                        "id": "1.2",
+                        "pilier": "🛖 1 — Produit",
+                        "critere": "Test 1.2",
+                        "potentiel_max": 1.5,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": [
+                    {
+                        "id": "0.1",
+                        "critere": "Test 0.1",
+                        "crans": ["Cran 1"],
+                        "niveau_impact": "Déterminant"
+                    }
+                ]
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-vide-1",
+                        "fichier": "produit-usage",
+                        "phase": "detail",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "1.1",
+                        "question": "Question 1.1 ?"
+                    },
+                    {
+                        "id": "test-vide-2",
+                        "fichier": "produit-usage",
+                        "phase": "detail",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "1.2",
+                        "question": "Question 1.2 ?"
+                    },
+                    {
+                        "id": "test-vide-3",
+                        "fichier": "produit-usage",
+                        "phase": "porte",
+                        "titre": "Test",
+                        "type": "direct",
+                        "critere": "0.1",
+                        "question": "Question 0.1 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # Tous les contextes sont null ou vides
+            audit_data = {
+                "criteres": [
+                    {"id": "1.1", "reponse": None, "contexte": None},
+                    {"id": "1.2", "reponse": None, "contexte": ""}
+                ],
+                "diagnostic_rapide_apercu": {
+                    "questions": [
+                        {"id": "0.1", "reponse": None, "indice_contextuel": None}
+                    ]
+                }
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("produit-usage", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Emprunt 1 - audit vide", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Aucun rappel ne doit être affiché nulle part
+                if "> **Ce que nous avons mesuré :**" in content:
+                    echecs.append(("Emprunt 1 - audit vide", "Rappel affiché alors que tous les contextes sont vides"))
+    except Exception as exc:
+        echecs.append(("Emprunt 1 - audit vide", f"Exception : {exc}"))
 
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
@@ -1008,7 +1525,7 @@ def main():
     # Charger les données
     ref_path = find_referentiel()
     criteres_ref, diag_rapide_ref = load_referentiel(ref_path)
-    audit_results = load_audit_results(audit_dir)
+    audit_results, contextes = load_audit_results(audit_dir)
 
     # Trouver la bibliothèque de blocs
     scripts_dir = Path(__file__).resolve().parent
@@ -1017,7 +1534,7 @@ def main():
     # Générer les deux fichiers
     for fichier in ["produit-usage", "technique"]:
         result = generate_questionnaire_file(fichier, blocs_data, audit_results,
-                                            criteres_ref, diag_rapide_ref, output_dir)
+                                            criteres_ref, diag_rapide_ref, output_dir, contextes)
         if result:
             print(f"Généré : {result}")
         else:
