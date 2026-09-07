@@ -2056,7 +2056,12 @@ def _instance_type_row(hyp):
 
     hyp : dict hypotheses d'efootprint-synthese-python.json. Retourne (label_value, conf).
     """
-    value = hyp.get("instance_type", "?")
+    # `.get(cle, repli)` ne suffit pas : la clé EXISTE et vaut `None` quand aucun
+    # type d'instance n'a été retenu. Le repli ne servait donc jamais et le
+    # rapport affichait "Type d'instance : None" au lecteur (trouvé par
+    # check_valeurs_rapport.py sur les rapports déjà produits). "sans donnée" est
+    # le libellé déjà employé ailleurs pour une absence.
+    value = hyp.get("instance_type") or "sans donnée"
     source_text = hyp.get("instance_type_source")
     source_url = hyp.get("instance_type_source_url")
 
@@ -4117,7 +4122,60 @@ def generate(audit_dir, output_path=None):
     else:
         print(f"[coûts] patch-audit-cost.sh introuvable ({patch_script}) — section coûts non patchée")
 
+    _avertir_valeurs_internes(output_path)
+
     return output_path
+
+
+def _avertir_valeurs_internes(output_path):
+    """Relit le rapport produit et signale les valeurs internes visibles.
+
+    AVERTIT, ne bloque pas : le rapport reste écrit et la génération se termine
+    normalement. Un axe EOF sans réponse est un état légitime du référentiel
+    aujourd'hui, il n'a pas à casser la production du livrable. Le contrôle
+    complet, lui, rend un code de sortie non nul et peut entrer dans une
+    batterie : `python3 check_valeurs_rapport.py <rapport>`.
+
+    Lancé APRÈS `patch-audit-cost.sh`, donc sur le fichier réellement final.
+
+    Ce contrôle existe parce que les validateurs du projet surveillent les NOMS
+    des clés et jamais les VALEURS affichées : un `None%` en gras au centre du
+    radar EOF a traversé toute la chaîne sans être vu.
+
+    Un contrôle qui se veut non bloquant ne doit pas pouvoir faire tomber la
+    génération par la bande : toute erreur de sa part est rattrapée et signalée.
+    Le rapport est déjà écrit à ce stade, il ne risque rien, mais un plantage ici
+    donnerait une trace Python en fin de commande et ferait croire que la
+    génération a échoué.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from check_valeurs_rapport import controler
+        fuites, _exemptees, _malformees = controler(
+            output_path.read_text(encoding="utf-8", errors="replace")
+        )
+    except Exception as erreur:  # volontairement large, cf. la docstring
+        print(
+            f"[valeurs] contrôle non lancé ({type(erreur).__name__}: {erreur}) - "
+            "valeurs affichées NON vérifiées, le rapport est produit quand même"
+        )
+        return
+
+    if not fuites:
+        print("[valeurs] aucune valeur interne visible dans le rapport.")
+        return
+
+    print(
+        f"\n[valeurs] AVERTISSEMENT : {len(fuites)} valeur(s) interne(s) visible(s) "
+        "par le lecteur du rapport."
+    )
+    for numero, nom, raison, extrait in fuites[:10]:
+        print(f"    {output_path.name}:{numero}  {nom} - {raison}")
+        print(f"        {extrait}")
+    if len(fuites) > 10:
+        print(f"    ... et {len(fuites) - 10} autre(s).")
+    print(f"    Détail : python3 check_valeurs_rapport.py {output_path}")
+    print("    Le rapport a bien été produit : cet avertissement ne bloque rien.")
 
 
 if __name__ == "__main__":
