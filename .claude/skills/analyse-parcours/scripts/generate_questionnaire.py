@@ -321,8 +321,14 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
     """
     lines = []
 
-    # Titre du bloc
-    lines.append(f"## Bloc {num} sur {total}")
+    # Titre du bloc : le sujet de la question, plus la personne a qui la passer.
+    # "Bloc 3 sur 41" seul ne disait rien du sujet, donc le lecteur devait lire la
+    # question entiere pour savoir si elle etait pour lui, et un questionnaire qui
+    # circule mal revient sans reponse.
+    titre_ligne = f"## {num} sur {total} - {bloc['titre']}"
+    if bloc.get("interlocuteur"):
+        titre_ligne += f" (à voir avec {bloc['interlocuteur']})"
+    lines.append(titre_ligne)
     lines.append("")
 
     # Marqueur machine
@@ -852,8 +858,8 @@ def autotest():
             blocs_data = {
                 "version": 1,
                 "blocs": [
-                    {"id": "bloc-detail", "fichier": "produit-usage", "phase": "detail", "type": "direct", "critere": "1.1", "question": "Detail ?"},
-                    {"id": "bloc-porte", "fichier": "produit-usage", "phase": "porte", "type": "direct", "critere": "0.1", "question": "Porte ?"}
+                    {"id": "bloc-detail", "fichier": "produit-usage", "phase": "detail", "titre": "Test", "interlocuteur": "le responsable produit", "type": "direct", "critere": "1.1", "question": "Detail ?"},
+                    {"id": "bloc-porte", "fichier": "produit-usage", "phase": "porte", "titre": "Test", "interlocuteur": "le responsable produit", "type": "direct", "critere": "0.1", "question": "Porte ?"}
                 ]
             }
             blocs_path = tmpdir / "questionnaire-blocs.json"
@@ -1494,6 +1500,59 @@ def autotest():
                     echecs.append(("Emprunt 1 - audit vide", "Rappel affiché alors que tous les contextes sont vides"))
     except Exception as exc:
         echecs.append(("Emprunt 1 - audit vide", f"Exception : {exc}"))
+
+    # Cas 15 : Emprunt 3 - le titre du bloc porte le sujet et l'interlocuteur
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "1.1", "pilier": "🛖 1 — Produit", "critere": "C", "potentiel_max": 2.0,
+                     "options_evaluation": ["✅ Point fort confirmé", "💡 Potentiel d'amélioration identifié"],
+                     "options_evaluation_coefficient": {"✅ Point fort confirmé": 0,
+                                                        "💡 Potentiel d'amélioration identifié": 1}}
+                ],
+                "diagnostic_rapide": []
+            }
+            (tmpdir / "eof-referentiel.json").write_text(
+                json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {"version": 1, "blocs": [
+                {"id": "b-titre", "fichier": "produit-usage", "phase": "detail",
+                 "titre": "Appareils anciens",
+                 "interlocuteur": "le responsable produit",
+                 "type": "direct", "critere": "1.1", "question": "Q ?"}
+            ]}
+            (tmpdir / "questionnaire-blocs.json").write_text(
+                json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            (tmpdir / "eof-audit-results.json").write_text(
+                json.dumps({"criteres": [{"id": "1.1", "reponse": None, "contexte": None}],
+                            "diagnostic_rapide_apercu": {"questions": []}},
+                           ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(tmpdir / "eof-referentiel.json")
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("produit-usage", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+            if result is None:
+                echecs.append(("Emprunt 3 - titre de bloc", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                attendu = "## 1 sur 1 - Appareils anciens (à voir avec le responsable produit)"
+                if attendu not in content:
+                    echecs.append(("Emprunt 3 - titre de bloc",
+                                   f"Ligne de titre absente : {attendu}"))
+                # La plomberie interne ne doit pas revenir sous les yeux du lecteur
+                if "**Critères EOF couverts" in content or "**Potentiel débloqué" in content:
+                    echecs.append(("Emprunt 3 - titre de bloc",
+                                   "Plomberie interne affichée au lecteur"))
+    except Exception as exc:
+        echecs.append(("Emprunt 3 - titre de bloc", f"Exception : {exc}"))
 
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")

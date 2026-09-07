@@ -6,7 +6,7 @@ Ce script valide questionnaire-blocs.json contre eof-referentiel.json.
 
 Il verifie :
 - La structure JSON et les cles obligatoires/interdites
-- Les valeurs des champs enumeres (fichier, phase, type)
+- Les valeurs des champs enumeres (fichier, phase, type, interlocuteur)
 - La coherence entre le type de bloc et ses cles (direct vs compose)
 - L'existence des criteres cites dans le referentiel
 - La correspondance exacte des libelles de reponse avec le referentiel
@@ -34,6 +34,17 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
+
+
+# Vocabulaire ferme des interlocuteurs, affiche tel quel au service audite apres
+# "a voir avec". Ajouter une entree ici est une decision de fond : chaque entree
+# doit designer une personne que le service audite identifie sans hesiter chez lui.
+INTERLOCUTEURS = {
+    "le responsable produit",
+    "l'équipe de développement",
+    "la personne qui exploite l'infrastructure",
+    "la personne qui gère les données",
+}
 
 
 # Libelle interdit dans les blocs composes : ce libelle a un coefficient de 0,
@@ -142,7 +153,13 @@ class Validateur:
 
     def _valider_cles_bloc(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide les cles d'un bloc."""
-        cles_obligatoires = {"id", "fichier", "phase", "titre", "type", "question"}
+        # "titre" et "interlocuteur" sont RENDUS en tete de bloc dans le questionnaire :
+        # "## 3 sur 41 - Appareils anciens (a voir avec le responsable produit)".
+        # L'interlocuteur est obligatoire pour qu'aucun bloc ne parte sans dire a qui
+        # la question se pose : une question posee a la mauvaise personne revient sans
+        # reponse, et un bloc sans reponse ne remplit aucun critere.
+        cles_obligatoires = {"id", "fichier", "phase", "titre", "type", "question",
+                             "interlocuteur"}
         # "note" est RENDUE au questionnaire, donc lue par la personne auditee :
         # elle s'adresse a elle, jamais au developpeur de l'outil. Ne rien y mettre
         # qui parle de la generation, du filtrage ou d'un futur chantier.
@@ -167,6 +184,13 @@ class Validateur:
 
         if "type" in bloc and bloc["type"] not in {"direct", "compose"}:
             self.erreurs.append(f"{id_bloc}: type invalide : {bloc['type']}")
+
+        # Vocabulaire ferme : l'interlocuteur est affiche tel quel au service audite,
+        # apres "a voir avec". Une liste libre ferait deriver les formulations d'un
+        # bloc a l'autre et rendrait le questionnaire illisible a l'oral.
+        if "interlocuteur" in bloc and bloc["interlocuteur"] not in INTERLOCUTEURS:
+            self.erreurs.append(
+                f"{id_bloc}: interlocuteur invalide : {bloc['interlocuteur']}")
 
     def _valider_coherence_type(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide la coherence entre le type et les cles presentes."""
@@ -464,7 +488,7 @@ def autotest() -> bool:
                 "id": "test-1",
                 "fichier": "produit-usage",
                 "phase": "porte",
-                "titre": "Test",
+                "titre": "Test", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "0.1",
                 "question": "Question test ?"
@@ -483,8 +507,8 @@ def autotest() -> bool:
     blocs_doublon = {
         "version": 1,
         "blocs": [
-            {"id": "test-1", "fichier": "technique", "phase": "porte", "titre": "A", "type": "direct", "critere": "0.1", "question": "Q1"},
-            {"id": "test-1", "fichier": "technique", "phase": "porte", "titre": "B", "type": "direct", "critere": "0.1", "question": "Q2"}
+            {"id": "test-1", "fichier": "technique", "phase": "porte", "titre": "A", "interlocuteur": "le responsable produit", "type": "direct", "critere": "0.1", "question": "Q1"},
+            {"id": "test-1", "fichier": "technique", "phase": "porte", "titre": "B", "interlocuteur": "le responsable produit", "type": "direct", "critere": "0.1", "question": "Q2"}
         ]
     }
     v = Validateur(blocs_doublon, referentiel_test)
@@ -515,7 +539,7 @@ def autotest() -> bool:
     blocs_fichier_invalide = {
         "version": 1,
         "blocs": [
-            {"id": "test-4", "fichier": "INVALIDE", "phase": "porte", "titre": "T", "type": "direct", "critere": "0.1", "question": "Q"}
+            {"id": "test-4", "fichier": "INVALIDE", "phase": "porte", "titre": "T", "interlocuteur": "le responsable produit", "type": "direct", "critere": "0.1", "question": "Q"}
         ]
     }
     v = Validateur(blocs_fichier_invalide, referentiel_test)
@@ -534,7 +558,7 @@ def autotest() -> bool:
                 "id": "test-5",
                 "fichier": "technique",
                 "phase": "porte",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "0.1",
                 "question": "Q",
@@ -558,7 +582,7 @@ def autotest() -> bool:
                 "id": "test-6",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Q"
             }
@@ -580,7 +604,7 @@ def autotest() -> bool:
                 "id": "test-7",
                 "fichier": "technique",
                 "phase": "porte",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "99.99",
                 "question": "Q"
@@ -603,7 +627,7 @@ def autotest() -> bool:
                 "id": "test-8",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Q",
                 "options": [
@@ -633,7 +657,7 @@ def autotest() -> bool:
                 "id": "test-9",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Q",
                 "options": [
@@ -665,7 +689,7 @@ def autotest() -> bool:
                 "id": "test-10",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "T",
+                "titre": "T", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Q",
                 "options": [
@@ -703,7 +727,7 @@ def autotest() -> bool:
                 "id": "test-11",
                 "fichier": "technique",
                 "phase": "porte",
-                "titre": "",
+                "titre": "", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "0.1",
                 "question": "Q"
@@ -726,7 +750,7 @@ def autotest() -> bool:
                 "id": "test-12",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "Test compose",
+                "titre": "Test compose", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Question ?",
                 "options": [
@@ -764,7 +788,7 @@ def autotest() -> bool:
                 "id": "test-13",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "Test interdit",
+                "titre": "Test interdit", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Question ?",
                 "options": [
@@ -794,7 +818,7 @@ def autotest() -> bool:
                 "id": "test-14",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "Test evaluation en cours",
+                "titre": "Test evaluation en cours", "interlocuteur": "le responsable produit",
                 "type": "compose",
                 "question": "Question ?",
                 "options": [
@@ -824,7 +848,7 @@ def autotest() -> bool:
                 "id": "test-15a",
                 "fichier": "technique",
                 "phase": "porte",
-                "titre": "Bloc A",
+                "titre": "Bloc A", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "1.1",
                 "question": "Q1"
@@ -833,7 +857,7 @@ def autotest() -> bool:
                 "id": "test-15b",
                 "fichier": "technique",
                 "phase": "detail",
-                "titre": "Bloc B",
+                "titre": "Bloc B", "interlocuteur": "le responsable produit",
                 "type": "direct",
                 "critere": "1.1",
                 "question": "Q2"
@@ -846,6 +870,56 @@ def autotest() -> bool:
         print("✓ Test 15 : Detection critere couvert par plusieurs blocs")
     else:
         print(f"✗ Test 15 : Detection critere couvert par plusieurs blocs - ECHEC")
+
+    # Test 16 : Interlocuteur absent (doit echouer)
+    # Un bloc sans interlocuteur part sans dire a qui la question se pose.
+    tests_total += 1
+    blocs_sans_interlocuteur = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "test-16",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Bloc sans interlocuteur",
+                "type": "direct",
+                "critere": "1.1",
+                "question": "Q"
+            }
+        ]
+    }
+    v = Validateur(blocs_sans_interlocuteur, referentiel_test)
+    if not v.valider() and any("interlocuteur" in e and "manquante" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 16 : Detection interlocuteur absent")
+    else:
+        print(f"✗ Test 16 : Detection interlocuteur absent - ECHEC : {v.erreurs}")
+
+    # Test 17 : Interlocuteur hors vocabulaire ferme (doit echouer)
+    # Une formulation libre deriverait d'un bloc a l'autre et rendrait le
+    # questionnaire illisible a l'oral.
+    tests_total += 1
+    blocs_interlocuteur_libre = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "test-17",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Bloc interlocuteur libre",
+                "interlocuteur": "le CTO",
+                "type": "direct",
+                "critere": "1.1",
+                "question": "Q"
+            }
+        ]
+    }
+    v = Validateur(blocs_interlocuteur_libre, referentiel_test)
+    if not v.valider() and any("interlocuteur invalide" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 17 : Detection interlocuteur hors vocabulaire")
+    else:
+        print(f"✗ Test 17 : Detection interlocuteur hors vocabulaire - ECHEC : {v.erreurs}")
 
     print(f"\n{tests_reussis}/{tests_total} tests reussis")
     print("---------------------\n")
