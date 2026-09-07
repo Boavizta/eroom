@@ -352,9 +352,14 @@
       "vague": "4-questionnaire",
       "libelle": "Emission des deux fichiers a cocher, sur le residu reel",
       "executeur": "script",
-      "etat": "a_ecrire",
+      "etat": "partiellement_a_ecrire",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/generate_questionnaire.py",
+        ".claude/skills/analyse-parcours/scripts/questionnaire-blocs.json",
+        ".claude/skills/analyse-parcours/scripts/valider_blocs_questionnaire.py"
+      ],
       "scripts_a_ecrire": [
-        "un generateur qui lit les resultats fusionnes, retient les criteres sans verdict, les trie par potentiel_max et selon la sequence de la porte, puis emet deux fichiers a cocher : un produit et usage, un technique"
+        "la bibliotheque de blocs ne couvre pour l'instant que la porte : les 16 questions du diagnostic rapide et les 10 criteres de la dimension 6, plus deux blocs composes. Les blocs des dimensions 1 a 5 restent a ajouter, et c'est de la donnee pure : aucun changement de code, le validateur les controle deja contre le referentiel"
       ],
       "depends_on": [
         "jugement-dimension-1",
@@ -380,10 +385,8 @@
       "vague": "4-questionnaire",
       "libelle": "Lecture des reponses cochees",
       "executeur": "script",
-      "etat": "a_ecrire",
-      "scripts_a_ecrire": [
-        "un analyseur qui lit les fichiers coches, verifie qu'un bloc porte une seule case cochee, signale les blocs vides, et emet un fichier de sortie de lot"
-      ],
+      "etat": "existant",
+      "scripts": [".claude/skills/analyse-parcours/scripts/parse_questionnaire.py"],
       "depends_on": ["generation-questionnaire"],
       "entrees": [
         "audits/<domaine>/questionnaire-produit-usage.md",

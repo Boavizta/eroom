@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "blocs": [
+    {
+      "id": "porte-diag-0.1",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Impact d'une indisponibilité",
+      "type": "direct",
+      "critere": "0.1",
+      "question": "Quel serait l'impact de la disparition de ce service numérique ?",
+      "aide": "Pensez aux conséquences concrètes pour vos utilisateurs et vos opérations."
+    },
+    {
+      "id": "porte-diag-0.2",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Redondance fonctionnelle",
+      "type": "direct",
+      "critere": "0.2",
+      "question": "Existe-t-il ailleurs dans votre organisation des fonctionnalités similaires ou du code comparable ?",
+      "aide": "Il s'agit d'identifier les doublons ou chevauchements avec d'autres services."
+    },
+    {
+      "id": "porte-diag-0.3",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Contraintes de disponibilité",
+      "type": "direct",
+      "critere": "0.3",
+      "question": "Quelles sont les contraintes de disponibilité de vos composants principaux ?",
+      "aide": "SLA, SLO, plan de reprise d'activité, horaires de fonctionnement garantis."
+    },
+    {
+      "id": "porte-diag-0.4",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Dépendances techniques",
+      "type": "direct",
+      "critere": "0.4",
+      "question": "Combien d'autres systèmes sont reliés techniquement à ce service ?",
+      "aide": "API, bases de données partagées, services d'authentification, etc."
+    },
+    {
+      "id": "porte-diag-0.5",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Accès au code source",
+      "type": "direct",
+      "critere": "0.5",
+      "question": "Disposez-vous du code source de ce service ?",
+      "aide": "Code open source, code interne accessible, ou solution propriétaire fermée."
+    },
+    {
+      "id": "porte-diag-0.6",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Compétences disponibles",
+      "type": "direct",
+      "critere": "0.6",
+      "question": "Votre équipe maîtrise-t-elle la conception fonctionnelle et technique de ce service ?",
+      "aide": "Capacité à modifier le service en toute confiance."
+    },
+    {
+      "id": "porte-diag-0.7",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Complexité de l'architecture",
+      "type": "direct",
+      "critere": "0.7",
+      "question": "Comment évaluez-vous la complexité de l'architecture de ce service ?",
+      "aide": "Nombre de composants, interactions, technologies hétérogènes."
+    },
+    {
+      "id": "porte-diag-0.8",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Taille de l'infrastructure",
+      "type": "direct",
+      "critere": "0.8",
+      "question": "Quelle est la taille de l'infrastructure de ce service par rapport à vos autres services ?",
+      "aide": "Nombre et taille des machines virtuelles, conteneurs, services hébergés."
+    },
+    {
+      "id": "porte-diag-0.9",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Volume de données stockées",
+      "type": "direct",
+      "critere": "0.9",
+      "question": "Quel volume de données ce service stocke-t-il par rapport à vos autres services ?",
+      "aide": "Bases de données, fichiers, archives, sauvegardes."
+    },
+    {
+      "id": "porte-diag-0.10",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Complexité fonctionnelle",
+      "type": "direct",
+      "critere": "0.10",
+      "question": "Comment évaluez-vous la complexité fonctionnelle de ce service ?",
+      "aide": "Nombre de fonctionnalités, règles métier, cas d'usage."
+    },
+    {
+      "id": "porte-diag-0.11",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Qualité de l'expérience utilisateur",
+      "type": "direct",
+      "critere": "0.11",
+      "question": "Les parcours utilisateurs sont-ils fluides et intuitifs ?",
+      "aide": "Retours utilisateurs, points de friction identifiés, éléments en attente d'amélioration UX/UI."
+    },
+    {
+      "id": "porte-diag-0.12",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Compatibilité avec les appareils anciens",
+      "type": "direct",
+      "critere": "0.12",
+      "question": "Ce service fonctionne-t-il correctement sur les appareils les plus anciens de votre flotte cible ?",
+      "aide": "Expérience fluide, ralentissements, incompatibilités."
+    },
+    {
+      "id": "porte-diag-0.13",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Problèmes de performance au backlog",
+      "type": "direct",
+      "critere": "0.13",
+      "question": "Votre backlog contient-il des problèmes de performance ou des améliorations d'efficacité ?",
+      "aide": "Tickets ouverts, discussions récurrentes, besoins d'optimisation identifiés."
+    },
+    {
+      "id": "porte-diag-0.14",
+      "fichier": "produit-usage",
+      "phase": "porte",
+      "titre": "Efficacité des fonctionnalités principales",
+      "type": "direct",
+      "critere": "0.14",
+      "question": "Les fonctionnalités principales de ce service sont-elles optimisées et efficaces ?",
+      "aide": "Fonctionnalités bien implémentées, performantes, sans redondance."
+    },
+    {
+      "id": "porte-diag-0.15",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Politique de suppression et d'archivage",
+      "type": "direct",
+      "critere": "0.15",
+      "question": "Disposez-vous d'une politique de suppression et d'archivage des données ?",
+      "aide": "Règles formalisées, automatisation, contrôles réguliers."
+    },
+    {
+      "id": "porte-diag-0.16",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Intensité carbone du mix électrique",
+      "type": "direct",
+      "critere": "0.16",
+      "question": "Dans quel pays votre service est-il hébergé ?",
+      "aide": "Cette question est normalement répondue automatiquement par un script d'analyse, mais vous pouvez la renseigner manuellement si nécessaire.",
+      "note": "Cette question est automatiquement remplie par un script qui détermine l'intensité carbone du mix électrique du pays d'hébergement. Elle est incluse ici pour complétude mais devrait être filtrée lors de la génération du questionnaire si déjà renseignée."
+    },
+    {
+      "id": "porte-dim6-6.1",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Observabilité du produit",
+      "type": "direct",
+      "critere": "6.1",
+      "question": "Des outils d'observabilité sont-ils en place pour suivre le comportement de ce service en production ?",
+      "aide": "Métriques, logs, traces, alertes, tableaux de bord."
+    },
+    {
+      "id": "porte-dim6-6.2",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Revues de code et pair programming",
+      "type": "direct",
+      "critere": "6.2",
+      "question": "Pratiquez-vous des revues de code ou de la programmation en binôme sur ce projet ?",
+      "aide": "Processus en place, fréquence, couverture du code."
+    },
+    {
+      "id": "porte-dim6-6.3",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Intégration et déploiement continus",
+      "type": "direct",
+      "critere": "6.3",
+      "question": "Disposez-vous d'un processus CI/CD efficace pour ce projet ?",
+      "aide": "Construction automatique, tests automatisés, déploiements réguliers."
+    },
+    {
+      "id": "porte-dim6-6.4",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Tests de non-régression",
+      "type": "direct",
+      "critere": "6.4",
+      "question": "Votre projet dispose-t-il de tests de non-régression automatisés ?",
+      "aide": "Tests unitaires, tests d'intégration, tests end-to-end couvrant les parties importantes du code."
+    },
+    {
+      "id": "porte-dim6-6.5",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Découplage domaine métier et technique",
+      "type": "direct",
+      "critere": "6.5",
+      "question": "Votre code sépare-t-il clairement le domaine métier de l'intégration technique ?",
+      "aide": "Injection de dépendances, architecture hexagonale, possibilité de changer les aspects techniques sans toucher au code fonctionnel."
+    },
+    {
+      "id": "porte-dim6-6.6",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Indicateurs de qualité logicielle",
+      "type": "direct",
+      "critere": "6.6",
+      "question": "Des indicateurs permettent-ils de suivre la qualité de votre logiciel ?",
+      "aide": "Couverture de code, complexité, nombre de bugs, délai de modification, fréquence de déploiement."
+    },
+    {
+      "id": "porte-dim6-6.7",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Documentation du projet",
+      "type": "direct",
+      "critere": "6.7",
+      "question": "Votre projet dispose-t-il d'une documentation complète et à jour ?",
+      "aide": "Architecture, guides de développement, documentation API, explications des choix techniques."
+    },
+    {
+      "id": "porte-dim6-6.8",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Code dupliqué",
+      "type": "direct",
+      "critere": "6.8",
+      "question": "Votre code contient-il des duplications injustifiées ?",
+      "aide": "Code copié-collé, logique répétée sans factorisation."
+    },
+    {
+      "id": "porte-dim6-6.9",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Autonomie pour les outils d'optimisation",
+      "type": "direct",
+      "critere": "6.9",
+      "question": "Votre équipe peut-elle déployer les outils dont elle a besoin pour observer, mesurer et optimiser le système ?",
+      "aide": "Outils personnalisés ou intégrés à la plateforme, accès aux données de performance."
+    },
+    {
+      "id": "porte-dim6-6.10",
+      "fichier": "technique",
+      "phase": "porte",
+      "titre": "Contraintes de haute disponibilité",
+      "type": "direct",
+      "critere": "6.10",
+      "question": "Les contraintes de disponibilité de ce service permettent-elles de le modifier et de l'optimiser sans difficulté majeure ?",
+      "aide": "Fenêtres de maintenance possibles, possibilité de faire évoluer l'architecture."
+    },
+    {
+      "id": "detail-compose-parcours-ecrans",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Optimisation des parcours et écrans principaux",
+      "type": "compose",
+      "question": "Comment sont conçus vos parcours utilisateurs et écrans principaux ?",
+      "aide": "Pensez aux flux les plus fréquents et aux écrans les plus visités.",
+      "options": [
+        {
+          "libelle": "Parcours courts avec peu d'étapes ET écrans légers avec informations essentielles uniquement",
+          "reponses": {
+            "1.13": "✅ Point fort confirmé",
+            "1.14": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Parcours courts avec peu d'étapes MAIS écrans chargés (beaucoup de contenu, médias lourds)",
+          "reponses": {
+            "1.13": "✅ Point fort confirmé",
+            "1.14": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Parcours longs ou redondants MAIS écrans légers",
+          "reponses": {
+            "1.13": "💡 Potentiel d'amélioration identifié",
+            "1.14": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Parcours longs ou redondants ET écrans chargés",
+          "reponses": {
+            "1.13": "💡 Potentiel d'amélioration identifié",
+            "1.14": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Je ne sais pas ou cela n'a pas été évalué",
+          "reponses": {
+            "1.13": "🤔 À évaluer",
+            "1.14": "🤔 À évaluer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "detail-compose-environnements-test",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Dimensionnement des environnements de test",
+      "type": "compose",
+      "question": "Comment dimensionnez-vous vos environnements de test par rapport à la production ?",
+      "aide": "Infrastructure (nombre et taille des composants) et bases de données.",
+      "options": [
+        {
+          "libelle": "Infrastructure réduite ET bases de données réduites",
+          "reponses": {
+            "3.9": "✅ Point fort confirmé",
+            "4.4": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Infrastructure réduite MAIS bases de données aussi volumineuses qu'en production",
+          "reponses": {
+            "3.9": "✅ Point fort confirmé",
+            "4.4": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Infrastructure identique à la production MAIS bases de données réduites",
+          "reponses": {
+            "3.9": "💡 Potentiel d'amélioration identifié",
+            "4.4": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Infrastructure ET bases de données identiques à la production",
+          "reponses": {
+            "3.9": "💡 Potentiel d'amélioration identifié",
+            "4.4": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Je ne sais pas",
+          "reponses": {
+            "3.9": "🤔 À évaluer",
+            "4.4": "🤔 À évaluer"
+          }
+        },
+        {
+          "libelle": "Nous n'avons pas d'environnements de test",
+          "reponses": {
+            "3.9": "🚫 Non applicable",
+            "4.4": "🚫 Non applicable"
+          }
+        }
+      ]
+    }
+  ]
+}
