@@ -4,7 +4,7 @@ site audité, à partir UNIQUEMENT de `eof-referentiel.json` (produit par le
 skill `eof`) et des données déjà collectées par `analyse-parcours`
 (`env-data.json`, `audit/har-analysis.json`, `audit/coverage-analysis.json`,
 `cwv.json`, `security-headers-analysis.json`, `wellknown-scan.json`,
-`html-css-criteria.json`). Ne lit JAMAIS la Google Sheet ni le Markdown
+`html-css-criteria.json`, `pages-publiques-criteria.json`). Ne lit JAMAIS la Google Sheet ni le Markdown
 humain — c'est le découplage voulu entre "synchroniser le référentiel" et
 "auditer un site" (cf. plan d'architecture, `tmp/handoff.md`).
 
@@ -36,6 +36,10 @@ Usage :
     eof-audit-results.json  - résumé léger, consommé par generate_report_html.py
     eof-rempli.md           - référentiel complet lisible, réponses + provenance + source
     eof-radar-<domaine>.svg - radar des 6 dimensions (valeurs None = "N/A", jamais un faux 0%)
+    lots/jugement-automatique.json - la sortie de lot que processus/manifeste-lots.json
+        déclare, consommée par processus/fusionner_lots.py et contrôlée par
+        processus/valider_sortie_lot.py. N'y figurent que les critères sur lesquels ce lot
+        s'est prononcé, jamais les critères sans donnée.
 """
 import argparse
 import json
@@ -78,22 +82,31 @@ def find_first(*candidates):
 def load_audit_data(source_dir):
     """Charge les données d'audit. COÛT : parse le .har entier (fichier lourd)
     pour deploy_freshness, alors qu'aujourd'hui seuls les résumés JSON étaient lus.
+
+    Retient au passage le chemin des fichiers RÉELLEMENT trouvés, sous la clé
+    `fichiers_charges`. C'est ce qui alimente le champ `entrees` du fichier de lot :
+    il doit dire ce qui a été lu, pas ce qui aurait pu l'être. Chemins relatifs à
+    source_dir, pour rester justes quand l'audit est rejoué depuis un autre dossier.
+    L'ordre des candidats par clé est celui d'avant, il porte la priorité de recherche.
     """
     audit_dir = source_dir / "audit"
-    env = load_json(find_first(source_dir / "env-data.json", audit_dir / "env-data.json"))
-    har = load_json(find_first(audit_dir / "har-analysis.json", source_dir / "har-analysis.json"))
-    coverage = load_json(find_first(audit_dir / "coverage-analysis.json", source_dir / "coverage-analysis.json"))
-    cwv = load_json(find_first(source_dir / "cwv.json", audit_dir / "cwv.json"))
-    headers = load_json(find_first(source_dir / "security-headers-analysis.json", audit_dir / "security-headers-analysis.json"))
-    wellknown = load_json(find_first(source_dir / "wellknown-scan.json", audit_dir / "wellknown-scan.json"))
-    htmlcss = load_json(find_first(source_dir / "html-css-criteria.json", audit_dir / "html-css-criteria.json"))
-    pages_publiques = load_json(find_first(source_dir / "pages-publiques-criteria.json", audit_dir / "pages-publiques-criteria.json"))
-    return {
-        "env": env, "har": har, "coverage": coverage, "cwv": cwv,
-        "headers": headers, "wellknown": wellknown, "htmlcss": htmlcss,
-        "pages_publiques": pages_publiques,
-        "source_dir": source_dir,  # exposé pour deploy_freshness (nécessite le chemin du .har, pas le JSON)
+    candidats = {
+        "env": (source_dir / "env-data.json", audit_dir / "env-data.json"),
+        "har": (audit_dir / "har-analysis.json", source_dir / "har-analysis.json"),
+        "coverage": (audit_dir / "coverage-analysis.json", source_dir / "coverage-analysis.json"),
+        "cwv": (source_dir / "cwv.json", audit_dir / "cwv.json"),
+        "headers": (source_dir / "security-headers-analysis.json", audit_dir / "security-headers-analysis.json"),
+        "wellknown": (source_dir / "wellknown-scan.json", audit_dir / "wellknown-scan.json"),
+        "htmlcss": (source_dir / "html-css-criteria.json", audit_dir / "html-css-criteria.json"),
+        "pages_publiques": (source_dir / "pages-publiques-criteria.json", audit_dir / "pages-publiques-criteria.json"),
     }
+    trouves = {cle: find_first(*chemins) for cle, chemins in candidats.items()}
+    data = {cle: load_json(chemin) for cle, chemin in trouves.items()}
+    data["fichiers_charges"] = [
+        str(chemin.relative_to(source_dir)) for chemin in trouves.values() if chemin is not None
+    ]
+    data["source_dir"] = source_dir  # exposé pour deploy_freshness (nécessite le chemin du .har, pas le JSON)
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -649,6 +662,71 @@ def build_diag_rapide_apercu(referentiel, data):
     return questions
 
 
+# ---------------------------------------------------------------------------
+# Sortie de lot, consommée par processus/fusionner_lots.py
+# ---------------------------------------------------------------------------
+
+LOT_ID = "jugement-automatique"
+
+# Les champs que la couche processus refuse dans un fichier de lot : ils viennent du
+# référentiel et c'est la fusion qui les rajoute. Cf. FORBIDDEN_FIELDS dans
+# processus/valider_sortie_lot.py. Le lot ne dit QUE ce qu'il a jugé.
+CHAMPS_DU_LOT = ("reponse", "coefficient", "provenance", "source", "contexte")
+
+
+def _entree_de_lot(critere_id, categorie, valeurs):
+    """Une entrée de lot : `id` et `categorie` toujours, le reste seulement s'il vaut
+    quelque chose. Omettre plutôt que poser `null` évite d'écrire un `coefficient: null`
+    à côté d'une réponse là où le contrat en exige un non nul, et se relit mieux.
+    """
+    entree = {"id": critere_id, "categorie": categorie}
+    for cle in CHAMPS_DU_LOT:
+        if valeurs.get(cle) is not None:
+            entree[cle] = valeurs[cle]
+    return entree
+
+
+def build_sortie_lot(results, diag_questions, fichiers_charges, genere_le):
+    """Construit ce que ce lot a à dire, au format que processus/valider_sortie_lot.py
+    fait respecter : racine à exactement 4 clés, rejet strict de toute autre.
+
+    Ne verse QUE les critères sur lesquels le lot s'est prononcé, c'est-à-dire ceux qui
+    portent une réponse ou un contexte. Un critère sans donnée n'est pas une information :
+    le taire évite de faire passer 31 silences pour un travail.
+
+    Les questions du diagnostic rapide (préfixe `0.`) ne sont versées que si elles sont au
+    MAPPING, donc aujourd'hui la seule 0.16. C'est une question de propriété : l'indice
+    contextuel de 0.4 appartient au lot `jugement-diagnostic-rapide`, et il n'a de toute
+    façon ni provenance ni source, que le contrat exigerait dès qu'un contexte est posé.
+    """
+    criteres = []
+    for r in results:
+        if r["reponse"] is None and not r["contexte"]:
+            continue
+        criteres.append(_entree_de_lot(r["id"], r["categorie"], r))
+    for q in diag_questions:
+        entry = MAPPING.get(q["id"])
+        if not entry:
+            continue
+        if q["reponse"] is None and not q["indice_contextuel"]:
+            continue
+        criteres.append(_entree_de_lot(q["id"], entry["categorie"], {
+            "reponse": q["reponse"],
+            # Jamais de coefficient sur le diagnostic rapide : le référentiel n'en définit
+            # pas pour ses crans, et le validateur le refuse. Ce n'est pas un oubli.
+            "coefficient": None,
+            "provenance": q["provenance"],
+            "source": q["source"],
+            "contexte": q["indice_contextuel"],
+        }))
+    return {
+        "lot_id": LOT_ID,
+        "genere_le": genere_le,
+        "entrees": fichiers_charges,
+        "criteres": criteres,
+    }
+
+
 def compute_dimension_scores(criteres_results):
     by_dim = {}
     for c in criteres_results:
@@ -664,7 +742,11 @@ def compute_dimension_scores(criteres_results):
             potentiel_optimisation_pct = None
         completude_pct = len(answered) / len(items) * 100 if items else 0
         # Comptage par provenance
-        repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+        # Les 5 provenances de conventions.precedence_provenance, dans l'ordre. `suppose` y
+        # figure depuis le 2026-09-07 : sans elle, le test `if prov in ...` juste en dessous
+        # jetterait sans un mot une réponse posée en `suppose`. Un compteur à zéro est un
+        # renseignement, une réponse perdue n'en est pas un.
+        repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
         for c in answered:
             prov = c.get("provenance")
             if prov in repondus_par_provenance:
@@ -762,8 +844,9 @@ def main():
         if total_potentiel_max_global else None
     )
     completude_globale_pct = len(all_answered) / len(results) * 100 if results else 0
-    # Comptage par provenance global
-    repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0}
+    # Comptage par provenance global — mêmes 5 provenances qu'en compute_dimension_scores(),
+    # `suppose` comprise, sinon une réponse posée en `suppose` disparaîtrait du décompte.
+    repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
     for r in all_answered:
         prov = r.get("provenance")
         if prov in repondus_par_provenance:
@@ -779,8 +862,12 @@ def main():
     radar_path = source_dir / f"eof-radar-{domaine}.svg"
     radar_path.write_text(svg_text, encoding="utf-8")
 
+    # Un seul horodatage pour les deux artefacts : le fichier de lot et le résumé d'audit
+    # sortent du même passage, deux instants différents laisseraient croire le contraire.
+    genere_le = datetime.now(timezone.utc).isoformat()
+
     audit_results = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": genere_le,
         "domaine": domaine,
         "criteres_total": len(referentiel["criteres"]),
         "criteres_repondus": len(all_answered),
@@ -807,9 +894,16 @@ def main():
     md_path = source_dir / "eof-rempli.md"
     md_path.write_text(md_text, encoding="utf-8")
 
+    sortie_lot = build_sortie_lot(results, diag_rapide_apercu, data["fichiers_charges"], genere_le)
+    lot_dir = source_dir / "lots"
+    lot_dir.mkdir(parents=True, exist_ok=True)
+    lot_path = lot_dir / f"{LOT_ID}.json"
+    lot_path.write_text(json.dumps(sortie_lot, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print(f"eof-audit-results.json écrit : {results_path}")
     print(f"eof-rempli.md écrit : {md_path}")
     print(f"eof-radar-{domaine}.svg écrit : {radar_path}")
+    print(f"lots/{LOT_ID}.json écrit : {lot_path} ({len(sortie_lot['criteres'])} critères)")
     # Le potentiel est rapporté à TOUS les critères, pas aux seuls répondus : sans la
     # complétude affichée juste à côté, un chiffre bas se lit comme un service mature
     # alors qu'il ne dit que "nous n'avons presque rien regardé".

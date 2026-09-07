@@ -1,0 +1,191 @@
+{
+  "lot_id": "jugement-automatique",
+  "genere_le": "2026-09-07T14:41:02.240627+00:00",
+  "entrees": [
+    "env-data.json",
+    "audit/har-analysis.json",
+    "audit/coverage-analysis.json",
+    "cwv.json",
+    "security-headers-analysis.json",
+    "wellknown-scan.json",
+    "html-css-criteria.json",
+    "pages-publiques-criteria.json"
+  ],
+  "criteres": [
+    {
+      "id": "1.4",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
+      "contexte": "Boutons natifs <button> : 14 ; boutons personnalisés (role=\"button\") : 0 (toutes pages confondues)"
+    },
+    {
+      "id": "1.5",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
+    },
+    {
+      "id": "1.6",
+      "categorie": "automatisable",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "estime",
+      "source": "html-css-criteria.json: adaptive_img_ratio par page = [0.66, 0.27, 0.0, 0.27, 0.27, 0.71] ; media_query_count = 228 (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)"
+    },
+    {
+      "id": "1.9",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
+      "contexte": "Poids réel transféré (page repère) : 702 Ko"
+    },
+    {
+      "id": "1.11",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
+      "contexte": "Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé"
+    },
+    {
+      "id": "1.12",
+      "categorie": "automatisable",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "estime",
+      "source": "security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement"
+    },
+    {
+      "id": "1.13",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]"
+    },
+    {
+      "id": "1.14",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
+      "contexte": "Page la plus lourde : https://octo.com/publications (1003 Ko) ; la plus légère : https://octo.com/recrutement/nos-offres (0 Ko)"
+    },
+    {
+      "id": "1.15",
+      "categorie": "partiel",
+      "provenance": "estime",
+      "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
+      "contexte": "Trafic estimé : 281,000 visites/an (SimilarWeb (estimation))"
+    },
+    {
+      "id": "1.16",
+      "categorie": "partiel",
+      "provenance": "estime",
+      "source": "env-data.json: traffic.visits_per_year",
+      "contexte": "Trafic estimé : 281,000 visites/an (SimilarWeb (estimation))"
+    },
+    {
+      "id": "2.1",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "estime",
+      "source": "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée"
+    },
+    {
+      "id": "2.3",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+      "contexte": "Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication"
+    },
+    {
+      "id": "2.5",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
+      "contexte": "https://api.analytics.octo.tools/log/hb ×54; https://api.analytics.octo.tools/log/ ×18; https://octo.com/style.css?v=2026-6-10-1-1 ×11"
+    },
+    {
+      "id": "3.2",
+      "categorie": "partiel",
+      "provenance": "declare",
+      "source": "pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)",
+      "contexte": "Déclaration sur eco-conception.html : \"Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement.\""
+    },
+    {
+      "id": "3.3",
+      "categorie": "automatisable",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "collecte",
+      "source": "env-data.json: servers[] = octo.com (DE, 381 gCO2/kWh) (seuil 250 gCO2/kWh dépassé)"
+    },
+    {
+      "id": "3.5",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
+      "contexte": "Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com..."
+    },
+    {
+      "id": "3.7",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
+      "contexte": "Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier"
+    },
+    {
+      "id": "5.4",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "cwv.json: toutes les pages sous les seuils CWV 'good'"
+    },
+    {
+      "id": "5.5",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
+      "contexte": "https://octo.com/ : JS inutilisé 79.02%; https://octo.com/recrutement : JS inutilisé 71.68%"
+    },
+    {
+      "id": "6.1",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
+      "contexte": "Score en-têtes sécurité (proxy indirect de maturité prod) : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn"
+    },
+    {
+      "id": "6.3",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
+      "contexte": "ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build"
+    },
+    {
+      "id": "6.6",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
+      "contexte": "Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent"
+    },
+    {
+      "id": "6.8",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
+      "contexte": "Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente"
+    },
+    {
+      "id": "0.16",
+      "categorie": "automatisable",
+      "reponse": "2- < 500 gCO2e / kWh",
+      "provenance": "collecte",
+      "source": "env-data.json: servers[].carbon_intensity_g_kwh = 381 gCO2e/kWh (doublon de 3.3, même donnée)"
+    }
+  ]
+}

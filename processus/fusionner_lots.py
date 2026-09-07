@@ -257,12 +257,17 @@ def merge_entries(entries_by_id, precedence_list, ref_criteres, ref_diagnostic, 
         # Prendre la première entrée de la provenance la plus haute
         base = entries_highest[0].copy()
 
-        # Vérifier que la réponse existe dans options_evaluation du référentiel
-        options_evaluation = ref.get("options_evaluation", [])
-        if base["reponse"] not in options_evaluation:
+        # Vérifier que la réponse appartient au vocabulaire du référentiel. Les deux
+        # vocabulaires n'ont pas le même nom de champ : les 54 critères détaillés ont des
+        # `options_evaluation`, les 16 questions du diagnostic rapide ont des `crans`
+        # (échelle 1 à 5). Ne lire que le premier rendait la liste vide pour une question du
+        # diagnostic, donc refusait TOUTE réponse posée dessus, 0.16 en tête.
+        # valider_sortie_lot.py distingue déjà les deux : c'est ici que l'écart existait.
+        options_valides = ref.get("options_evaluation") or ref.get("crans") or []
+        if base["reponse"] not in options_valides:
             errors.append(
-                f"Critère {cid} : réponse '{base['reponse']}' absente de options_evaluation "
-                f"du référentiel (options valides : {options_evaluation})"
+                f"Critère {cid} : réponse '{base['reponse']}' absente du vocabulaire du "
+                f"référentiel (valeurs valides : {options_valides})"
             )
             continue
 
@@ -462,8 +467,14 @@ def compute_metrics(criteres, ref_criteres):
         repondus = stats["repondus"]
         total_criteres = dimension_counts[name] - stats["sans_objet_count"]
 
-        # Potentiel d'optimisation : dénominateur = TOUS les critères de la dimension, hors sans_objet
-        if potentiel_total > 0:
+        # Potentiel d'optimisation : dénominateur = TOUS les critères de la dimension, hors sans_objet.
+        # ⚠️ Un axe où RIEN n'a été répondu vaut None, jamais 0.0. Le dénominateur est toujours
+        # non nul, donc ne tester que lui posait 0 % sur les dimensions vides : sur le radar, un
+        # 0 % se lit comme un service exemplaire alors qu'il ne dit que "personne n'a regardé".
+        # C'est la règle de compute_dimension_scores() de run_eof.py, dont ce calcul est le jumeau
+        # (cf. l'invariant des deux producteurs) ; l'écart n'était visible qu'une fois un vrai
+        # fichier de lot fusionné, ce qui n'était jamais arrivé avant le 2026-09-07.
+        if repondus > 0 and potentiel_total > 0:
             potentiel_optimisation_pct = (potentiel_retenu / potentiel_total) * 100
         else:
             potentiel_optimisation_pct = None
