@@ -360,6 +360,406 @@
           }
         }
       ]
+    },
+    {
+      "id": "detail-dim1-1.1",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Valeur ajoutée du numérique",
+      "type": "direct",
+      "critere": "1.1",
+      "question": "Avez-vous identifié une solution non numérique et démontré que votre version numérique apporte une valeur ajoutée claire ?",
+      "aide": "Pensez aux gains de temps, d'accessibilité ou de réduction d'impact matériel par rapport à l'alternative existante."
+    },
+    {
+      "id": "detail-dim1-1.2",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Connaissance des utilisateurs",
+      "type": "direct",
+      "critere": "1.2",
+      "question": "Documentez-vous les besoins, contextes d'usage et appareils de vos utilisateurs cibles ?",
+      "aide": "Personas, entretiens, analyses d'utilisation, ou liste des appareils couramment utilisés."
+    },
+    {
+      "id": "detail-dim1-1.3",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Impact des mises à jour",
+      "type": "direct",
+      "critere": "1.3",
+      "question": "Les mises à jour de fonctionnalités préservent-elles les performances sur les appareils anciens ou modestes ?",
+      "aide": "Tests de performance, modes allégés ou optionnels proposés aux utilisateurs."
+    },
+    {
+      "id": "detail-dim1-1.4",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Composants natifs vs personnalisés",
+      "type": "direct",
+      "critere": "1.4",
+      "question": "Privilégiez-vous les composants natifs, ou justifiez-vous l'usage de composants personnalisés ?",
+      "aide": "Boutons, menus, formulaires système vs composants créés sur mesure."
+    },
+    {
+      "id": "detail-dim1-1.5",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Lecture automatique de médias",
+      "type": "direct",
+      "critere": "1.5",
+      "question": "Vos animations, vidéos, sons ou cartes sont-ils lancés uniquement par action de l'utilisateur ?",
+      "aide": "Aucune lecture automatique, ou lecture strictement nécessaire, optimisée et contrôlable."
+    },
+    {
+      "id": "detail-dim1-1.6",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Adaptation au matériel",
+      "type": "direct",
+      "critere": "1.6",
+      "question": "Votre application détecte-t-elle les configurations limitées et adapte-t-elle son comportement ?",
+      "aide": "Qualité réduite, rendu simplifié, processus lourds désactivés sur matériel modeste."
+    },
+    {
+      "id": "detail-dim1-1.7",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Utilité des fonctionnalités",
+      "type": "direct",
+      "critere": "1.7",
+      "question": "Chaque fonctionnalité de votre service est-elle réellement utilisée et apporte-t-elle de la valeur ?",
+      "aide": "Analyses d'usage, commentaires utilisateurs, suppression des fonctionnalités redondantes ou inutilisées."
+    },
+    {
+      "id": "detail-dim1-1.8",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Compatibilité avec appareils anciens",
+      "type": "direct",
+      "critere": "1.8",
+      "question": "Votre service fonctionne-t-il correctement sur les appareils les plus anciens de votre cible ?",
+      "aide": "Pas de mises à niveau forcées, pas de dégradation de performance accélérant l'obsolescence."
+    },
+    {
+      "id": "detail-dim1-1.9",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Compatibilité basse bande passante",
+      "type": "direct",
+      "critere": "1.9",
+      "question": "Votre application reste-t-elle utilisable sur une connexion à faible bande passante ?",
+      "aide": "Optimisation des requêtes, fichiers multimédias réduits, mise en cache, mode allégé."
+    },
+    {
+      "id": "detail-dim1-1.10",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Absence de dark patterns",
+      "type": "direct",
+      "critere": "1.10",
+      "question": "Votre conception évite-t-elle les pratiques manipulatrices qui augmentent artificiellement l'utilisation ?",
+      "aide": "Défilement infini, lecture automatique forcée, désabonnement caché, cases pré-cochées."
+    },
+    {
+      "id": "detail-dim1-1.11",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Valeurs par défaut sobres",
+      "type": "direct",
+      "critere": "1.11",
+      "question": "Vos valeurs par défaut sont-elles sobres et les utilisateurs peuvent-ils facilement les ajuster ?",
+      "aide": "Nombre d'éléments affichés, qualité des médias, fréquence de rafraîchissement."
+    },
+    {
+      "id": "detail-dim1-1.12",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Limitation du tracking",
+      "type": "direct",
+      "critere": "1.12",
+      "question": "Limitez-vous strictement le nombre de traceurs et d'outils de suivi au nécessaire ?",
+      "aide": "Chaque traceur doit être justifié, les outils redondants ou inutiles supprimés."
+    },
+    {
+      "id": "detail-dim1-1.15",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Fréquence d'utilisation",
+      "type": "direct",
+      "critere": "1.15",
+      "question": "Ce service présente-t-il une utilisation régulière et significative ?",
+      "aide": "Fréquence d'usage en adéquation avec l'empreinte en ressources du service."
+    },
+    {
+      "id": "detail-dim1-1.16",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Volume d'utilisateurs",
+      "type": "direct",
+      "critere": "1.16",
+      "question": "Le volume d'utilisateurs actifs justifie-t-il l'architecture et les ressources allouées ?",
+      "aide": "Nombre d'utilisateurs en rapport avec la taille de l'infrastructure."
+    },
+    {
+      "id": "detail-dim2-2.1",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Technologies gourmandes en ressources",
+      "type": "direct",
+      "critere": "2.1",
+      "question": "Utilisez-vous des technologies particulièrement gourmandes en ressources ?",
+      "aide": "IA générative, blockchain, ou autres technologies connues pour leur consommation élevée."
+    },
+    {
+      "id": "detail-dim2-2.2",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Stratégie de compatibilité",
+      "type": "direct",
+      "critere": "2.2",
+      "question": "Avez-vous défini une stratégie de compatibilité avec les appareils de vos utilisateurs ?",
+      "aide": "Liste des appareils ciblés, tests de compatibilité, support des appareils anciens."
+    },
+    {
+      "id": "detail-dim2-2.3",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Communication entre composants",
+      "type": "direct",
+      "critere": "2.3",
+      "question": "La séparation et la communication entre vos composants sont-elles optimisées ?",
+      "aide": "Couplage faible, absence de dépendances excessives, communication efficace sans ralentissement."
+    },
+    {
+      "id": "detail-dim2-2.4",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Lissage des pics de charge",
+      "type": "direct",
+      "critere": "2.4",
+      "question": "Pouvez-vous lisser vos pics de charge en différant certaines tâches ?",
+      "aide": "Traitement par lots, files de messages, tâches asynchrones pour répartir la charge dans le temps."
+    },
+    {
+      "id": "detail-dim2-2.5",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Mise en cache",
+      "type": "direct",
+      "critere": "2.5",
+      "question": "Mettez-vous en cache les résultats de vos calculs et requêtes coûteux ?",
+      "aide": "Résultats réutilisés plusieurs fois, mise en cache pour éviter les recalculs."
+    },
+    {
+      "id": "detail-dim3-3.1",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Optimisation des coûts",
+      "type": "direct",
+      "critere": "3.1",
+      "question": "Avez-vous mis en place une stratégie pour optimiser vos coûts d'infrastructure ?",
+      "aide": "FinOps, GreenOps, identification des composants sous-utilisés, ajustement de la taille."
+    },
+    {
+      "id": "detail-dim3-3.2",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Suivi de l'impact environnemental",
+      "type": "direct",
+      "critere": "3.2",
+      "question": "Suivez-vous l'impact environnemental de votre infrastructure ?",
+      "aide": "Émissions de carbone, intensité carbone, indices PUE et WUE du datacenter."
+    },
+    {
+      "id": "detail-dim3-3.3",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Mix électrique de la région",
+      "type": "direct",
+      "critere": "3.3",
+      "question": "Avez-vous choisi votre région d'hébergement en fonction de l'impact du mix électrique local ?",
+      "aide": "Privilégier les régions à mix électrique décarboné (France, Norvège, Islande, etc.)."
+    },
+    {
+      "id": "detail-dim3-3.5",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Mutualisation de l'infrastructure",
+      "type": "direct",
+      "critere": "3.5",
+      "question": "Votre infrastructure est-elle mutualisée ?",
+      "aide": "VM, conteneurs, services gérés, plateformes *aaS qui partagent les ressources avec d'autres projets."
+    },
+    {
+      "id": "detail-dim3-3.6",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Dimensionnement des composants",
+      "type": "direct",
+      "critere": "3.6",
+      "question": "Vos composants d'infrastructure ont-ils une charge suffisante ?",
+      "aide": "Vérifier via l'observabilité que CPU et RAM sont utilisés à au moins 70%, sinon redimensionner."
+    },
+    {
+      "id": "detail-dim3-3.7",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Élasticité et auto-scaling",
+      "type": "direct",
+      "critere": "3.7",
+      "question": "Disposez-vous d'outils d'élasticité pour ajuster automatiquement votre infrastructure ?",
+      "aide": "Auto-scaling contrôlé, orchestrateurs, conteneurs, fonctions serverless pour adapter les ressources à la charge."
+    },
+    {
+      "id": "detail-dim3-3.8",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Extinction des environnements",
+      "type": "direct",
+      "critere": "3.8",
+      "question": "Éteignez-vous vos environnements non productifs hors des heures d'utilisation ?",
+      "aide": "Environnements de développement ou de test désactivés la nuit, le week-end, ou entre deux utilisations."
+    },
+    {
+      "id": "detail-dim4-4.1",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Suppression et archivage",
+      "type": "direct",
+      "critere": "4.1",
+      "question": "Disposez-vous de mécanismes automatiques pour supprimer ou archiver les données obsolètes ?",
+      "aide": "Règles de conservation formalisées, automatisation des suppressions et de l'archivage."
+    },
+    {
+      "id": "detail-dim4-4.2",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Optimisation des bases de données",
+      "type": "direct",
+      "critere": "4.2",
+      "question": "Appliquez-vous une stratégie pour optimiser les performances de vos bases de données ?",
+      "aide": "Indexation appropriée, modélisation des données, maintenance régulière."
+    },
+    {
+      "id": "detail-dim4-4.3",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Technologies de stockage adaptées",
+      "type": "direct",
+      "critere": "4.3",
+      "question": "Les technologies de stockage utilisées sont-elles bien adaptées à vos besoins réels ?",
+      "aide": "Choix entre relationnel, NoSQL orienté document, base en colonnes, bases spécialisées selon l'usage."
+    },
+    {
+      "id": "detail-dim4-4.5",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Duplication de données",
+      "type": "direct",
+      "critere": "4.5",
+      "question": "Avez-vous identifié des données dupliquées et déterminé si cette duplication est justifiée ?",
+      "aide": "Duplication pour haute disponibilité ou dénormalisation intentionnelle, par opposition à duplication accidentelle."
+    },
+    {
+      "id": "detail-dim4-4.6",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Stockage à froid",
+      "type": "direct",
+      "critere": "4.6",
+      "question": "Les données rarement consultées sont-elles transférées vers un stockage plus économe en énergie ?",
+      "aide": "Archivage des données anciennes sur un support plus lent mais moins énergivore."
+    },
+    {
+      "id": "detail-dim5-5.1",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Analyse statique du code",
+      "type": "direct",
+      "critere": "5.1",
+      "question": "Utilisez-vous des outils d'analyse statique qui ont révélé des pistes d'amélioration de l'efficacité ?",
+      "aide": "Outils d'analyse de code identifiant des problèmes de performance et d'efficacité."
+    },
+    {
+      "id": "detail-dim5-5.2",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Tests de charge et résistance",
+      "type": "direct",
+      "critere": "5.2",
+      "question": "Des tests de charge ou de résistance ont-ils mis en évidence des problèmes d'efficacité ?",
+      "aide": "Campagnes de tests sous charge ou en conditions extrêmes révélant des points faibles."
+    },
+    {
+      "id": "detail-dim5-5.3",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Backlog d'optimisations",
+      "type": "direct",
+      "critere": "5.3",
+      "question": "Votre backlog contient-il des tâches identifiées pour améliorer les performances ou l'efficacité ?",
+      "aide": "Tickets, issues ou éléments de backlog portant sur l'optimisation."
+    },
+    {
+      "id": "detail-dim5-5.4",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Indicateurs de performance",
+      "type": "direct",
+      "critere": "5.4",
+      "question": "Vos indicateurs de performance actuels correspondent-ils à l'ambition du projet ?",
+      "aide": "Latence, requêtes par seconde, Core Web Vitals, temps de réponse."
+    },
+    {
+      "id": "detail-dim5-5.5",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Optimisation des parcours critiques",
+      "type": "direct",
+      "critere": "5.5",
+      "question": "Les parcours utilisateurs les plus fréquents ont-ils fait l'objet d'une étude d'optimisation ?",
+      "aide": "Analyse et amélioration des chemins de code les plus empruntés."
+    },
+    {
+      "id": "detail-dim5-5.6",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Mise à jour de la pile technique",
+      "type": "direct",
+      "critere": "5.6",
+      "question": "Votre pile technique est-elle à jour, au moins sur les dernières versions LTS ?",
+      "aide": "Versions des langages et runtimes utilisés."
+    },
+    {
+      "id": "detail-dim5-5.7",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Configuration des composants",
+      "type": "direct",
+      "critere": "5.7",
+      "question": "Avez-vous étudié si la configuration de vos composants pourrait améliorer leur efficacité ?",
+      "aide": "Paramètres de runtime, tuning de la JVM ou de composants similaires."
+    },
+    {
+      "id": "detail-dim5-5.8",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Dépendances à jour",
+      "type": "direct",
+      "critere": "5.8",
+      "question": "Les principales dépendances de votre projet sont-elles à jour ?",
+      "aide": "Versions stables des bibliothèques et frameworks utilisés."
+    },
+    {
+      "id": "detail-dim5-5.9",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Problèmes de compatibilité",
+      "type": "direct",
+      "critere": "5.9",
+      "question": "Avez-vous détecté des problèmes de compatibilité avec les appareils ciblés ?",
+      "aide": "Tests sur différents navigateurs, systèmes d'exploitation ou configurations matérielles."
     }
   ]
 }

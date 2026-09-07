@@ -352,14 +352,11 @@
       "vague": "4-questionnaire",
       "libelle": "Emission des deux fichiers a cocher, sur le residu reel",
       "executeur": "script",
-      "etat": "partiellement_a_ecrire",
+      "etat": "existant",
       "scripts": [
         ".claude/skills/analyse-parcours/scripts/generate_questionnaire.py",
         ".claude/skills/analyse-parcours/scripts/questionnaire-blocs.json",
         ".claude/skills/analyse-parcours/scripts/valider_blocs_questionnaire.py"
-      ],
-      "scripts_a_ecrire": [
-        "la bibliotheque de blocs ne couvre pour l'instant que la porte : les 16 questions du diagnostic rapide et les 10 criteres de la dimension 6, plus deux blocs composes. Les blocs des dimensions 1 a 5 restent a ajouter, et c'est de la donnee pure : aucun changement de code, le validateur les controle deja contre le referentiel"
       ],
       "depends_on": [
         "jugement-dimension-1",
