@@ -8,8 +8,8 @@
       "titre": "Impact d'une indisponibilité",
       "type": "direct",
       "critere": "0.1",
-      "question": "Quel serait l'impact de la disparition de ce service numérique ?",
-      "aide": "Pensez aux conséquences concrètes pour vos utilisateurs et vos opérations."
+      "question": "Si ce service s'arrêtait demain matin, qu'est-ce que cela changerait concrètement pour vous ?",
+      "aide": "Regardez ce qui se bloque vraiment : des clients qui ne peuvent plus commander, une équipe qui ne peut plus travailler, une réputation abîmée."
     },
     {
       "id": "porte-diag-0.2",
@@ -18,8 +18,8 @@
       "titre": "Redondance fonctionnelle",
       "type": "direct",
       "critere": "0.2",
-      "question": "Existe-t-il ailleurs dans votre organisation des fonctionnalités similaires ou du code comparable ?",
-      "aide": "Il s'agit d'identifier les doublons ou chevauchements avec d'autres services."
+      "question": "Est-ce que d'autres services ou applications dans votre organisation font la même chose ou quelque chose de similaire ?",
+      "aide": "Cherchez les fonctionnalités qui se recouvrent ou du code qui fait le même travail ailleurs dans votre organisation."
     },
     {
       "id": "porte-compose-haute-dispo-0.3",
@@ -27,8 +27,6 @@
       "phase": "porte",
       "titre": "Contraintes de haute disponibilité",
       "type": "compose",
-      "question": "Quelles sont les contraintes de disponibilité de vos composants principaux ?",
-      "aide": "SLA, SLO, plan de reprise d'activité, horaires de fonctionnement garantis. Ces contraintes déterminent aussi la marge de manoeuvre dont vous disposez pour faire évoluer le service : plus la disponibilité exigée est stricte, plus les fenêtres de maintenance et les changements d'architecture sont difficiles.",
       "options": [
         {
           "libelle": "Disponibilité 24 heures sur 24, 7 jours sur 7, avec un engagement à 99,99 % et une couverture internationale",
@@ -65,7 +63,9 @@
             "6.10": "🟢 Facile à modifier"
           }
         }
-      ]
+      ],
+      "question": "Quelles sont les contraintes de disponibilité qui s'appliquent à votre service ?",
+      "aide": "Engagements de temps de disponibilité, plans de reprise d'activité, horaires de fonctionnement garantis. Des contraintes strictes réduisent les occasions de modifier, migrer ou optimiser l'infrastructure."
     },
     {
       "id": "porte-diag-0.4",
@@ -74,8 +74,8 @@
       "titre": "Dépendances techniques",
       "type": "direct",
       "critere": "0.4",
-      "question": "Combien d'autres systèmes sont reliés techniquement à ce service ?",
-      "aide": "API, bases de données partagées, services d'authentification, etc."
+      "question": "À combien d'autres systèmes ce service est-il techniquement relié ?",
+      "aide": "Comptez les connexions actives : API que vous appelez, bases de données partagées, services d'authentification, flux de données entrants ou sortants."
     },
     {
       "id": "porte-diag-0.5",
@@ -84,8 +84,8 @@
       "titre": "Accès au code source",
       "type": "direct",
       "critere": "0.5",
-      "question": "Disposez-vous du code source de ce service ?",
-      "aide": "Code open source, code interne accessible, ou solution propriétaire fermée."
+      "question": "Dans quelle mesure avez-vous accès au code source de ce service ?",
+      "aide": "Code complètement accessible à l'équipe, code ouvert au public, code fermé fourni par un éditeur, ou accès limité à certains modules seulement."
     },
     {
       "id": "porte-diag-0.6",
@@ -94,8 +94,8 @@
       "titre": "Compétences disponibles",
       "type": "direct",
       "critere": "0.6",
-      "question": "Votre équipe maîtrise-t-elle la conception fonctionnelle et technique de ce service ?",
-      "aide": "Capacité à modifier le service en toute confiance."
+      "question": "Votre équipe connaît-elle suffisamment ce service pour le modifier en toute confiance ?",
+      "aide": "Regardez si l'équipe maîtrise la conception fonctionnelle et technique, si elle peut travailler sereinement ou avec prudence, ou si la connaissance est trop fragmentée."
     },
     {
       "id": "porte-diag-0.7",
@@ -104,8 +104,8 @@
       "titre": "Complexité de l'architecture",
       "type": "direct",
       "critere": "0.7",
-      "question": "Comment évaluez-vous la complexité de l'architecture de ce service ?",
-      "aide": "Nombre de composants, interactions, technologies hétérogènes."
+      "question": "Comment jugez-vous la complexité de l'architecture de ce service ?",
+      "aide": "Pensez au nombre de composants, à leurs interactions, aux technologies différentes utilisées, à la facilité de comprendre le fonctionnement d'ensemble."
     },
     {
       "id": "porte-diag-0.8",
@@ -115,7 +115,7 @@
       "type": "direct",
       "critere": "0.8",
       "question": "Quelle est la taille de l'infrastructure de ce service par rapport à vos autres services ?",
-      "aide": "Nombre et taille des machines virtuelles, conteneurs, services hébergés."
+      "aide": "Comparez le nombre et la taille des serveurs, machines virtuelles, conteneurs ou autres composants hébergés à ce que vous avez ailleurs dans l'organisation."
     },
     {
       "id": "porte-diag-0.9",
@@ -125,7 +125,7 @@
       "type": "direct",
       "critere": "0.9",
       "question": "Quel volume de données ce service stocke-t-il par rapport à vos autres services ?",
-      "aide": "Bases de données, fichiers, archives, sauvegardes."
+      "aide": "Regardez les bases de données, les fichiers, les archives, les sauvegardes. Comparez à ce que vous avez ailleurs dans l'organisation."
     },
     {
       "id": "porte-diag-0.10",
@@ -134,8 +134,8 @@
       "titre": "Complexité fonctionnelle",
       "type": "direct",
       "critere": "0.10",
-      "question": "Comment évaluez-vous la complexité fonctionnelle de ce service ?",
-      "aide": "Nombre de fonctionnalités, règles métier, cas d'usage."
+      "question": "Comment décririez-vous la complexité de ce service ?",
+      "aide": "Pensez au nombre de fonctionnalités, aux règles métier, aux différents cas d'usage que vous gérez."
     },
     {
       "id": "porte-diag-0.11",
@@ -144,8 +144,8 @@
       "titre": "Qualité de l'expérience utilisateur",
       "type": "direct",
       "critere": "0.11",
-      "question": "Les parcours utilisateurs sont-ils fluides et intuitifs ?",
-      "aide": "Retours utilisateurs, points de friction identifiés, éléments en attente d'amélioration UX/UI."
+      "question": "Comment évaluez-vous la fluidité et l'intuitivité des parcours utilisateurs ?",
+      "aide": "Regardez ce que disent vos utilisateurs, les endroits où ils buttent, les améliorations que vous avez en liste d'attente."
     },
     {
       "id": "porte-diag-0.12",
@@ -154,8 +154,8 @@
       "titre": "Compatibilité avec les appareils anciens",
       "type": "direct",
       "critere": "0.12",
-      "question": "Ce service fonctionne-t-il correctement sur les appareils les plus anciens de votre flotte cible ?",
-      "aide": "Expérience fluide, ralentissements, incompatibilités."
+      "question": "Ce service fonctionne-t-il bien sur les appareils les plus anciens que vos utilisateurs utilisent encore ?",
+      "aide": "Vérifiez s'il y a des ralentissements, des incompatibilités, ou si l'expérience reste confortable."
     },
     {
       "id": "porte-diag-0.13",
@@ -164,8 +164,8 @@
       "titre": "Problèmes de performance au backlog",
       "type": "direct",
       "critere": "0.13",
-      "question": "Votre backlog contient-il des problèmes de performance ou des améliorations d'efficacité ?",
-      "aide": "Tickets ouverts, discussions récurrentes, besoins d'optimisation identifiés."
+      "question": "Votre backlog contient-il des problèmes de performance ou des besoins d'optimisation ?",
+      "aide": "Tickets ouverts sur la lenteur du service, discussions récurrentes sur l'efficacité, améliorations techniques identifiées mais non encore traitées."
     },
     {
       "id": "porte-diag-0.14",
@@ -174,8 +174,8 @@
       "titre": "Efficacité des fonctionnalités principales",
       "type": "direct",
       "critere": "0.14",
-      "question": "Les fonctionnalités principales de ce service sont-elles optimisées et efficaces ?",
-      "aide": "Fonctionnalités bien implémentées, performantes, sans redondance."
+      "question": "Les fonctionnalités principales de ce service sont-elles bien implémentées et performantes ?",
+      "aide": "Cherchez les fonctionnalités qui font double emploi ou qui pourraient être plus efficaces."
     },
     {
       "id": "porte-diag-0.15",
@@ -184,8 +184,8 @@
       "titre": "Politique de suppression et d'archivage",
       "type": "direct",
       "critere": "0.15",
-      "question": "Disposez-vous d'une politique de suppression et d'archivage des données ?",
-      "aide": "Règles formalisées, automatisation, contrôles réguliers."
+      "question": "Disposez-vous d'une politique de suppression et d'archivage des données pour ce service ?",
+      "aide": "Regardez s'il existe des règles formalisées, si elles sont appliquées de manière cohérente, si des automatismes sont en place, et si des contrôles réguliers vérifient leur respect."
     },
     {
       "id": "porte-diag-0.16",
@@ -195,7 +195,7 @@
       "type": "direct",
       "critere": "0.16",
       "question": "Dans quel pays votre service est-il hébergé ?",
-      "aide": "Cette question est normalement répondue automatiquement par un script d'analyse, mais vous pouvez la renseigner manuellement si nécessaire."
+      "aide": "Le pays d'hébergement détermine l'intensité carbone du mix électrique utilisé par vos serveurs. Cette information est normalement collectée automatiquement, mais vous pouvez la renseigner si nécessaire."
     },
     {
       "id": "porte-dim6-6.1",
@@ -204,8 +204,8 @@
       "titre": "Observabilité du produit",
       "type": "direct",
       "critere": "6.1",
-      "question": "Des outils d'observabilité sont-ils en place pour suivre le comportement de ce service en production ?",
-      "aide": "Métriques, logs, traces, alertes, tableaux de bord."
+      "question": "Est-il facile de mettre en place et d'exploiter des outils pour suivre le comportement de ce service en production ?",
+      "aide": "Pensez à la possibilité d'ajouter des métriques, des logs, des traces, des alertes, des tableaux de bord. Regardez si des outils sont déjà en place et s'ils sont simples à faire évoluer."
     },
     {
       "id": "porte-dim6-6.2",
@@ -214,8 +214,8 @@
       "titre": "Revues de code et pair programming",
       "type": "direct",
       "critere": "6.2",
-      "question": "Pratiquez-vous des revues de code ou de la programmation en binôme sur ce projet ?",
-      "aide": "Processus en place, fréquence, couverture du code."
+      "question": "Est-il facile d'organiser des revues de code ou de la programmation en binôme sur ce projet ?",
+      "aide": "Regardez si des processus sont déjà en place, si l'équipe a le temps et les habitudes pour cela, si des obstacles organisationnels ou techniques compliquent leur mise en oeuvre."
     },
     {
       "id": "porte-dim6-6.3",
@@ -224,8 +224,8 @@
       "titre": "Intégration et déploiement continus",
       "type": "direct",
       "critere": "6.3",
-      "question": "Disposez-vous d'un processus CI/CD efficace pour ce projet ?",
-      "aide": "Construction automatique, tests automatisés, déploiements réguliers."
+      "question": "Est-il facile de mettre en place ou de faire évoluer un processus de construction et de déploiement automatisé pour ce projet ?",
+      "aide": "Regardez si des automatisations existent déjà, si l'infrastructure le permet, si l'équipe a les compétences et les accès nécessaires pour construire et tester automatiquement le code."
     },
     {
       "id": "porte-dim6-6.4",
@@ -234,8 +234,8 @@
       "titre": "Tests de non-régression",
       "type": "direct",
       "critere": "6.4",
-      "question": "Votre projet dispose-t-il de tests de non-régression automatisés ?",
-      "aide": "Tests unitaires, tests d'intégration, tests end-to-end couvrant les parties importantes du code."
+      "question": "Est-il facile d'ajouter ou de faire évoluer des tests automatisés sur ce projet ?",
+      "aide": "Pensez aux tests unitaires, tests d'intégration, tests de bout en bout. Regardez si une infrastructure de tests existe déjà, si le code se prête à être testé, si l'équipe a les compétences et le temps pour écrire des tests."
     },
     {
       "id": "porte-dim6-6.5",
@@ -244,8 +244,8 @@
       "titre": "Découplage domaine métier et technique",
       "type": "direct",
       "critere": "6.5",
-      "question": "Votre code sépare-t-il clairement le domaine métier de l'intégration technique ?",
-      "aide": "Injection de dépendances, architecture hexagonale, possibilité de changer les aspects techniques sans toucher au code fonctionnel."
+      "question": "Est-il facile de modifier les aspects techniques de ce service sans toucher au code fonctionnel ?",
+      "aide": "Regardez si le code métier est bien séparé de l'intégration technique. Par exemple, pouvez-vous changer de base de données, de service d'authentification ou de framework sans réécrire la logique fonctionnelle ?"
     },
     {
       "id": "porte-dim6-6.6",
@@ -254,8 +254,8 @@
       "titre": "Indicateurs de qualité logicielle",
       "type": "direct",
       "critere": "6.6",
-      "question": "Des indicateurs permettent-ils de suivre la qualité de votre logiciel ?",
-      "aide": "Couverture de code, complexité, nombre de bugs, délai de modification, fréquence de déploiement."
+      "question": "Est-il facile de mettre en place et de suivre des indicateurs de qualité pour ce logiciel ?",
+      "aide": "Pensez à la couverture de code, à la complexité, au nombre de bugs, au délai de modification, à la fréquence de déploiement. Regardez si des outils existent déjà ou s'il est simple d'en ajouter."
     },
     {
       "id": "porte-dim6-6.7",
@@ -264,8 +264,8 @@
       "titre": "Documentation du projet",
       "type": "direct",
       "critere": "6.7",
-      "question": "Votre projet dispose-t-il d'une documentation complète et à jour ?",
-      "aide": "Architecture, guides de développement, documentation API, explications des choix techniques."
+      "question": "Est-il facile de maintenir une documentation complète et à jour pour ce projet ?",
+      "aide": "Regardez si une documentation existe déjà, si l'équipe a les outils et le temps pour la tenir à jour, si le projet s'y prête. Pensez à l'architecture, aux guides de développement, aux explications des choix techniques."
     },
     {
       "id": "porte-dim6-6.8",
@@ -274,8 +274,8 @@
       "titre": "Code dupliqué",
       "type": "direct",
       "critere": "6.8",
-      "question": "Votre code contient-il des duplications injustifiées ?",
-      "aide": "Code copié-collé, logique répétée sans factorisation."
+      "question": "Est-il facile de repérer et de supprimer le code dupliqué dans ce projet ?",
+      "aide": "Regardez si du code copié-collé ou des logiques répétées existent, si l'équipe a les outils pour les détecter, et si l'architecture permet de les factoriser sans risque."
     },
     {
       "id": "porte-dim6-6.9",
@@ -284,8 +284,8 @@
       "titre": "Autonomie pour les outils d'optimisation",
       "type": "direct",
       "critere": "6.9",
-      "question": "Votre équipe peut-elle déployer les outils dont elle a besoin pour observer, mesurer et optimiser le système ?",
-      "aide": "Outils personnalisés ou intégrés à la plateforme, accès aux données de performance."
+      "question": "Est-il facile pour votre équipe de déployer les outils dont elle a besoin pour observer, mesurer et optimiser ce système ?",
+      "aide": "Regardez si l'équipe peut installer des outils personnalisés, accéder aux données de performance, utiliser des outils fournis par la plateforme, sans avoir à demander d'autorisations lourdes."
     },
     {
       "id": "detail-compose-parcours-ecrans",
@@ -293,8 +293,6 @@
       "phase": "detail",
       "titre": "Optimisation des parcours et écrans principaux",
       "type": "compose",
-      "question": "Comment sont conçus vos parcours utilisateurs et écrans principaux ?",
-      "aide": "Pensez aux flux les plus fréquents et aux écrans les plus visités.",
       "options": [
         {
           "libelle": "Parcours courts avec peu d'étapes ET écrans légers avec informations essentielles uniquement",
@@ -324,7 +322,9 @@
             "1.14": "💡 Potentiel d'amélioration identifié"
           }
         }
-      ]
+      ],
+      "question": "Comment sont organisés vos parcours utilisateurs principaux et qu'est-ce qui s'affiche à l'écran ?",
+      "aide": "Comptez les étapes pour réaliser les actions courantes, et regardez combien d'informations et de médias vous affichez sur les écrans les plus visités."
     },
     {
       "id": "detail-compose-environnements-test",
@@ -332,8 +332,6 @@
       "phase": "detail",
       "titre": "Dimensionnement des environnements de test",
       "type": "compose",
-      "question": "Comment dimensionnez-vous vos environnements de test par rapport à la production ?",
-      "aide": "Infrastructure (nombre et taille des composants) et bases de données.",
       "options": [
         {
           "libelle": "Infrastructure réduite ET bases de données réduites",
@@ -370,7 +368,9 @@
             "4.4": "🚫 Non applicable"
           }
         }
-      ]
+      ],
+      "question": "Quelle est la taille de vos environnements de test par rapport à la production ?",
+      "aide": "Regardez le nombre et la taille de vos machines virtuelles, conteneurs, et le volume de vos bases de données."
     },
     {
       "id": "detail-dim1-1.1",
@@ -380,7 +380,7 @@
       "type": "direct",
       "critere": "1.1",
       "question": "Avez-vous identifié une solution non numérique et démontré que votre version numérique apporte une valeur ajoutée claire ?",
-      "aide": "Pensez aux gains de temps, d'accessibilité ou de réduction d'impact matériel par rapport à l'alternative existante."
+      "aide": "Cherchez les gains de temps, d'accessibilité ou de réduction d'impact matériel par rapport à ce qui existait avant."
     },
     {
       "id": "detail-dim1-1.2",
@@ -389,8 +389,8 @@
       "titre": "Connaissance des utilisateurs",
       "type": "direct",
       "critere": "1.2",
-      "question": "Documentez-vous les besoins, contextes d'usage et appareils de vos utilisateurs cibles ?",
-      "aide": "Personas, entretiens, analyses d'utilisation, ou liste des appareils couramment utilisés."
+      "question": "Documentez-vous les besoins, les contextes d'usage et les appareils de vos utilisateurs cibles ?",
+      "aide": "Regardez si vous avez des personas, des entretiens, des analyses d'utilisation, ou une liste des appareils couramment utilisés."
     },
     {
       "id": "detail-dim1-1.3",
@@ -399,8 +399,8 @@
       "titre": "Impact des mises à jour",
       "type": "direct",
       "critere": "1.3",
-      "question": "Les mises à jour de fonctionnalités préservent-elles les performances sur les appareils anciens ou modestes ?",
-      "aide": "Tests de performance, modes allégés ou optionnels proposés aux utilisateurs."
+      "question": "Vous testez que vos nouvelles fonctionnalités restent performantes sur les appareils anciens ou modestes, et vous proposez des modes allégés quand c'est nécessaire.",
+      "aide": "Regardez si vous testez réellement sur ces appareils, et si vous offrez un mode simplifié quand les performances baissent."
     },
     {
       "id": "detail-dim1-1.4",
@@ -409,8 +409,8 @@
       "titre": "Composants natifs vs personnalisés",
       "type": "direct",
       "critere": "1.4",
-      "question": "Privilégiez-vous les composants natifs, ou justifiez-vous l'usage de composants personnalisés ?",
-      "aide": "Boutons, menus, formulaires système vs composants créés sur mesure."
+      "question": "Vous utilisez les composants natifs du système, ou vous justifiez chaque composant personnalisé par une vraie nécessité.",
+      "aide": "Les boutons, menus et formulaires du système sont plus performants et accessibles que ceux créés sur mesure, sauf exception justifiée."
     },
     {
       "id": "detail-dim1-1.5",
@@ -419,8 +419,8 @@
       "titre": "Lecture automatique de médias",
       "type": "direct",
       "critere": "1.5",
-      "question": "Vos animations, vidéos, sons ou cartes sont-ils lancés uniquement par action de l'utilisateur ?",
-      "aide": "Aucune lecture automatique, ou lecture strictement nécessaire, optimisée et contrôlable."
+      "question": "Vos animations, vidéos, sons ou cartes sont-ils lancés uniquement quand l'utilisateur le demande ?",
+      "aide": "Vérifiez qu'aucun contenu ne démarre tout seul, ou que la lecture automatique est vraiment nécessaire, optimisée et contrôlable."
     },
     {
       "id": "detail-dim1-1.6",
@@ -429,8 +429,8 @@
       "titre": "Adaptation au matériel",
       "type": "direct",
       "critere": "1.6",
-      "question": "Votre application détecte-t-elle les configurations limitées et adapte-t-elle son comportement ?",
-      "aide": "Qualité réduite, rendu simplifié, processus lourds désactivés sur matériel modeste."
+      "question": "Votre application détecte les appareils à configuration limitée et passe automatiquement en mode allégé.",
+      "aide": "Par exemple : qualité d'image réduite, rendu simplifié, ou désactivation automatique des fonctions lourdes."
     },
     {
       "id": "detail-dim1-1.7",
@@ -440,7 +440,7 @@
       "type": "direct",
       "critere": "1.7",
       "question": "Chaque fonctionnalité de votre service est-elle réellement utilisée et apporte-t-elle de la valeur ?",
-      "aide": "Analyses d'usage, commentaires utilisateurs, suppression des fonctionnalités redondantes ou inutilisées."
+      "aide": "Regardez vos analyses d'usage, les commentaires utilisateurs, et vérifiez si vous avez supprimé les fonctionnalités redondantes ou inutilisées."
     },
     {
       "id": "detail-compose-appareils-anciens",
@@ -448,9 +448,6 @@
       "phase": "detail",
       "titre": "Fonctionnement sur les appareils les plus anciens ciblés",
       "type": "compose",
-      "question": "Comment votre service se comporte-t-il sur les appareils les plus anciens de votre cible ?",
-      "aide": "Le \"groupe cible\" est la liste des appareils que vous vous engagez à supporter.",
-      "note": "Le périmètre des appareils ciblés est une décision produit : à valider avec le responsable produit.",
       "options": [
         {
           "libelle": "Nous testons sur les appareils les plus anciens de notre cible, et aucun problème de compatibilité n'a été détecté",
@@ -480,7 +477,10 @@
             "5.9": "🚫 Non applicable"
           }
         }
-      ]
+      ],
+      "question": "Que se passe-t-il quand vous testez votre service sur les appareils les plus anciens que vous vous engagez à supporter ?",
+      "aide": "C'est-à-dire les appareils que vous promettez de supporter, même s'ils ont plusieurs années.",
+      "note": "Le périmètre des appareils ciblés est une décision produit : à valider avec le responsable produit."
     },
     {
       "id": "detail-dim1-1.9",
@@ -489,8 +489,8 @@
       "titre": "Compatibilité basse bande passante",
       "type": "direct",
       "critere": "1.9",
-      "question": "Votre application reste-t-elle utilisable sur une connexion à faible bande passante ?",
-      "aide": "Optimisation des requêtes, fichiers multimédias réduits, mise en cache, mode allégé."
+      "question": "Votre application reste utilisable sur une connexion à faible débit, grâce à des requêtes optimisées, des fichiers allégés et de la mise en cache.",
+      "aide": "Regardez si vous limitez le nombre et la taille des requêtes, si vous réduisez les images et vidéos, et si vous mettez en cache les contenus."
     },
     {
       "id": "detail-dim1-1.10",
@@ -499,8 +499,8 @@
       "titre": "Absence de dark patterns",
       "type": "direct",
       "critere": "1.10",
-      "question": "Votre conception évite-t-elle les pratiques manipulatrices qui augmentent artificiellement l'utilisation ?",
-      "aide": "Défilement infini, lecture automatique forcée, désabonnement caché, cases pré-cochées."
+      "question": "Votre conception évite-t-elle les pratiques qui poussent artificiellement l'utilisateur à consommer plus ?",
+      "aide": "Cherchez le défilement infini, la lecture automatique forcée, les désabonnements cachés, les cases pré-cochées."
     },
     {
       "id": "detail-dim1-1.11",
@@ -510,7 +510,7 @@
       "type": "direct",
       "critere": "1.11",
       "question": "Vos valeurs par défaut sont-elles sobres et les utilisateurs peuvent-ils facilement les ajuster ?",
-      "aide": "Nombre d'éléments affichés, qualité des médias, fréquence de rafraîchissement."
+      "aide": "Regardez le nombre d'éléments affichés, la qualité des médias, la fréquence de rafraîchissement."
     },
     {
       "id": "detail-dim1-1.12",
@@ -519,8 +519,8 @@
       "titre": "Limitation du tracking",
       "type": "direct",
       "critere": "1.12",
-      "question": "Limitez-vous strictement le nombre de traceurs et d'outils de suivi au nécessaire ?",
-      "aide": "Chaque traceur doit être justifié, les outils redondants ou inutiles supprimés.",
+      "question": "Vous limitez le nombre de traceurs au strict nécessaire, et chaque outil de suivi est justifié.",
+      "aide": "Les outils marketing et d'analyse sont souvent responsables d'un tiers du trafic : supprimez ceux qui font doublon.",
       "note": "La justification de chaque traceur est une décision produit ou marketing : à valider avec le responsable produit."
     },
     {
@@ -531,7 +531,7 @@
       "type": "direct",
       "critere": "1.15",
       "question": "Ce service présente-t-il une utilisation régulière et significative ?",
-      "aide": "Fréquence d'usage en adéquation avec l'empreinte en ressources du service."
+      "aide": "Vérifiez que la fréquence d'usage est en rapport avec ce que le service coûte en ressources."
     },
     {
       "id": "detail-dim1-1.16",
@@ -541,7 +541,7 @@
       "type": "direct",
       "critere": "1.16",
       "question": "Le volume d'utilisateurs actifs justifie-t-il l'architecture et les ressources allouées ?",
-      "aide": "Nombre d'utilisateurs en rapport avec la taille de l'infrastructure."
+      "aide": "Regardez si le nombre d'utilisateurs est en rapport avec la taille de votre infrastructure."
     },
     {
       "id": "detail-dim2-2.1",
@@ -550,8 +550,8 @@
       "titre": "Technologies gourmandes en ressources",
       "type": "direct",
       "critere": "2.1",
-      "question": "Utilisez-vous des technologies particulièrement gourmandes en ressources ?",
-      "aide": "IA générative, blockchain, ou autres technologies connues pour leur consommation élevée."
+      "question": "Votre pile technique évite les technologies particulièrement gourmandes en ressources, ou vous les justifiez.",
+      "aide": "Par exemple : intelligence artificielle générative, blockchain à preuve de travail, ou d'autres technologies reconnues pour leur consommation."
     },
     {
       "id": "detail-dim2-2.2",
@@ -561,7 +561,7 @@
       "type": "direct",
       "critere": "2.2",
       "question": "Avez-vous défini une stratégie de compatibilité avec les appareils de vos utilisateurs ?",
-      "aide": "Liste des appareils ciblés, tests de compatibilité, support des appareils anciens."
+      "aide": "Vérifiez si vous avez une liste des appareils ciblés, si vous faites des tests de compatibilité, et si vous supportez les appareils anciens."
     },
     {
       "id": "detail-dim2-2.3",
@@ -570,8 +570,8 @@
       "titre": "Communication entre composants",
       "type": "direct",
       "critere": "2.3",
-      "question": "La séparation et la communication entre vos composants sont-elles optimisées ?",
-      "aide": "Couplage faible, absence de dépendances excessives, communication efficace sans ralentissement."
+      "question": "Vos composants sont faiblement couplés, et leur communication ne provoque pas de ralentissements ni de complexité inutile.",
+      "aide": "Regardez si un composant peut changer sans casser les autres, et si la communication entre eux est rapide et fiable."
     },
     {
       "id": "detail-dim2-2.4",
@@ -580,8 +580,8 @@
       "titre": "Lissage des pics de charge",
       "type": "direct",
       "critere": "2.4",
-      "question": "Pouvez-vous lisser vos pics de charge en différant certaines tâches ?",
-      "aide": "Traitement par lots, files de messages, tâches asynchrones pour répartir la charge dans le temps."
+      "question": "Vous lissez vos pics de charge en différant les tâches qui n'ont pas besoin d'être exécutées immédiatement.",
+      "aide": "Par exemple : traiter les exports ou les notifications par lots, ou utiliser des files d'attente pour répartir le travail."
     },
     {
       "id": "detail-dim2-2.5",
@@ -590,8 +590,8 @@
       "titre": "Mise en cache",
       "type": "direct",
       "critere": "2.5",
-      "question": "Mettez-vous en cache les résultats de vos calculs et requêtes coûteux ?",
-      "aide": "Résultats réutilisés plusieurs fois, mise en cache pour éviter les recalculs."
+      "question": "Vous mettez en cache les résultats de vos calculs et requêtes coûteux quand ils sont réutilisés plusieurs fois.",
+      "aide": "Regardez si vous recalculez les mêmes choses plusieurs fois, ou si vous gardez le résultat en mémoire pour le réutiliser."
     },
     {
       "id": "detail-dim3-3.1",
@@ -600,8 +600,8 @@
       "titre": "Optimisation des coûts",
       "type": "direct",
       "critere": "3.1",
-      "question": "Avez-vous mis en place une stratégie pour optimiser vos coûts d'infrastructure ?",
-      "aide": "FinOps, GreenOps, identification des composants sous-utilisés, ajustement de la taille."
+      "question": "Vous avez mis en place une stratégie pour optimiser vos coûts d'infrastructure.",
+      "aide": "Par exemple : repérer les composants sous-utilisés, ajuster leur taille, ou basculer vers des services mieux dimensionnés."
     },
     {
       "id": "detail-dim3-3.2",
@@ -610,8 +610,8 @@
       "titre": "Suivi de l'impact environnemental",
       "type": "direct",
       "critere": "3.2",
-      "question": "Suivez-vous l'impact environnemental de votre infrastructure ?",
-      "aide": "Émissions de carbone, intensité carbone, indices PUE et WUE du datacenter."
+      "question": "Vous suivez l'impact environnemental de votre infrastructure.",
+      "aide": "Par exemple : émissions de carbone de vos serveurs, efficacité énergétique et consommation d'eau de votre centre de données."
     },
     {
       "id": "detail-dim3-3.3",
@@ -620,8 +620,8 @@
       "titre": "Mix électrique de la région",
       "type": "direct",
       "critere": "3.3",
-      "question": "Avez-vous choisi votre région d'hébergement en fonction de l'impact du mix électrique local ?",
-      "aide": "Privilégier les régions à mix électrique décarboné (France, Norvège, Islande, etc.)."
+      "question": "Vous avez choisi une région d'hébergement dont le mix électrique a un faible impact.",
+      "aide": "Les régions où l'électricité est décarbonée, comme la France, la Norvège ou l'Islande, ont un impact bien moindre."
     },
     {
       "id": "detail-dim3-3.5",
@@ -630,8 +630,8 @@
       "titre": "Mutualisation de l'infrastructure",
       "type": "direct",
       "critere": "3.5",
-      "question": "Votre infrastructure est-elle mutualisée ?",
-      "aide": "VM, conteneurs, services gérés, plateformes *aaS qui partagent les ressources avec d'autres projets."
+      "question": "Votre infrastructure est mutualisée.",
+      "aide": "Par exemple : machines virtuelles, conteneurs, ou services gérés qui partagent les ressources avec d'autres projets."
     },
     {
       "id": "detail-compose-dimensionnement",
@@ -639,8 +639,6 @@
       "phase": "detail",
       "titre": "Dimensionnement et élasticité de l'infrastructure",
       "type": "compose",
-      "question": "Vos composants sont-ils utilisés à pleine charge, et leur nombre s'ajuste-t-il à la charge ?",
-      "aide": "Le référentiel considère un composant bien dimensionné à partir de 70 % de charge CPU ou RAM. L'auto-scaling doit être borné par une limite, pas laissé libre.",
       "options": [
         {
           "libelle": "Nos composants tournent à au moins 70 % de charge CPU ou RAM, et un auto-scaling borné est en place (ou la charge est constante)",
@@ -670,7 +668,9 @@
             "3.7": "💡 Potentiel d'amélioration identifié"
           }
         }
-      ]
+      ],
+      "question": "Vos composants tournent-ils à au moins 70 % de charge, et leur nombre s'ajuste-t-il quand la charge varie ?",
+      "aide": "Regardez la charge processeur ou mémoire de vos serveurs et conteneurs. L'ajustement automatique doit avoir une limite haute pour éviter les emballements."
     },
     {
       "id": "detail-dim3-3.8",
@@ -679,8 +679,8 @@
       "titre": "Extinction des environnements",
       "type": "direct",
       "critere": "3.8",
-      "question": "Éteignez-vous vos environnements non productifs hors des heures d'utilisation ?",
-      "aide": "Environnements de développement ou de test désactivés la nuit, le week-end, ou entre deux utilisations."
+      "question": "Vous éteignez vos environnements non productifs quand personne ne les utilise.",
+      "aide": "Par exemple : environnements de développement ou de test éteints la nuit, le week-end, ou entre deux campagnes de tests."
     },
     {
       "id": "detail-compose-donnees-anciennes",
@@ -688,9 +688,6 @@
       "phase": "detail",
       "titre": "Cycle de vie des données anciennes",
       "type": "compose",
-      "question": "Que devient une donnée devenue inutile ou très rarement consultée ?",
-      "aide": "On parle ici de suppression et d'archivage automatiques, et de bascule vers un stockage moins coûteux et plus lent.",
-      "note": "Le caractère acceptable d'un accès plus lent pour l'utilisateur est une décision produit : à valider avec le responsable produit.",
       "options": [
         {
           "libelle": "Des mécanismes automatiques de suppression et d'archivage sont appliqués, ET les données rarement consultées ont déjà été basculées vers un stockage à froid",
@@ -720,7 +717,10 @@
             "4.6": "💡 Potentiel d'amélioration identifié"
           }
         }
-      ]
+      ],
+      "question": "Que se passe-t-il quand une donnée devient inutile ou rarement consultée ?",
+      "aide": "Par exemple : une règle qui supprime ou archive automatiquement les anciennes factures, ou un transfert vers un disque plus lent mais moins énergivore pour les données rarement demandées.",
+      "note": "Le caractère acceptable d'un accès plus lent pour l'utilisateur est une décision produit : à valider avec le responsable produit."
     },
     {
       "id": "detail-dim4-4.2",
@@ -729,8 +729,8 @@
       "titre": "Optimisation des bases de données",
       "type": "direct",
       "critere": "4.2",
-      "question": "Appliquez-vous une stratégie pour optimiser les performances de vos bases de données ?",
-      "aide": "Indexation appropriée, modélisation des données, maintenance régulière."
+      "question": "Avez-vous une stratégie pour optimiser les performances de vos bases de données ?",
+      "aide": "Par exemple : choisir les bons index, modéliser les tables pour limiter les requêtes coûteuses, nettoyer régulièrement la base."
     },
     {
       "id": "detail-dim4-4.3",
@@ -739,8 +739,8 @@
       "titre": "Technologies de stockage adaptées",
       "type": "direct",
       "critere": "4.3",
-      "question": "Les technologies de stockage utilisées sont-elles bien adaptées à vos besoins réels ?",
-      "aide": "Choix entre relationnel, NoSQL orienté document, base en colonnes, bases spécialisées selon l'usage."
+      "question": "Vos technologies de stockage correspondent-elles vraiment à ce que vous en faites ?",
+      "aide": "Par exemple : une base relationnelle classique pour les données structurées, une base orientée document pour du contenu flexible, une base en colonnes pour de l'analyse, ou une base spécialisée pour des cas précis."
     },
     {
       "id": "detail-dim4-4.5",
@@ -749,8 +749,8 @@
       "titre": "Duplication de données",
       "type": "direct",
       "critere": "4.5",
-      "question": "Avez-vous identifié des données dupliquées et déterminé si cette duplication est justifiée ?",
-      "aide": "Duplication pour haute disponibilité ou dénormalisation intentionnelle, par opposition à duplication accidentelle."
+      "question": "Avez-vous repéré les données dupliquées et vérifié si c'est voulu ?",
+      "aide": "Certaines duplications sont utiles : pour garantir que le service reste accessible même en cas de panne, ou pour accélérer certaines requêtes. D'autres sont accidentelles et coûtent de l'espace pour rien."
     },
     {
       "id": "detail-compose-outils-efficacite",
@@ -758,8 +758,6 @@
       "phase": "detail",
       "titre": "Ce que vos outils de mesure ont révélé",
       "type": "compose",
-      "question": "Vos outils d'analyse statique et vos campagnes de charge ont-ils révélé des problèmes d'efficacité ?",
-      "aide": "Le référentiel considère qu'une pratique absente laisse un potentiel d'amélioration, au même titre qu'une pratique qui a révélé un problème.",
       "options": [
         {
           "libelle": "Les deux pratiques sont en place et n'ont révélé aucun problème d'efficacité",
@@ -789,7 +787,9 @@
             "5.2": "💡 Potentiel d'amélioration identifié"
           }
         }
-      ]
+      ],
+      "question": "Vos outils d'analyse du code et vos tests de charge ont-ils révélé des points à améliorer ?",
+      "aide": "Les outils d'analyse automatique du code et les tests sous forte charge permettent de détecter des inefficacités. L'absence de ces pratiques compte aussi comme un potentiel d'amélioration."
     },
     {
       "id": "detail-dim5-5.3",
@@ -798,8 +798,8 @@
       "titre": "Backlog d'optimisations",
       "type": "direct",
       "critere": "5.3",
-      "question": "Votre backlog contient-il des tâches identifiées pour améliorer les performances ou l'efficacité ?",
-      "aide": "Tickets, issues ou éléments de backlog portant sur l'optimisation."
+      "question": "Votre backlog contient-il des tâches d'optimisation ?",
+      "aide": "Par exemple : des tickets ou issues qui visent à accélérer une page, réduire la consommation mémoire, ou améliorer le temps de réponse."
     },
     {
       "id": "detail-dim5-5.4",
@@ -808,8 +808,8 @@
       "titre": "Indicateurs de performance",
       "type": "direct",
       "critere": "5.4",
-      "question": "Vos indicateurs de performance actuels correspondent-ils à l'ambition du projet ?",
-      "aide": "Latence, requêtes par seconde, Core Web Vitals, temps de réponse.",
+      "question": "Vos performances actuelles correspondent-elles à ce que vous visez ?",
+      "aide": "Par exemple : le temps de chargement d'une page, le temps de réponse d'une API, le nombre de requêtes traitées par seconde.",
       "note": "L'ambition de performance du projet est une décision produit : à valider avec le responsable produit."
     },
     {
@@ -820,7 +820,7 @@
       "type": "direct",
       "critere": "5.5",
       "question": "Les parcours utilisateurs les plus fréquents ont-ils fait l'objet d'une étude d'optimisation ?",
-      "aide": "Analyse et amélioration des chemins de code les plus empruntés."
+      "aide": "Regardez si vous avez analysé et amélioré les chemins de code les plus empruntés."
     },
     {
       "id": "detail-compose-a-jour",
@@ -828,8 +828,6 @@
       "phase": "detail",
       "titre": "Fraîcheur de la pile technique et des dépendances",
       "type": "compose",
-      "question": "Votre socle technique et vos dépendances sont-ils à jour ?",
-      "aide": "Le socle, c'est le runtime ou la plateforme (JVM, Node, Python, PHP). Les dépendances, ce sont les bibliothèques et frameworks du projet.",
       "options": [
         {
           "libelle": "Le socle est au moins sur la dernière version LTS ET les principales dépendances sont à jour",
@@ -859,7 +857,9 @@
             "5.8": "💡 Potentiel d'amélioration identifié"
           }
         }
-      ]
+      ],
+      "question": "Votre plateforme et vos bibliothèques principales sont-elles à jour ?",
+      "aide": "La plateforme, c'est par exemple Node, Python, Java, PHP : vérifiez que vous êtes au moins sur la version que l'éditeur s'engage à maintenir longtemps. Les bibliothèques, ce sont les frameworks et modules que vous importez dans votre code."
     },
     {
       "id": "detail-dim5-5.7",
@@ -868,8 +868,8 @@
       "titre": "Configuration des composants",
       "type": "direct",
       "critere": "5.7",
-      "question": "Avez-vous étudié si la configuration de vos composants pourrait améliorer leur efficacité ?",
-      "aide": "Paramètres de runtime, tuning de la JVM ou de composants similaires."
+      "question": "Avez-vous vérifié si vos composants pourraient être mieux configurés ?",
+      "aide": "Par exemple : ajuster les paramètres de la machine virtuelle Java, les pools de connexion d'une base de données, ou les limites mémoire d'un serveur."
     }
   ]
 }
