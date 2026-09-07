@@ -22,14 +22,50 @@
       "aide": "Il s'agit d'identifier les doublons ou chevauchements avec d'autres services."
     },
     {
-      "id": "porte-diag-0.3",
+      "id": "porte-compose-haute-dispo-0.3",
       "fichier": "technique",
       "phase": "porte",
-      "titre": "Contraintes de disponibilité",
-      "type": "direct",
-      "critere": "0.3",
+      "titre": "Contraintes de haute disponibilité",
+      "type": "compose",
       "question": "Quelles sont les contraintes de disponibilité de vos composants principaux ?",
-      "aide": "SLA, SLO, plan de reprise d'activité, horaires de fonctionnement garantis."
+      "aide": "SLA, SLO, plan de reprise d'activité, horaires de fonctionnement garantis. Ces contraintes déterminent aussi la marge de manoeuvre dont vous disposez pour faire évoluer le service : plus la disponibilité exigée est stricte, plus les fenêtres de maintenance et les changements d'architecture sont difficiles.",
+      "options": [
+        {
+          "libelle": "Disponibilité 24 heures sur 24, 7 jours sur 7, avec un engagement à 99,99 % et une couverture internationale",
+          "reponses": {
+            "0.3": "1 - 7 jours sur 7, 24 heures sur 24 - 99,99 % - Couverture internationale",
+            "6.10": "🔴 Difficile à changer"
+          }
+        },
+        {
+          "libelle": "Disponibilité 24 heures sur 24, 7 jours sur 7, avec un engagement à 99 %",
+          "reponses": {
+            "0.3": "2 - 7 jours sur 7, 24 heures sur 24 - 99 %",
+            "6.10": "🔴 Difficile à changer"
+          }
+        },
+        {
+          "libelle": "Quelques engagements de service, sans exigence de disponibilité permanente",
+          "reponses": {
+            "0.3": "3 - Certains SLA.",
+            "6.10": "🟡 Effort modéré"
+          }
+        },
+        {
+          "libelle": "Disponibilité en heures ouvrées seulement, sans engagement de service ni plan de reprise d'activité",
+          "reponses": {
+            "0.3": "4 - 5 jours sur 7, 8 heures sur 24 - Pas de SLA - Pas de Plan de reprise d'activité (DRP)",
+            "6.10": "🟢 Facile à modifier"
+          }
+        },
+        {
+          "libelle": "Aucun engagement de disponibilité",
+          "reponses": {
+            "0.3": "5 - Pas de SLA/SLO",
+            "6.10": "🟢 Facile à modifier"
+          }
+        }
+      ]
     },
     {
       "id": "porte-diag-0.4",
@@ -250,16 +286,6 @@
       "critere": "6.9",
       "question": "Votre équipe peut-elle déployer les outils dont elle a besoin pour observer, mesurer et optimiser le système ?",
       "aide": "Outils personnalisés ou intégrés à la plateforme, accès aux données de performance."
-    },
-    {
-      "id": "porte-dim6-6.10",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Contraintes de haute disponibilité",
-      "type": "direct",
-      "critere": "6.10",
-      "question": "Les contraintes de disponibilité de ce service permettent-elles de le modifier et de l'optimiser sans difficulté majeure ?",
-      "aide": "Fenêtres de maintenance possibles, possibilité de faire évoluer l'architecture."
     },
     {
       "id": "detail-compose-parcours-ecrans",
