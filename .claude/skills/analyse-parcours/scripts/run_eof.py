@@ -357,7 +357,9 @@ def rule_diag_0_16(data, crans):
 def context_1_9(data):
     env = data["env"]
     v = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("data_transferred_bytes_real")
-    return f"Poids réel transféré (page repère) : {v / 1024:.0f} Ko" if v else None
+    # La mesure porte sur la page LA PLUS LOURDE de la capture, pas sur la page d'accueil :
+    # cf. collect_env_data.py, qui alimente ce champ depuis la variable heaviest.
+    return f"Données réellement transférées (page la plus lourde) : {v / 1024:.0f} Ko" if v else None
 
 
 def context_1_14(data):
@@ -366,14 +368,24 @@ def context_1_14(data):
     if not pages:
         return None
     pages.sort(key=lambda x: -x[1])
-    return f"Page la plus lourde : {pages[0][0]} ({pages[0][1]:.0f} Ko) ; la plus légère : {pages[-1][0]} ({pages[-1][1]:.0f} Ko)"
+    # Omettre la page la plus légère si son poids s'arrondit à 0 (échec de mesure, pas un résultat)
+    heaviest = f"{pages[0][0]} ({pages[0][1]:.0f} Ko)"
+    if pages[-1][1] >= 0.5:
+        lightest = f"{pages[-1][0]} ({pages[-1][1]:.0f} Ko)"
+        return f"Page la plus lourde : {heaviest} ; la plus légère : {lightest}"
+    else:
+        return f"Page la plus lourde : {heaviest}"
 
 
 def context_1_15(data):
     env = data["env"]
     t = (env or {}).get("traffic") or {}
     v = t.get("visits_per_year")
-    return f"Trafic estimé : {v:,} visites/an ({t.get('source', '?')})" if v else None
+    if v:
+        # Séparateur de milliers français (espace insécable), pas anglais (virgule)
+        formatted = f"{v:,}".replace(",", " ")
+        return f"Trafic estimé : {formatted} visites/an ({t.get('source', '?')})"
+    return None
 
 
 def context_5_5(data):
@@ -382,7 +394,7 @@ def context_5_5(data):
     worst = sorted(pages, key=lambda p: -(p.get("js_unused_pct") or 0))[:2]
     if not worst:
         return None
-    return "; ".join(f"{p.get('url', '?')} : JS inutilisé {p.get('js_unused_pct', '?')}%" for p in worst)
+    return " ; ".join(f"{p.get('url', '?')} : JavaScript inutilisé {p.get('js_unused_pct', '?')}%" for p in worst)
 
 
 def context_2_3(data):
@@ -395,7 +407,7 @@ def context_2_3(data):
     paas = families.get("paas_backend") or []
     if not paas:
         return None
-    return f"Composant(s) backend externalisé(s) détecté(s) ({', '.join(paas)}) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication"
+    return f"Plusieurs composants d'hébergement distincts détectés ({', '.join(paas)}), ce qui suggère une architecture séparant les responsabilités. Nous ne pouvons pas évaluer de l'extérieur l'efficacité de leur couplage ni l'optimisation de leur communication."
 
 
 def context_2_5(data):
@@ -403,7 +415,7 @@ def context_2_5(data):
     dups = sorted((har or {}).get("duplicate_urls") or [], key=lambda d: -d.get("count", 0))[:3]
     if not dups:
         return None
-    return "; ".join(f"{d['url']} ×{d['count']}" for d in dups)
+    return " ; ".join(f"{d['url']} chargé {d['count']} fois" for d in dups)
 
 
 # --- Extension Phase 1 (2026-09-03) ---------------------------------------
@@ -415,7 +427,7 @@ def context_1_4(data):
     custom = sum(p.get("custom_role_buttons") or 0 for p in pages)
     if native + custom == 0:
         return None
-    return f"Boutons natifs <button> : {native} ; boutons personnalisés (role=\"button\") : {custom} (toutes pages confondues)"
+    return f"Boutons HTML natifs détectés : {native} ; boutons avec attribut role='button' : {custom} (sur l'ensemble des pages)"
 
 
 def context_1_11(data):
@@ -423,9 +435,9 @@ def context_1_11(data):
     css = (htmlcss or {}).get("css")
     if css is None:
         return None
-    return ("@media (prefers-reduced-motion|prefers-color-scheme) détecté dans le CSS chargé"
+    return ("Règles @media (prefers-reduced-motion ou prefers-color-scheme) détectées dans les feuilles de style"
             if css.get("has_prefers_reduced_or_scheme")
-            else "Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé")
+            else "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style")
 
 
 def context_6_1(data):
@@ -433,7 +445,7 @@ def context_6_1(data):
     worst = (headers or {}).get("worst_page")
     if not worst:
         return None
-    return f"Score en-têtes sécurité (proxy indirect de maturité prod) : {worst['score_pct']}% (grade {worst['grade']}) sur {worst['url']}"
+    return f"Score en-têtes de sécurité HTTP : {worst['score_pct']}% (grade {worst['grade']}) sur {worst['url']} - indicateur parmi d'autres de la maturité en production"
 
 
 def context_3_5(data):
@@ -449,7 +461,7 @@ def context_3_5(data):
     all_mut = paas + cdn + cloud
     if not all_mut:
         return None
-    return f"Infrastructure mutualisée déclarée au CSP : {len(all_mut)} domaine(s) (PaaS/CDN/cloud) : {', '.join(all_mut[:5])}{'...' if len(all_mut) > 5 else ''}"
+    return f"Votre service fait appel à {len(all_mut)} service(s) d'infrastructure externe(s) (hébergement, diffusion de contenu, cloud) : {', '.join(all_mut[:5])}{'...' if len(all_mut) > 5 else ''}"
 
 
 def context_3_7(data):
@@ -462,7 +474,7 @@ def context_3_7(data):
     paas = families.get("paas_backend") or []
     if not paas:
         return None
-    return f"Plate-forme(s) PaaS détectée(s) ({', '.join(paas)}) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier"
+    return f"Votre service s'appuie sur une plate-forme d'hébergement ({', '.join(paas)}) capable d'ajuster automatiquement ses ressources. Nous ne pouvons pas voir de l'extérieur si cet ajustement est activé chez vous, ni si votre charge varie assez pour le justifier."
 
 
 def context_6_3(data):
@@ -483,6 +495,9 @@ def context_6_3(data):
             if host:
                 first_party_hosts.add(host)
     info = analyse_har_freshness(har_path, first_party_hosts or None)
+    # summarise() rédige déjà son texte pour le service audité : ne pas le retoucher ici
+    # par substitution de mots, cela fabrique des phrases incorrectes ("paramètre d'évite
+    # la mise en cache"). Toute reformulation se fait dans deploy_freshness.summarise().
     return summarise(info)
 
 
@@ -494,13 +509,13 @@ def context_6_6(data):
     if cwv:
         bp_scores = [e["best_practices_score_pct"] for e in cwv if e.get("best_practices_score_pct") is not None]
         if bp_scores:
-            parts.append(f"Best Practices Lighthouse (pire page) : {min(bp_scores)}%")
+            parts.append(f"Audit Lighthouse - Bonnes Pratiques (pire page) : {min(bp_scores)}%")
     if headers and headers.get("worst_page"):
-        parts.append(f"en-têtes sécurité (pire page) : grade {headers['worst_page']['grade']}")
+        parts.append(f"en-têtes de sécurité (pire page) : grade {headers['worst_page']['grade']}")
     if wellknown is not None:
         txt = (wellknown.get("security_txt") or {})
-        parts.append(f"security.txt : {'présent, bien formé' if txt.get('well_formed') else ('présent, mal formé' if txt.get('present') else 'absent')}")
-    return "; ".join(parts) if parts else None
+        parts.append(f"fichier security.txt : {'présent et bien formé' if txt.get('well_formed') else ('présent mais mal formé' if txt.get('present') else 'absent')}")
+    return " ; ".join(parts) if parts else None
 
 
 def context_6_8(data):
@@ -523,16 +538,12 @@ def context_6_8(data):
             continue
         score = dup.get("score")
         item_count = dup.get("itemCount", 0)
-        found_as = dup.get("found_as")
-        if found_as is None:
-            # Ancien format : deviner la clé depuis insights
-            found_as = "duplicated-javascript-insight" if "duplicated-javascript-insight" in insights else "duplicated-javascript"
         if score == 1 and item_count == 0:
-            return f"Audit Lighthouse '{found_as}' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente"
+            return "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée."
         elif score is not None:
-            return f"Audit Lighthouse '{found_as}' : score {score:.2f}, {item_count} item(s) détecté(s) - indice de duplication potentielle de bundles JS"
+            return f"Audit Lighthouse de duplication JavaScript : score {score:.2f}, {item_count} élément(s) détecté(s) - indice de duplication potentielle"
         else:
-            return f"Audit Lighthouse '{found_as}' : présent mais sans score (contenu non analysable)"
+            return "Audit Lighthouse de duplication JavaScript : présent mais sans score (contenu non analysable)"
     return None
 
 
@@ -597,7 +608,7 @@ def diag_context_0_4(data):
     third_party = (har or {}).get("domains", {}).get("third_party")
     if third_party is None:
         return None
-    return f"{len(third_party)} domaine(s) tiers détecté(s) dans le HAR (≠ dépendances techniques du SI, simple proxy) : {', '.join(third_party)}"
+    return f"{len(third_party)} domaine(s) tiers détecté(s) lors de la capture (liste observée depuis l'extérieur, ne dit rien de l'architecture technique complète) : {', '.join(third_party)}"
 
 
 def diag_context_0_10(data):
@@ -607,7 +618,7 @@ def diag_context_0_10(data):
         return None
     import math
     n = sitemap["url_count"]
-    return f"{n} URL(s) dans le sitemap (échelle grossière log2 ≈ {math.log2(n):.1f})"
+    return f"{n} URL(s) dans le sitemap (ordre de grandeur logarithmique : environ {math.log2(n):.1f})"
 
 
 DIAG_CONTEXTS = {"0.4": diag_context_0_4, "0.10": diag_context_0_10}

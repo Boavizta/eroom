@@ -288,8 +288,10 @@ def summarise(info):
     """Phrase courte pour l'annexe du rapport. None si info est None."""
     if not info:
         return None
+    # Ce texte est lu par le service audité, dans le questionnaire et dans le rapport :
+    # il est rédigé pour lui, sans notre vocabulaire d'outillage.
     parts = [
-        f"ressource 1st-party la plus récente : {info['age_jours_vs_capture']:.1f} jour(s) "
+        f"ressource de votre site la plus récente : {info['age_jours_vs_capture']:.1f} jour(s) "
         f"avant la capture (publiée à {info['heure_publication_utc']} UTC)"
     ]
     spread = info["dispersion_code_secondes"]
@@ -308,12 +310,16 @@ def summarise(info):
     stamp = info.get("horodatage_build_declare")
     if stamp and stamp.get("concorde_avec_last_modified"):
         parts.append(
-            f"paramètre d'anti-cache daté ({stamp['parametre']}) concordant avec "
-            f"le Last-Modified à {stamp['ecart_secondes']} s près, "
-            "donc généré par la chaîne de build"
+            f"les adresses de vos fichiers portent une date ({stamp['parametre']}) qui "
+            f"concorde à {stamp['ecart_secondes']} s près avec la date de dernière "
+            "modification déclarée par votre serveur, donc produite par votre chaîne "
+            "de fabrication"
         )
     elif stamp:
-        parts.append(f"paramètre d'anti-cache daté ({stamp['parametre']}) non concordant")
+        parts.append(
+            f"les adresses de vos fichiers portent une date ({stamp['parametre']}) qui ne "
+            "concorde pas avec la date de dernière modification déclarée par votre serveur"
+        )
     return " ; ".join(parts)
 
 
