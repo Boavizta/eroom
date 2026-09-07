@@ -369,13 +369,17 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
         lines.append(f"> **Note :** {bloc['note']}")
         lines.append("")
 
-    # Critères couverts et potentiel
+    # Critères couverts et potentiel : plomberie interne, en commentaires HTML.
+    # Ces deux informations servent à nous, jamais au service audité : un identifiant
+    # de critère et un nombre de points ne l'aident pas à répondre et lui donnent à
+    # lire le fonctionnement de notre outil. Elles restent dans le fichier, invisibles
+    # à la lecture, pour rester traçables.
     criteres_residu = [c for c in criteres if c in residu]
     potentiel = compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref)
 
-    lines.append(f"**Critères EOF couverts :** {', '.join(criteres_residu)}")
+    lines.append(f"<!-- criteres:{','.join(criteres_residu)} -->")
     if potentiel > 0:
-        lines.append(f"**Potentiel débloqué :** {potentiel:.1f} points")
+        lines.append(f"<!-- potentiel:{potentiel:.1f} -->")
     lines.append("")
 
     # Options
