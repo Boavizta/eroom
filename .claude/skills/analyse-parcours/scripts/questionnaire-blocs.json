@@ -156,7 +156,7 @@
       "type": "direct",
       "critere": "0.11",
       "question": "Comment évaluez-vous la fluidité et l'intuitivité des parcours utilisateurs ?",
-      "aide": "Regardez ce que disent vos utilisateurs, les endroits où ils buttent, les améliorations que vous avez en liste d'attente."
+      "aide": "Regardez ce que disent vos utilisateurs, les endroits où ils butent, les améliorations que vous avez en liste d'attente."
     },
     {
       "id": "porte-diag-0.12",
@@ -436,7 +436,7 @@
       "id": "detail-dim1-1.4",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Composants natifs vs personnalisés",
+      "titre": "Composants natifs ou personnalisés",
       "interlocuteur": "l'équipe de développement",
       "type": "direct",
       "critere": "1.4",
@@ -480,7 +480,7 @@
       "id": "detail-compose-appareils-anciens",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Appareils anciens",
+      "titre": "Tests sur les appareils anciens",
       "interlocuteur": "le responsable produit",
       "type": "compose",
       "options": [
