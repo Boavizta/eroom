@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Validateur de cohérence des clés EOF entre producteurs et consommateur.
+Validateur de cohérence des clés EOF entre producteurs et consommateurs.
 
 POURQUOI CE SCRIPT EXISTE
 -------------------------
-Deux scripts écrivent le même fichier eof-audit-results.json, et un troisième le lit.
-Si les deux producteurs n'écrivent pas les MÊMES noms de clés, le rapport affiche des
-blancs selon lequel des deux a produit le fichier.
+Deux scripts écrivent le même fichier eof-audit-results.json, deux autres le relisent
+pour fabriquer les livrables. Si les deux producteurs n'écrivent pas les MÊMES noms de
+clés, le livrable affiche des blancs selon lequel des deux a produit le fichier.
 
 Incident vécu : fusionner_lots.py écrivait "criteres_repondus" pendant que run_eof.py
 écrivait encore "criteres_repondus_auto", et le KPI du rapport affichait 0/54 au lieu
@@ -18,14 +18,16 @@ filet.
 CE QU'IL CONTRÔLE
 -----------------
 1. Les clés canoniques sont écrites par les DEUX producteurs
-2. Le consommateur lit chacune de ces clés, sauf celles dont le consommateur n'existe
-   pas encore et qui sont exemptées explicitement (CLES_PRODUITES_NON_ENCORE_LUES)
+2. Chaque clé canonique est lue par AU MOINS UN des consommateurs. Il y en a deux :
+   le rapport HTML et le générateur de radar. Une clé lue par l'un seulement est
+   couverte : ils ne montrent pas la même chose et n'ont pas à lire la même donnée.
 3. Aucun nom mort n'est ÉCRIT par un producteur (distinction écriture/lecture)
 4. Aucun nom de clé inventé (famille potentiel_*, completude_*, criteres_*)
 
 Distinction écriture/lecture (contrôle 3) :
-  - Le consommateur (generate_report_html.py) a le DROIT de LIRE les anciens noms
-    en repli pour que les audits déjà produits continuent de s'afficher.
+  - Les consommateurs (generate_report_html.py, generate_radar_svg.py) ont le DROIT de
+    LIRE les anciens noms en repli pour que les audits déjà produits continuent de
+    s'afficher.
   - Les producteurs (run_eof.py, fusionner_lots.py) ne doivent JAMAIS ÉCRIRE ces
     anciens noms.
   - Méthode retenue : analyse par recherche de string literals dans des contextes
@@ -52,7 +54,7 @@ CANONICAL_KEYS, plus bas dans ce fichier) :
   - criteres_total
   - potentiel_optimisation_global_pct
   - potentiel_optimisation_pct (par dimension)
-  - repondus_par_provenance (produite, pas encore lue : exemption du contrôle 2)
+  - repondus_par_provenance (lue par le radar depuis le chantier 13, plus par exemption)
   - provenance (par critère et par question de diagnostic, pas à la racine)
 """
 
@@ -70,6 +72,7 @@ DEFAULT_PATHS = {
     "run_eof": PROJECT_ROOT / ".claude/skills/analyse-parcours/scripts/run_eof.py",
     "fusionner_lots": PROJECT_ROOT / "processus/fusionner_lots.py",
     "generate_report": PROJECT_ROOT / ".claude/skills/analyse-parcours/scripts/generate_report_html.py",
+    "generate_radar": PROJECT_ROOT / ".claude/skills/eof/scripts/generate_radar_svg.py",
 }
 
 # Les clés canoniques que les deux producteurs doivent écrire à l'identique
@@ -106,16 +109,15 @@ DEAD_NAMES = {
 }
 
 # Clés produites mais pas encore consommées : exemption EXPLICITE et TEMPORAIRE du
-# contrôle 2 (lecture par le consommateur). Elles doivent quand même être écrites à
+# contrôle 2 (lecture par un consommateur). Elles doivent quand même être écrites à
 # l'identique par les deux producteurs, le contrôle 1 continue de s'appliquer.
 #
-# `repondus_par_provenance` : produite par les deux producteurs, à la racine et par
-# dimension. Son consommateur prévu est le radar à deux couches, chantier encore
-# ouvert. Retirer cette entrée le jour où le radar lit la clé : le contrôle 2
-# redeviendra alors bloquant, ce qui est le but.
-CLES_PRODUITES_NON_ENCORE_LUES = {
-    "repondus_par_provenance",
-}
+# VIDE depuis le chantier 13 : `repondus_par_provenance` y était, en attendant le
+# radar à deux couches. Le radar existe et lit la clé pour écrire le décompte par
+# provenance sous la figure, donc le contrôle 2 est redevenu bloquant sur elle, ce
+# qui était le but. Ne remplir cet ensemble que pour une clé dont le consommateur
+# n'est pas encore écrit, jamais pour faire taire une violation.
+CLES_PRODUITES_NON_ENCORE_LUES = set()
 
 # Familles de clés surveillées pour détecter les inventions
 KEY_FAMILIES = ["potentiel_", "completude_", "criteres_"]
@@ -197,8 +199,15 @@ def check_canonical_keys_written(written_keys, producer_name):
     return violations
 
 
-def check_canonical_keys_read(read_keys, consumer_name):
-    """Vérifie que toutes les clés canoniques sont lues par le consommateur.
+def check_canonical_keys_read(read_keys_par_consommateur):
+    """Vérifie que chaque clé canonique est lue par au moins un consommateur.
+
+    `read_keys_par_consommateur` : dict {nom_de_fichier: clés lues}.
+
+    Une clé lue par UN SEUL consommateur est couverte. Exiger que chacun lise tout
+    serait faux : le rapport HTML et le radar ne montrent pas la même chose. Ce que
+    le contrôle interdit, c'est qu'une clé écrite par les producteurs ne soit lue
+    par PERSONNE, cas où un renommage passe inaperçu jusqu'au livrable.
 
     Les clés de CLES_PRODUITES_NON_ENCORE_LUES sont exemptées, mais l'exemption est
     affichée : elle doit rester visible pour être levée un jour, pas devenir un
@@ -208,18 +217,25 @@ def check_canonical_keys_read(read_keys, consumer_name):
     """
     violations = []
     rappels = []
-    read_key_names = {key for key, lineno in read_keys if key != "PARSE_ERROR"}
+    lues_par = {}
+    for nom, read_keys in read_keys_par_consommateur.items():
+        for key, _lineno in read_keys:
+            if key != "PARSE_ERROR":
+                lues_par.setdefault(key, []).append(nom)
 
+    consommateurs = ", ".join(read_keys_par_consommateur)
     for key in sorted(CANONICAL_KEYS):
-        if key in read_key_names:
+        if key in lues_par:
             continue
         if key in CLES_PRODUITES_NON_ENCORE_LUES:
             rappels.append(
-                f"{consumer_name} : clé '{key}' produite mais pas encore lue "
+                f"clé '{key}' produite mais lue par aucun consommateur "
                 f"(exemption explicite, cf. CLES_PRODUITES_NON_ENCORE_LUES)"
             )
         else:
-            violations.append(f"{consumer_name} : clé canonique non lue '{key}'")
+            violations.append(
+                f"clé canonique '{key}' lue par aucun consommateur ({consommateurs})"
+            )
 
     return violations, rappels
 
@@ -297,7 +313,7 @@ def check_invented_keys(written_keys, producer_name):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Valide la cohérence des clés EOF entre producteurs et consommateur. "
+        description="Valide la cohérence des clés EOF entre producteurs et consommateurs. "
                     "Refuse toute divergence de nommage qui ferait afficher des blancs dans le rapport."
     )
     parser.add_argument("--test-dir", type=Path,
@@ -311,7 +327,14 @@ def main():
             "run_eof": args.test_dir / "run_eof.py",
             "fusionner_lots": args.test_dir / "fusionner_lots.py",
             "generate_report": args.test_dir / "generate_report_html.py",
+            "generate_radar": args.test_dir / "generate_radar_svg.py",
         }
+        # En test négatif, on ne copie que le fichier qu'on veut casser. Un
+        # consommateur absent du répertoire de test est repris de l'état réel du
+        # repo : sinon le test ne pourrait porter que sur un seul fichier à la fois.
+        for name, path in paths.items():
+            if not path.exists():
+                paths[name] = DEFAULT_PATHS[name]
     else:
         paths = DEFAULT_PATHS
 
@@ -323,9 +346,10 @@ def main():
 
     print("-" * 70)
     print("  COHÉRENCE DES CLÉS EOF")
-    print(f"  Producteur 1  : {paths['run_eof'].name}")
-    print(f"  Producteur 2  : {paths['fusionner_lots'].name}")
-    print(f"  Consommateur  : {paths['generate_report'].name}")
+    print(f"  Producteur 1   : {paths['run_eof'].name}")
+    print(f"  Producteur 2   : {paths['fusionner_lots'].name}")
+    print(f"  Consommateur 1 : {paths['generate_report'].name}")
+    print(f"  Consommateur 2 : {paths['generate_radar'].name}")
     print(f"  {len(CANONICAL_KEYS)} clés canoniques à vérifier")
     print("-" * 70)
     print()
@@ -337,6 +361,7 @@ def main():
         source_run_eof = paths["run_eof"].read_text(encoding="utf-8")
         source_fusionner = paths["fusionner_lots"].read_text(encoding="utf-8")
         source_generate = paths["generate_report"].read_text(encoding="utf-8")
+        source_radar = paths["generate_radar"].read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         print(f"[erreur] Impossible de lire les fichiers : {exc}")
         return 1
@@ -344,15 +369,19 @@ def main():
     # Extraire les clés écrites et lues
     written_run_eof = extract_written_keys(source_run_eof, paths["run_eof"])
     written_fusionner = extract_written_keys(source_fusionner, paths["fusionner_lots"])
-    read_generate = extract_read_keys(source_generate, paths["generate_report"])
+    read_par_consommateur = {
+        paths["generate_report"].name: extract_read_keys(source_generate, paths["generate_report"]),
+        paths["generate_radar"].name: extract_read_keys(source_radar, paths["generate_radar"]),
+    }
 
     # Vérifier les erreurs de parsing
     if any(key == "PARSE_ERROR" for key, _ in written_run_eof):
         violations.append(f"run_eof.py : erreur de parsing, contrôle impossible")
     if any(key == "PARSE_ERROR" for key, _ in written_fusionner):
         violations.append(f"fusionner_lots.py : erreur de parsing, contrôle impossible")
-    if any(key == "PARSE_ERROR" for key, _ in read_generate):
-        violations.append(f"generate_report_html.py : erreur de parsing, contrôle impossible")
+    for nom, read_keys in read_par_consommateur.items():
+        if any(key == "PARSE_ERROR" for key, _ in read_keys):
+            violations.append(f"{nom} : erreur de parsing, contrôle impossible")
 
     if violations:
         print("[ÉCHEC] Erreurs de parsing :")
@@ -366,9 +395,9 @@ def main():
     violations.extend(check_canonical_keys_written(written_run_eof, "run_eof.py"))
     violations.extend(check_canonical_keys_written(written_fusionner, "fusionner_lots.py"))
 
-    # Contrôle 2 : Le consommateur lit chacune des clés canoniques, sauf celles
-    # explicitement exemptées parce que leur consommateur n'existe pas encore.
-    violations_lecture, rappels = check_canonical_keys_read(read_generate, "generate_report_html.py")
+    # Contrôle 2 : chaque clé canonique est lue par au moins un consommateur, sauf
+    # celles explicitement exemptées parce que leur consommateur n'existe pas encore.
+    violations_lecture, rappels = check_canonical_keys_read(read_par_consommateur)
     violations.extend(violations_lecture)
 
     # Contrôle 3 : Aucun nom mort n'est ÉCRIT par un producteur
@@ -394,9 +423,10 @@ def main():
 
     nb_cles = len(CANONICAL_KEYS)
     nb_lues = nb_cles - len(CLES_PRODUITES_NON_ENCORE_LUES)
+    noms_consommateurs = " et ".join(read_par_consommateur)
     print(f"[OK] Producteur 1 (run_eof.py) écrit les {nb_cles} clés canoniques")
     print(f"[OK] Producteur 2 (fusionner_lots.py) écrit les {nb_cles} clés canoniques")
-    print(f"[OK] Consommateur (generate_report_html.py) lit les {nb_lues} clés attendues de lui")
+    print(f"[OK] Les {nb_lues} clés attendues sont lues par {noms_consommateurs}")
     print("[OK] Aucun nom mort écrit par les producteurs")
     print("[OK] Aucune clé inventée")
     for rappel in rappels:
