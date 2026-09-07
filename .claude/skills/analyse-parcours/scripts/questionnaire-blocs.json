@@ -159,8 +159,7 @@
       "type": "direct",
       "critere": "0.16",
       "question": "Dans quel pays votre service est-il hébergé ?",
-      "aide": "Cette question est normalement répondue automatiquement par un script d'analyse, mais vous pouvez la renseigner manuellement si nécessaire.",
-      "note": "Cette question est automatiquement remplie par un script qui détermine l'intensité carbone du mix électrique du pays d'hébergement. Elle est incluse ici pour complétude mais devrait être filtrée lors de la génération du questionnaire si déjà renseignée."
+      "aide": "Cette question est normalement répondue automatiquement par un script d'analyse, mais vous pouvez la renseigner manuellement si nécessaire."
     },
     {
       "id": "porte-dim6-6.1",

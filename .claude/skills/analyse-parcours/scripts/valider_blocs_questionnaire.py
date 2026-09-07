@@ -143,6 +143,9 @@ class Validateur:
     def _valider_cles_bloc(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide les cles d'un bloc."""
         cles_obligatoires = {"id", "fichier", "phase", "titre", "type", "question"}
+        # "note" est RENDUE au questionnaire, donc lue par la personne auditee :
+        # elle s'adresse a elle, jamais au developpeur de l'outil. Ne rien y mettre
+        # qui parle de la generation, du filtrage ou d'un futur chantier.
         cles_optionnelles = {"critere", "options", "aide", "note"}
         cles_autorisees = cles_obligatoires | cles_optionnelles
 
