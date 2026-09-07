@@ -313,6 +313,11 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
         lines.append(f"*{bloc['aide']}*")
         lines.append("")
 
+    # Note en blockquote gras si présente
+    if bloc.get("note"):
+        lines.append(f"> **Note :** {bloc['note']}")
+        lines.append("")
+
     # Critères couverts et potentiel
     criteres_residu = [c for c in criteres if c in residu]
     potentiel = compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref)
@@ -876,6 +881,98 @@ def autotest():
                     echecs.append(("Tri numérique 0.2 avant 0.10", f"0.2 après 0.10 (positions : {pos_02} > {pos_010})"))
     except Exception as exc:
         echecs.append(("Tri numérique 0.2 avant 0.10", f"Exception : {exc}"))
+
+    # Cas 8 : Rendu de la clé `note`
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {
+                        "id": "4.1",
+                        "pilier": "🔍 4 — Observabilité",
+                        "critere": "Test 4.1",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    },
+                    {
+                        "id": "4.2",
+                        "pilier": "🔍 4 — Observabilité",
+                        "critere": "Test 4.2",
+                        "potentiel_max": 1.0,
+                        "options_evaluation": ["✅ Point fort confirmé"],
+                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                    }
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "test-avec-note",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test avec note",
+                        "type": "direct",
+                        "critere": "4.1",
+                        "question": "Question avec note ?",
+                        "aide": "Aide test",
+                        "note": "À valider avec le responsable produit"
+                    },
+                    {
+                        "id": "test-sans-note",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Test sans note",
+                        "type": "direct",
+                        "critere": "4.2",
+                        "question": "Question sans note ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "4.1", "reponse": None},
+                    {"id": "4.2", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_file("technique", blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir)
+
+            if result is None:
+                echecs.append(("Rendu clé note", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Vérifier que la note apparaît pour le bloc test-avec-note
+                if "> **Note :** À valider avec le responsable produit" not in content:
+                    echecs.append(("Rendu clé note", "Note absente pour bloc avec note"))
+                # Vérifier qu'aucune note n'apparaît pour le bloc test-sans-note
+                # On cherche entre le marqueur du bloc et la ligne des critères
+                pos_sans_note = content.find("<!-- bloc:test-sans-note -->")
+                if pos_sans_note != -1:
+                    section_sans_note = content[pos_sans_note:pos_sans_note + 500]
+                    if "> **Note :**" in section_sans_note:
+                        echecs.append(("Rendu clé note", "Note présente pour bloc sans note (ne devrait pas)"))
+    except Exception as exc:
+        echecs.append(("Rendu clé note", f"Exception : {exc}"))
 
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")

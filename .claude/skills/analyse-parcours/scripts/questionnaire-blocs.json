@@ -298,13 +298,6 @@
             "1.13": "💡 Potentiel d'amélioration identifié",
             "1.14": "💡 Potentiel d'amélioration identifié"
           }
-        },
-        {
-          "libelle": "Je ne sais pas ou cela n'a pas été évalué",
-          "reponses": {
-            "1.13": "🤔 À évaluer",
-            "1.14": "🤔 À évaluer"
-          }
         }
       ]
     },
@@ -343,13 +336,6 @@
           "reponses": {
             "3.9": "💡 Potentiel d'amélioration identifié",
             "4.4": "💡 Potentiel d'amélioration identifié"
-          }
-        },
-        {
-          "libelle": "Je ne sais pas",
-          "reponses": {
-            "3.9": "🤔 À évaluer",
-            "4.4": "🤔 À évaluer"
           }
         },
         {
@@ -432,14 +418,44 @@
       "aide": "Analyses d'usage, commentaires utilisateurs, suppression des fonctionnalités redondantes ou inutilisées."
     },
     {
-      "id": "detail-dim1-1.8",
+      "id": "detail-compose-appareils-anciens",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Compatibilité avec appareils anciens",
-      "type": "direct",
-      "critere": "1.8",
-      "question": "Votre service fonctionne-t-il correctement sur les appareils les plus anciens de votre cible ?",
-      "aide": "Pas de mises à niveau forcées, pas de dégradation de performance accélérant l'obsolescence."
+      "titre": "Fonctionnement sur les appareils les plus anciens ciblés",
+      "type": "compose",
+      "question": "Comment votre service se comporte-t-il sur les appareils les plus anciens de votre cible ?",
+      "aide": "Le \"groupe cible\" est la liste des appareils que vous vous engagez à supporter.",
+      "note": "Le périmètre des appareils ciblés est une décision produit : à valider avec le responsable produit.",
+      "options": [
+        {
+          "libelle": "Nous testons sur les appareils les plus anciens de notre cible, et aucun problème de compatibilité n'a été détecté",
+          "reponses": {
+            "1.8": "✅ Point fort confirmé",
+            "5.9": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Nous avons détecté des problèmes de compatibilité, mais le service reste utilisable sur ces appareils",
+          "reponses": {
+            "1.8": "✅ Point fort confirmé",
+            "5.9": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Nous avons détecté des problèmes de compatibilité qui dégradent réellement l'usage sur ces appareils",
+          "reponses": {
+            "1.8": "💡 Potentiel d'amélioration identifié",
+            "5.9": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Notre service ne cible aucun appareil ancien : le parc utilisateur est récent et maîtrisé",
+          "reponses": {
+            "1.8": "🚫 Non applicable",
+            "5.9": "🚫 Non applicable"
+          }
+        }
+      ]
     },
     {
       "id": "detail-dim1-1.9",
@@ -479,7 +495,8 @@
       "type": "direct",
       "critere": "1.12",
       "question": "Limitez-vous strictement le nombre de traceurs et d'outils de suivi au nécessaire ?",
-      "aide": "Chaque traceur doit être justifié, les outils redondants ou inutiles supprimés."
+      "aide": "Chaque traceur doit être justifié, les outils redondants ou inutiles supprimés.",
+      "note": "La justification de chaque traceur est une décision produit ou marketing : à valider avec le responsable produit."
     },
     {
       "id": "detail-dim1-1.15",
@@ -592,24 +609,43 @@
       "aide": "VM, conteneurs, services gérés, plateformes *aaS qui partagent les ressources avec d'autres projets."
     },
     {
-      "id": "detail-dim3-3.6",
+      "id": "detail-compose-dimensionnement",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Dimensionnement des composants",
-      "type": "direct",
-      "critere": "3.6",
-      "question": "Vos composants d'infrastructure ont-ils une charge suffisante ?",
-      "aide": "Vérifier via l'observabilité que CPU et RAM sont utilisés à au moins 70%, sinon redimensionner."
-    },
-    {
-      "id": "detail-dim3-3.7",
-      "fichier": "technique",
-      "phase": "detail",
-      "titre": "Élasticité et auto-scaling",
-      "type": "direct",
-      "critere": "3.7",
-      "question": "Disposez-vous d'outils d'élasticité pour ajuster automatiquement votre infrastructure ?",
-      "aide": "Auto-scaling contrôlé, orchestrateurs, conteneurs, fonctions serverless pour adapter les ressources à la charge."
+      "titre": "Dimensionnement et élasticité de l'infrastructure",
+      "type": "compose",
+      "question": "Vos composants sont-ils utilisés à pleine charge, et leur nombre s'ajuste-t-il à la charge ?",
+      "aide": "Le référentiel considère un composant bien dimensionné à partir de 70 % de charge CPU ou RAM. L'auto-scaling doit être borné par une limite, pas laissé libre.",
+      "options": [
+        {
+          "libelle": "Nos composants tournent à au moins 70 % de charge CPU ou RAM, et un auto-scaling borné est en place (ou la charge est constante)",
+          "reponses": {
+            "3.6": "✅ Point fort confirmé",
+            "3.7": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Nos composants tournent à au moins 70 % de charge, mais il n'y a pas d'auto-scaling alors que la charge varie",
+          "reponses": {
+            "3.6": "✅ Point fort confirmé",
+            "3.7": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Nos composants tournent en dessous de 70 % de charge, mais un auto-scaling borné est en place (ou la charge est constante)",
+          "reponses": {
+            "3.6": "💡 Potentiel d'amélioration identifié",
+            "3.7": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Nos composants tournent en dessous de 70 % de charge, et il n'y a pas d'auto-scaling alors que la charge varie",
+          "reponses": {
+            "3.6": "💡 Potentiel d'amélioration identifié",
+            "3.7": "💡 Potentiel d'amélioration identifié"
+          }
+        }
+      ]
     },
     {
       "id": "detail-dim3-3.8",
@@ -622,14 +658,44 @@
       "aide": "Environnements de développement ou de test désactivés la nuit, le week-end, ou entre deux utilisations."
     },
     {
-      "id": "detail-dim4-4.1",
+      "id": "detail-compose-donnees-anciennes",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Suppression et archivage",
-      "type": "direct",
-      "critere": "4.1",
-      "question": "Disposez-vous de mécanismes automatiques pour supprimer ou archiver les données obsolètes ?",
-      "aide": "Règles de conservation formalisées, automatisation des suppressions et de l'archivage."
+      "titre": "Cycle de vie des données anciennes",
+      "type": "compose",
+      "question": "Que devient une donnée devenue inutile ou très rarement consultée ?",
+      "aide": "On parle ici de suppression et d'archivage automatiques, et de bascule vers un stockage moins coûteux et plus lent.",
+      "note": "Le caractère acceptable d'un accès plus lent pour l'utilisateur est une décision produit : à valider avec le responsable produit.",
+      "options": [
+        {
+          "libelle": "Des mécanismes automatiques de suppression et d'archivage sont appliqués, ET les données rarement consultées ont déjà été basculées vers un stockage à froid",
+          "reponses": {
+            "4.1": "✅ Point fort confirmé",
+            "4.6": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Des mécanismes automatiques de suppression et d'archivage sont appliqués, mais tout reste sur le stockage principal",
+          "reponses": {
+            "4.1": "✅ Point fort confirmé",
+            "4.6": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Aucun mécanisme automatique, mais les données rarement consultées ont déjà été basculées vers un stockage à froid",
+          "reponses": {
+            "4.1": "💡 Potentiel d'amélioration identifié",
+            "4.6": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Aucun mécanisme automatique, et tout reste sur le stockage principal",
+          "reponses": {
+            "4.1": "💡 Potentiel d'amélioration identifié",
+            "4.6": "💡 Potentiel d'amélioration identifié"
+          }
+        }
+      ]
     },
     {
       "id": "detail-dim4-4.2",
@@ -662,34 +728,43 @@
       "aide": "Duplication pour haute disponibilité ou dénormalisation intentionnelle, par opposition à duplication accidentelle."
     },
     {
-      "id": "detail-dim4-4.6",
+      "id": "detail-compose-outils-efficacite",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Stockage à froid",
-      "type": "direct",
-      "critere": "4.6",
-      "question": "Les données rarement consultées sont-elles transférées vers un stockage plus économe en énergie ?",
-      "aide": "Archivage des données anciennes sur un support plus lent mais moins énergivore."
-    },
-    {
-      "id": "detail-dim5-5.1",
-      "fichier": "technique",
-      "phase": "detail",
-      "titre": "Analyse statique du code",
-      "type": "direct",
-      "critere": "5.1",
-      "question": "Utilisez-vous des outils d'analyse statique qui ont révélé des pistes d'amélioration de l'efficacité ?",
-      "aide": "Outils d'analyse de code identifiant des problèmes de performance et d'efficacité."
-    },
-    {
-      "id": "detail-dim5-5.2",
-      "fichier": "technique",
-      "phase": "detail",
-      "titre": "Tests de charge et résistance",
-      "type": "direct",
-      "critere": "5.2",
-      "question": "Des tests de charge ou de résistance ont-ils mis en évidence des problèmes d'efficacité ?",
-      "aide": "Campagnes de tests sous charge ou en conditions extrêmes révélant des points faibles."
+      "titre": "Ce que vos outils de mesure ont révélé",
+      "type": "compose",
+      "question": "Vos outils d'analyse statique et vos campagnes de charge ont-ils révélé des problèmes d'efficacité ?",
+      "aide": "Le référentiel considère qu'une pratique absente laisse un potentiel d'amélioration, au même titre qu'une pratique qui a révélé un problème.",
+      "options": [
+        {
+          "libelle": "Les deux pratiques sont en place et n'ont révélé aucun problème d'efficacité",
+          "reponses": {
+            "5.1": "✅ Point fort confirmé",
+            "5.2": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "L'analyse statique n'a rien révélé, mais la campagne de charge a révélé des problèmes, ou nous n'en menons pas",
+          "reponses": {
+            "5.1": "✅ Point fort confirmé",
+            "5.2": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "L'analyse statique a révélé des gains possibles, ou nous n'en faisons pas, mais la campagne de charge n'a rien révélé",
+          "reponses": {
+            "5.1": "💡 Potentiel d'amélioration identifié",
+            "5.2": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Les deux ont révélé des problèmes, ou au moins l'une des deux pratiques est absente",
+          "reponses": {
+            "5.1": "💡 Potentiel d'amélioration identifié",
+            "5.2": "💡 Potentiel d'amélioration identifié"
+          }
+        }
+      ]
     },
     {
       "id": "detail-dim5-5.3",
@@ -709,7 +784,8 @@
       "type": "direct",
       "critere": "5.4",
       "question": "Vos indicateurs de performance actuels correspondent-ils à l'ambition du projet ?",
-      "aide": "Latence, requêtes par seconde, Core Web Vitals, temps de réponse."
+      "aide": "Latence, requêtes par seconde, Core Web Vitals, temps de réponse.",
+      "note": "L'ambition de performance du projet est une décision produit : à valider avec le responsable produit."
     },
     {
       "id": "detail-dim5-5.5",
@@ -722,14 +798,43 @@
       "aide": "Analyse et amélioration des chemins de code les plus empruntés."
     },
     {
-      "id": "detail-dim5-5.6",
+      "id": "detail-compose-a-jour",
       "fichier": "technique",
       "phase": "detail",
-      "titre": "Mise à jour de la pile technique",
-      "type": "direct",
-      "critere": "5.6",
-      "question": "Votre pile technique est-elle à jour, au moins sur les dernières versions LTS ?",
-      "aide": "Versions des langages et runtimes utilisés."
+      "titre": "Fraîcheur de la pile technique et des dépendances",
+      "type": "compose",
+      "question": "Votre socle technique et vos dépendances sont-ils à jour ?",
+      "aide": "Le socle, c'est le runtime ou la plateforme (JVM, Node, Python, PHP). Les dépendances, ce sont les bibliothèques et frameworks du projet.",
+      "options": [
+        {
+          "libelle": "Le socle est au moins sur la dernière version LTS ET les principales dépendances sont à jour",
+          "reponses": {
+            "5.6": "✅ Point fort confirmé",
+            "5.8": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Le socle est au moins sur la dernière version LTS, mais des dépendances importantes sont en retard",
+          "reponses": {
+            "5.6": "✅ Point fort confirmé",
+            "5.8": "💡 Potentiel d'amélioration identifié"
+          }
+        },
+        {
+          "libelle": "Le socle est en retard sur la dernière version LTS, mais les principales dépendances sont à jour",
+          "reponses": {
+            "5.6": "💡 Potentiel d'amélioration identifié",
+            "5.8": "✅ Point fort confirmé"
+          }
+        },
+        {
+          "libelle": "Le socle est en retard ET des dépendances importantes le sont aussi",
+          "reponses": {
+            "5.6": "💡 Potentiel d'amélioration identifié",
+            "5.8": "💡 Potentiel d'amélioration identifié"
+          }
+        }
+      ]
     },
     {
       "id": "detail-dim5-5.7",
@@ -740,26 +845,6 @@
       "critere": "5.7",
       "question": "Avez-vous étudié si la configuration de vos composants pourrait améliorer leur efficacité ?",
       "aide": "Paramètres de runtime, tuning de la JVM ou de composants similaires."
-    },
-    {
-      "id": "detail-dim5-5.8",
-      "fichier": "technique",
-      "phase": "detail",
-      "titre": "Dépendances à jour",
-      "type": "direct",
-      "critere": "5.8",
-      "question": "Les principales dépendances de votre projet sont-elles à jour ?",
-      "aide": "Versions stables des bibliothèques et frameworks utilisés."
-    },
-    {
-      "id": "detail-dim5-5.9",
-      "fichier": "technique",
-      "phase": "detail",
-      "titre": "Problèmes de compatibilité",
-      "type": "direct",
-      "critere": "5.9",
-      "question": "Avez-vous détecté des problèmes de compatibilité avec les appareils ciblés ?",
-      "aide": "Tests sur différents navigateurs, systèmes d'exploitation ou configurations matérielles."
     }
   ]
 }

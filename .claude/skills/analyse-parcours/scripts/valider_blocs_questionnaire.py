@@ -13,6 +13,8 @@ Il verifie :
 - L'absence de doublons (id de bloc, options identiques dans un meme bloc)
 - La coherence des criteres dans un bloc compose (memes criteres dans toutes les options)
 - Les champs non vides (titre, question)
+- L'interdiction du libelle "🤔 À évaluer" dans les blocs composes
+- L'absence de chevauchement (un critere couvert par plusieurs blocs)
 
 Ce qu'il ne verifie PAS :
 - La fidelite de la question a la methode du critere (jugement humain requis)
@@ -32,6 +34,16 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
+
+
+# Libelle interdit dans les blocs composes : ce libelle a un coefficient de 0,
+# exactement comme "Point fort confirme", donc le repondant qui coche cette case
+# fait monter la completude et pose un point a 0% sur le radar, affichant un
+# service exemplaire alors que personne ne sait rien. Le generateur ajoute deja
+# de lui-meme une case "Je ne sais pas" qui ne pose aucune reponse.
+# Note : "⌛️ Évaluation en cours" (coefficient 0.5) est volontairement exclu de
+# ce verrou, car le repondant qui la coche affirme quelque chose de vrai.
+LIBELLE_INTERDIT_BLOC_COMPOSE = "🤔 À évaluer"
 
 
 # Chemins par defaut, resolus depuis l'emplacement de CE fichier et non depuis le
@@ -100,12 +112,18 @@ class Validateur:
             # 6. Verifier les libelles de reponse
             self._valider_libelles_reponses(bloc, id_bloc)
 
-            # 7 & 8. Pour les blocs composes : options identiques et coherence des criteres
+            # 7. Verifier l'absence de libelles interdits dans les blocs composes
+            self._valider_libelles_interdits(bloc, id_bloc)
+
+            # 8 & 9. Pour les blocs composes : options identiques et coherence des criteres
             if bloc.get("type") == "compose":
                 self._valider_bloc_compose(bloc, id_bloc)
 
-            # 9. Verifier les champs non vides
+            # 10. Verifier les champs non vides
             self._valider_champs_non_vides(bloc, id_bloc)
+
+        # 11. Verifier qu'un critere n'est pas couvert par plusieurs blocs
+        self._valider_unicite_criteres(blocs)
 
         return len(self.erreurs) == 0
 
@@ -206,6 +224,24 @@ class Validateur:
                         f"{id_bloc}, option {i}: libelle de reponse invalide pour {critere_id} : '{libelle_reponse}'"
                     )
 
+    def _valider_libelles_interdits(self, bloc: Dict[str, Any], id_bloc: str):
+        """Valide qu'aucun libelle interdit n'est utilise dans les blocs composes."""
+        if bloc.get("type") != "compose" or "options" not in bloc:
+            return
+
+        for i, option in enumerate(bloc["options"]):
+            if not isinstance(option, dict):
+                continue
+
+            reponses = option.get("reponses", {})
+            for critere_id, libelle_reponse in reponses.items():
+                if libelle_reponse == LIBELLE_INTERDIT_BLOC_COMPOSE:
+                    self.erreurs.append(
+                        f"{id_bloc}, option {i}, critere {critere_id}: libelle interdit "
+                        f"'{LIBELLE_INTERDIT_BLOC_COMPOSE}' - ce libelle a un coefficient de 0 "
+                        f"et fait monter la completude sans apporter d'information"
+                    )
+
     def _valider_bloc_compose(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide les contraintes specifiques aux blocs composes."""
         if "options" not in bloc:
@@ -259,6 +295,41 @@ class Validateur:
                 valeur = bloc[champ]
                 if not isinstance(valeur, str) or not valeur.strip():
                     self.erreurs.append(f"{id_bloc}: {champ} vide")
+
+    def _valider_unicite_criteres(self, blocs: List[Dict[str, Any]]):
+        """Valide qu'un critere n'est pas couvert par plusieurs blocs."""
+        critere_vers_blocs: Dict[str, List[str]] = {}
+
+        for bloc in blocs:
+            if not isinstance(bloc, dict):
+                continue
+
+            id_bloc = bloc.get("id", "<sans id>")
+
+            # Collecter les criteres couverts par ce bloc
+            criteres_couverts = set()
+
+            if bloc.get("type") == "direct" and "critere" in bloc:
+                criteres_couverts.add(bloc["critere"])
+
+            elif bloc.get("type") == "compose" and "options" in bloc:
+                for option in bloc["options"]:
+                    if isinstance(option, dict) and "reponses" in option:
+                        criteres_couverts.update(option["reponses"].keys())
+
+            # Enregistrer ce bloc pour chaque critere qu'il couvre
+            for critere_id in criteres_couverts:
+                if critere_id not in critere_vers_blocs:
+                    critere_vers_blocs[critere_id] = []
+                critere_vers_blocs[critere_id].append(id_bloc)
+
+        # Signaler les criteres couverts par plusieurs blocs
+        for critere_id, blocs_ids in critere_vers_blocs.items():
+            if len(blocs_ids) > 1:
+                blocs_str = ", ".join(blocs_ids)
+                self.erreurs.append(
+                    f"Critere {critere_id} couvert par plusieurs blocs : {blocs_str}"
+                )
 
     def imprimer_etat_des_lieux(self):
         """Imprime un recapitulatif de la bibliotheque."""
@@ -344,7 +415,9 @@ def autotest() -> bool:
                 "potentiel_max": 2.0,
                 "options_evaluation_coefficient": {
                     "✅ Point fort confirmé": 0,
-                    "💡 Potentiel d'amélioration identifié": 1
+                    "💡 Potentiel d'amélioration identifié": 1,
+                    "🤔 À évaluer": 0,
+                    "⌛️ Évaluation en cours": 0.5
                 }
             },
             {
@@ -678,6 +751,98 @@ def autotest() -> bool:
         print("✓ Test 12 : Bloc compose valide")
     else:
         print(f"✗ Test 12 : Bloc compose valide - ECHEC : {v.erreurs}")
+
+    # Test 13 : Bloc compose avec libelle interdit "🤔 À évaluer" (doit echouer)
+    tests_total += 1
+    blocs_libelle_interdit = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "test-13",
+                "fichier": "technique",
+                "phase": "detail",
+                "titre": "Test interdit",
+                "type": "compose",
+                "question": "Question ?",
+                "options": [
+                    {
+                        "libelle": "Option A",
+                        "reponses": {
+                            "1.1": "🤔 À évaluer"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    v = Validateur(blocs_libelle_interdit, referentiel_test)
+    if not v.valider() and any("libelle interdit" in e and "🤔 À évaluer" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 13 : Detection libelle interdit dans bloc compose")
+    else:
+        print(f"✗ Test 13 : Detection libelle interdit dans bloc compose - ECHEC")
+
+    # Test 14 : Bloc compose avec "⌛️ Évaluation en cours" (doit reussir)
+    tests_total += 1
+    blocs_evaluation_en_cours = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "test-14",
+                "fichier": "technique",
+                "phase": "detail",
+                "titre": "Test evaluation en cours",
+                "type": "compose",
+                "question": "Question ?",
+                "options": [
+                    {
+                        "libelle": "Option A",
+                        "reponses": {
+                            "1.1": "⌛️ Évaluation en cours"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    v = Validateur(blocs_evaluation_en_cours, referentiel_test)
+    if v.valider():
+        tests_reussis += 1
+        print("✓ Test 14 : Acceptation de 'Évaluation en cours'")
+    else:
+        print(f"✗ Test 14 : Acceptation de 'Évaluation en cours' - ECHEC : {v.erreurs}")
+
+    # Test 15 : Critere couvert par plusieurs blocs (doit echouer)
+    tests_total += 1
+    blocs_critere_duplique = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "test-15a",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Bloc A",
+                "type": "direct",
+                "critere": "1.1",
+                "question": "Q1"
+            },
+            {
+                "id": "test-15b",
+                "fichier": "technique",
+                "phase": "detail",
+                "titre": "Bloc B",
+                "type": "direct",
+                "critere": "1.1",
+                "question": "Q2"
+            }
+        ]
+    }
+    v = Validateur(blocs_critere_duplique, referentiel_test)
+    if not v.valider() and any("plusieurs blocs" in e and "1.1" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 15 : Detection critere couvert par plusieurs blocs")
+    else:
+        print(f"✗ Test 15 : Detection critere couvert par plusieurs blocs - ECHEC")
 
     print(f"\n{tests_reussis}/{tests_total} tests reussis")
     print("---------------------\n")
