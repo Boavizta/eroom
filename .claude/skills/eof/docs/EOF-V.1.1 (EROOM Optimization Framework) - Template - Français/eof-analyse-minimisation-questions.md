@@ -246,7 +246,32 @@ d'un côté, marketing-CRM-pixels publicitaires de l'autre) et fonder la
 réponse sur la seconde catégorie. Source additionnelle : le CSP (4.b) + le
 HTML déjà re-fetché.
 
-### 5.b Bug latent dans `parse_html_criteria.py` : attributs non quotés
+### 5.b Bug latent dans `parse_html_criteria.py` : attributs non quotés — ✅ CORRIGÉ le 2026-09-07
+
+⚠️ **Cette section décrit un état dépassé, elle est conservée pour son constat
+sur octo.com, qui reste vrai et qui a servi à mesurer l'impact.** Le défaut
+est corrigé : `parse_html_criteria.py` ne lit plus le HTML par expressions
+régulières mais par `html.parser` (bibliothèque standard). L'ordre des
+attributs, les guillemets, la casse, les entités et les chevrons dans une
+valeur d'attribut ont cessé d'être un sujet. La correction embarque son test :
+`python3 parse_html_criteria.py --autotest`, 32 cas, dont 13 écritures HTML
+que l'ancienne version lisait faux en silence.
+
+**La correction dépasse le périmètre décrit ci-dessous** : le défaut ne
+touchait pas 2 expressions mais 4, et la plus grave n'était pas celle-ci.
+`_AUTOPLAY_RE` prenait `<video class="no-autoplay">` et
+`<video data-autoplay="false">` pour des vidéos à lecture automatique, ce qui
+alimentait le critère `1.5` en provenance **`collecte`**, donc présenté au
+lecteur comme une mesure. Vérifié sur les données déjà sur le disque :
+`has_autoplay_media` vaut `False` sur les 6 pages d'octo.com, ce faux positif
+ne s'est donc **pas** déclenché ici.
+
+**Le texte d'origine suit. Sa dernière phrase, "à corriger (rendre le
+guillemet fermant optionnel)", est périmée** : rapiécer l'expression aurait
+laissé passer l'ordre des attributs et les trois autres formes d'écriture.
+
+-----
+
 
 octo.com sert du HTML minifié à attributs non quotés
 (`<script src=/scripts/home.js defer>`, `<link rel=stylesheet
