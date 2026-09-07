@@ -86,3 +86,15 @@ Deux pièges du référentiel, lisibles dans ces fichiers :
 - **Deux vocabulaires de réponse** : 44 critères en `✅ / 💡 / 🚫 / 🤔 / ⌛️`, et les 10
   critères de la dimension 6 en `🟢 / 🟡 / 🔴`, **sans option "À évaluer"**. Toujours lire
   `options_evaluation` du critère, ne jamais coder ces libellés en dur.
+
+⚠️ **Ces deux pièges ne sont que les plus visibles. Le recensement complet est dans
+[`PIEGES-REFERENTIEL.md`](PIEGES-REFERENTIEL.md)**, à lire **avant** de rédiger une question ou
+d'écrire un extracteur. Il documente verbatim, entre autres : les 8 crans du diagnostic rapide qui
+attribuent un cran extrême à qui répond ne pas savoir ; le fait que l'échelle de 1 à 5 **n'a pas
+d'orientation constante** d'une question à l'autre ; les critères dont le libellé et la `methode`
+ne posent pas la même question ; ceux qui sont validés par l'absence de découverte, donc qui
+récompensent l'inaction ; et tous les recoupements entre le diagnostic rapide et les critères
+détaillés, avec le motif de chaque refus.
+
+**La règle qui résume tout** : c'est la `methode` qui définit ce que le critère mesure, jamais le
+libellé ni l'`explication`.
