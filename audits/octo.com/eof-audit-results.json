@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T14:41:02.240627+00:00",
+  "generated_at": "2026-09-07T20:15:42.313182+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
   "criteres_repondus": 7,
@@ -137,7 +137,7 @@
         "reponse": null,
         "provenance": null,
         "source": null,
-        "indice_contextuel": "5 domaine(s) tiers détecté(s) dans le HAR (≠ dépendances techniques du SI, simple proxy) : api.analytics.octo.tools, cdn.jsdelivr.net, fonts.googleapis.com, fonts.gstatic.com, swetrix.org"
+        "indice_contextuel": "5 domaine(s) tiers détecté(s) lors de la capture (liste observée depuis l'extérieur, ne dit rien de l'architecture technique complète) : api.analytics.octo.tools, cdn.jsdelivr.net, fonts.googleapis.com, fonts.gstatic.com, swetrix.org"
       },
       {
         "id": "0.5",
@@ -296,7 +296,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
-      "contexte": "Boutons natifs <button> : 14 ; boutons personnalisés (role=\"button\") : 0 (toutes pages confondues)"
+      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 0 (sur l'ensemble des pages)"
     },
     {
       "id": "1.5",
@@ -356,7 +356,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
-      "contexte": "Poids réel transféré (page repère) : 702 Ko"
+      "contexte": "Données réellement transférées (page la plus lourde) : 702 Ko"
     },
     {
       "id": "1.10",
@@ -380,7 +380,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
-      "contexte": "Aucune règle @media (prefers-reduced-motion|prefers-color-scheme) détectée dans le CSS chargé"
+      "contexte": "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style"
     },
     {
       "id": "1.12",
@@ -416,7 +416,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
-      "contexte": "Page la plus lourde : https://octo.com/publications (1003 Ko) ; la plus légère : https://octo.com/recrutement/nos-offres (0 Ko)"
+      "contexte": "Page la plus lourde : https://octo.com/publications (1003 Ko)"
     },
     {
       "id": "1.15",
@@ -428,7 +428,7 @@
       "coefficient": null,
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
-      "contexte": "Trafic estimé : 281,000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "1.16",
@@ -440,7 +440,7 @@
       "coefficient": null,
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year",
-      "contexte": "Trafic estimé : 281,000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "2.1",
@@ -476,7 +476,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-      "contexte": "Composant(s) backend externalisé(s) détecté(s) (herokuapp.com) : ces domaines PaaS distincts suggèrent une architecture à composants séparés, mais ne prouvent ni l'efficacité de leur couplage ni l'optimisation de leur communication"
+      "contexte": "Plusieurs composants d'hébergement distincts détectés (herokuapp.com), ce qui suggère une architecture séparant les responsabilités. Nous ne pouvons pas évaluer de l'extérieur l'efficacité de leur couplage ni l'optimisation de leur communication."
     },
     {
       "id": "2.4",
@@ -500,7 +500,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
-      "contexte": "https://api.analytics.octo.tools/log/hb ×54; https://api.analytics.octo.tools/log/ ×18; https://octo.com/style.css?v=2026-6-10-1-1 ×11"
+      "contexte": "https://api.analytics.octo.tools/log/hb chargé 54 fois ; https://api.analytics.octo.tools/log/ chargé 18 fois ; https://octo.com/style.css?v=2026-6-10-1-1 chargé 11 fois"
     },
     {
       "id": "3.1",
@@ -548,7 +548,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
-      "contexte": "Infrastructure mutualisée déclarée au CSP : 6 domaine(s) (PaaS/CDN/cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com..."
+      "contexte": "Votre service fait appel à 6 service(s) d'infrastructure externe(s) (hébergement, diffusion de contenu, cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com..."
     },
     {
       "id": "3.6",
@@ -572,7 +572,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-      "contexte": "Plate-forme(s) PaaS détectée(s) (herokuapp.com) : ces services cloud supportent l'auto-scaling natif, mais rien ne prouve qu'il soit configuré ni que la charge du service varie suffisamment pour le justifier"
+      "contexte": "Votre service s'appuie sur une plate-forme d'hébergement (herokuapp.com) capable d'ajuster automatiquement ses ressources. Nous ne pouvons pas voir de l'extérieur si cet ajustement est activé chez vous, ni si votre charge varie assez pour le justifier."
     },
     {
       "id": "3.8",
@@ -728,7 +728,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
-      "contexte": "https://octo.com/ : JS inutilisé 79.02%; https://octo.com/recrutement : JS inutilisé 71.68%"
+      "contexte": "https://octo.com/ : JavaScript inutilisé 79.02% ; https://octo.com/recrutement : JavaScript inutilisé 71.68%"
     },
     {
       "id": "5.6",
@@ -788,7 +788,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
-      "contexte": "Score en-têtes sécurité (proxy indirect de maturité prod) : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn"
+      "contexte": "Score en-têtes de sécurité HTTP : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn - indicateur parmi d'autres de la maturité en production"
     },
     {
       "id": "6.2",
@@ -812,7 +812,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
-      "contexte": "ressource 1st-party la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; paramètre d'anti-cache daté (v=2026-6-10-1-1) concordant avec le Last-Modified à 19 s près, donc généré par la chaîne de build"
+      "contexte": "ressource de votre site la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; les adresses de vos fichiers portent une date (v=2026-6-10-1-1) qui concorde à 19 s près avec la date de dernière modification déclarée par votre serveur, donc produite par votre chaîne de fabrication"
     },
     {
       "id": "6.4",
@@ -848,7 +848,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
-      "contexte": "Best Practices Lighthouse (pire page) : 81%; en-têtes sécurité (pire page) : grade B; security.txt : absent"
+      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 81% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent"
     },
     {
       "id": "6.7",
@@ -872,7 +872,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
-      "contexte": "Audit Lighthouse 'duplicated-javascript-insight' : aucune duplication de bundle détectée (score parfait, 0 item) - ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente"
+      "contexte": "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée."
     },
     {
       "id": "6.9",
