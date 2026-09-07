@@ -43,35 +43,59 @@ travail de classification critère par critère est volumineux.
 
 ## Étapes
 
-### 1. Récupérer les données de la Google Sheet (si pas déjà fait, ou pour rafraîchir)
+### 1. La source de vérité est versionnée : ne pas la retélécharger sans raison
 
-9 onglets, 1 appel par `gid` via l'API `gviz` (les exports CSV/XLSX classiques
-échouent — redirection à jeton à usage unique) :
+L'export brut des 9 onglets est conservé dans **`docs/source-sheet/`**, versionné, avec
+son propre `README.md`. C'est la photocopie de la Sheet au **2026-09-02**, et c'est le
+seul point de comparaison permettant de savoir si EROOM a fait évoluer son référentiel.
+
+Vérifier si la Sheet a bougé, sans rien modifier :
 
 ```bash
-mkdir -p tmp/eof-gviz
-BASE="https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/gviz/tq?tqx=out:json"
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=1677462955" -o tmp/eof-gviz/a-lire.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=296916801"  -o tmp/eof-gviz/diag-rapide.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=2022239731" -o tmp/eof-gviz/produit.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=615231881"  -o tmp/eof-gviz/architecture.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=1603246930" -o tmp/eof-gviz/infrastructure.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=31675448"   -o tmp/eof-gviz/stockage.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=1046049603" -o tmp/eof-gviz/algo-code.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=24436077"   -o tmp/eof-gviz/facilite.json
-curl -sL -A "Mozilla/5.0" "${BASE}&gid=958616182"  -o tmp/eof-gviz/synthese.json
+.claude/skills/eof/scripts/verifier_source_sheet.sh
 ```
 
-`tmp/eof-gviz/` est un dossier de travail (pas commité) : les JSON déjà
-récupérés peuvent être réutilisés directement par l'étape 2 sans refaire les
-appels réseau, sauf si on veut des données plus fraîches (la Sheet peut
-évoluer — vérifié le 02/09/2026 : elle avait été enrichie de 43 à 54
-critères détaillés depuis l'export Excel initialement fourni).
+Code de sortie 0 si la Sheet est identique à la photocopie, 1 si un onglet a changé ou si
+un téléchargement échoue. Le script détecte aussi une Sheet devenue privée ou un onglet
+supprimé, cas qui renvoient du HTML avec un code 200 et se compareraient sinon en silence.
+
+Pour adopter une évolution, puis voir exactement ce qu'EROOM a changé :
+
+```bash
+.claude/skills/eof/scripts/verifier_source_sheet.sh --rafraichir
+git diff .claude/skills/eof/docs/source-sheet/
+```
+
+La Sheet évolue réellement : vérifié le 02/09/2026, elle avait été enrichie de 43 à 54
+critères détaillés depuis l'export Excel initialement fourni par EROOM.
+
+Le script porte l'identifiant de la Sheet et les 9 `gid` d'onglets. L'API `gviz` est
+obligatoire, les exports CSV et XLSX classiques échouent sur une redirection à jeton à
+usage unique. La recette brute, pour mémoire :
+
+```bash
+BASE="https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/gviz/tq?tqx=out:json"
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=1677462955" -o .claude/skills/eof/docs/source-sheet/a-lire.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=296916801"  -o .claude/skills/eof/docs/source-sheet/diag-rapide.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=2022239731" -o .claude/skills/eof/docs/source-sheet/produit.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=615231881"  -o .claude/skills/eof/docs/source-sheet/architecture.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=1603246930" -o .claude/skills/eof/docs/source-sheet/infrastructure.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=31675448"   -o .claude/skills/eof/docs/source-sheet/stockage.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=1046049603" -o .claude/skills/eof/docs/source-sheet/algo-code.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=24436077"   -o .claude/skills/eof/docs/source-sheet/facilite.json
+curl -sL -A "Mozilla/5.0" "${BASE}&gid=958616182"  -o .claude/skills/eof/docs/source-sheet/synthese.json
+```
+
+⚠️ Ces JSON étaient auparavant dans `tmp/eof-gviz/`, dossier ignoré par git, donc
+sauvegardés nulle part. Il en reste une copie à cet endroit, sans valeur : la référence
+est désormais `docs/source-sheet/`. Ne jamais réintroduire un chemin sous `tmp/` ici, ce
+serait perdre le point de comparaison avec la Sheet d'EROOM.
 
 ### 2. Construire le template Markdown
 
 ```bash
-python3 .claude/skills/eof/scripts/build_template.py tmp/eof-gviz \
+python3 .claude/skills/eof/scripts/build_template.py \
+  ".claude/skills/eof/docs/source-sheet" \
   ".claude/skills/eof/docs/EOF-V.1.1 (EROOM Optimization Framework) - Template - Français/EOF-V.1.1 (EROOM Optimization Framework) - Référentiel complet.md"
 ```
 
