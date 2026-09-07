@@ -20,6 +20,8 @@ import sys
 from xml.sax.saxutils import escape
 
 NAVY = "#2D4675"  # contraste ~9,35:1 sur fond blanc (RGAA/WCAG AAA)
+GREY = "#5F5F5F"  # contraste ~6,7:1 sur fond blanc : marqueur "N/A", visiblement
+                  # éteint par rapport au NAVY sans descendre sous le seuil AA
 SCALE = 100  # axe en pourcentage (0-100%), comme le radar du Google Sheet source
 
 AXES_EOF = [
@@ -32,7 +34,7 @@ AXES_EOF = [
 ]
 
 
-def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
+def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=720):
     """axes : liste de tuples (nom, valeur 0-100 OU None). Retourne le texte SVG complet.
 
     Une valeur `None` (dimension sans aucune donnée réelle) est rendue à
@@ -41,10 +43,23 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
     (qui signifierait "point fort confirmé partout"), une absence de
     réponse n'est pas une réponse.
 
-    width/height généreux par défaut : le libellé le plus long ("Facilité de
+    width généreux par défaut : le libellé le plus long ("Facilité de
     changement") dépasse largement le rayon du radar. Une valeur trop petite
     le coupe sur le bord de l'image (constaté et corrigé après vérification
     par rendu réel, pas par relecture du code).
+
+    height serré à l'inverse : le contenu le plus bas est le libellé de l'axe du
+    bas, dont la ligne de base tombe à cy + R + 55 = 635, et la note se pose à
+    height - 30. Une valeur trop grande ne coupe rien mais laisse une bande
+    blanche vide sous le radar, bien visible dans le rapport HTML où le SVG est
+    encadré (constaté à 900, ramené à 720).
+
+    Piège de vérification : contrôler ce rendu avec `qlmanage -t` (QuickLook)
+    donne une image fausse. Il produit une vignette carrée, décale le contenu
+    et coupe les libellés de droite, ce qui fait croire à un débordement
+    inexistant. Utiliser `rsvg-convert -o sortie.png fichier.svg`, qui respecte
+    le viewBox (il rend en revanche les emojis en noir, faute de police
+    couleur : c'est sa limite, pas celle du SVG).
     """
     cx, cy = width / 2, 360
     R = 220
@@ -112,8 +127,24 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
 
     for i, (name, val) in enumerate(axes):
         p = point(i, val)
-        svg.append(f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="6" fill="{NAVY}" stroke="white" stroke-width="1.5"/>')
         angle = -math.pi / 2 + i * 2 * math.pi / n
+        if val is None:
+            # Absence de réponse : cercle creux gris et libellé "N/A", jamais un
+            # pourcentage. Le libellé est repoussé plus loin que dans le cas
+            # chiffré parce que tous les axes sans réponse sont au même point,
+            # le centre : à 22 px, deux axes voisins se chevauchent.
+            svg.append(
+                f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="5" fill="white" '
+                f'stroke="{GREY}" stroke-width="2"/>'
+            )
+            lx = p[0] + 40 * math.cos(angle)
+            ly = p[1] + 40 * math.sin(angle)
+            svg.append(
+                f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" font-size="13" '
+                f'fill="{GREY}" font-weight="bold">N/A</text>'
+            )
+            continue
+        svg.append(f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="6" fill="{NAVY}" stroke="white" stroke-width="1.5"/>')
         lx = p[0] + 22 * math.cos(angle)
         ly = p[1] + 22 * math.sin(angle)
         svg.append(
@@ -133,12 +164,14 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=900):
 
 def _demo(output_path):
     """Radar de démonstration : valeurs fictives, une par axe, pour vérifier le rendu."""
-    valeurs_demo = [35, 70, 15, 85, 50, 40]
+    # Le dernier axe est volontairement à None : c'est le cas "aucune réponse",
+    # celui qu'on ne voit jamais autrement et qui affichait "None%" avant correction.
+    valeurs_demo = [35, 70, 15, 85, 50, None]
     axes = list(zip(AXES_EOF, valeurs_demo))
     svg_text = radar_svg(
         axes,
         title="Radar EROOM — test complet (6 axes, valeurs fictives)",
-        note="Exemple avec des valeurs fictives de potentiel d'optimisation, uniquement pour valider le rendu visuel",
+        note="Exemple avec des valeurs fictives de potentiel d'optimisation, dont un axe sans réponse, uniquement pour valider le rendu visuel",
     )
     with open(output_path, "w") as f:
         f.write(svg_text)

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="900" viewBox="0 0 1100 900" font-family="sans-serif">
-<rect width="1100" height="900" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720" font-family="sans-serif">
+<rect width="1100" height="720" fill="white"/>
 <text x="550.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">EOF — potentiel d'optimisation (octo.com)</text>
 <circle cx="550.0" cy="360" r="55.0" fill="none" stroke="#ccc" stroke-width="1"/>
 <text x="556.0" y="301.0" font-size="12" fill="#666">25%</text>
@@ -28,11 +28,11 @@
 <text x="569.1" y="349.0" text-anchor="middle" font-size="13" fill="#2D4675" font-weight="bold">0.0%</text>
 <circle cx="573.8" cy="373.8" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"/>
 <text x="592.9" y="384.8" text-anchor="middle" font-size="13" fill="#2D4675" font-weight="bold">12.5%</text>
-<circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"/>
-<text x="550.0" y="382.0" text-anchor="middle" font-size="13" fill="#2D4675" font-weight="bold">None%</text>
+<circle cx="550.0" cy="360.0" r="5" fill="white" stroke="#5F5F5F" stroke-width="2"/>
+<text x="550.0" y="400.0" text-anchor="middle" font-size="13" fill="#5F5F5F" font-weight="bold">N/A</text>
 <circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"/>
 <text x="530.9" y="371.0" text-anchor="middle" font-size="13" fill="#2D4675" font-weight="bold">0.0%</text>
-<circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"/>
-<text x="530.9" y="349.0" text-anchor="middle" font-size="13" fill="#2D4675" font-weight="bold">None%</text>
-<text x="550.0" y="870" text-anchor="middle" font-size="12" fill="#666">7/54 critères répondus automatiquement — les axes 'N/A' n'ont aucune réponse (jamais un faux 0%)</text>
+<circle cx="550.0" cy="360.0" r="5" fill="white" stroke="#5F5F5F" stroke-width="2"/>
+<text x="515.4" y="340.0" text-anchor="middle" font-size="13" fill="#5F5F5F" font-weight="bold">N/A</text>
+<text x="550.0" y="690" text-anchor="middle" font-size="12" fill="#666">7/54 critères répondus automatiquement — les axes 'N/A' n'ont aucune réponse (jamais un faux 0%)</text>
 </svg>
