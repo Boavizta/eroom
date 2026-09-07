@@ -335,11 +335,11 @@ def main():
             print(f"         {err}")
         return 1
 
-    print("=" * 68)
+    print("-" * 68)
     print(f"  VALIDATION SORTIE LOT EOF — {fichier.name}")
     print(f"  fichier     : {fichier}")
     print(f"  référentiel : {REFERENTIEL_PATH.relative_to(PROJECT_ROOT)}")
-    print("=" * 68)
+    print("-" * 68)
     print()
 
     violations = []

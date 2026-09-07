@@ -321,13 +321,13 @@ def main():
             print(f"[erreur] Fichier introuvable : {path}")
             return 1
 
-    print("=" * 70)
+    print("-" * 70)
     print("  COHÉRENCE DES CLÉS EOF")
     print(f"  Producteur 1  : {paths['run_eof'].name}")
     print(f"  Producteur 2  : {paths['fusionner_lots'].name}")
     print(f"  Consommateur  : {paths['generate_report'].name}")
     print(f"  {len(CANONICAL_KEYS)} clés canoniques à vérifier")
-    print("=" * 70)
+    print("-" * 70)
     print()
 
     violations = []

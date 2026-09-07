@@ -265,11 +265,11 @@ def print_hypotheses(spec):
     fidèle que l'ancien tableau (qui relisait env-data.json en parallèle du
     calcul et pouvait diverger de ce qui est réellement utilisé)."""
     print()
-    print("=" * 65)
+    print("-" * 65)
     print("  AVERTISSEMENT : ESTIMATION HYPOTHÉTIQUE")
     print("  Les valeurs ci-dessous sont des hypothèses de calcul.")
     print("  Elles ne constituent pas une mesure réelle.")
-    print("=" * 65)
+    print("-" * 65)
     print()
     print(f"  {'Paramètre':<35} {'Valeur':<18} {'Source'}")
     print(f"  {'-'*35} {'-'*18} {'-'*12}")
@@ -303,9 +303,9 @@ def print_hypotheses(spec):
 
 def print_reserves(reserves):
     print()
-    print("=" * 65)
+    print("-" * 65)
     print("  RÉSERVES DE CALCUL — la spécification ne peut pas être publiée telle quelle")
-    print("=" * 65)
+    print("-" * 65)
     for code, message in reserves:
         print(f"\n  [{code}] {message}")
         options = arbitrations_for(code)
@@ -323,11 +323,11 @@ def print_results(spec, built, ranges):
     visits = spec.audience.visits_per_year.value if spec.audience and spec.audience.visits_per_year else 0
 
     print()
-    print("=" * 65)
+    print("-" * 65)
     print("  RÉSULTATS — ESTIMATION HYPOTHÉTIQUE CO2e")
     if visits:
         print(f"  Base : {visits:,.0f} visites/an")
-    print("=" * 65)
+    print("-" * 65)
     print()
     print(f"  Total annuel estimé  : ~{total:.1f} kg CO2e/an")
     if visits:

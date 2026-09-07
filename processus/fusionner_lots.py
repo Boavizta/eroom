@@ -588,12 +588,12 @@ def main():
     output_path = audit_dir / "eof-audit-results.json"
     domaine = audit_dir.name
 
-    print("=" * 68)
+    print("-" * 68)
     print(f"  FUSION DES LOTS EOF — {domaine}")
     print(f"  répertoire  : {audit_dir}")
     print(f"  lots        : {lots_dir}")
     print(f"  sortie      : {output_path}")
-    print("=" * 68)
+    print("-" * 68)
     print()
 
     # Charger le référentiel
@@ -744,7 +744,7 @@ def main():
         return 1
 
     print()
-    print("=" * 68)
+    print("-" * 68)
     print("[SUCCÈS] Fusion terminée")
     print(f"  Fichier produit   : {output_path}")
     print(f"  Critères répondus : {metrics['criteres_repondus']}/{len(ref_criteres)}")
@@ -752,7 +752,7 @@ def main():
         print(f"  Complétude globale : {metrics['completude_globale_pct']:.1f}%")
     if metrics["potentiel_optimisation_global_pct"] is not None:
         print(f"  Potentiel global  : {metrics['potentiel_optimisation_global_pct']:.1f}%")
-    print("=" * 68)
+    print("-" * 68)
 
     return 0
 

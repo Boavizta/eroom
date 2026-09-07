@@ -264,11 +264,11 @@ def main():
         print(f"    python3 run_efootprint.py {source_dir}")
         return 1
 
-    print("=" * 68)
+    print("-" * 68)
     print(f"  CONTRAT e-footprint — {source_dir.name}")
     print(f"  baseline : {baseline_path}")
     print(f"  sortie   : {results_path}")
-    print("=" * 68)
+    print("-" * 68)
     print()
 
     errors, _ = compare(baseline, results, args.strict_added)

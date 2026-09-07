@@ -465,10 +465,10 @@ def main():
         print(f"[info] Aucun fichier Python sous {target}. Rien à contrôler.")
         return 0
 
-    print("=" * 68)
+    print("-" * 68)
     print(f"  GÉNÉRICITÉ — {target}")
     print(f"  {len(files)} fichier(s), {len(FORBIDDEN_VALUES)} valeurs interdites")
-    print("=" * 68)
+    print("-" * 68)
     print()
 
     total = 0

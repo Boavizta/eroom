@@ -533,10 +533,10 @@ def main():
         print(f"[ERREUR] Manifeste introuvable : {manifest_path}")
         return 1
 
-    print("=" * 68)
+    print("-" * 68)
     print(f"  VALIDATION DU MANIFESTE DE LOTS")
     print(f"  {manifest_path}")
-    print("=" * 68)
+    print("-" * 68)
 
     errors = check_manifest(manifest_path)
 
