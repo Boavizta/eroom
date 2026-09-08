@@ -186,6 +186,9 @@ def get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref):
     if bloc["type"] == "direct":
         # Bloc direct : un seul critère
         return [bloc["critere"]]
+    elif bloc["type"] == "filtre":
+        # Bloc filtre : liste de critères écartés
+        return bloc.get("criteres", [])
     else:
         # Bloc composé : extraire tous les critères des options
         criteres = set()
@@ -220,11 +223,48 @@ def compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref):
     return potentiel
 
 
-def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref):
+def bloc_filtre_doit_etre_supprime(bloc, audit_results):
+    """
+    Vérifie si un bloc filtre doit être supprimé selon la règle 4.2.
+
+    Un filtre n'est imprimé que si AUCUN de ses critères ne porte déjà une
+    réponse tranchante (c'est-à-dire une réponse absente de REPONSES_NON_TRANCHANTES).
+
+    Retourne True si le filtre doit être supprimé, False sinon.
+    """
+    if bloc.get("type") != "filtre":
+        return False
+
+    criteres_filtre = bloc.get("criteres", [])
+
+    # Construire un index {id_critere: reponse} depuis audit_results
+    reponses = {}
+
+    # Critères détaillés
+    for c in audit_results.get("criteres", []):
+        reponses[c["id"]] = c.get("reponse")
+
+    # Questions diagnostic rapide
+    diag_apercu = audit_results.get("diagnostic_rapide_apercu", {})
+    for q in diag_apercu.get("questions", []):
+        reponses[q["id"]] = q.get("reponse")
+
+    # Vérifier si au moins un critère du filtre a une réponse tranchante
+    for cid in criteres_filtre:
+        reponse = reponses.get(cid)
+        if reponse is not None and reponse not in REPONSES_NON_TRANCHANTES:
+            # Une réponse tranchante existe : supprimer le filtre
+            return True
+
+    return False
+
+
+def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref, audit_results=None):
     """
     Sélectionne et trie les blocs à afficher dans le questionnaire unique.
 
     Un bloc est retenu si au moins un de ses critères est dans le résidu.
+    Un bloc filtre est supprimé si l'un de ses critères a déjà une réponse tranchante.
 
     Tri : rendement décroissant (nombre de critères), puis phase "porte" avant
     "detail", puis ordre du référentiel (0.x, puis 1.x à 6.x).
@@ -232,6 +272,10 @@ def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref):
     blocs_retenus = []
 
     for bloc in blocs_data["blocs"]:
+        # Règle 4.2 : supprimer un filtre si l'un de ses critères est déjà tranché
+        if audit_results and bloc_filtre_doit_etre_supprime(bloc, audit_results):
+            continue
+
         criteres = get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref)
 
         # Retenir si au moins un critère est dans le résidu
@@ -241,7 +285,8 @@ def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref):
             rendement = len(criteres_residu)
             blocs_retenus.append((bloc, potentiel, criteres, rendement))
 
-    # Tri : rendement décroissant, puis phase (porte avant detail), puis ordre référentiel
+    # Tri spécial : les filtres en tête de la partie detail, triés entre eux par rendement,
+    # puis tous les autres blocs (porte puis detail) triés par rendement/ordre référentiel
     def parse_critere_id(critere_id):
         """
         Extrait les composants numériques d'un id de critère pour tri numérique.
@@ -255,13 +300,25 @@ def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref):
 
     def sort_key(item):
         bloc, potentiel, criteres, rendement = item
-        phase_order = 0 if bloc["phase"] == "porte" else 1
 
-        # Ordre du référentiel : prendre le premier critère dans l'ordre numérique
+        # Tri : porte d'abord, puis filtres detail, puis autres detail
+        # Ordre de tri : (1) phase_order, (2) rendement décroissant, (3) ordre ref
+        is_filtre = bloc.get("type") == "filtre"
+
+        if bloc["phase"] == "porte":
+            # Blocs porte : (0, rendement décroissant, ordre ref)
+            phase_order = 0
+        elif is_filtre:
+            # Filtres detail : (1, rendement décroissant, ordre ref)
+            phase_order = 1
+        else:
+            # Autres blocs detail : (2, rendement décroissant, ordre ref)
+            phase_order = 2
+
         min_critere = min(criteres, key=parse_critere_id) if criteres else "999.999"
         ordre_ref = parse_critere_id(min_critere)
 
-        return (-rendement, phase_order, ordre_ref)
+        return (phase_order, -rendement, ordre_ref)
 
     blocs_retenus.sort(key=sort_key)
 
@@ -300,8 +357,34 @@ def get_options_for_direct_bloc(bloc, criteres_ref, diag_rapide_ref):
             raise ValueError(f"Critère {cid} introuvable dans le référentiel")
 
 
+def build_filtres_index(blocs_tries):
+    """
+    Construit un index {critere_id: [(filtre_id, num_question, titre, libelle_ecarte), ...]}
+    pour tous les critères gouvernés par des filtres.
+
+    blocs_tries est la liste triée des blocs retenus (avec leurs métadonnées).
+    """
+    index = {}
+    num = 1
+
+    for bloc, potentiel, criteres, rendement in blocs_tries:
+        if bloc.get("type") == "filtre":
+            filtre_id = bloc["id"]
+            titre = bloc["titre"]
+            libelle_ecarte = bloc["libelle_ecarte"]
+
+            for critere_id in bloc.get("criteres", []):
+                if critere_id not in index:
+                    index[critere_id] = []
+                index[critere_id].append((filtre_id, num, titre, libelle_ecarte))
+
+        num += 1
+
+    return index
+
+
 def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_ref,
-                         audit_results, residu, contextes):
+                         audit_results, residu, contextes, filtres_index):
     """
     Formate un bloc en Markdown.
 
@@ -309,6 +392,7 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
     pas de tiret long.
 
     Paramètre contextes : dict {id_critere: texte_contexte} pour l'emprunt 1.
+    Paramètre filtres_index : dict {critere_id: [(filtre_id, num_question, titre, libelle_ecarte), ...]}
     """
     lines = []
 
@@ -321,6 +405,45 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
         titre_ligne += f" (à voir avec {bloc['interlocuteur']})"
     lines.append(titre_ligne)
     lines.append("")
+
+    # Mention "À IGNORER" si tous les critères du bloc sont gouvernés par des filtres
+    # Section 4.2ter de la convention
+    if bloc.get("type") != "filtre":
+        criteres_residu = [c for c in criteres if c in residu]
+
+        # Vérifier si tous les critères sont gouvernés
+        filtres_gouvernants = {}  # {filtre_id: (num, titre, libelle_ecarte)}
+        tous_gouvernes = True
+
+        for cid in criteres_residu:
+            if cid not in filtres_index or not filtres_index[cid]:
+                tous_gouvernes = False
+                break
+            # Collecter tous les filtres qui gouvernent ce critère
+            for filtre_id, num_q, titre_f, libelle_e in filtres_index[cid]:
+                if filtre_id not in filtres_gouvernants:
+                    filtres_gouvernants[filtre_id] = (num_q, titre_f, libelle_e)
+
+        if tous_gouvernes and filtres_gouvernants:
+            # Construire la mention avec conjonction si plusieurs filtres
+            # Trier par numéro de question pour avoir l'ordre d'apparition dans le questionnaire
+            filtres_tries = sorted(filtres_gouvernants.items(), key=lambda item: item[1][0])
+
+            if len(filtres_tries) == 1:
+                # Un seul filtre : extraire son libellé et construire la mention
+                filtre_id, (num_q, titre_f, libelle_e) = filtres_tries[0]
+                debut_libelle = libelle_e.split('(')[0].strip()
+                condition = f"si vous avez repondu \"{debut_libelle}\" a la question {num_q} ({titre_f})"
+            else:
+                # Plusieurs filtres : chaque terme porte son propre libellé
+                termes = []
+                for filtre_id, (num_q, titre_f, libelle_e) in filtres_tries:
+                    debut_libelle = libelle_e.split('(')[0].strip()
+                    termes.append(f"\"{debut_libelle}\" a la question {num_q} ({titre_f})")
+                condition = f"si vous avez repondu {' ET '.join(termes)}"
+
+            lines.append(f"**A IGNORER** {condition}.")
+            lines.append("")
 
     # Marqueur machine
     lines.append(f"<!-- bloc:{bloc['id']} -->")
@@ -386,11 +509,20 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
         cid = bloc["critere"]
         if cid.startswith("0."):
             options = [nettoyer_mention_jnsp(opt) for opt in options]
-    else:
-        options = [opt["libelle"] for opt in bloc["options"]]
 
-    for i, opt_libelle in enumerate(options):
-        lines.append(f"- [ ] {opt_libelle}  <!-- opt:{i} -->")
+        for i, opt_libelle in enumerate(options):
+            lines.append(f"- [ ] {opt_libelle}  <!-- opt:{i} -->")
+
+    elif bloc["type"] == "filtre":
+        # Bloc filtre : deux options (ecarte et applicable)
+        lines.append(f"- [ ] {bloc['libelle_ecarte']}  <!-- opt:ecarte -->")
+        lines.append(f"- [ ] {bloc['libelle_applicable']}  <!-- opt:applicable -->")
+
+    else:
+        # Bloc composé
+        options = [opt["libelle"] for opt in bloc["options"]]
+        for i, opt_libelle in enumerate(options):
+            lines.append(f"- [ ] {opt_libelle}  <!-- opt:{i} -->")
 
     # Case "Je ne sais pas"
     lines.append(f"- [ ] Je ne sais pas  <!-- opt:jnsp -->")
@@ -411,7 +543,7 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
     """Génère le questionnaire unique trié par rendement décroissant."""
     residu = compute_residu(audit_results, criteres_ref, diag_rapide_ref)
     blocs_tries = select_and_sort_blocs(blocs_data, residu, criteres_ref,
-                                        diag_rapide_ref)
+                                        diag_rapide_ref, audit_results)
 
     if not blocs_tries:
         # Aucun bloc à afficher : ne pas créer le fichier
@@ -441,6 +573,9 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
     lines.append(f"<!-- version-blocs: {blocs_data['version']} -->")
     lines.append("")
 
+    # Construire l'index des filtres pour la mention "À IGNORER"
+    filtres_index = build_filtres_index(blocs_tries)
+
     # Séparer porte et détail
     blocs_porte = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "porte"]
     blocs_detail = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "detail"]
@@ -459,7 +594,7 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
         for bloc, potentiel, criteres, rendement in blocs_porte:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
-                                             audit_results, residu, contextes))
+                                             audit_results, residu, contextes, filtres_index))
             num += 1
 
     if blocs_detail:
@@ -471,7 +606,7 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
         for bloc, potentiel, criteres, rendement in blocs_detail:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
-                                             audit_results, residu, contextes))
+                                             audit_results, residu, contextes, filtres_index))
             num += 1
 
     # Écrire le fichier
@@ -1545,6 +1680,629 @@ def autotest():
                                    "Plomberie interne affichée au lecteur"))
     except Exception as exc:
         echecs.append(("Emprunt 3 - titre de bloc", f"Exception : {exc}"))
+
+    # Cas 16 : Bloc filtre imprimé (aucun critère tranché)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
+                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-test",
+                        "fichier": "technique",
+                        "phase": "porte",
+                        "titre": "Test filtre",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.1", "4.2"],
+                        "question": "Question filtre ?",
+                        "libelle_ecarte": "Non applicable",
+                        "libelle_applicable": "Cela s'applique"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # Aucun critère tranché : le filtre doit être imprimé
+            audit_data = {
+                "criteres": [
+                    {"id": "4.1", "reponse": None},
+                    {"id": "4.2", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc filtre imprimé", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                if "<!-- bloc:filtre-test -->" not in content:
+                    echecs.append(("Bloc filtre imprimé", "Marqueur bloc filtre absent"))
+                if "<!-- opt:ecarte -->" not in content:
+                    echecs.append(("Bloc filtre imprimé", "Marqueur opt:ecarte absent"))
+                if "<!-- opt:applicable -->" not in content:
+                    echecs.append(("Bloc filtre imprimé", "Marqueur opt:applicable absent"))
+                if "Non applicable" not in content:
+                    echecs.append(("Bloc filtre imprimé", "Libellé écarte absent"))
+    except Exception as exc:
+        echecs.append(("Bloc filtre imprimé", f"Exception : {exc}"))
+
+    # Cas 17 : Bloc filtre supprimé par la règle 4.2 (un critère déjà tranché)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "1.5", "potentiel_max": 1.0, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
+                    {"id": "1.13", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
+                    {"id": "2.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-interface",
+                        "fichier": "produit-usage",
+                        "phase": "porte",
+                        "titre": "Interface utilisateur",
+                        "interlocuteur": "le responsable produit",
+                        "type": "filtre",
+                        "criteres": ["1.5", "1.13"],
+                        "question": "Le service a-t-il une interface ?",
+                        "libelle_ecarte": "Non, pas d'interface",
+                        "libelle_applicable": "Oui, il y a une interface"
+                    },
+                    {
+                        "id": "bloc-autre",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Autre bloc",
+                        "interlocuteur": "l'équipe de développement",
+                        "type": "direct",
+                        "critere": "2.1",
+                        "question": "Question autre ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # 1.5 est tranché : le filtre doit être supprimé, mais le bloc autre reste
+            audit_data = {
+                "criteres": [
+                    {"id": "1.5", "reponse": "✅ Point fort confirmé", "coefficient": 0},
+                    {"id": "1.13", "reponse": None},
+                    {"id": "2.1", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc filtre supprimé règle 4.2", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                if "<!-- bloc:filtre-interface -->" in content:
+                    echecs.append(("Bloc filtre supprimé règle 4.2", "Filtre présent alors qu'il devrait être supprimé"))
+                if "<!-- bloc:bloc-autre -->" not in content:
+                    echecs.append(("Bloc filtre supprimé règle 4.2", "Bloc autre absent"))
+    except Exception as exc:
+        echecs.append(("Bloc filtre supprimé règle 4.2", f"Exception : {exc}"))
+
+    # Cas 18 : Bloc filtre avec réponse "🤔 À évaluer" (ne supprime pas le filtre)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "3.8", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
+                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-env-test",
+                        "fichier": "technique",
+                        "phase": "porte",
+                        "titre": "Environnement de test",
+                        "interlocuteur": "la personne qui exploite l'infrastructure",
+                        "type": "filtre",
+                        "criteres": ["3.8", "3.9"],
+                        "question": "Avez-vous des environnements de test ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            # 3.8 a une réponse non tranchante : le filtre doit être imprimé
+            audit_data = {
+                "criteres": [
+                    {"id": "3.8", "reponse": "🤔 À évaluer", "coefficient": 0},
+                    {"id": "3.9", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc filtre avec À évaluer", "Aucun fichier généré"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                if "<!-- bloc:filtre-env-test -->" not in content:
+                    echecs.append(("Bloc filtre avec À évaluer", "Filtre absent alors qu'il devrait être imprimé (réponse non tranchante)"))
+    except Exception as exc:
+        echecs.append(("Bloc filtre avec À évaluer", f"Exception : {exc}"))
+
+    # Cas 19 : Bloc totalement gouverné qui reçoit la mention "À IGNORER"
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Stockage de donnees du service",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.1", "4.2"],
+                        "question": "Avez-vous des donnees ?",
+                        "libelle_ecarte": "Non, le service ne conserve aucune donnee",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "bloc-4.1",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Critere 4.1",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "direct",
+                        "critere": "4.1",
+                        "question": "Question 4.1 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "4.1", "reponse": None},
+                    {"id": "4.2", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc totalement gouverne avec mention", "Aucun fichier genere"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                if "**A IGNORER**" not in content:
+                    echecs.append(("Bloc totalement gouverne avec mention", "Mention 'A IGNORER' absente"))
+                elif "la question 1 (Stockage de donnees du service)" not in content:
+                    echecs.append(("Bloc totalement gouverne avec mention", "Reference au filtre absente ou incorrecte"))
+    except Exception as exc:
+        echecs.append(("Bloc totalement gouverne avec mention", f"Exception : {exc}"))
+
+    # Cas 20 : Bloc partiellement gouverné qui ne reçoit pas la mention
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "5.1", "potentiel_max": 1.0, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Stockage",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.1"],
+                        "question": "Avez-vous des donnees ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "bloc-compose",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Bloc compose",
+                        "interlocuteur": "l'équipe de développement",
+                        "type": "compose",
+                        "question": "Question ?",
+                        "options": [
+                            {"libelle": "Option A", "reponses": {"4.1": "✅ Point fort confirmé", "5.1": "✅ Point fort confirmé"}}
+                        ]
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "4.1", "reponse": None},
+                    {"id": "5.1", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc partiellement gouverne sans mention", "Aucun fichier genere"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Trouver le bloc compose dans le contenu
+                if "bloc-compose" in content:
+                    # Extraire la section du bloc compose
+                    bloc_debut = content.find("<!-- bloc:bloc-compose -->")
+                    bloc_fin = content.find("##", bloc_debut + 1) if bloc_debut >= 0 else -1
+                    bloc_section = content[bloc_debut:bloc_fin] if bloc_fin > bloc_debut else content[bloc_debut:]
+
+                    if "**A IGNORER**" in bloc_section:
+                        echecs.append(("Bloc partiellement gouverne sans mention", "Mention presente alors qu'elle ne devrait pas (bloc partiellement gouverne)"))
+    except Exception as exc:
+        echecs.append(("Bloc partiellement gouverne sans mention", f"Exception : {exc}"))
+
+    # Cas 21 : Bloc gouverné par deux filtres avec conjonction ET
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "3.8", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.4", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-env",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Environnements de test",
+                        "interlocuteur": "la personne qui exploite l'infrastructure",
+                        "type": "filtre",
+                        "criteres": ["3.8", "3.9"],
+                        "question": "Question env ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Donnees persistantes",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.4"],
+                        "question": "Question donnees ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "bloc-compose",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Environnements de test",
+                        "interlocuteur": "la personne qui exploite l'infrastructure",
+                        "type": "compose",
+                        "question": "Question compose ?",
+                        "options": [
+                            {"libelle": "Option A", "reponses": {"3.9": "✅ Point fort confirmé", "4.4": "✅ Point fort confirmé"}}
+                        ]
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "3.8", "reponse": None},
+                    {"id": "3.9", "reponse": None},
+                    {"id": "4.4", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Bloc gouverne par deux filtres avec ET", "Aucun fichier genere"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                if " ET " not in content:
+                    echecs.append(("Bloc gouverne par deux filtres avec ET", "Conjonction 'ET' absente de la mention"))
+    except Exception as exc:
+        echecs.append(("Bloc gouverne par deux filtres avec ET", f"Exception : {exc}"))
+
+    # Cas 22 : Filtre toujours placé avant les blocs qu'il gouverne
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Stockage",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.1", "4.2"],
+                        "question": "Avez-vous des donnees ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "bloc-4.1",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Critere 4.1",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "direct",
+                        "critere": "4.1",
+                        "question": "Question 4.1 ?"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "4.1", "reponse": None},
+                    {"id": "4.2", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Filtre avant les blocs gouvernes", "Aucun fichier genere"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                pos_filtre = content.find("<!-- bloc:filtre-donnees -->")
+                pos_bloc = content.find("<!-- bloc:bloc-4.1 -->")
+                if pos_filtre == -1 or pos_bloc == -1:
+                    echecs.append(("Filtre avant les blocs gouvernes", "Blocs absents"))
+                elif pos_filtre > pos_bloc:
+                    echecs.append(("Filtre avant les blocs gouvernes", f"Filtre apres le bloc gouverne (positions : {pos_filtre} > {pos_bloc})"))
+    except Exception as exc:
+        echecs.append(("Filtre avant les blocs gouvernes", f"Exception : {exc}"))
+
+    # Cas 23 : Mention "À IGNORER" avec deux filtres porte les deux libellés distincts
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.4", "potentiel_max": 2.0, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Stockage de donnees du service",
+                        "interlocuteur": "la personne qui gère les données",
+                        "type": "filtre",
+                        "criteres": ["4.4"],
+                        "question": "Question donnees ?",
+                        "libelle_ecarte": "Non, le service ne conserve aucune donnee (ni base de donnees, ni stockage objet)",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "filtre-env",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Environnements de test",
+                        "interlocuteur": "la personne qui exploite l'infrastructure",
+                        "type": "filtre",
+                        "criteres": ["3.9"],
+                        "question": "Question env ?",
+                        "libelle_ecarte": "Non, pas d'environnement de pre-production distinct (tous les tests en local ou en production)",
+                        "libelle_applicable": "Oui"
+                    },
+                    {
+                        "id": "bloc-compose",
+                        "fichier": "technique",
+                        "phase": "detail",
+                        "titre": "Gestion des environnements de test",
+                        "interlocuteur": "la personne qui exploite l'infrastructure",
+                        "type": "compose",
+                        "question": "Question compose ?",
+                        "options": [
+                            {"libelle": "Option A", "reponses": {"3.9": "✅ Point fort confirmé", "4.4": "✅ Point fort confirmé"}}
+                        ]
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            audit_data = {
+                "criteres": [
+                    {"id": "3.9", "reponse": None},
+                    {"id": "4.4", "reponse": None}
+                ],
+                "diagnostic_rapide_apercu": {"questions": []}
+            }
+            audit_path = tmpdir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            audit, contextes = load_audit_results(tmpdir)
+            blocs = load_blocs(tmpdir)
+
+            result = generate_questionnaire_unique(blocs, audit,
+                                                criteres_ref, diag_ref, tmpdir, contextes)
+
+            if result is None:
+                echecs.append(("Mention deux filtres avec deux libelles", "Aucun fichier genere"))
+            else:
+                content = result.read_text(encoding="utf-8")
+                # Vérifier que les deux libellés apparaissent dans la mention
+                libelle_donnees = "Non, le service ne conserve aucune donnee"
+                libelle_env = "Non, pas d'environnement de pre-production distinct"
+
+                if libelle_donnees not in content:
+                    echecs.append(("Mention deux filtres avec deux libelles", f"Libelle du filtre donnees absent : {libelle_donnees}"))
+                if libelle_env not in content:
+                    echecs.append(("Mention deux filtres avec deux libelles", f"Libelle du filtre env absent : {libelle_env}"))
+                # Vérifier que la conjonction ET est présente
+                if " ET " not in content:
+                    echecs.append(("Mention deux filtres avec deux libelles", "Conjonction 'ET' absente"))
+    except Exception as exc:
+        echecs.append(("Mention deux filtres avec deux libelles", f"Exception : {exc}"))
 
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")

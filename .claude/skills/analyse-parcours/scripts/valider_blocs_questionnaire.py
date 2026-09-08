@@ -163,7 +163,9 @@ class Validateur:
         # "note" est RENDUE au questionnaire, donc lue par la personne auditee :
         # elle s'adresse a elle, jamais au developpeur de l'outil. Ne rien y mettre
         # qui parle de la generation, du filtrage ou d'un futur chantier.
-        cles_optionnelles = {"critere", "options", "aide", "note"}
+        # Ajout pour filtres : "criteres", "libelle_ecarte", "libelle_applicable"
+        cles_optionnelles = {"critere", "options", "aide", "note", "criteres",
+                             "libelle_ecarte", "libelle_applicable"}
         cles_autorisees = cles_obligatoires | cles_optionnelles
 
         for cle in cles_obligatoires:
@@ -182,7 +184,7 @@ class Validateur:
         if "phase" in bloc and bloc["phase"] not in {"porte", "detail"}:
             self.erreurs.append(f"{id_bloc}: phase invalide : {bloc['phase']}")
 
-        if "type" in bloc and bloc["type"] not in {"direct", "compose"}:
+        if "type" in bloc and bloc["type"] not in {"direct", "compose", "filtre"}:
             self.erreurs.append(f"{id_bloc}: type invalide : {bloc['type']}")
 
         # Vocabulaire ferme : l'interlocuteur est affiche tel quel au service audite,
@@ -199,12 +201,28 @@ class Validateur:
                 self.erreurs.append(f"{id_bloc}: bloc direct sans cle 'critere'")
             if "options" in bloc:
                 self.erreurs.append(f"{id_bloc}: bloc direct ne doit pas avoir de cle 'options'")
+            if "criteres" in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc direct ne doit pas avoir de cle 'criteres'")
 
         elif bloc.get("type") == "compose":
             if "critere" in bloc:
                 self.erreurs.append(f"{id_bloc}: bloc compose ne doit pas avoir de cle 'critere'")
             if "options" not in bloc:
                 self.erreurs.append(f"{id_bloc}: bloc compose sans cle 'options'")
+            if "criteres" in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc compose ne doit pas avoir de cle 'criteres'")
+
+        elif bloc.get("type") == "filtre":
+            if "criteres" not in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc filtre sans cle 'criteres'")
+            if "libelle_ecarte" not in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc filtre sans cle 'libelle_ecarte'")
+            if "libelle_applicable" not in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc filtre sans cle 'libelle_applicable'")
+            if "critere" in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc filtre ne doit pas avoir de cle 'critere' (singulier)")
+            if "options" in bloc:
+                self.erreurs.append(f"{id_bloc}: bloc filtre ne doit pas avoir de cle 'options'")
 
     def _valider_existence_criteres(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide que les criteres cites existent dans le referentiel."""
@@ -221,6 +239,29 @@ class Validateur:
                 for critere_id in reponses:
                     if critere_id not in self.tous_criteres:
                         self.erreurs.append(f"{id_bloc}, option {i}: critere inexistant : {critere_id}")
+
+        elif bloc.get("type") == "filtre" and "criteres" in bloc:
+            criteres_filtre = bloc["criteres"]
+            if not isinstance(criteres_filtre, list):
+                self.erreurs.append(f"{id_bloc}: 'criteres' doit etre une liste")
+            else:
+                for critere_id in criteres_filtre:
+                    if critere_id not in self.tous_criteres:
+                        self.erreurs.append(f"{id_bloc}: critere inexistant : {critere_id}")
+                        continue
+
+                    # Vérifier que le critère est bien des dimensions 1 à 5
+                    # Les critères de dimension 6 commencent par "6.", les questions diagnostic par "0."
+                    if critere_id.startswith("6.") or critere_id.startswith("0."):
+                        self.erreurs.append(f"{id_bloc}: critere {critere_id} n'est pas un critere detaille (les filtres ne peuvent ecarter que des criteres des dimensions 1 a 5)")
+                        continue
+
+                    # Vérifier que le critère offre "🚫 Non applicable"
+                    if critere_id in self.criteres_detailles:
+                        critere = self.criteres_detailles[critere_id]
+                        options_coeff = critere.get("options_evaluation_coefficient", {})
+                        if "🚫 Non applicable" not in options_coeff:
+                            self.erreurs.append(f"{id_bloc}: critere {critere_id} n'offre pas l'option '🚫 Non applicable'")
 
     def _valider_libelles_reponses(self, bloc: Dict[str, Any], id_bloc: str):
         """Valide que les libelles de reponse correspondent au referentiel."""
@@ -324,38 +365,63 @@ class Validateur:
                     self.erreurs.append(f"{id_bloc}: {champ} vide")
 
     def _valider_unicite_criteres(self, blocs: List[Dict[str, Any]]):
-        """Valide qu'un critere n'est pas couvert par plusieurs blocs."""
-        critere_vers_blocs: Dict[str, List[str]] = {}
+        """
+        Valide qu'un critere n'est pas couvert par plusieurs blocs.
+
+        Règle 4.4 : la règle d'unicité ne s'applique pas aux blocs filtre face aux
+        blocs direct/compose, mais s'applique entre filtres eux-mêmes.
+        """
+        # Deux index séparés : un pour les blocs non-filtre, un pour les filtres
+        critere_vers_blocs_non_filtre: Dict[str, List[str]] = {}
+        critere_vers_blocs_filtre: Dict[str, List[str]] = {}
 
         for bloc in blocs:
             if not isinstance(bloc, dict):
                 continue
 
             id_bloc = bloc.get("id", "<sans id>")
+            type_bloc = bloc.get("type")
 
             # Collecter les criteres couverts par ce bloc
             criteres_couverts = set()
 
-            if bloc.get("type") == "direct" and "critere" in bloc:
+            if type_bloc == "direct" and "critere" in bloc:
                 criteres_couverts.add(bloc["critere"])
 
-            elif bloc.get("type") == "compose" and "options" in bloc:
+            elif type_bloc == "compose" and "options" in bloc:
                 for option in bloc["options"]:
                     if isinstance(option, dict) and "reponses" in option:
                         criteres_couverts.update(option["reponses"].keys())
 
-            # Enregistrer ce bloc pour chaque critere qu'il couvre
-            for critere_id in criteres_couverts:
-                if critere_id not in critere_vers_blocs:
-                    critere_vers_blocs[critere_id] = []
-                critere_vers_blocs[critere_id].append(id_bloc)
+            elif type_bloc == "filtre" and "criteres" in bloc:
+                criteres_couverts.update(bloc["criteres"])
 
-        # Signaler les criteres couverts par plusieurs blocs
-        for critere_id, blocs_ids in critere_vers_blocs.items():
+            # Enregistrer ce bloc pour chaque critere qu'il couvre
+            if type_bloc == "filtre":
+                for critere_id in criteres_couverts:
+                    if critere_id not in critere_vers_blocs_filtre:
+                        critere_vers_blocs_filtre[critere_id] = []
+                    critere_vers_blocs_filtre[critere_id].append(id_bloc)
+            else:
+                for critere_id in criteres_couverts:
+                    if critere_id not in critere_vers_blocs_non_filtre:
+                        critere_vers_blocs_non_filtre[critere_id] = []
+                    critere_vers_blocs_non_filtre[critere_id].append(id_bloc)
+
+        # Signaler les criteres couverts par plusieurs blocs non-filtre (direct/compose)
+        for critere_id, blocs_ids in critere_vers_blocs_non_filtre.items():
             if len(blocs_ids) > 1:
                 blocs_str = ", ".join(blocs_ids)
                 self.erreurs.append(
-                    f"Critere {critere_id} couvert par plusieurs blocs : {blocs_str}"
+                    f"Critere {critere_id} couvert par plusieurs blocs non-filtre : {blocs_str}"
+                )
+
+        # Signaler les criteres couverts par plusieurs blocs filtre
+        for critere_id, blocs_ids in critere_vers_blocs_filtre.items():
+            if len(blocs_ids) > 1:
+                blocs_str = ", ".join(blocs_ids)
+                self.erreurs.append(
+                    f"Critere {critere_id} couvert par plusieurs blocs filtre : {blocs_str}"
                 )
 
     def imprimer_etat_des_lieux(self):
@@ -453,6 +519,24 @@ def autotest() -> bool:
                 "options_evaluation_coefficient": {
                     "✅ Point fort confirmé": 0,
                     "💡 Potentiel d'amélioration identifié": 1
+                }
+            },
+            {
+                "id": "4.1",
+                "potentiel_max": 1.5,
+                "options_evaluation_coefficient": {
+                    "✅ Point fort confirmé": 0,
+                    "💡 Potentiel d'amélioration identifié": 1,
+                    "🚫 Non applicable": 0
+                }
+            },
+            {
+                "id": "4.2",
+                "potentiel_max": 1.5,
+                "options_evaluation_coefficient": {
+                    "✅ Point fort confirmé": 0,
+                    "💡 Potentiel d'amélioration identifié": 1,
+                    "🚫 Non applicable": 0
                 }
             },
             {
@@ -920,6 +1004,158 @@ def autotest() -> bool:
         print("✓ Test 17 : Detection interlocuteur hors vocabulaire")
     else:
         print(f"✗ Test 17 : Detection interlocuteur hors vocabulaire - ECHEC : {v.erreurs}")
+
+    # Test 18 : Bloc filtre valide
+    tests_total += 1
+    blocs_filtre_valide = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "filtre-donnees",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Données persistantes",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "filtre",
+                "criteres": ["4.1", "4.2"],
+                "question": "Avez-vous des données ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            }
+        ]
+    }
+    v = Validateur(blocs_filtre_valide, referentiel_test)
+    if v.valider():
+        tests_reussis += 1
+        print("✓ Test 18 : Bloc filtre valide")
+    else:
+        print(f"✗ Test 18 : Bloc filtre valide - ECHEC : {v.erreurs}")
+
+    # Test 19 : Bloc filtre avec critère qui n'offre pas "🚫 Non applicable" (doit echouer)
+    tests_total += 1
+    blocs_filtre_critere_sans_non_applicable = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "filtre-test",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Test",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "filtre",
+                "criteres": ["1.1", "1.2"],
+                "question": "Question ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            }
+        ]
+    }
+    v = Validateur(blocs_filtre_critere_sans_non_applicable, referentiel_test)
+    if not v.valider() and any("n'offre pas l'option" in e and "🚫 Non applicable" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 19 : Detection critère sans 'Non applicable' dans filtre")
+    else:
+        print(f"✗ Test 19 : Detection critère sans 'Non applicable' dans filtre - ECHEC : {v.erreurs}")
+
+    # Test 20 : Bloc filtre avec critère de dimension 6 (doit echouer)
+    tests_total += 1
+    blocs_filtre_dim6 = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "filtre-dim6",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Test dim 6",
+                "interlocuteur": "l'équipe de développement",
+                "type": "filtre",
+                "criteres": ["6.1"],
+                "question": "Question ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            }
+        ]
+    }
+    v = Validateur(blocs_filtre_dim6, referentiel_test)
+    if not v.valider() and any("dimensions 1 a 5" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 20 : Detection critère dimension 6 dans filtre")
+    else:
+        print(f"✗ Test 20 : Detection critère dimension 6 dans filtre - ECHEC : {v.erreurs}")
+
+    # Test 21 : Bloc filtre + bloc direct sur même critère (doit reussir - règle 4.4)
+    tests_total += 1
+    blocs_filtre_et_direct = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "filtre-donnees",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Données",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "filtre",
+                "criteres": ["4.1", "4.2"],
+                "question": "Avez-vous des données ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            },
+            {
+                "id": "direct-4.1",
+                "fichier": "technique",
+                "phase": "detail",
+                "titre": "Critère 4.1",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "direct",
+                "critere": "4.1",
+                "question": "Question sur 4.1 ?"
+            }
+        ]
+    }
+    v = Validateur(blocs_filtre_et_direct, referentiel_test)
+    if v.valider():
+        tests_reussis += 1
+        print("✓ Test 21 : Filtre + direct sur même critère accepté")
+    else:
+        print(f"✗ Test 21 : Filtre + direct sur même critère accepté - ECHEC : {v.erreurs}")
+
+    # Test 22 : Deux blocs filtre avec même critère (doit echouer - règle 4.4)
+    tests_total += 1
+    blocs_deux_filtres_meme_critere = {
+        "version": 1,
+        "blocs": [
+            {
+                "id": "filtre-1",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Filtre 1",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "filtre",
+                "criteres": ["4.1"],
+                "question": "Question 1 ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            },
+            {
+                "id": "filtre-2",
+                "fichier": "technique",
+                "phase": "porte",
+                "titre": "Filtre 2",
+                "interlocuteur": "la personne qui gère les données",
+                "type": "filtre",
+                "criteres": ["4.1"],
+                "question": "Question 2 ?",
+                "libelle_ecarte": "Non",
+                "libelle_applicable": "Oui"
+            }
+        ]
+    }
+    v = Validateur(blocs_deux_filtres_meme_critere, referentiel_test)
+    if not v.valider() and any("plusieurs blocs filtre" in e and "4.1" in e for e in v.erreurs):
+        tests_reussis += 1
+        print("✓ Test 22 : Detection deux filtres sur même critère")
+    else:
+        print(f"✗ Test 22 : Detection deux filtres sur même critère - ECHEC : {v.erreurs}")
 
     print(f"\n{tests_reussis}/{tests_total} tests reussis")
     print("---------------------\n")

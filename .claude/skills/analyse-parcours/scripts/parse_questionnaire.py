@@ -152,6 +152,9 @@ def get_criteres_from_bloc(bloc_def, blocs_data):
     """Retourne la liste des critères couverts par un bloc."""
     if bloc_def["type"] == "direct":
         return [bloc_def["critere"]]
+    elif bloc_def["type"] == "filtre":
+        # Bloc filtre : liste de critères écartés
+        return bloc_def.get("criteres", [])
     else:
         # Bloc composé : extraire tous les critères des options
         criteres = set()
@@ -206,6 +209,34 @@ def process_bloc(bloc_parsed, bloc_def, criteres_ref, diag_rapide_ref):
                 "contexte": f"Question posée au service audité, réponse : ne sait pas"
             }
             entries.append(entry)
+
+        return entries, errors
+
+    # Cas bloc filtre : deux options spéciales (ecarte / applicable)
+    if bloc_def.get("type") == "filtre":
+        if opt_str == "ecarte":
+            # Case "libelle_ecarte" cochée : verser une entrée par critère avec 🚫 Non applicable
+            criteres = bloc_def.get("criteres", [])
+            for cid in criteres:
+                if cid in deja_tranches:
+                    continue
+
+                entry = {
+                    "id": cid,
+                    "categorie": "aucune_donnee",
+                    "reponse": "🚫 Non applicable",
+                    "coefficient": 0,
+                    "provenance": "precise",
+                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{bloc_def['libelle_ecarte']}\""
+                }
+                entries.append(entry)
+
+        elif opt_str == "applicable":
+            # Case "libelle_applicable" cochée : ne rien verser
+            pass
+
+        else:
+            errors.append(f"Bloc {bloc_id} : option filtre invalide ({opt_str}), rien versé")
 
         return entries, errors
 
@@ -396,7 +427,9 @@ def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
         if bloc_errors:
             errors.extend(bloc_errors)
             report["blocs_erreur"] += 1
-        elif bloc_entries:
+        else:
+            # Un bloc compte comme répondu s'il n'a pas d'erreur, même s'il ne verse rien
+            # (cas du filtre avec case "applicable" cochée)
             report["blocs_repondus"] += 1
 
             # Compter les critères versés vs jnsp
@@ -779,6 +812,127 @@ def autotest():
         pass  # Déjà couvert par les autres cas
     except Exception as exc:
         echecs.append(("Aller-retour générateur/parseur", f"Exception : {exc}"))
+
+    # Cas 8 : Bloc filtre avec case "écarte" cochée (doit verser N entrées)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "4.1", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.2", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}},
+                    {"id": "4.3", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-donnees",
+                        "fichier": "technique",
+                        "phase": "porte",
+                        "type": "filtre",
+                        "criteres": ["4.1", "4.2", "4.3"],
+                        "question": "Avez-vous des données ?",
+                        "libelle_ecarte": "Non, pas de données",
+                        "libelle_applicable": "Oui, nous avons des données"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            md_content = """
+<!-- bloc:filtre-donnees -->
+- [x] Non, pas de données  <!-- opt:ecarte -->
+- [ ] Oui, nous avons des données  <!-- opt:applicable -->
+- [ ] Je ne sais pas  <!-- opt:jnsp -->
+"""
+            md_path = tmpdir / "questionnaire-eof.md"
+            md_path.write_text(md_content, encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            blocs = load_blocs(tmpdir)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+
+            if errors:
+                echecs.append(("Bloc filtre case écarte", f"Erreurs : {errors}"))
+            elif len(entries) != 3:
+                echecs.append(("Bloc filtre case écarte", f"Attendu 3 entrées, obtenu {len(entries)}"))
+            else:
+                # Vérifier que toutes les entrées ont la réponse "🚫 Non applicable"
+                for entry in entries:
+                    if entry.get("reponse") != "🚫 Non applicable":
+                        echecs.append(("Bloc filtre case écarte", f"Réponse incorrecte pour {entry['id']} : {entry.get('reponse')}"))
+                    if entry.get("coefficient") != 0:
+                        echecs.append(("Bloc filtre case écarte", f"Coefficient incorrect pour {entry['id']} : {entry.get('coefficient')}"))
+                    if entry.get("provenance") != "precise":
+                        echecs.append(("Bloc filtre case écarte", f"Provenance incorrecte pour {entry['id']} : {entry.get('provenance')}"))
+    except Exception as exc:
+        echecs.append(("Bloc filtre case écarte", f"Exception : {exc}"))
+
+    # Cas 9 : Bloc filtre avec case "applicable" cochée (ne doit rien verser)
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            ref_data = {
+                "criteres": [
+                    {"id": "1.5", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}},
+                    {"id": "1.13", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}}
+                ],
+                "diagnostic_rapide": []
+            }
+            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
+
+            blocs_data = {
+                "version": 1,
+                "blocs": [
+                    {
+                        "id": "filtre-interface",
+                        "fichier": "produit-usage",
+                        "phase": "porte",
+                        "type": "filtre",
+                        "criteres": ["1.5", "1.13"],
+                        "question": "Le service a-t-il une interface ?",
+                        "libelle_ecarte": "Non",
+                        "libelle_applicable": "Oui"
+                    }
+                ]
+            }
+            blocs_path = tmpdir / "questionnaire-blocs.json"
+            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+
+            md_content = """
+<!-- bloc:filtre-interface -->
+- [ ] Non  <!-- opt:ecarte -->
+- [x] Oui  <!-- opt:applicable -->
+- [ ] Je ne sais pas  <!-- opt:jnsp -->
+"""
+            md_path = tmpdir / "questionnaire-eof.md"
+            md_path.write_text(md_content, encoding="utf-8")
+
+            criteres_ref, diag_ref = load_referentiel(ref_path)
+            blocs = load_blocs(tmpdir)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+
+            if errors:
+                echecs.append(("Bloc filtre case applicable", f"Erreurs : {errors}"))
+            elif len(entries) != 0:
+                echecs.append(("Bloc filtre case applicable", f"Attendu 0 entrée, obtenu {len(entries)}"))
+            # Le bloc doit compter comme répondu
+            if report["blocs_repondus"] != 1:
+                echecs.append(("Bloc filtre case applicable", f"Attendu 1 bloc répondu, obtenu {report['blocs_repondus']}"))
+    except Exception as exc:
+        echecs.append(("Bloc filtre case applicable", f"Exception : {exc}"))
 
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")

@@ -932,6 +932,45 @@
       "critere": "5.7",
       "question": "Avez-vous vérifié si vos composants pourraient être mieux configurés ?",
       "aide": "Par exemple : ajuster les paramètres de la machine virtuelle Java, les pools de connexion d'une base de données, ou les limites mémoire d'un serveur."
+    },
+    {
+      "id": "filtre-interface-utilisateur",
+      "fichier": "produit-usage",
+      "phase": "detail",
+      "titre": "Interface utilisateur du service",
+      "interlocuteur": "le responsable produit",
+      "type": "filtre",
+      "criteres": ["1.4", "1.5", "1.8", "1.9", "1.10", "1.11", "1.13", "1.14", "5.9"],
+      "question": "Votre service a-t-il une interface utilisateur avec laquelle des personnes interagissent directement ?",
+      "libelle_ecarte": "Non, c'est un service sans interface (API, batch, worker, service de calcul, etc.)",
+      "libelle_applicable": "Oui, le service a une interface utilisateur (web, mobile, desktop, etc.)",
+      "aide": "Une interface utilisateur comprend des écrans, des boutons, des formulaires, des pages web. Un service qui expose seulement une API pour d'autres programmes n'a pas d'interface utilisateur."
+    },
+    {
+      "id": "filtre-donnees-persistantes",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Stockage de données du service",
+      "interlocuteur": "la personne qui gère les données",
+      "type": "filtre",
+      "criteres": ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6"],
+      "question": "Votre service conserve-t-il des données dans une base de données ou un stockage qui lui est propre ?",
+      "libelle_ecarte": "Non, le service ne conserve aucune donnée (ou seulement en cache temporaire)",
+      "libelle_applicable": "Oui, le service conserve des données persistantes (base de données, fichiers, etc.)",
+      "aide": "Des données persistantes sont conservées même après un redémarrage du service. Un cache temporaire en mémoire n'est pas du stockage persistant."
+    },
+    {
+      "id": "filtre-environnement-test",
+      "fichier": "technique",
+      "phase": "detail",
+      "titre": "Environnements de test",
+      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "type": "filtre",
+      "criteres": ["3.8", "3.9"],
+      "question": "Disposez-vous d'environnements de test ou de développement distincts de la production ?",
+      "libelle_ecarte": "Non, nous n'avons pas d'environnement de test distinct",
+      "libelle_applicable": "Oui, nous avons des environnements de test ou de développement",
+      "aide": "Un environnement de test est une infrastructure séparée où vous pouvez tester vos modifications avant de les déployer en production."
     }
   ]
 }
