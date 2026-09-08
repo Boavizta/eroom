@@ -3,8 +3,8 @@
 Génération de questionnaires EOF depuis un audit existant.
 
 Lit eof-audit-results.json, eof-referentiel.json et questionnaire-blocs.json
-pour produire deux fichiers Markdown (produit-usage et technique) contenant
-les questions encore à répondre.
+pour produire un fichier Markdown unique contenant les questions encore à
+répondre, triées par rendement décroissant.
 
 Le résidu : un critère fait partie du résidu s'il n'a pas de verdict utile.
 ATTENTION : "🤔 À évaluer" et "⌛️ Évaluation en cours" comptent comme des
@@ -17,8 +17,8 @@ Usage :
     python3 generate_questionnaire.py <repertoire-audit> --output-dir <autre-dir>
     python3 generate_questionnaire.py --autotest
 
-Écrit questionnaire-produit-usage.md et questionnaire-technique.md dans le
-répertoire d'audit (ou dans --output-dir si spécifié).
+Écrit questionnaire-eof.md dans le répertoire d'audit (ou dans --output-dir
+si spécifié).
 
 NE modifie JAMAIS questionnaire-blocs.json ni son validateur.
 """
@@ -220,57 +220,48 @@ def compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref):
     return potentiel
 
 
-def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref, fichier):
+def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref):
     """
-    Sélectionne et trie les blocs à afficher dans un fichier donné.
+    Sélectionne et trie les blocs à afficher dans le questionnaire unique.
 
     Un bloc est retenu si au moins un de ses critères est dans le résidu.
 
-    Tri : phase "porte" avant "detail", puis potentiel décroissant, puis id de bloc
-    (avec tri numérique des identifiants de critères pour que 0.2 < 0.10).
+    Tri : rendement décroissant (nombre de critères), puis phase "porte" avant
+    "detail", puis ordre du référentiel (0.x, puis 1.x à 6.x).
     """
     blocs_retenus = []
 
     for bloc in blocs_data["blocs"]:
-        if bloc["fichier"] != fichier:
-            continue
-
         criteres = get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref)
 
         # Retenir si au moins un critère est dans le résidu
-        if any(c in residu for c in criteres):
+        criteres_residu = [c for c in criteres if c in residu]
+        if criteres_residu:
             potentiel = compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref)
-            blocs_retenus.append((bloc, potentiel, criteres))
+            rendement = len(criteres_residu)
+            blocs_retenus.append((bloc, potentiel, criteres, rendement))
 
-    # Tri : phase (porte=0, detail=1), puis -potentiel, puis diagnostic rapide avant détaillé, puis id numérique
-    def parse_bloc_id_numerique(bloc_id):
+    # Tri : rendement décroissant, puis phase (porte avant detail), puis ordre référentiel
+    def parse_critere_id(critere_id):
         """
-        Extrait les composants numériques d'un id de bloc pour permettre un tri numérique.
-        Ex: "porte-diag-0.10" -> (0, 10), "porte-dim6-6.1" -> (6, 1)
-        Retourne un tuple de nombres pour comparaison totale et déterministe.
+        Extrait les composants numériques d'un id de critère pour tri numérique.
+        Ex: "0.10" -> (0, 10), "1.5" -> (1, 5)
         """
         import re
-        # Chercher la partie "X.Y" dans l'id du bloc
-        match = re.search(r'(\d+)\.(\d+)', bloc_id)
+        match = re.search(r'(\d+)\.(\d+)', critere_id)
         if match:
             return (int(match.group(1)), int(match.group(2)))
-        # Fallback : retour d'une valeur haute pour que ça se trie en dernier
         return (999, 999)
 
     def sort_key(item):
-        bloc, potentiel, criteres = item
+        bloc, potentiel, criteres, rendement = item
         phase_order = 0 if bloc["phase"] == "porte" else 1
 
-        # Dans la phase porte : diagnostic rapide (0.x) avant dimension 6 (6.x)
-        # En utilisant le premier critère couvert (le plus petit numériquement)
-        min_critere = min(criteres) if criteres else "999.999"
-        is_diag_rapide = min_critere.startswith("0.")
-        diag_order = 0 if is_diag_rapide else 1
+        # Ordre du référentiel : prendre le premier critère dans l'ordre numérique
+        min_critere = min(criteres, key=parse_critere_id) if criteres else "999.999"
+        ordre_ref = parse_critere_id(min_critere)
 
-        # Tri numérique sur l'id du bloc
-        bloc_id_num = parse_bloc_id_numerique(bloc["id"])
-
-        return (phase_order, diag_order, -potentiel, bloc_id_num)
+        return (-rendement, phase_order, ordre_ref)
 
     blocs_retenus.sort(key=sort_key)
 
@@ -415,12 +406,12 @@ def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_r
     return "\n".join(lines)
 
 
-def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref,
-                                 diag_rapide_ref, output_dir, contextes):
-    """Génère un fichier de questionnaire (produit-usage ou technique)."""
+def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
+                                   diag_rapide_ref, output_dir, contextes):
+    """Génère le questionnaire unique trié par rendement décroissant."""
     residu = compute_residu(audit_results, criteres_ref, diag_rapide_ref)
     blocs_tries = select_and_sort_blocs(blocs_data, residu, criteres_ref,
-                                        diag_rapide_ref, fichier)
+                                        diag_rapide_ref)
 
     if not blocs_tries:
         # Aucun bloc à afficher : ne pas créer le fichier
@@ -430,8 +421,7 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
 
     # En-tête du fichier
     lines.append(SEPARATOR)
-    titre = "Questionnaire EOF - Produit et usage" if fichier == "produit-usage" else "Questionnaire EOF - Technique"
-    lines.append(titre)
+    lines.append("Questionnaire EOF")
     lines.append(SEPARATOR)
     lines.append("")
 
@@ -440,18 +430,20 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
     lines.append("")
     lines.append("- Cochez UNE SEULE case par bloc en utilisant la syntaxe `- [x]`.")
     lines.append("- Une case laissée vide reste vide et ne sera jamais devinée.")
-    lines.append("- Vous pouvez vous arrêter après la partie porte en sachant ce que vous laissez.")
+    lines.append("- Chaque question indique dans son titre à qui la poser.")
+    lines.append("- Les questions sont classées pour que les premières rapportent le plus de critères.")
+    lines.append("- Vous pouvez vous arrêter en cours de route : l'effort fourni aura couvert le maximum de critères.")
     lines.append("- Si vous ne savez pas, cochez la case \"Je ne sais pas\".")
     lines.append("")
 
     # Marqueurs machine
-    lines.append(f"<!-- questionnaire: {fichier} -->")
+    lines.append(f"<!-- questionnaire: eof -->")
     lines.append(f"<!-- version-blocs: {blocs_data['version']} -->")
     lines.append("")
 
     # Séparer porte et détail
-    blocs_porte = [(b, p, c) for b, p, c in blocs_tries if b["phase"] == "porte"]
-    blocs_detail = [(b, p, c) for b, p, c in blocs_tries if b["phase"] == "detail"]
+    blocs_porte = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "porte"]
+    blocs_detail = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "detail"]
 
     total_blocs = len(blocs_tries)
     num = 1
@@ -464,7 +456,7 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
         lines.append("La porte permet de décider rapidement si un diagnostic approfondi est pertinent.")
         lines.append("")
 
-        for bloc, potentiel, criteres in blocs_porte:
+        for bloc, potentiel, criteres, rendement in blocs_porte:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
                                              audit_results, residu, contextes))
@@ -476,14 +468,14 @@ def generate_questionnaire_file(fichier, blocs_data, audit_results, criteres_ref
         lines.append(SEPARATOR)
         lines.append("")
 
-        for bloc, potentiel, criteres in blocs_detail:
+        for bloc, potentiel, criteres, rendement in blocs_detail:
             lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
                                              criteres_ref, diag_rapide_ref,
                                              audit_results, residu, contextes))
             num += 1
 
     # Écrire le fichier
-    output_path = output_dir / f"questionnaire-{fichier}.md"
+    output_path = output_dir / "questionnaire-eof.md"
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -1567,7 +1559,7 @@ def autotest():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Génère des questionnaires EOF depuis un audit existant")
+        description="Génère un questionnaire EOF depuis un audit existant")
     parser.add_argument("repertoire_audit", nargs="?",
                         help="dossier d'audit contenant eof-audit-results.json")
     parser.add_argument("--output-dir",
@@ -1594,14 +1586,13 @@ def main():
     scripts_dir = Path(__file__).resolve().parent
     blocs_data = load_blocs(scripts_dir)
 
-    # Générer les deux fichiers
-    for fichier in ["produit-usage", "technique"]:
-        result = generate_questionnaire_file(fichier, blocs_data, audit_results,
-                                            criteres_ref, diag_rapide_ref, output_dir, contextes)
-        if result:
-            print(f"Généré : {result}")
-        else:
-            print(f"Aucun bloc à afficher pour {fichier} (résidu vide)")
+    # Générer le questionnaire unique
+    result = generate_questionnaire_unique(blocs_data, audit_results,
+                                          criteres_ref, diag_rapide_ref, output_dir, contextes)
+    if result:
+        print(f"Généré : {result}")
+    else:
+        print("Aucun bloc à afficher (résidu vide)")
 
     return 0
 

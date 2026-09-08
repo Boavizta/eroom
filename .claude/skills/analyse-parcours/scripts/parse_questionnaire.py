@@ -2,9 +2,8 @@
 """
 Parsing de questionnaires EOF remplis.
 
-Lit questionnaire-produit-usage.md et questionnaire-technique.md, extrait les
-réponses cochées, et produit lots/relecture-questionnaire.json respectant le
-contrat de sortie de lot.
+Lit questionnaire-eof.md, extrait les réponses cochées, et produit
+lots/relecture-questionnaire.json respectant le contrat de sortie de lot.
 
 Règles strictes :
 - Un bloc doit porter EXACTEMENT une case cochée. Zéro ou plusieurs = rien versé.
@@ -162,7 +161,7 @@ def get_criteres_from_bloc(bloc_def, blocs_data):
         return list(criteres)
 
 
-def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
+def process_bloc(bloc_parsed, bloc_def, criteres_ref, diag_rapide_ref):
     """
     Traite un bloc parsé et retourne les entrées de critères à verser.
 
@@ -203,7 +202,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
                 "id": cid,
                 "categorie": "aucune_donnee",
                 "provenance": "precise",
-                "source": f"questionnaire-{fichier}.md: bloc {bloc_id}, case cochée \"Je ne sais pas\"",
+                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"Je ne sais pas\"",
                 "contexte": f"Question posée au service audité, réponse : ne sait pas"
             }
             entries.append(entry)
@@ -244,7 +243,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
                 "reponse": reponse_libelle,
                 # PAS de coefficient pour diagnostic rapide
                 "provenance": "precise",
-                "source": f"questionnaire-{fichier}.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
+                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
             }
             entries.append(entry)
 
@@ -272,7 +271,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
                 "reponse": reponse_libelle,
                 "coefficient": coefficient,
                 "provenance": "precise",
-                "source": f"questionnaire-{fichier}.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
+                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
             }
             entries.append(entry)
 
@@ -299,7 +298,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
                     "categorie": "aucune_donnee",
                     "reponse": reponse_libelle,
                     "provenance": "precise",
-                    "source": f"questionnaire-{fichier}.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
+                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
                 }
             else:
                 # Critère détaillé : coefficient obligatoire
@@ -318,7 +317,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
                     "reponse": reponse_libelle,
                     "coefficient": coefficient,
                     "provenance": "precise",
-                    "source": f"questionnaire-{fichier}.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
+                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
                 }
 
             entries.append(entry)
@@ -328,7 +327,7 @@ def process_bloc(bloc_parsed, bloc_def, fichier, criteres_ref, diag_rapide_ref):
 
 def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
     """
-    Parse les deux fichiers de questionnaire et retourne les entrées de critères.
+    Parse le questionnaire unique et retourne les entrées de critères.
 
     Retourne (entries, report) où :
     - entries : liste de dicts pour le fichier JSON de sortie
@@ -344,59 +343,58 @@ def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
         "blocs_erreur": 0,
         "criteres_verses": 0,
         "criteres_jnsp": 0,
-        "fichiers_lus": []
+        "fichier_lu": None
     }
 
     # Construire un index {bloc_id: bloc_def}
     blocs_index = {b["id"]: b for b in blocs_data["blocs"]}
 
-    for fichier in ["produit-usage", "technique"]:
-        md_path = audit_dir / f"questionnaire-{fichier}.md"
+    md_path = audit_dir / "questionnaire-eof.md"
 
-        if not md_path.exists():
-            errors.append(f"Fichier {md_path.name} absent, ignoré")
+    if not md_path.exists():
+        errors.append(f"Fichier {md_path.name} absent")
+        return entries, report, errors
+
+    parsed = parse_markdown_file(md_path)
+
+    if not parsed["read_success"]:
+        errors.append(f"Erreur lecture {md_path.name} : {parsed['read_error']}")
+        return entries, report, errors
+
+    report["fichier_lu"] = md_path.name
+
+    for bloc_parsed in parsed["blocs"]:
+        report["blocs_lus"] += 1
+        bloc_id = bloc_parsed["id"]
+
+        if bloc_id not in blocs_index:
+            errors.append(f"Bloc {bloc_id} introuvable dans la bibliothèque, ignoré")
+            report["blocs_erreur"] += 1
             continue
 
-        parsed = parse_markdown_file(md_path)
+        bloc_def = blocs_index[bloc_id]
 
-        if not parsed["read_success"]:
-            errors.append(f"Erreur lecture {md_path.name} : {parsed['read_error']}")
+        if len(bloc_parsed["options_cochees"]) == 0:
+            report["blocs_vides"] += 1
             continue
 
-        report["fichiers_lus"].append(md_path.name)
+        bloc_entries, bloc_errors = process_bloc(bloc_parsed, bloc_def,
+                                                 criteres_ref, diag_rapide_ref)
 
-        for bloc_parsed in parsed["blocs"]:
-            report["blocs_lus"] += 1
-            bloc_id = bloc_parsed["id"]
+        if bloc_errors:
+            errors.extend(bloc_errors)
+            report["blocs_erreur"] += 1
+        elif bloc_entries:
+            report["blocs_repondus"] += 1
 
-            if bloc_id not in blocs_index:
-                errors.append(f"Bloc {bloc_id} introuvable dans la bibliothèque, ignoré")
-                report["blocs_erreur"] += 1
-                continue
+            # Compter les critères versés vs jnsp
+            for entry in bloc_entries:
+                if "reponse" in entry:
+                    report["criteres_verses"] += 1
+                elif "contexte" in entry:
+                    report["criteres_jnsp"] += 1
 
-            bloc_def = blocs_index[bloc_id]
-
-            if len(bloc_parsed["options_cochees"]) == 0:
-                report["blocs_vides"] += 1
-                continue
-
-            bloc_entries, bloc_errors = process_bloc(bloc_parsed, bloc_def, fichier,
-                                                     criteres_ref, diag_rapide_ref)
-
-            if bloc_errors:
-                errors.extend(bloc_errors)
-                report["blocs_erreur"] += 1
-            elif bloc_entries:
-                report["blocs_repondus"] += 1
-
-                # Compter les critères versés vs jnsp
-                for entry in bloc_entries:
-                    if "reponse" in entry:
-                        report["criteres_verses"] += 1
-                    elif "contexte" in entry:
-                        report["criteres_jnsp"] += 1
-
-                entries.extend(bloc_entries)
+            entries.extend(bloc_entries)
 
     return entries, report, errors
 
@@ -794,7 +792,7 @@ def main():
                                                    criteres_ref, diag_rapide_ref)
 
     # Afficher le compte-rendu
-    print(f"Fichiers lus : {', '.join(report['fichiers_lus']) if report['fichiers_lus'] else 'aucun'}")
+    print(f"Fichier lu : {report['fichier_lu'] if report['fichier_lu'] else 'aucun'}")
     print(f"Blocs lus : {report['blocs_lus']}")
     print(f"Blocs répondus : {report['blocs_repondus']}")
     print(f"Blocs vides : {report['blocs_vides']}")
@@ -814,7 +812,7 @@ def main():
     output = {
         "lot_id": "relecture-questionnaire",
         "genere_le": datetime.now(timezone.utc).isoformat(),
-        "entrees": report["fichiers_lus"],
+        "entrees": [report["fichier_lu"]] if report["fichier_lu"] else [],
         "criteres": entries
     }
 
