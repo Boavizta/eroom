@@ -16,15 +16,16 @@ Deux scripts dans `.claude/skills/analyse-parcours/scripts/` :
 
 1. **`generate_questionnaire.py`**
    - Lit `eof-audit-results.json`, `eof-referentiel.json` et `questionnaire-blocs.json`
-   - Génère `questionnaire-produit-usage.md` et `questionnaire-technique.md`
+   - Génère `questionnaire-eof.md` (un seul fichier)
    - Calcule le résidu (critères sans verdict utile)
-   - Ordonnance les blocs par phase puis potentiel décroissant
+   - Ordonnance les blocs par rendement décroissant (nombre de critères couverts), puis phase "porte" avant "detail"
 
 2. **`parse_questionnaire.py`**
-   - Lit les deux fichiers `.md` remplis
+   - Lit `questionnaire-eof.md`
    - Produit `lots/relecture-questionnaire.json`
    - Vérifie exactement une case cochée par bloc
-   - Respecte le contrat de sortie de lot (4 clés racine, omission des null)
+   - Respecte le contrat de sortie de lot (5 clés racine, omission des null)
+   - Pose un bloc `mesure` conforme à la convention d'état de mesure
 
 ## Ce que les autotests couvrent
 
@@ -49,6 +50,7 @@ réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
 - Deux cases cochées = rien versé (erreur signalée)
 - Critère déjà tranché ignoré
 - (Aller-retour générateur/parseur : couvert implicitement)
+- Bloc mesure conforme à la convention : fichier absent = `echec_lecture`, fichier vide = `rien_trouve`, fichier répondu = `ok`
 
 ## Décisions clés prises
 
@@ -66,27 +68,37 @@ réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
 - Critère détaillé : lecture de `options_evaluation`
 - Question diagnostic rapide : lecture de `crans`
 
-### 3. Ordonnancement par potentiel décroissant
+### 3. Ordonnancement par rendement décroissant sur les critères restants
 
-**Raison** : Décision métier - poser d'abord les questions qui débloquent le plus de potentiel.
+**Raison** : Axe unique et prioritaire - minimiser le nombre de questions posées, maximiser le nombre de critères répondus, et le plus précisément possible. Les questions qui renseignent PLUSIEURS critères passent d'abord.
 
-**Impact** : Tri stable (phase, -potentiel, id de bloc) pour résultats déterministes.
+**Impact** : Le rendement se calcule sur les critères RESTANTS dans le résidu. Un bloc dont la mesure a déjà tranché une partie redescend automatiquement dans l'ordre. Exemple réel : le bloc "parcours et écrans" tombe en 41e position parce que le critère 1.13 a déjà été tranché par la mesure, il ne rapporte donc plus qu'un critère.
+
+**Structure** : Le questionnaire garde DEUX PARTIES (porte puis détail), avec le tri par rendement décroissant à l'intérieur de chacune. Ce n'est pas un tri global, et c'est délibéré : la porte sert à décider si un diagnostic approfondi vaut la peine.
 
 **Mesure ultérieure** : La session 19 a montré que ce tri ne fait gagner que 4,5 questions sur 37 par rapport à un tirage au hasard. Le tri est conservé parce qu'il ne coûte rien et qu'il permet à l'interlocuteur de s'arrêter en sachant ce qu'il laisse, mais il ne faut pas en attendre un gain de compaction. Voir la section "Session 19 : le plafond du format actuel, mesuré".
 
-### 4. Case "Je ne sais pas" ajoutée à chaque bloc
+### 4. Un seul fichier, le destinataire n'est plus un axe de classement
+
+**Décision** : `questionnaire-eof.md` remplace les deux fichiers `questionnaire-produit-usage.md` et `questionnaire-technique.md`.
+
+**Raison** : Le découpage ne routait rien. Sur 4 destinataires, 3 recevaient des questions dans les DEUX fichiers. Envoyer "le fichier produit" au responsable produit lui cachait 5 questions qui le concernaient et lui en donnait 5 qui ne le concernaient pas. Répartition mesurée des 62 questions par destinataire : équipe de développement 30, responsable produit 16, exploitation de l'infrastructure 12, personne qui gère les données 4.
+
+Le destinataire reste écrit dans le titre de chaque question, sous la forme "à voir avec l'équipe de développement". Classer le document par destinataire a été explicitement ÉCARTÉ : le découpage des rôles dépend trop de l'organisation de chaque client.
+
+### 5. Case "Je ne sais pas" ajoutée à chaque bloc
 
 **Raison** : Distinguer "on a demandé et personne ne sait" de "personne n'a demandé". Évite de fabriquer un faux zéro qui rend un service ignoré indistinguable d'un service exemplaire.
 
 **Impact** : Le parseur produit un `contexte` mais JAMAIS de `reponse` pour cette case.
 
-### 5. Provenance = "precise", catégorie = "aucune_donnee"
+### 6. Provenance = "precise", catégorie = "aucune_donnee"
 
 **Raison** : Contrat de lot - une case cochée par le service audité, sans preuve, ne vient d'aucune donnée collectée.
 
 **Impact** : Tous les critères versés portent ces valeurs fixes.
 
-### 6. Format Markdown strict
+### 7. Format Markdown strict
 
 **Raison** : Consignes de style du projet (TTS macOS lit les séparateurs en signes égal lettre par lettre).
 
@@ -95,7 +107,7 @@ réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
 - Guillemets droits `"`
 - Pas de tiret long (cadratin)
 
-### 7. Coefficient obligatoire pour critères détaillés, absent pour diagnostic rapide
+### 8. Coefficient obligatoire pour critères détaillés, absent pour diagnostic rapide
 
 **Raison** : Règle du validateur de lots. Le référentiel ne définit pas de coefficient pour les questions `0.x`.
 
@@ -111,9 +123,10 @@ réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
   "blocs": [
     {
       "id": "...",
-      "fichier": "produit-usage" | "technique",
+      "fichier": "produit-usage" | "technique",  (vestigial, n'est plus utilisé)
       "phase": "porte" | "detail",
       "titre": "...",
+      "interlocuteur": "..." (facultatif),
       "type": "direct" | "compose",
       "critere": "..." (si direct),
       "question": "...",
@@ -133,7 +146,10 @@ réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
 
 ### Contrat de sortie de lot
 
-Racine : exactement 4 clés `lot_id`, `genere_le`, `entrees`, `criteres`.
+Racine : exactement 5 clés `lot_id`, `genere_le`, `entrees`, `criteres`, `mesure`.
+
+La clé `mesure` est la dernière arrivée. Elle porte l'état de lecture du questionnaire, décrit plus
+bas dans "Le bloc mesure sur le lot de relecture".
 
 Par critère :
 - `id` et `categorie` : obligatoires
@@ -149,12 +165,13 @@ Par critère :
 - Génération d'un questionnaire vide (si résidu vide, aucun fichier créé)
 - Gestion des blocs dont l'ID change entre deux versions de la bibliothèque
 - Interface graphique de remplissage (hors périmètre : Markdown éditable manuellement)
+- Branchement dans le pipeline d'audit (voir section dédiée ci-après)
 
 ## Traçabilité des bugs corrigés en autotest
 
 1. **Bug regex** : `[^-\s]+` n'acceptait pas les tirets dans les IDs de blocs (ex: `test-11`). Corrigé en `[^\s]+?`.
 2. **Bug JSON Python** : `null` au lieu de `None` dans les autotests. Corrigé dans 5 endroits.
-3. **Bug fichiers absents** : autotests du parseur ne créaient pas les deux fichiers `.md`. Corrigé en créant un fichier vide pour l'autre questionnaire.
+3. **Bug fichier absent** : autotests du parseur ne créaient pas `questionnaire-eof.md`. Corrigé en créant le fichier dans le répertoire temporaire de test.
 
 ## Vérifications effectuées
 
@@ -166,20 +183,21 @@ Par critère :
 ## Commandes de référence
 
 ```bash
-# Générer les questionnaires
-python3 generate_questionnaire.py <repertoire-audit>
-python3 generate_questionnaire.py <repertoire-audit> --output-dir <autre-dir>
+# Générer le questionnaire
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <repertoire-audit>
 
-# Parser les questionnaires remplis
-python3 parse_questionnaire.py <repertoire-audit>
+# Parser le questionnaire rempli
+python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <repertoire-audit>
 
 # Lancer les autotests
-python3 generate_questionnaire.py --autotest
-python3 parse_questionnaire.py --autotest
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py --autotest
+python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py --autotest
 
-# Contrôler la bibliothèque de blocs contre le référentiel
-python3 valider_blocs_questionnaire.py
-python3 valider_blocs_questionnaire.py --autotest
+# Fusionner les lots (OBLIGATOIRE après parse_questionnaire.py ou run_eof.py)
+python3 processus/fusionner_lots.py <repertoire-audit>
+
+# Contrôler la santé des sondes (détecte les échecs de mesure)
+python3 processus/valider_sante_sondes.py <repertoire-audit>
 ```
 
 ## Session 19, 2026-09-07 : le plafond du format actuel, mesuré
@@ -346,6 +364,115 @@ d'audit produit avant `e091e98` publie donc encore les anciens textes, avec leur
 internes. Les rafraîchir se fait **sans appel réseau**, en rejouant `run_eof.py` sur une copie du
 dossier : il ne relit que des fichiers déjà sur le disque. Vérifié, aucun verdict ne change et le
 radar reste identique à l'octet ; seuls les 16 textes de contexte sont réécrits.
+
+-----
+
+## Session 25, 2026-09-08 : l'axe unique, et ce qu'il donne quand on le suit
+
+Tout ce qui suit relève d'un seul axe, posé par l'utilisatrice et prioritaire sur tout le reste :
+**poser le moins de questions possible pour faire répondre le plus grand nombre de critères, et le
+plus précisément possible.** Le contenu des questions et leur ordre découlent de cet axe, et de rien
+d'autre. En particulier, ni le destinataire ni le confort de lecture ne sont des axes de classement.
+
+Deux conséquences valent d'être dites tout de suite, parce qu'elles ferment des pistes qui reviennent
+naturellement à l'esprit. La redondance apparente entre questions n'est presque pas exploitable, et
+gagner des questions en remplaçant une question par un indice technique approximatif est un recul,
+pas un gain : cela fait baisser le compteur en fabriquant de l'imprécision.
+
+### Les comptes réels
+
+70 critères au référentiel (54 détaillés sur 6 dimensions + 16 questions de diagnostic rapide).
+
+62 blocs de questions dans la bibliothèque, ce qui est un PLAFOND et non le nombre posé : `generate_questionnaire.py` ne garde que les critères restés sans réponse.
+
+Sur un audit réel, 57 questions ont été produites, contre 16 + 41 = 57 avec l'ancien code : le regroupement ne coûte aucune question.
+
+8 critères sont tranchés par la mesure seule (1.5, 1.6, 1.12, 1.13, 2.1, 3.3, 5.4 et 0.16).
+
+16 critères reçoivent un contexte affiché mais JAMAIS de réponse.
+
+46 critères qu'aucune sonde n'atteint.
+
+### La fusion est épuisée
+
+Les 8 blocs de type composé couvrent 16 critères à eux seuls. Une recherche exhaustive a conclu qu'AUCUNE fusion supplémentaire n'est possible sans perte.
+
+Une seule paire nouvelle a été proposée, 1.1 avec 1.7, et elle a été rejetée : 1.1 demande si une solution non numérique a été écartée preuve en main, 1.7 si chaque fonctionnalité est réellement utilisée, et une réponse "potentiel d'amélioration" ne dirait plus lequel des deux manque.
+
+Dix fusions tentantes ont été examinées et rejetées, toutes sur le même mécanisme : DEUX PRATIQUES DÉCOUPLÉES DANS LA VRAIE VIE. Liste à ne pas rouvrir : 1.2 avec 2.2, 1.5 avec 1.10, 1.3 avec 1.6, 3.1 avec 3.2, 4.2 avec 4.3, 6.1 avec 6.6, 6.2 avec 6.4, 6.3 avec 6.4, 1.11 avec 1.12, 2.3 avec 2.4. Exemples parlants : un CI/CD peut tourner sans tests, on peut faire du FinOps sans GreenOps, une base mal choisie peut être correctement optimisée.
+
+### La contrainte des deux vocabulaires
+
+Les 16 questions de diagnostic rapide 0.x offrent "Non applicable" et n'offrent PAS "À évaluer". Les critères détaillés des dimensions 1 à 5 offrent "À évaluer". La dimension 6 partage l'échelle du diagnostic rapide.
+
+Conséquence : fusionner une 0.x avec un critère des dimensions 1 à 5 rend une réponse INEXPRIMABLE ("🚫 Non applicable" devient impossible à cocher).
+
+C'est pour cela que le seul bloc composé touchant une 0.x associe 0.3 et 6.10.
+
+Conséquence pratique : sur 5 groupes de questions redondantes repérés, 4 traversent cette frontière et ne sont donc pas fusionnables ; seul 0.7 avec 0.10 l'est, pour un gain d'une seule question. La redondance apparente n'est PAS le levier.
+
+### "Non applicable" et sans_objet sont deux mécanismes distincts
+
+⚠️ **À ne jamais confondre.**
+
+- La réponse "🚫 Non applicable" a un coefficient de 0, compte dans `criteres_repondus`, et NE RETIRE PAS le critère du dénominateur, ni celui de `completude_pct` ni celui de `potentiel_optimisation_pct`.
+- Elle se comporte donc EXACTEMENT comme "🤔 À évaluer" : les deux gonflent la complétude sans rien apporter au potentiel.
+
+Démonstration : 10 critères dont 3 répondus. Passer les 7 autres à "Non applicable" donne `criteres_repondus` 3 vers 10, `completude_pct` 30 % vers 100 %, et `potentiel_optimisation_pct` 15 % vers 15 %, INCHANGÉ.
+
+Le champ `sans_objet`, lui, est un booléen distinct de la réponse. Il saute le critère avant tout comptage et retire son `potentiel_max` des DEUX dénominateurs.
+
+**DIVERGENCE ENTRE LES DEUX PRODUCTEURS, à signaler comme un défaut ouvert et non corrigé** : `fusionner_lots.py` traite `sans_objet` et réduit les deux dénominateurs, `run_eof.py` ignore le champ et ne le pose jamais. Si un lot manuel le pose et qu'on relance `run_eof.py` seul, les chiffres changent en silence.
+
+### Un levier apparent, refusé : remplacer une question par un indice technique
+
+Six questions pourraient être approchées par un signal que nous mesurons déjà : 0.4 par le nombre de
+domaines tiers, 0.10 par le nombre d'URL du sitemap, 1.9 et 1.14 par le poids de page, 2.5 par les
+codes HTTP 304, 6.3 par la fraîcheur des déploiements.
+
+Ce sont des proxys faibles. Un déploiement récent ne prouve pas qu'un pipeline existe, un poids de
+page ne dit rien de la clarté d'un écran. Les transformer en réponses gagnerait 6 questions **en
+dégradant la précision**, c'est-à-dire l'inverse du but. Refusé.
+
+### Le levier qui reste : les questions filtres
+
+Une question filtre ne fait pas répondre 2 critères, elle en fait répondre dix quand la réponse est "ça ne s'applique pas chez nous" : un service sans base de données propre réglerait la dimension 4 d'un coup, sans perte de précision puisque "Non applicable" est une réponse légitime du référentiel.
+
+Ce levier n'est pas implémenté.
+
+**GARDE-FOU OBLIGATOIRE** : le rapport devra afficher À PART le nombre de critères écartés, sinon on affiche une complétude de 100 % construite sur des exclusions, indiscernable d'un audit réellement instruit. Autrement dit on fabriquerait de la complétude.
+
+### Le bloc mesure sur le lot de relecture
+
+`parse_questionnaire.py` produit un bloc `mesure` conforme à `documentation/implementation/convention-etat-de-mesure.md`, avec trois statuts :
+
+- `echec_lecture` si le fichier est absent ou illisible
+- `rien_trouve` s'il est lu mais qu'aucune case n'est cochée
+- `ok` sinon
+
+Vérifié par les trois tests de convention : fichier absent, `valider_sante_sondes.py` sort en 1 et nomme l'échec ; fichier présent et vide, il sort en 0 sans faux positif ; fichier répondu, il sort en 0.
+
+Un questionnaire revenu entièrement vide est un résultat d'audit légitime, pas un échec de notre outil : c'est `rien_trouve`, jamais `ok` ni `echec_*`.
+
+Sur un dossier sans questionnaire, `parse_questionnaire.py` écrivait un lot indistinguable d'un questionnaire revenu entièrement vide. Le lot porte désormais un bloc mesure qui distingue les deux cas.
+
+### Le questionnaire n'est branché nulle part dans le pipeline
+
+Établi par `grep` sur `SKILL.md` et les 9 fichiers de skill-steps : le mot "questionnaire" n'apparaît qu'une fois, dans une parenthèse de nom de plan à `39_eof-audit.md` ligne 16. Aucune étape n'appelle `generate_questionnaire.py`. Aucune échéance de retour n'est encodée nulle part.
+
+Le circuit complet est dessiné dans `documentation/diagrammes/eof-questionnaire-sequence.pdf`, 3 pages : ce que l'audit lance seul, générer et envoyer hors pipeline, relire et fusionner.
+
+### Le piège de manipulation
+
+`run_eof.py` réécrit `eof-audit-results.json` sans relire les lots. Le relancer seul après une fusion fait donc disparaître du rapport, EN SILENCE, toutes les réponses du questionnaire. Il faut toujours relancer `fusionner_lots.py` derrière lui.
+
+### Une leçon de méthode à ne pas oublier
+
+La fusion en un seul fichier a d'abord été commitée après `py_compile` et `valider_coherence_cles.py`, SANS lancer `parse_questionnaire.py --autotest`. Cet autotest fabriquait ses fixtures sous les deux anciens noms de fichier : 6 cas sur 7 tombaient, et la fusion était donc livrée avec son propre filet de sécurité crevé. Corrigé, 7 sur 7.
+
+La batterie de `processus/CONTROLES.md` ne suffit donc pas : **un script qui porte un `--autotest`
+doit voir son `--autotest` rejoué avant tout commit.** Cette règle n'est pas encore inscrite dans
+`processus/CONTROLES.md`, c'est un chantier ouvert.
 
 ## Chantiers livrés
 

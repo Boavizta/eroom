@@ -544,7 +544,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -610,7 +610,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -673,7 +673,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             # Le critère doit être dans le résidu et le bloc doit être généré
@@ -747,7 +747,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -810,7 +810,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -868,7 +868,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result:
@@ -920,7 +920,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result:
@@ -1007,7 +1007,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1078,7 +1078,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1142,7 +1142,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1220,7 +1220,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1303,7 +1303,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("technique", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1374,7 +1374,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1480,7 +1480,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
 
             if result is None:
@@ -1529,7 +1529,7 @@ def autotest():
             audit, contextes = load_audit_results(tmpdir)
             blocs = load_blocs(tmpdir)
 
-            result = generate_questionnaire_file("produit-usage", blocs, audit,
+            result = generate_questionnaire_unique(blocs, audit,
                                                 criteres_ref, diag_ref, tmpdir, contextes)
             if result is None:
                 echecs.append(("Emprunt 3 - titre de bloc", "Aucun fichier généré"))
