@@ -41,15 +41,27 @@ C -> GQ : python3 generate_questionnaire.py <dossier-audit>
 GQ -> FS : Lire eof-audit-results.json
 FS -> GQ : Critères déjà tranchés par la mesure
 GQ -> GQ : Ne garder que les critères sans réponse,\net ceux répondus "à évaluer"
-GQ -> FS : questionnaire-produit-usage.md\n(17 questions)
-GQ -> FS : questionnaire-technique.md\n(45 questions)
-GQ -> C : 62 questions au plus,\nréparties en 2 fichiers
+GQ -> GQ : Trier par rendement décroissant :\nles questions à plusieurs critères d'abord
+GQ -> FS : questionnaire-eof.md\n(62 questions au plus)
+GQ -> C : Le compte réel est inférieur :\nun site bien mesuré en reçoit environ 55
 
 note over GQ, FS
-  Deux fichiers parce que deux interlocuteurs différents.
+  UN SEUL fichier. Le découpage en deux, produit et
+  technique, a été supprimé : il ne routait rien.
+  3 destinataires sur 4 recevaient des questions dans
+  les DEUX fichiers.
+
   Chaque question dit dans son titre à qui la poser :
   le responsable produit, l'équipe de développement,
-  ou la personne qui exploite l'infrastructure.
+  la personne qui exploite l'infrastructure, celle qui
+  gère les données. C'est une indication, pas un plan de
+  classement : les rôles dépendent trop de chaque client.
+
+  L'ordre suit le rendement : un client qui s'arrête en
+  cours de route a couvert le maximum de critères pour
+  l'effort fourni. Le rendement se calcule sur les
+  critères RESTANTS, donc un bloc dont la mesure a déjà
+  tranché une partie redescend tout seul.
 
   Format : cases à cocher Markdown, avec des repères
   cachés en commentaire HTML pour que la relecture ne
@@ -58,11 +70,11 @@ note over GQ, FS
   elle ne produit jamais de réponse.
 end note
 
-C -> U : Chemins des 2 fichiers
+C -> U : Chemin du fichier
 
 == Envoyer, attendre, recevoir ==
 
-U -> I : Transmettre les 2 fichiers
+U -> I : Transmettre le fichier
 
 note over U, I
   ATTENTE. Le délai est asynchrone et n'est pas outillé.
@@ -72,14 +84,19 @@ note over U, I
   ce que le client accepte.
 end note
 
-I -> I : Cocher les cases,\nchacun sur son fichier
-I -> U : Renvoyer les 2 fichiers remplis
-U -> FS : Reposer les fichiers remplis\ndans le dossier d'audit
+I -> I : Cocher les cases,\nchacun les questions qui le concernent
+I -> U : Renvoyer le fichier rempli
+U -> FS : Reposer le fichier rempli\ndans le dossier d'audit
 
 note over U, FS
-  Les fichiers doivent revenir sous leurs noms d'origine,
-  dans le dossier d'audit : c'est là que la relecture les
-  cherche. Suite : page 3/3.
+  Le fichier doit revenir sous son nom d'origine, dans le
+  dossier d'audit : c'est là que la relecture le cherche.
+
+  S'il ne revient pas, la relecture le dit : elle pose un
+  état echec_lecture que le contrôle de santé des sondes
+  attrape. Un questionnaire jamais revenu ne ressemble
+  donc plus à un questionnaire rendu vide.
+  Suite : page 3/3.
 end note
 
 @enduml

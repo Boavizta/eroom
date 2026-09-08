@@ -33,10 +33,10 @@ database "dossier-audit/" as FS #9BD0DD
 
 U -> C : Demander la relecture
 C -> PQ : python3 parse_questionnaire.py <dossier-audit>
-PQ -> FS : Lire les 2 questionnaires remplis
+PQ -> FS : Lire questionnaire-eof.md rempli
 FS -> PQ : Cases cochées
 PQ -> PQ : Se repérer sur les commentaires HTML,\njamais sur un numéro de ligne
-PQ -> FS : lots/relecture-questionnaire.json
+PQ -> FS : lots/relecture-questionnaire.json\n+ un bloc mesure disant si le fichier était là
 
 note over PQ, FS
   Provenance posée sur ces réponses : "precise",
