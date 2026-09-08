@@ -329,9 +329,11 @@ def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
     """
     Parse le questionnaire unique et retourne les entrées de critères.
 
-    Retourne (entries, report) où :
+    Retourne (entries, report, errors, mesure) où :
     - entries : liste de dicts pour le fichier JSON de sortie
     - report : dict avec les statistiques
+    - errors : liste de messages d'erreur
+    - mesure : bloc mesure conforme à la convention (statut, cible, detail)
     """
     entries = []
     errors = []
@@ -353,13 +355,23 @@ def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
 
     if not md_path.exists():
         errors.append(f"Fichier {md_path.name} absent")
-        return entries, report, errors
+        mesure = {
+            "statut": "echec_lecture",
+            "cible": md_path.name,
+            "detail": "Fichier questionnaire-eof.md absent"
+        }
+        return entries, report, errors, mesure
 
     parsed = parse_markdown_file(md_path)
 
     if not parsed["read_success"]:
         errors.append(f"Erreur lecture {md_path.name} : {parsed['read_error']}")
-        return entries, report, errors
+        mesure = {
+            "statut": "echec_lecture",
+            "cible": md_path.name,
+            "detail": f"Erreur de lecture : {parsed['read_error']}"
+        }
+        return entries, report, errors, mesure
 
     report["fichier_lu"] = md_path.name
 
@@ -396,7 +408,29 @@ def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
 
             entries.extend(bloc_entries)
 
-    return entries, report, errors
+    # Le fichier a été lu. Reste à dire si on y a trouvé des réponses ou non.
+    # Un questionnaire revenu entièrement vide est un résultat d'audit légitime,
+    # pas un échec de notre outil : c'est rien_trouve, jamais ok ni echec_*.
+    if report["blocs_repondus"] == 0:
+        mesure = {
+            "statut": "rien_trouve",
+            "cible": md_path.name,
+            "detail": (
+                f"Fichier lu, {report['blocs_lus']} blocs reconnus, "
+                "aucune case cochée."
+            )
+        }
+    else:
+        mesure = {
+            "statut": "ok",
+            "cible": md_path.name,
+            "detail": (
+                f"{report['blocs_repondus']} blocs répondus sur "
+                f"{report['blocs_lus']}."
+            )
+        }
+
+    return entries, report, errors, mesure
 
 
 def autotest():
@@ -458,16 +492,15 @@ def autotest():
 - [ ] 💡 Potentiel d'amélioration identifié  <!-- opt:1 -->
 - [ ] Je ne sais pas  <!-- opt:jnsp -->
 """
-            md_path = tmpdir / "questionnaire-produit-usage.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
             # Créer l'autre fichier vide pour éviter les warnings
-            (tmpdir / "questionnaire-technique.md").write_text("", encoding="utf-8")
 
             # Parser
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             if errors:
                 echecs.append(("Bloc direct case cochée", f"Erreurs : {errors}"))
@@ -522,14 +555,13 @@ def autotest():
 - [ ] Cran 2  <!-- opt:1 -->
 - [ ] Je ne sais pas  <!-- opt:jnsp -->
 """
-            md_path = tmpdir / "questionnaire-produit-usage.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            (tmpdir / "questionnaire-technique.md").write_text("", encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             if errors:
                 echecs.append(("Diagnostic rapide sans coefficient", f"Erreurs : {errors}"))
@@ -580,14 +612,13 @@ def autotest():
 - [ ] ✅ Point fort confirmé  <!-- opt:0 -->
 - [x] Je ne sais pas  <!-- opt:jnsp -->
 """
-            md_path = tmpdir / "questionnaire-technique.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            (tmpdir / "questionnaire-produit-usage.md").write_text("", encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             if errors:
                 echecs.append(("Case Je ne sais pas", f"Erreurs : {errors}"))
@@ -625,14 +656,13 @@ def autotest():
 - [ ] ✅  <!-- opt:0 -->
 - [ ] Je ne sais pas  <!-- opt:jnsp -->
 """
-            md_path = tmpdir / "questionnaire-technique.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            (tmpdir / "questionnaire-produit-usage.md").write_text("", encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             # Aucune entrée versée, un bloc vide signalé
             if len(entries) != 0:
@@ -668,14 +698,13 @@ def autotest():
 - [x] 💡  <!-- opt:1 -->
 - [ ] Je ne sais pas  <!-- opt:jnsp -->
 """
-            md_path = tmpdir / "questionnaire-technique.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            (tmpdir / "questionnaire-produit-usage.md").write_text("", encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             if len(entries) != 0:
                 echecs.append(("Deux cases cochées rien versé", f"Attendu 0 entrée, obtenu {len(entries)}"))
@@ -724,14 +753,13 @@ def autotest():
 - [ ] Je ne sais pas  <!-- opt:jnsp -->
 <!-- deja-tranche:5.1 -->
 """
-            md_path = tmpdir / "questionnaire-technique.md"
+            md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            (tmpdir / "questionnaire-produit-usage.md").write_text("", encoding="utf-8")
 
             criteres_ref, diag_ref = load_referentiel(ref_path)
             blocs = load_blocs(tmpdir)
-            entries, report, errors = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
 
             # Seul 5.2 doit être versé, 5.1 ignoré
             if len(entries) != 1:
@@ -788,11 +816,12 @@ def main():
     blocs_data = load_blocs(scripts_dir)
 
     # Parser les questionnaires
-    entries, report, errors = parse_questionnaires(audit_dir, blocs_data,
-                                                   criteres_ref, diag_rapide_ref)
+    entries, report, errors, mesure = parse_questionnaires(audit_dir, blocs_data,
+                                                           criteres_ref, diag_rapide_ref)
 
     # Afficher le compte-rendu
     print(f"Fichier lu : {report['fichier_lu'] if report['fichier_lu'] else 'aucun'}")
+    print(f"Statut de mesure : {mesure['statut']}")
     print(f"Blocs lus : {report['blocs_lus']}")
     print(f"Blocs répondus : {report['blocs_repondus']}")
     print(f"Blocs vides : {report['blocs_vides']}")
@@ -813,7 +842,8 @@ def main():
         "lot_id": "relecture-questionnaire",
         "genere_le": datetime.now(timezone.utc).isoformat(),
         "entrees": [report["fichier_lu"]] if report["fichier_lu"] else [],
-        "criteres": entries
+        "criteres": entries,
+        "mesure": mesure
     }
 
     output_path = lots_dir / "relecture-questionnaire.json"
