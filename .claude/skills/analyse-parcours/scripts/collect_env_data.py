@@ -216,7 +216,7 @@ def weighted_os_shares(audience_mix):
     return round(ios, 3), round(macos, 3), detail
 
 
-def resolve_audience(cli_audience, existing_audience, ios_override=None):
+def resolve_audience(cli_audience, existing_audience, ios_override=None, audience_mesure=None):
     """Résout le mix pays d'audience selon l'ordre de priorité et calcule les
     parts iOS/macOS pondérées.
 
@@ -224,6 +224,9 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
     existing_audience: bloc 'audience' déjà présent dans env-data.json, écrit par
                        l'agent (SimilarWeb) ou un run précédent (ou None).
     ios_override     : valeur de --ios-mobile-share (écrase la part iOS calculée).
+    audience_mesure  : bloc 'mesures.audience' issu de env-data.json (écrit par
+                       similarweb_api.py), ou None. Utilisé pour distinguer une
+                       absence de donnée (statut != 'ok') d'un vrai défaut.
 
     Retourne un dict 'audience' prêt à stocker dans env-data.json :
         {mix, source, ios_share, macos_share, ios_share_source,
@@ -247,12 +250,43 @@ def resolve_audience(cli_audience, existing_audience, ios_override=None):
         confidence = existing_audience.get("confidence", CONFIDENCE_MEDIUM)
         source_url = existing_audience.get("source_url")
     else:
+        # Repli sur France (100 %). Distinguer une absence de donnée (rien_trouve)
+        # d'un échec de sonde (echec_reseau, echec_lecture, echec_analyse).
         mix = {"FR": 1.0}
         source = "default"
         confidence = CONFIDENCE_DEFAULT
-        warning = ("Aucun mix pays d'audience fourni : France (100 %) par défaut. "
-                   "Fournir --audience \"FR:0.7,US:0.3\" (analytics client) ou laisser "
-                   "l'agent écrire un mix SimilarWeb dans env-data.json.")
+
+        if audience_mesure:
+            statut = audience_mesure.get("statut", "")
+            detail = audience_mesure.get("detail", "")
+            cible = audience_mesure.get("cible", "")
+
+            # Les trois echec_* sont des échecs de notre outil, pas des résultats d'audit.
+            if statut in ("echec_reseau", "echec_lecture", "echec_analyse"):
+                print(f"  ⚠ Sonde d'audience échouée ({statut}) : {detail}")
+                if cible:
+                    print(f"     Cible : {cible}")
+                warning = (f"Sonde d'audience échouée ({statut}). "
+                           f"Audience livrée : France (100 %) PAR DÉFAUT (non mesuré). "
+                           f"Détail : {detail}")
+            # rien_trouve est un résultat d'audit : le domaine n'est vraiment pas référencé.
+            # Le repli reste légitime mais le dire différemment.
+            elif statut == "rien_trouve":
+                print(f"  ⚠ Domaine non référencé par SimilarWeb : {detail}")
+                if cible:
+                    print(f"     Cible : {cible}")
+                warning = (f"Domaine non référencé par SimilarWeb. "
+                           f"Audience livrée : France (100 %) par défaut. "
+                           f"Fournir --audience \"FR:0.7,US:0.3\" (analytics client) si disponible.")
+            else:
+                # Statut inattendu (ne devrait pas arriver) : traiter comme absence de donnée.
+                warning = ("Aucun mix pays d'audience fourni : France (100 %) par défaut. "
+                           "Fournir --audience \"FR:0.7,US:0.3\" (analytics client) ou laisser "
+                           "l'agent écrire un mix SimilarWeb dans env-data.json.")
+        else:
+            warning = ("Aucun mix pays d'audience fourni : France (100 %) par défaut. "
+                       "Fournir --audience \"FR:0.7,US:0.3\" (analytics client) ou laisser "
+                       "l'agent écrire un mix SimilarWeb dans env-data.json.")
 
     ios_share, macos_share, per_country = weighted_os_shares(mix)
     ios_share_source = f"pondéré par mix pays ({source}), d'après {IOS_SHARE_SOURCE}"
@@ -1061,7 +1095,7 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
 # ---------------------------------------------------------------------------
 
 def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None,
-                   tech_stack=None, servers_info=None, ai_external_apis=None):
+                   tech_stack=None, servers_info=None, ai_external_apis=None, mesures=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
@@ -1291,7 +1325,7 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
                 "stack technique : " + ", ".join(_cdn_names) + "."
             )
 
-    return {
+    result = {
         "schema_version": "1.7",
         "pages": pages if har_metrics else [],
         "har_summary": har_metrics,
@@ -1305,6 +1339,10 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
         "tech_stack": tech_stack,
         "ai_external_apis": ai_external_apis or {},
     }
+    # Préserver les mesures écrites par similarweb_api.py (convention d'état de mesure)
+    if mesures:
+        result["mesures"] = mesures
+    return result
 
 
 def merge_ai_external_apis(detected, existing, refresh):
@@ -1557,6 +1595,7 @@ def main():
     existing_audience = None
     existing_traffic = None
     existing_ai_external_apis = None
+    existing_mesures = {}
     if env_data_path.exists():
         try:
             with open(env_data_path, encoding="utf-8") as f:
@@ -1564,10 +1603,12 @@ def main():
             existing_audience = _prev.get("audience")
             existing_traffic = _prev.get("traffic")
             existing_ai_external_apis = _prev.get("ai_external_apis")
+            existing_mesures = _prev.get("mesures", {})
         except (json.JSONDecodeError, OSError):
             existing_audience = None
             existing_traffic = None
             existing_ai_external_apis = None
+            existing_mesures = {}
 
     ai_external_apis = merge_ai_external_apis(
         ai_hosts_detected, existing_ai_external_apis, refresh=args.refresh)
@@ -1595,8 +1636,18 @@ def main():
         existing_audience, existing_traffic = maybe_fetch_similarweb(
             source_dir, existing_audience, existing_traffic,
             cli_audience=args.audience, sw_domain=args.sw_domain)
+        # Recharger les mesures après l'appel SimilarWeb (qui écrit dans env-data.json)
+        if env_data_path.exists():
+            try:
+                with open(env_data_path, encoding="utf-8") as f:
+                    _updated = json.load(f)
+                existing_mesures = _updated.get("mesures", {})
+            except (json.JSONDecodeError, OSError):
+                pass
 
-    audience = resolve_audience(args.audience, existing_audience, ios_override=args.ios_mobile_share)
+    audience = resolve_audience(args.audience, existing_audience,
+                               ios_override=args.ios_mobile_share,
+                               audience_mesure=existing_mesures.get("audience"))
     if audience.get("error"):
         print(f"  Erreur : {audience['error']}")
         sys.exit(1)
@@ -1620,7 +1671,7 @@ def main():
     env_data = build_env_data((pages, server_ip), device_mix, server_info,
                               audience=audience, traffic=traffic,
                               tech_stack=tech_stack, servers_info=servers_info,
-                              ai_external_apis=ai_external_apis)
+                              ai_external_apis=ai_external_apis, mesures=existing_mesures)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)
