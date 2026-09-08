@@ -17,6 +17,13 @@ env-data.json
 # présents et futurs, à n'importe quelle profondeur.
 donnees-brutes-potentiellement-sensibles/
 
+# Archive brute du HTML/CSS retéléchargé par parse_html_criteria.py (chantier
+# 27), une copie par page/feuille de style pour rejouer l'analyse hors ligne.
+# Capture brute d'un site tiers, pas un artefact du rapport : même logique que
+# donnees-brutes-potentiellement-sensibles/ ci-dessus, à n'importe quelle
+# profondeur sous audits/.
+pages-html/
+
 # Outputs e-footprint (générés, non versionnés)
 efootprint-synthese-python.json
 efootprint-boavizta-model.json

@@ -14,17 +14,34 @@ d'audit, seulement une source de donnée différente pour le même périmètre.
 Le HTML est lu par html.parser (bibliothèque standard, aucune dépendance),
 PAS par des expressions régulières : voir _HtmlFacts et autotest().
 
+CHANTIER 27 — archivage pour reproductibilité. Le .har capturé ne contient pas
+les corps de réponse (voir plus haut), donc ce script re-télécharge en direct ;
+mais retélécharger à CHAQUE exécution casse la reproductibilité (deux passages
+peuvent rendre des résultats différents si le site a changé). Chaque page/CSS
+récupéré est donc archivé tel quel sous <source_dir>/pages-html/, avec un nom
+de fichier déterministe (voir archive_filename()). Par défaut, une exécution
+relit l'archive existante au lieu de refaire une requête réseau ; --refresh
+force un nouveau téléchargement. Un futur script (hors périmètre ici) pourra
+retrouver le fichier archivé à partir d'une URL en appelant archive_filename()
+lui-même, sans jamais avoir à "dérivider" un nom de fichier.
+
 Usage :
     python3 parse_html_criteria.py <source_dir>
+    python3 parse_html_criteria.py <source_dir> --refresh
     python3 parse_html_criteria.py --autotest
 
-Écrit <source_dir>/html-css-criteria.json.
+Écrit <source_dir>/html-css-criteria.json et archive les pages/CSS récupérés
+sous <source_dir>/pages-html/.
 """
 
 import argparse
+import contextlib
+import hashlib
+import io
 import json
 import re
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
@@ -34,10 +51,29 @@ from urllib.parse import urljoin, urlparse
 TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (compatible; eof-audit-scan/1.0)"
 MAX_CSS_PER_PAGE = 8
+ARCHIVE_DIRNAME = "pages-html"
+
+
+def archive_filename(url, is_css):
+    """Nom de fichier d'archive déterministe pour une URL.
+
+    Propriété essentielle, exploitée par un futur script (chantier 35) : la
+    MÊME url donne TOUJOURS le même nom, et deux urls différentes (même si
+    elles ne diffèrent que par la query string) donnent des noms différents.
+    Le slug rend le nom lisible (déboguage), le hachage SHA1 tranche toute
+    ambiguïté — y compris entre deux urls dont seule la query string diffère,
+    puisque le slug seul l'ignorerait.
+    """
+    parsed = urlparse(url)
+    slug = (parsed.netloc + parsed.path).strip("/").replace("/", "_") or "index"
+    slug = slug[:80]  # évite les noms de fichier absurdement longs
+    digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
+    ext = ".css" if is_css else ".html"
+    return f"{slug}__{digest}{ext}"
 
 
 def fetch_text(url):
-    """Récupère le contenu textuel d'une URL.
+    """Récupère le contenu textuel d'une URL par requête réseau directe.
 
     Retourne un dict avec :
     - content : str|None (contenu si succès)
@@ -65,6 +101,49 @@ def fetch_text(url):
     except Exception as exc:
         return {"content": None, "status": "echec_reseau",
                "error_detail": f"{type(exc).__name__}: {str(exc)}"}
+
+
+def fetch_text_cached(url, source_dir, is_css, refresh=False):
+    """Récupère le contenu d'une URL via l'archive locale <source_dir>/pages-html/,
+    en repli sur le réseau — c'est la fonction à appeler à la place de
+    fetch_text() partout où le résultat doit être archivé.
+
+    Comportement :
+    - --refresh actif : ignore toute archive existante, télécharge toujours
+      en réseau.
+    - Sinon, si le fichier d'archive existe et se lit correctement : le
+      rendre tel quel, statut "ok", SANS requête réseau.
+    - Sinon (archive absente, ou présente mais illisible/vide) : télécharger
+      en réseau comme fetch_text(), puis, SEULEMENT en cas de succès, écrire
+      (ou réécrire) l'archive. Choix assumé : un échec réseau ponctuel ne
+      doit jamais écraser une bonne archive déjà sur disque ; seul un succès
+      la remplace.
+    """
+    archive_dir = source_dir / ARCHIVE_DIRNAME
+    archive_path = archive_dir / archive_filename(url, is_css)
+
+    if not refresh and archive_path.exists():
+        try:
+            content = archive_path.read_text(encoding="utf-8")
+            if not content:
+                raise ValueError("fichier d'archive vide")
+            return {"content": content, "status": "ok", "error_detail":
+                    "lu depuis l'archive locale (pages-html/), aucune requête réseau"}
+        except Exception as exc:
+            print(f"  [parse_html] archive illisible pour {url} "
+                  f"({archive_path.name}) : {type(exc).__name__}: {exc} "
+                  f"— repli sur le réseau")
+            # Pas de return ici : on tombe dans le fetch réseau ci-dessous.
+
+    result = fetch_text(url)
+    if result["status"] == "ok":
+        try:
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path.write_text(result["content"], encoding="utf-8")
+        except Exception as exc:
+            print(f"  [parse_html] écriture de l'archive impossible pour "
+                  f"{url} : {type(exc).__name__}: {exc}")
+    return result
 
 
 def load_page_urls(source_dir):
@@ -282,6 +361,171 @@ CAS_AUTOTEST = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Autotest — chantier 27 : archivage sous pages-html/ pour reproductibilité.
+# Chaque cas est une fonction sans argument qui rend True si elle passe. Ils
+# utilisent un dossier temporaire (jamais audits/*) et monkeypatchent
+# urllib.request.urlopen pour prouver l'absence — ou la présence — d'un appel
+# réseau, sans jamais en faire un vrai.
+# ---------------------------------------------------------------------------
+
+class _FakeReponseReseau:
+    """Réponse HTTP factice, juste assez pour le `with ... as resp: resp.read()`
+    utilisé par fetch_text()."""
+
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def read(self):
+        return self._data
+
+
+def _reseau_interdit(*_args, **_kwargs):
+    raise AssertionError("réseau appelé alors que l'archive locale existait")
+
+
+def _test_nommage_meme_url_meme_nom():
+    url = "https://exemple.test/a/b.css"
+    return archive_filename(url, True) == archive_filename(url, True)
+
+
+def _test_nommage_query_string_distingue():
+    a = archive_filename("https://exemple.test/a.css?x=1", True)
+    b = archive_filename("https://exemple.test/a.css?x=2", True)
+    return a != b
+
+
+def _test_archive_lue_sans_reseau():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_dir = Path(tmp)
+        url = "https://exemple.test/page-en-cache.html"
+        archive_dir = source_dir / ARCHIVE_DIRNAME
+        archive_dir.mkdir()
+        nom = archive_filename(url, False)
+        (archive_dir / nom).write_text("<html>depuis l'archive</html>", encoding="utf-8")
+
+        original = urllib.request.urlopen
+        urllib.request.urlopen = _reseau_interdit
+        try:
+            resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+        finally:
+            urllib.request.urlopen = original
+
+        return (resultat["status"] == "ok"
+                and resultat["content"] == "<html>depuis l'archive</html>"
+                and "archive locale" in (resultat["error_detail"] or ""))
+
+
+def _test_refresh_force_le_reseau():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_dir = Path(tmp)
+        url = "https://exemple.test/page-a-rafraichir.html"
+        archive_dir = source_dir / ARCHIVE_DIRNAME
+        archive_dir.mkdir()
+        nom = archive_filename(url, False)
+        (archive_dir / nom).write_text("<html>ancienne version</html>", encoding="utf-8")
+
+        appels = []
+
+        def _reseau_ok(*_args, **_kwargs):
+            appels.append(1)
+            return _FakeReponseReseau(b"<html>fraiche du reseau</html>")
+
+        original = urllib.request.urlopen
+        urllib.request.urlopen = _reseau_ok
+        try:
+            resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=True)
+        finally:
+            urllib.request.urlopen = original
+
+        contenu_archive = (archive_dir / nom).read_text(encoding="utf-8")
+        return (len(appels) == 1
+                and resultat["content"] == "<html>fraiche du reseau</html>"
+                and contenu_archive == "<html>fraiche du reseau</html>")
+
+
+def _test_archive_vide_replie_sur_reseau():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_dir = Path(tmp)
+        url = "https://exemple.test/page-archive-vide.html"
+        archive_dir = source_dir / ARCHIVE_DIRNAME
+        archive_dir.mkdir()
+        nom = archive_filename(url, False)
+        (archive_dir / nom).write_text("", encoding="utf-8")  # archive vide = corrompue
+
+        appels = []
+
+        def _reseau_ok(*_args, **_kwargs):
+            appels.append(1)
+            return _FakeReponseReseau(b"<html>reparee</html>")
+
+        original = urllib.request.urlopen
+        urllib.request.urlopen = _reseau_ok
+        sortie = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(sortie):
+                resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+        finally:
+            urllib.request.urlopen = original
+
+        message_affiche = "archive illisible" in sortie.getvalue()
+        contenu_reecrit = (archive_dir / nom).read_text(encoding="utf-8")
+        return (len(appels) == 1
+                and resultat["status"] == "ok"
+                and resultat["content"] == "<html>reparee</html>"
+                and message_affiche
+                and contenu_reecrit == "<html>reparee</html>")
+
+
+def _test_archive_indecodable_replie_sur_reseau():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_dir = Path(tmp)
+        url = "https://exemple.test/page-archive-indecodable.html"
+        archive_dir = source_dir / ARCHIVE_DIRNAME
+        archive_dir.mkdir()
+        nom = archive_filename(url, False)
+        # Octets invalides en UTF-8 strict : provoque une UnicodeDecodeError
+        # à la lecture, pas un simple contenu vide.
+        (archive_dir / nom).write_bytes(b"\xff\xfe\x00garbage")
+
+        appels = []
+
+        def _reseau_ok(*_args, **_kwargs):
+            appels.append(1)
+            return _FakeReponseReseau(b"<html>reparee 2</html>")
+
+        original = urllib.request.urlopen
+        urllib.request.urlopen = _reseau_ok
+        sortie = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(sortie):
+                resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+        finally:
+            urllib.request.urlopen = original
+
+        message_affiche = "archive illisible" in sortie.getvalue()
+        return (len(appels) == 1
+                and resultat["status"] == "ok"
+                and resultat["content"] == "<html>reparee 2</html>"
+                and message_affiche)
+
+
+CAS_AUTOTEST_ARCHIVE = [
+    ("nommage : la même URL donne toujours le même nom", _test_nommage_meme_url_meme_nom),
+    ("nommage : une query string différente change le nom", _test_nommage_query_string_distingue),
+    ("archive présente : lue sans requête réseau", _test_archive_lue_sans_reseau),
+    ("--refresh : force le réseau même si l'archive existe", _test_refresh_force_le_reseau),
+    ("archive vide : message + repli réseau + réécriture", _test_archive_vide_replie_sur_reseau),
+    ("archive indécodable : message + repli réseau", _test_archive_indecodable_replie_sur_reseau),
+]
+
+
 def autotest():
     echecs = []
     corriges = 0
@@ -292,7 +536,16 @@ def autotest():
         elif regression:
             corriges += 1
 
-    total = len(CAS_AUTOTEST)
+    for libelle, fonction_test in CAS_AUTOTEST_ARCHIVE:
+        try:
+            ok = fonction_test()
+        except Exception as exc:
+            ok = False
+            libelle = f"{libelle} (exception : {type(exc).__name__}: {exc})"
+        if not ok:
+            echecs.append((libelle, "archive", True, False))
+
+    total = len(CAS_AUTOTEST) + len(CAS_AUTOTEST_ARCHIVE)
     if echecs:
         print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
         for libelle, champ, attendu, obtenu in echecs:
@@ -312,6 +565,8 @@ def main():
                         help="dossier d'audit contenant env-data.json")
     parser.add_argument("--autotest", action="store_true",
                         help="rejoue les cas de lecture HTML embarqués et sort 1 si un cas échoue")
+    parser.add_argument("--refresh", action="store_true",
+                        help="ignore l'archive locale pages-html/ et retélécharge tout en réseau")
     args = parser.parse_args()
 
     if args.autotest:
@@ -329,7 +584,7 @@ def main():
     stylesheets_failed = []
     all_css_texts = []
     for url in urls:
-        fetch_result = fetch_text(url)
+        fetch_result = fetch_text_cached(url, source_dir, is_css=False, refresh=args.refresh)
         if fetch_result["status"] != "ok":
             # Page non récupérée : créer une entrée avec bloc mesure
             page_entry = {
@@ -347,16 +602,17 @@ def main():
         # Page récupérée : analyser
         html = fetch_result["content"]
         page_data = analyze_html(html, url)
-        # Ajouter le bloc mesure pour indiquer succès
+        # Ajouter le bloc mesure pour indiquer succès (detail précise si le
+        # contenu vient de l'archive locale ou d'une requête réseau fraîche)
         page_data["mesure"] = {
             "statut": "ok",
             "cible": url,
-            "detail": None
+            "detail": fetch_result["error_detail"]
         }
 
         # Récupérer les CSS
         for css_url in page_data["stylesheet_urls"]:
-            css_result = fetch_text(css_url)
+            css_result = fetch_text_cached(css_url, source_dir, is_css=True, refresh=args.refresh)
             if css_result["status"] == "ok":
                 all_css_texts.append(css_result["content"])
             else:

@@ -62,7 +62,10 @@ python3 processus/fusionner_lots.py       --autotest
 
 `parse_html_criteria.py` et `parse_pages_publiques.py` sont faciles à oublier, parce qu'on ne
 pense pas à un extracteur comme à un script testé. `parse_html_criteria.py` sort sur le réseau
-dans son usage normal ; son `--autotest`, lui, travaille sur des fixtures et n'écrit rien.
+dans son usage normal ; son `--autotest`, lui, travaille sur des fixtures et n'écrit rien (les
+cas d'archivage du chantier 27 utilisent un dossier temporaire, jamais `audits/`). Son
+`--autotest` compte actuellement **38 cas** (32 de lecture HTML/CSS + 6 sur l'archivage
+`pages-html/` et le flag `--refresh`).
 
 Les deux derniers sont les **producteurs** du fichier de résultats, et leur `--autotest` est né
 en session 26 : l'arithmétique du critère écarté avait été livrée sans aucun test. Ils gardent
