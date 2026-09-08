@@ -111,9 +111,50 @@ def _decompte_criteres(repondus, total):
     return f"{repondus} critères renseignés sur {total}"
 
 
+def _wrap_text(text):
+    """Découpe un texte long en lignes qui tiennent dans la largeur du radar.
+
+    Coupe aux espaces sans jamais couper un mot. 152 caractères est la longueur
+    de la note d'origine, qui tenait sur une ligne sans déborder : une note de
+    cette longueur ou moins n'est pas découpée, ce qui préserve la non-régression.
+    Au-delà, le découpage se fait à 110 caractères par ligne, ce qui correspond
+    à environ 880 pixels en police 12pt sans-serif, largeur qui tient confortablement
+    dans les 1100 pixels du canevas avec des marges.
+    """
+    # Si le texte tient sur une ligne (note d'origine), ne pas découper.
+    if len(text) <= 152:
+        return [text]
+
+    # Sinon, découper à 110 caractères par ligne.
+    max_length = 110
+    lines = []
+    words = text.split()
+    current_line = []
+    current_length = 0
+
+    for word in words:
+        # +1 pour l'espace qui précède le mot (sauf pour le premier mot de la ligne)
+        word_length = len(word) + (1 if current_line else 0)
+        if current_length + word_length <= max_length:
+            current_line.append(word)
+            current_length += word_length
+        else:
+            # La ligne courante est pleine, on la ferme
+            if current_line:
+                lines.append(" ".join(current_line))
+            current_line = [word]
+            current_length = len(word)
+
+    # Ajouter la dernière ligne si elle existe
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return lines
+
+
 def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
-              axes_etabli=None, axes_renseignes=None, couverture=None,
-              provenances=None):
+              axes_etabli=None, axes_renseignes=None, axes_hors_perimetre=None,
+              axes_ecartes=None, couverture=None, provenances=None):
     """axes : liste de tuples (nom, valeur 0-100 OU None). Retourne le texte SVG complet.
 
     Une valeur `None` (dimension sans aucune donnée réelle) est rendue à
@@ -167,6 +208,16 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     pied = couverture is not None or provenances is not None
     if height is None:
         height = 792 if pied else 720
+
+    # Ajuster la hauteur si la note nécessite plusieurs lignes.
+    if note:
+        note_lines = _wrap_text(note)
+        if len(note_lines) > 1:
+            # Interligne de 18, première ligne à y=766, dernière à y=766 + (n-1)*18
+            # On ajoute 22 pixels de marge en bas après la dernière ligne.
+            height_needed = 766 + (len(note_lines) - 1) * 18 + 22
+            if height < height_needed:
+                height = height_needed
 
     cx, cy = width / 2, 360
     R = 220
@@ -253,13 +304,17 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
             f'font-weight="bold" fill="#222">{escape(name)}</text>'
         )
         if val is None:
-            # "aucune réponse", pas "N/A" : le rapport est lu à voix haute par une
-            # synthèse vocale, qui épelle les sigles. Et une absence de réponse
-            # n'est jamais assimilée à un 0 %, qui voudrait dire "point fort
-            # confirmé partout".
+            # Distinguer hors périmètre (dimension qui ne concerne pas ce service)
+            # d'une absence de réponse (dimension que nous n'avons pas su instruire).
+            # Le rapport est lu à voix haute par une synthèse vocale, qui épelle les
+            # sigles, d'où "aucune réponse" plutôt que "N/A". Une absence de réponse
+            # n'est jamais assimilée à un 0 %, qui voudrait dire "point fort confirmé
+            # partout".
+            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
+            libelle = "hors périmètre" if hors_perimetre else "aucune réponse"
             svg.append(
                 f'<text x="{lx:.1f}" y="{ly + 18:.1f}" text-anchor="{anchor}" font-size="13" '
-                f'font-weight="bold" fill="{GREY}">aucune réponse</text>'
+                f'font-weight="bold" fill="{GREY}">{escape(libelle)}</text>'
             )
         else:
             svg.append(
@@ -268,13 +323,24 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
             )
         if axes_renseignes is not None:
             repondus, total = axes_renseignes[i]
-            # "renseignés" placé juste après "critères", pas après le total : la
-            # première tournure essayée, "1 critère sur 5 renseigné", laissait
-            # entendre que c'était le 5 qui était renseigné.
-            svg.append(
-                f'<text x="{lx:.1f}" y="{ly + 34:.1f}" text-anchor="{anchor}" font-size="12" '
-                f'fill="{GREY}">{_decompte_criteres(repondus, total)}</text>'
-            )
+            # Pour un axe hors périmètre, afficher le nombre de critères écartés
+            # au lieu du décompte "sur 0", qui ne veut rien dire pour un lecteur.
+            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
+            if hors_perimetre and axes_ecartes is not None and i < len(axes_ecartes):
+                nb_ecartes = axes_ecartes[i]
+                texte_ecartes = f"{nb_ecartes} critère écarté" if nb_ecartes == 1 else f"{nb_ecartes} critères écartés"
+                svg.append(
+                    f'<text x="{lx:.1f}" y="{ly + 34:.1f}" text-anchor="{anchor}" font-size="12" '
+                    f'fill="{GREY}">{texte_ecartes}</text>'
+                )
+            else:
+                # "renseignés" placé juste après "critères", pas après le total : la
+                # première tournure essayée, "1 critère sur 5 renseigné", laissait
+                # entendre que c'était le 5 qui était renseigné.
+                svg.append(
+                    f'<text x="{lx:.1f}" y="{ly + 34:.1f}" text-anchor="{anchor}" font-size="12" '
+                    f'fill="{GREY}">{_decompte_criteres(repondus, total)}</text>'
+                )
 
     # Polygones de données (lignes droites entre points, comme le Sheet source).
     # La couche hachurée d'abord, la pleine par-dessus : dans l'autre ordre les
@@ -303,12 +369,15 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     for i, (name, val) in enumerate(axes):
         p = point(i, val)
         if val is None:
-            # Absence de réponse : anneau gris au centre. La dimension est bien
-            # dessinée, mais éteinte, et son bloc de libellé dit "aucune réponse".
+            # Absence de réponse ou hors périmètre : anneau gris au centre. La
+            # dimension est bien dessinée, mais éteinte. Le bloc de libellé
+            # distingue les deux cas.
+            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
+            titre = f"{name} : hors périmètre, ne concerne pas ce service" if hors_perimetre else f"{name} : aucune réponse, ce n'est pas un 0 %"
             svg.append(
                 f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="5" fill="white" '
                 f'stroke="{GREY}" stroke-width="2"><title>'
-                f'{escape(name)} : aucune réponse, ce n\'est pas un 0 %</title></circle>'
+                f'{escape(titre)}</title></circle>'
             )
             continue
         svg.append(
@@ -370,13 +439,26 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     # puis la note. La jauge est là pour qu'un potentiel bas ne se lise pas comme
     # un service mûr alors qu'il ne dit que "nous n'avons presque rien regardé".
     if couverture is not None:
-        pct, repondus, total = couverture
+        # Accepter ancien format (3 éléments) et nouveau format (4 éléments avec écartés)
+        if len(couverture) == 4:
+            pct, repondus, total, ecartes = couverture
+        else:
+            pct, repondus, total = couverture
+            ecartes = None
         bar_w, bar_h, bar_y = 560, 14, 708
         bar_x = (width - bar_w) / 2
+        ecartes_txt = ""
+        if ecartes is not None and ecartes > 0:
+            ecartes_txt = f', {ecartes} écarté{"s" if ecartes > 1 else ""}'
+        # Le dénominateur change selon qu'il y a des critères écartés ou non.
+        # Sans écartés : "du potentiel maximum du référentiel" (le dénominateur
+        # est bien le référentiel complet). Avec écartés : "du potentiel retenu"
+        # (les écartés sont sortis du dénominateur).
+        libelle_denominateur = "du potentiel retenu" if (ecartes is not None and ecartes > 0) else "du potentiel maximum du référentiel"
         svg.append(
             f'<text x="{width/2:.1f}" y="700" text-anchor="middle" font-size="12" fill="#222">'
-            f'Renseigné à ce jour : {escape(_pct(pct, 0))} du potentiel maximum du référentiel '
-            f'({repondus} critères sur {total})</text>'
+            f'Renseigné à ce jour : {escape(_pct(pct, 0))} {libelle_denominateur} '
+            f'({repondus} critères sur {total}{ecartes_txt})</text>'
         )
         svg.append(
             f'<rect x="{bar_x:.1f}" y="{bar_y}" width="{bar_w}" height="{bar_h}" '
@@ -400,13 +482,40 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
         )
 
     if note:
-        svg.append(
-            f'<text x="{width/2:.1f}" y="{height - 22}" text-anchor="middle" font-size="12" '
-            f'fill="#666">{escape(note)}</text>'
-        )
+        # Découper la note en lignes si elle est trop longue. Une note courte
+        # (qui tient sur une ligne) n'est pas modifiée, ce qui préserve la
+        # non-régression sur les radars existants.
+        note_lines = _wrap_text(note)
+        interligne = 18
+        # Placer les lignes après la ligne de provenance (y=748) ou à la position
+        # standard (height - 22 = 770) si une seule ligne. Interligne de 18 pixels.
+        if len(note_lines) == 1:
+            # Note courte : position standard, inchangée
+            y_start = height - 22
+        else:
+            # Note longue : commencer à y=766 (après provenance à 748 + 18)
+            # et augmenter la hauteur du canevas si nécessaire pour que tout tienne.
+            y_start = 766
+        for i, line in enumerate(note_lines):
+            y = y_start + i * interligne
+            svg.append(
+                f'<text x="{width/2:.1f}" y="{y}" text-anchor="middle" font-size="12" '
+                f'fill="#666">{escape(line)}</text>'
+            )
 
     svg.append("</svg>")
     return "\n".join(svg)
+
+
+def _est_critere_ecarte(critere):
+    """Retourne vrai si le critère est écarté (hors périmètre).
+
+    Un critère est écarté quand il ne s'applique pas au service audité. Deux
+    chemins mènent au même état, comme établi dans la convention session 26 :
+    - sa `reponse` vaut `🚫 Non applicable` ;
+    - ou son booléen `sans_objet` vaut vrai.
+    """
+    return critere.get("reponse") == "🚫 Non applicable" or critere.get("sans_objet") is True
 
 
 def build_radar_from_results(audit_results, domaine=None, title=None, note=None):
@@ -420,9 +529,9 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
 
     La couche pleine n'est PAS recalculée depuis un dénominateur maison : elle est
     prise comme la part du potentiel déjà affiché qui vient de nos propres
-    provenances. Le producteur reste seul maître de son dénominateur (les deux
-    ne traitent pas les critères sans objet de la même façon), et la couche
-    pleine ne peut pas sortir de la couche hachurée.
+    provenances. Le producteur reste seul maître de son dénominateur, et depuis
+    la session 26 les deux producteurs traitent les critères écartés de la même
+    façon. La couche pleine ne peut pas sortir de la couche hachurée.
     """
     dimensions = audit_results.get("dimensions") or []
     criteres = audit_results.get("criteres") or []
@@ -438,6 +547,10 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
             # dimensions détaillées et n'ont pas de potentiel : elles ne comptent
             # ni dans le radar ni dans la jauge.
             continue
+        # Un critère écarté sort de tous les dénominateurs et ne compte dans
+        # aucun numérateur. Il n'est ni une réussite ni un manque.
+        if _est_critere_ecarte(c):
+            continue
         pmax = c.get("potentiel_max") or 0.0
         pmax_par_dimension[nom]["total"] += pmax
         if c.get("reponse") is None:
@@ -451,10 +564,15 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
     axes = []
     axes_etabli = []
     axes_renseignes = []
+    axes_hors_perimetre = []
+    axes_ecartes = []
     for d in dimensions:
         nom = d.get("nom")
         total_pct = d.get("potentiel_optimisation_pct")
+        hors_perimetre = d.get("hors_perimetre", False)
         axes.append((nom, total_pct))
+        axes_hors_perimetre.append(hors_perimetre)
+        axes_ecartes.append(d.get("ecartes") or 0)
         if total_pct is None:
             axes_etabli.append(None)
         elif retenu[nom]["total"] > 0:
@@ -467,17 +585,23 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
 
     # Jauge : part du potentiel maximum du référentiel déjà renseignée. Pondérée
     # par `potentiel_max`, comme le demande le manifeste : un critère à 2,0 qui
-    # manque ne laisse pas le même trou qu'un critère à 0,5. Un critère répondu
-    # "non applicable" compte comme renseigné, parce qu'il l'a bien été.
+    # manque ne laisse pas le même trou qu'un critère à 0,5. Un critère écarté
+    # (répondu "non applicable" ou sans_objet=true) sort du dénominateur et ne
+    # compte dans aucun numérateur : il n'est ni une réussite ni un manque.
     pmax_total = sum(v["total"] for v in pmax_par_dimension.values())
     pmax_repondu = sum(v["repondu"] for v in pmax_par_dimension.values())
     couverture = None
+    criteres_ecartes = audit_results.get("criteres_ecartes")
     if pmax_total > 0:
-        criteres_des_dimensions = [c for c in criteres if c.get("dimension") in retenu]
+        criteres_des_dimensions = [
+            c for c in criteres
+            if c.get("dimension") in retenu and not _est_critere_ecarte(c)
+        ]
         couverture = (
             pmax_repondu / pmax_total * 100,
             sum(1 for c in criteres_des_dimensions if c.get("reponse") is not None),
             len(criteres_des_dimensions),
+            criteres_ecartes,
         )
 
     if title is None:
@@ -488,6 +612,13 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
             "Une dimension dont aucun critère n'a répondu est marquée \"aucune réponse\", "
             "jamais 0 % : un 0 % voudrait dire point fort confirmé sur toute la dimension."
         )
+        # Ajouter une explication de "hors périmètre" si au moins un axe l'est.
+        if any(axes_hors_perimetre):
+            note += (
+                " Une dimension hors périmètre est une dimension dont nous savons "
+                "qu'elle ne concerne pas ce service, alors qu'une dimension sans réponse "
+                "est une dimension que nous n'avons pas su instruire."
+            )
 
     return radar_svg(
         axes,
@@ -495,6 +626,8 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
         note=note,
         axes_etabli=axes_etabli,
         axes_renseignes=axes_renseignes,
+        axes_hors_perimetre=axes_hors_perimetre,
+        axes_ecartes=axes_ecartes,
         couverture=couverture,
         provenances=audit_results.get("repondus_par_provenance"),
     )
@@ -527,6 +660,9 @@ def _demo(output_path):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
+        print("Usage: python3 generate_radar_svg.py <fichier_sortie.svg>")
+        sys.exit(1)
+    if sys.argv[1].startswith("-"):
         print("Usage: python3 generate_radar_svg.py <fichier_sortie.svg>")
         sys.exit(1)
     _demo(sys.argv[1])

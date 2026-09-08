@@ -2867,6 +2867,19 @@ def _section_eof(results, radar_svg_text=None):
             f'    <div style="font-size:14px;color:#888">critères réellement examinés</div>'
             f'  </div>'
         )
+
+    # Critères écartés (nouveau champ LOT C, optionnel)
+    criteres_ecartes = results.get("criteres_ecartes")
+    ecartes_kpi = ""
+    if criteres_ecartes is not None:
+        ecartes_kpi = (
+            f"  <div style=\"{kpi_style}\">"
+            f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Écartés</div>"
+            f"    <div style=\"font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0\">{criteres_ecartes}</div>"
+            f"    <div style=\"font-size:14px;color:#888\">critères hors périmètre du service</div>"
+            f"  </div>"
+        )
+
     kpis = (
         f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
         f'  <div style="{kpi_style}">'
@@ -2875,11 +2888,12 @@ def _section_eof(results, radar_svg_text=None):
         f'    <div style="font-size:14px;color:#888">critères détaillés, quelle que soit la provenance</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Potentiel d’optimisation</div>'
+        f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Potentiel d'optimisation</div>"
         f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{potentiel_txt}</div>'
         f'    <div style="font-size:14px;color:#888">sur tous les critères de chaque dimension</div>'
         f'  </div>'
         f'{completude_kpi}'
+        f'{ecartes_kpi}'
         f'</div>'
     )
 
@@ -2893,16 +2907,31 @@ def _section_eof(results, radar_svg_text=None):
     criteres_list = results.get("criteres", [])
     dim_rows = ""
     for d in dimensions:
-        # Accepter les deux noms (score_pct ancien, potentiel_optimisation_pct nouveau)
-        pct_val = d.get("potentiel_optimisation_pct") if d.get("potentiel_optimisation_pct") is not None else d.get("score_pct")
-        # Même libellé que le radar juste au-dessus : deux mots différents pour le
-        # même état ("sans donnée" ici, "aucune réponse" sur la figure) laisseraient
-        # croire au lecteur qu'ils désignent deux situations distinctes.
-        pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">aucune réponse</span>'
+        # LOT C : gérer les critères écartés
+        hors_perimetre = d.get("hors_perimetre", False)
+        ecartes = d.get("ecartes", 0)
 
-        # Afficher la complétude si disponible (nouveaux champs du LOT 1)
-        completude = d.get("completude_pct")
-        completude_txt = f' <span style="color:#888;font-size:0.85em">({completude:.0f}% complétude)</span>' if completude is not None else ""
+        if hors_perimetre:
+            # Dimension entièrement hors périmètre : ne jamais afficher 0 %
+            ecartes_s = "s" if ecartes > 1 else ""
+            pct_txt = f'<span style="color:#888">hors périmètre</span> <span style="font-size:0.85em;color:#999">({ecartes} écarté{ecartes_s})</span>'
+            completude_txt = ""
+        else:
+            # Accepter les deux noms (score_pct ancien, potentiel_optimisation_pct nouveau)
+            pct_val = d.get("potentiel_optimisation_pct") if d.get("potentiel_optimisation_pct") is not None else d.get("score_pct")
+            # Même libellé que le radar juste au-dessus : deux mots différents pour le
+            # même état ("sans donnée" ici, "aucune réponse" sur la figure) laisseraient
+            # croire au lecteur qu'ils désignent deux situations distinctes.
+            pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">aucune réponse</span>'
+
+            # Afficher la complétude si disponible (nouveaux champs du LOT 1)
+            completude = d.get("completude_pct")
+            completude_txt = f' <span style="color:#888;font-size:0.85em">({completude:.0f}% complétude)</span>' if completude is not None else ""
+
+            # Ajouter le décompte d'écartés si partiellement écarté
+            if ecartes > 0:
+                ecartes_s = "s" if ecartes > 1 else ""
+                completude_txt += f' <span style="font-size:0.85em;color:#999">({ecartes} écarté{ecartes_s})</span>'
 
         dim_rows += (
             f'<tr>'
