@@ -404,8 +404,8 @@
       "vague": "5-consolidation",
       "libelle": "Fusion des lots par precedence de provenance",
       "executeur": "script",
-      "etat": "a_ecrire",
-      "scripts_a_ecrire": ["processus/fusionner_lots.py"],
+      "etat": "existant",
+      "scripts": ["processus/fusionner_lots.py"],
       "depends_on": [
         "jugement-automatique",
         "jugement-diagnostic-rapide",

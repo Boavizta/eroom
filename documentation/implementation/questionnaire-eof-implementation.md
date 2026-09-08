@@ -347,10 +347,10 @@ internes. Les rafraîchir se fait **sans appel réseau**, en rejouant `run_eof.p
 dossier : il ne relit que des fichiers déjà sur le disque. Vérifié, aucun verdict ne change et le
 radar reste identique à l'octet ; seuls les 16 textes de contexte sont réécrits.
 
-## Prochaines étapes
+## Chantiers livrés
 
-1. **Chantier 13, le radar à deux couches** : mesuré en hachuré, déclaré en plein, plus une jauge de complétude. Le plus urgent côté rendu, et chaque question répondue l'aggrave.
-2. **Chantier 31** : 7 fichiers Python impriment un séparateur `=` fabriqué à l'exécution, que la synthèse vocale lit lettre par lettre. `grep '====='` ne les trouve pas, chercher `'"=" \*'`.
+1. **Chantier 13, le radar à deux couches** : livré. Le script `generate_radar_svg.py` produit un radar distinguant les provenances par deux couches.
+2. **Chantier 31, séparateurs accessibles** : livré. Les séparateurs fabriqués dynamiquement ont été corrigés.
 
 ⛔ **Ce qui est clos et ne doit pas être rouvert** :
 
