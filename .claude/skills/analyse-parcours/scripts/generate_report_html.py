@@ -484,7 +484,7 @@ def _bar(used_pct):
 
 
 def _dedup_page_metrics(page_metrics):
-    """Déduplique par URL canonique : garde la ligne avec DOM non-zéro, sinon la plus lourde.
+    """Déduplique par URL canonique : garde la ligne avec mesure réussie (statut ok), sinon la plus lourde.
     Ajoute un champ page_num (1-indexé) dans l'ordre de première apparition."""
     seen = {}
     order = []
@@ -495,11 +495,14 @@ def _dedup_page_metrics(page_metrics):
             seen[url] = m
             order.append(url)
         else:
-            if m["dom"] > 0 and prev["dom"] == 0:
+            # Préférer la mesure réussie (statut ok) à une mesure échouée
+            m_ok = m.get("mesure", {}).get("statut") == "ok"
+            prev_ok = prev.get("mesure", {}).get("statut") == "ok"
+            if m_ok and not prev_ok:
                 seen[url] = m
-            elif m["dom"] > 0 and prev["dom"] > 0 and m["req"] > prev["req"]:
+            elif m_ok and prev_ok and m["req"] > prev["req"]:
                 seen[url] = m
-            elif m["dom"] == 0 and prev["dom"] == 0 and m["req"] > prev["req"]:
+            elif not m_ok and not prev_ok and m["req"] > prev["req"]:
                 seen[url] = m
     result = []
     for i, url in enumerate(order, 1):
@@ -624,12 +627,21 @@ def _section_dashboard(page_metrics, cwv):
             inp_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
             cls_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
 
+        # Affichage EcoIndex et DOM : "non mesuré" si la mesure a échoué
+        mesure_ok = m.get("mesure", {}).get("statut") == "ok"
+        if mesure_ok:
+            ecoindex_cell = f'<td style="text-align:center">{badge} {m["ecoindex"]}/100</td>'
+            dom_cell = f'<td style="text-align:right">{m["dom"]}</td>'
+        else:
+            ecoindex_cell = f'<td style="text-align:center;color:{STATUS_NEUTRAL}">non mesuré</td>'
+            dom_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">non mesuré</td>'
+
         rows += f"""<tr>
       <td>{page_cell}</td>
-      <td style="text-align:center">{badge} {m['ecoindex']}/100</td>
+      {ecoindex_cell}
       <td style="text-align:right">{m['req']}</td>
       <td style="text-align:right">{m['size_ko']:.0f} Ko</td>
-      <td style="text-align:right">{m['dom']}</td>
+      {dom_cell}
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
