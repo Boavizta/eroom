@@ -44,7 +44,7 @@ qui est tombé de 15 cas sur 15 à **0 sur 15** ; les 5 contrôles de cette batt
 tous en 0 pendant ce temps, parce qu'aucun ne regarde ce que fait un script. Un filet de
 sécurité crevé est plus dangereux qu'un filet absent : il rassure.
 
-Les **huit** scripts qui portent un `--autotest`. ⚠️ Ils ne sont **plus tous** dans le même
+Les **neuf** scripts qui portent un `--autotest`. ⚠️ Ils ne sont **plus tous** dans le même
 dossier depuis la session 26 : `fusionner_lots.py` vit sous `processus/`. À lancer depuis la
 racine du dépôt :
 
@@ -57,8 +57,20 @@ python3 $S/valider_blocs_questionnaire.py --autotest
 python3 $S/parse_html_criteria.py         --autotest
 python3 $S/parse_pages_publiques.py       --autotest
 python3 $S/run_eof.py                     --autotest
+python3 $S/analyze_har.py                 --autotest
 python3 processus/fusionner_lots.py       --autotest
 ```
+
+`analyze_har.py` (chantier 35, étape 20 "analyse du fichier HAR") : avant lui, cette étape
+n'avait AUCUN script — un agent lisait le `.har` à la main, et le fichier réel produit sur
+octo.com portait une clé `blocking_resources` inventée en lisant le HTML à l'œil, non
+rejouable. Son `--autotest` compte **17 cas** : comptage total, split 1st/3rd-party (règle
+canonique importée de `deploy_freshness._first_party_hosts_from_env`, jamais réinventée),
+dédoublonnage des URLs avant le top10 des ressources les plus lourdes, absence de cache,
+requêtes tierces lentes (> 1 s), ressources bloquantes du `<head>` avec et sans archive HTML
+(chantier 27) disponible, et un cas de cohérence croisée avec
+`generate_report_html.har_traffic_analysis()` sur le même HAR de fixture (import en lecture
+seule, aucune écriture).
 
 `parse_html_criteria.py` et `parse_pages_publiques.py` sont faciles à oublier, parce qu'on ne
 pense pas à un extracteur comme à un script testé. `parse_html_criteria.py` sort sur le réseau

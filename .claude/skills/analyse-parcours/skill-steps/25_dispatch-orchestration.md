@@ -72,22 +72,22 @@ PIPELINE: skill-steps/20_analyse-har.md
 
 Lire et exécuter le pipeline `skill-steps/20_analyse-har.md`.
 
-20a — Vue d'ensemble du trafic :
-- Nombre total de requêtes
-- Domaines contactés (first-party / third-party)
-- Répartition codes HTTP
-- Volume total transféré (Mo)
-- Top 10 requêtes les plus lourdes
+Le calcul est fait par un script, PAS à la main. Une lecture manuelle du `.har`
+avait déjà produit une clé (`blocking_resources`) inventée en lisant le HTML à
+l'œil, non rejouable :
 
-20b — Performance réseau :
-- Requêtes sans cache
-- Requêtes dupliquées (URLs identiques)
-- Ressources bloquantes (JS/CSS synchrones en <head>)
-- Ressources tierces lentes (> 1s)
+```bash
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/analyze_har.py {{SOURCE_DIR}} --output {{AUDIT_DIR}}/har-analysis.json
+```
 
-Note sur les HAR volumineux : lire par lots si > 5 Mo (50 000+ lignes).
+Le script classe les domaines 1st-party/3rd-party depuis `env-data.json`,
+déduplique par URL avant le top10 des ressources les plus lourdes, détecte les
+requêtes sans cache, les doublons d'URL et les ressources tierces lentes
+(> 1 s), et calcule les ressources bloquantes du `<head>` uniquement pour les
+pages dont l'archive HTML (chantier 27, `<source_dir>/pages-html/`) est
+disponible — sinon le champ est marqué non calculé, jamais deviné depuis le
+seul type MIME.
 
-Écrire les résultats dans `{{AUDIT_DIR}}/har-analysis.json`.
 Format attendu :
 {
   "total_requests": N,

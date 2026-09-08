@@ -56,6 +56,7 @@
       "executeur": "script",
       "etat": "existant",
       "scripts": [
+        ".claude/skills/analyse-parcours/scripts/analyze_har.py",
         ".claude/skills/analyse-parcours/scripts/har_metrics.py",
         ".claude/skills/analyse-parcours/scripts/coverage_metrics.py",
         ".claude/skills/analyse-parcours/scripts/analyze_security_headers.py",
