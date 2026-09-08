@@ -180,11 +180,29 @@ Par critère :
 - **Commentaires en français** : conformément aux consignes du projet
 - **Style respecté** : séparateurs `-----`, guillemets droits, pas de tiret long
 
+## Garde-fou : refus d'écrire dans audits/
+
+Décision de l'utilisatrice, 2026-09-08 : **seul un questionnaire revenu REMPLI du client a le droit d'exister dans `audits/<domaine>/`.** Or le générateur ne produit que des questionnaires vierges, dont toutes les cases restent à cocher. Un tel fichier posé dans le dossier d'audit peut être envoyé au client comme s'il était à jour, alors qu'il ne contient aucune réponse.
+
+Ce n'est pas une crainte théorique. Le fichier trouvé le 2026-09-08 dans `audits/octo.com/` portait **322 cases vides et 0 cochée**, et il était en plus antérieur à la fonctionnalité des filtres : ses deux questions filtres étaient posées en tête au lieu d'être placées dans la partie détaillée, et il ne portait aucune mention "À IGNORER". Il a été supprimé.
+
+Le générateur refuse donc d'écrire dans un chemin dont un composant s'appelle `audits`, sauf si le drapeau `--dans-le-dossier-audit` est passé explicitement. Il sort alors en 2 avec un message qui dit ce qu'il refuse, pourquoi, et quoi faire à la place.
+
+Recommandation : générer dans `/tmp/questionnaire-<domaine>`.
+
+Trois autotests couvrent ce garde-fou : refus sans drapeau, acceptation avec drapeau, acceptation sans drapeau hors de `audits/`. Ce sont les seuls cas de la batterie qui relancent le script par `subprocess` : ils exercent `main()`, pas une fonction interne, et travaillent donc avec le vrai référentiel et la vraie bibliothèque de blocs, que le script retrouve depuis son propre répertoire.
+
+## Le titre lu par le client ne dit plus "porte"
+
+Décision de l'utilisatrice, 2026-09-08. `porte` est notre étiquette interne pour la phase de dépistage, celle qui décide si l'audit complet vaut la peine. Cette étiquette était imprimée telle quelle comme titre dans le document envoyé au client : "Partie 1 : Questions de porte". Le mot n'existe que dans notre code, et il n'a rien dit à l'utilisatrice elle-même, qui connaît le projet.
+
+Le titre imprimé devient donc **"Partie 1 : Premier tri"**, et la phrase d'introduction "Ce premier tri permet de décider rapidement si un diagnostic approfondi est pertinent." Le nom de la phase dans le code, `porte`, ne change pas : rien ne relit ce titre, ni `parse_questionnaire.py`, ni aucun autre script.
+
 ## Commandes de référence
 
 ```bash
 # Générer le questionnaire
-python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <repertoire-audit>
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <repertoire-audit> --output-dir /tmp/questionnaire-<domaine>
 
 # Parser le questionnaire rempli
 python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <repertoire-audit>

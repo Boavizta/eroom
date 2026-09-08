@@ -13,12 +13,14 @@ réponses doivent être reposées. Raison : éviter qu'un critère ne soit jamai
 posé et reste un faux zéro.
 
 Usage :
-    python3 generate_questionnaire.py <repertoire-audit>
     python3 generate_questionnaire.py <repertoire-audit> --output-dir <autre-dir>
     python3 generate_questionnaire.py --autotest
 
-Écrit questionnaire-eof.md dans le répertoire d'audit (ou dans --output-dir
-si spécifié).
+Écrit questionnaire-eof.md dans le répertoire spécifié par --output-dir.
+
+Par défaut, REFUSE d'écrire dans un chemin contenant "audits" (un questionnaire
+vierge ne doit jamais se trouver dans audits/ pour éviter l'envoi accidentel
+d'un fichier non rempli). Passer --dans-le-dossier-audit pour forcer.
 
 NE modifie JAMAIS questionnaire-blocs.json ni son validateur.
 """
@@ -585,10 +587,12 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
 
     if blocs_porte:
         lines.append(SEPARATOR)
-        lines.append("Partie 1 : Questions de porte")
+        # "Porte" est notre étiquette interne pour cette phase, elle ne dit rien à
+        # un lecteur client : le titre imprimé emploie des mots ordinaires.
+        lines.append("Partie 1 : Premier tri")
         lines.append(SEPARATOR)
         lines.append("")
-        lines.append("La porte permet de décider rapidement si un diagnostic approfondi est pertinent.")
+        lines.append("Ce premier tri permet de décider rapidement si un diagnostic approfondi est pertinent.")
         lines.append("")
 
         for bloc, potentiel, criteres, rendement in blocs_porte:
@@ -620,9 +624,100 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
 def autotest():
     """Rejoue les cas de test embarqués."""
     import tempfile
+    import subprocess
 
     echecs = []
     total = 0
+
+    # Les cas 24 à 26 sont groupés ici parce qu'ils sont les seuls à relancer le
+    # script par subprocess : ils exercent main() et son garde-fou, pas une
+    # fonction interne. Ils travaillent donc avec le VRAI référentiel et la VRAIE
+    # bibliothèque de blocs, que le script retrouve depuis son propre répertoire
+    # (find_referentiel) et non depuis le dossier d'audit qu'on lui passe.
+
+    # Cas 24 : Refus d'écrire dans audits/ sans drapeau
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Créer une arborescence avec audits/
+            audit_dir = tmpdir / "audits" / "test.com"
+            audit_dir.mkdir(parents=True)
+
+            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_path = audit_dir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            # Appeler le script sans drapeau
+            result = subprocess.run(
+                [sys.executable, __file__, str(audit_dir)],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 2:
+                echecs.append(("Refus ecriture dans audits sans drapeau", f"Code sortie attendu 2, obtenu {result.returncode}"))
+            elif "audits" not in result.stderr:
+                echecs.append(("Refus ecriture dans audits sans drapeau", "Message d'erreur ne mentionne pas 'audits'"))
+    except Exception as exc:
+        echecs.append(("Refus ecriture dans audits sans drapeau", f"Exception : {exc}"))
+
+    # Cas 25 : Acceptation avec --dans-le-dossier-audit
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            audit_dir = tmpdir / "audits" / "test.com"
+            audit_dir.mkdir(parents=True)
+
+            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_path = audit_dir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            # Appeler le script avec drapeau
+            result = subprocess.run(
+                [sys.executable, __file__, str(audit_dir), "--dans-le-dossier-audit"],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                echecs.append(("Acceptation avec drapeau explicite", f"Code sortie attendu 0, obtenu {result.returncode}. stderr: {result.stderr}"))
+            elif not (audit_dir / "questionnaire-eof.md").exists():
+                echecs.append(("Acceptation avec drapeau explicite", "Fichier questionnaire-eof.md non cree"))
+    except Exception as exc:
+        echecs.append(("Acceptation avec drapeau explicite", f"Exception : {exc}"))
+
+    # Cas 26 : Acceptation sans drapeau hors de audits/
+    total += 1
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            audit_dir = tmpdir / "test.com"
+            audit_dir.mkdir(parents=True)
+            output_dir = tmpdir / "output"
+            output_dir.mkdir()
+
+            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_path = audit_dir / "eof-audit-results.json"
+            audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
+
+            # Appeler le script sans drapeau mais avec output-dir hors audits/
+            result = subprocess.run(
+                [sys.executable, __file__, str(audit_dir), "--output-dir", str(output_dir)],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                echecs.append(("Acceptation sans drapeau hors audits", f"Code sortie attendu 0, obtenu {result.returncode}. stderr: {result.stderr}"))
+            elif not (output_dir / "questionnaire-eof.md").exists():
+                echecs.append(("Acceptation sans drapeau hors audits", "Fichier questionnaire-eof.md non cree"))
+    except Exception as exc:
+        echecs.append(("Acceptation sans drapeau hors audits", f"Exception : {exc}"))
 
     # Cas 1 : Bloc direct sur critère détaillé
     total += 1
@@ -2322,6 +2417,8 @@ def main():
                         help="dossier d'audit contenant eof-audit-results.json")
     parser.add_argument("--output-dir",
                         help="répertoire de sortie (par défaut : repertoire_audit)")
+    parser.add_argument("--dans-le-dossier-audit", action="store_true",
+                        help="autorise l'écriture dans un chemin contenant 'audits'")
     parser.add_argument("--autotest", action="store_true",
                         help="rejoue les cas de test embarqués et sort 1 si un cas échoue")
     args = parser.parse_args()
@@ -2334,6 +2431,23 @@ def main():
 
     audit_dir = Path(args.repertoire_audit).resolve()
     output_dir = Path(args.output_dir).resolve() if args.output_dir else audit_dir
+
+    # Garde-fou : refuser d'écrire dans audits/ sans drapeau explicite
+    if "audits" in output_dir.parts and not args.dans_le_dossier_audit:
+        print(
+            "ERREUR : Ce script refuse d'écrire dans un chemin contenant 'audits'.\n"
+            "\n"
+            "RAISON : Un questionnaire généré est VIERGE, toutes ses cases restent à cocher.\n"
+            "Seul un questionnaire revenu REMPLI du client a le droit d'exister dans\n"
+            "audits/<domaine>/. Un questionnaire vierge dans ce dossier peut être envoyé\n"
+            "au client comme s'il était à jour, alors qu'il ne contient aucune réponse.\n"
+            "\n"
+            "SOLUTION :\n"
+            "  - Pour générer sans risque : --output-dir /tmp/questionnaire-<domaine>\n"
+            "  - Pour forcer (si vous savez ce que vous faites) : --dans-le-dossier-audit\n",
+            file=sys.stderr
+        )
+        sys.exit(2)
 
     # Charger les données
     ref_path = find_referentiel()
