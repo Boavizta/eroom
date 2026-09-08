@@ -7,6 +7,7 @@ Usage autonome :
   python3 ecoindex_utils.py capture.har
 """
 
+import base64
 import json
 from pathlib import Path
 import math
@@ -63,15 +64,42 @@ def count_dom_elements(html_text):
 
 
 def extract_dom_from_har_entry(entry):
-    """Extrait le DOM depuis une entrée HAR de type document (HTML)."""
+    """Extrait le DOM depuis une entrée HAR de type document (HTML).
+
+    Retourne (count, success, reason) :
+      - count : nombre de balises (0 si échec)
+      - success : True si mesuré avec succès
+      - reason : None si succès, message d'erreur sinon
+    """
     content = entry.get("response", {}).get("content", {})
     mime = content.get("mimeType", "")
     if "html" not in mime:
-        return 0
+        return 0, False, "no_html_entry"
+
     text = content.get("text", "")
     if not text:
-        return 0
-    return count_dom_elements(text)
+        return 0, False, "no_content"
+
+    # Gestion de l'encodage
+    encoding = content.get("encoding", "")
+    if encoding == "base64":
+        try:
+            decoded_bytes = base64.b64decode(text)
+            text = decoded_bytes.decode("utf-8")
+        except Exception as exc:
+            return 0, False, f"echec_decodage_base64: {str(exc)}"
+    elif encoding and encoding != "":
+        # Encodage non vide et inconnu
+        return 0, False, f"encodage_inconnu: {encoding}"
+
+    # Compte des balises
+    count = count_dom_elements(text)
+
+    # Garde-fou : un document HTML non vide avec zéro balise est anormal
+    if count == 0 and len(text.strip()) > 0:
+        return 0, False, "aucune_balise_reconnue"
+
+    return count, True, None
 
 
 def extract_page_metrics(har_data):
@@ -108,11 +136,66 @@ def extract_page_metrics(har_data):
 
         # DOM : première entrée HTML de la page
         dom = 0
+        dom_success = False
+        dom_reason = None
+        url = page.get("title", "")  # HAR pages stockent l'URL dans title
+
         for e in page_entries:
-            d = extract_dom_from_har_entry(e)
-            if d > 0:
-                dom = d
+            count, success, reason = extract_dom_from_har_entry(e)
+            if success:
+                dom = count
+                dom_success = True
+                dom_reason = None
                 break
+            # Garder trace de la première tentée
+            if dom_reason is None:
+                dom_reason = reason
+
+        # Construction du bloc mesure selon la convention
+        if dom_success:
+            mesure = {
+                "statut": "ok",
+                "cible": url,
+                "detail": None
+            }
+        elif dom_reason == "no_content":
+            mesure = {
+                "statut": "echec_lecture",
+                "cible": url,
+                "detail": "La capture HAR ne contient pas les corps de réponse HTML"
+            }
+        elif dom_reason and dom_reason.startswith("echec_decodage_base64"):
+            mesure = {
+                "statut": "echec_lecture",
+                "cible": url,
+                "detail": f"Échec du décodage base64: {dom_reason.split(': ', 1)[1] if ': ' in dom_reason else 'invalide'}"
+            }
+        elif dom_reason and dom_reason.startswith("encodage_inconnu"):
+            encoding_name = dom_reason.split(": ", 1)[1] if ": " in dom_reason else "inconnu"
+            mesure = {
+                "statut": "echec_lecture",
+                "cible": url,
+                "detail": f"Encodage non supporté: {encoding_name}"
+            }
+        elif dom_reason == "aucune_balise_reconnue":
+            mesure = {
+                "statut": "echec_analyse",
+                "cible": url,
+                "detail": "Corps HTML lu mais aucune balise reconnue"
+            }
+        elif dom_reason == "no_html_entry":
+            mesure = {
+                "statut": "echec_analyse",
+                "cible": url,
+                "detail": "Aucun document HTML trouvé pour cette page"
+            }
+        else:
+            # Cas par défaut si aucune entrée du tout
+            mesure = {
+                "statut": "echec_analyse",
+                "cible": url,
+                "detail": "Aucun document HTML trouvé pour cette page"
+            }
 
         score = ecoindex_score(dom, req, size_ko)
         grade, color = ecoindex_grade(score)
@@ -128,6 +211,7 @@ def extract_page_metrics(har_data):
             "grade_color": color,
             "on_load_ms": round(on_load),
             "on_content_load_ms": round(on_content),
+            "mesure": mesure,
         })
 
     return results
@@ -182,14 +266,26 @@ if __name__ == "__main__":
 
     metrics = extract_page_metrics(har)
 
-    print(f"\n{'Page':<30} {'Req':>5} {'Ko':>8} {'DOM':>6} {'Score':>6} {'Grade':>6} {'onLoad':>9}")
-    print("-" * 80)
+    # Comptage des échecs
+    total_pages = len(metrics)
+    failed_pages = sum(1 for m in metrics if m["mesure"]["statut"] != "ok")
+
+    print(f"\n{'Page':<30} {'Req':>5} {'Ko':>8} {'DOM':>6} {'Score':>6} {'Grade':>6} {'onLoad':>9} {'Mesure':<10}")
+    print("-" * 95)
     for m in metrics:
+        status_marker = "✓" if m["mesure"]["statut"] == "ok" else "✗ ÉCHEC"
         print(f"{m['title'][:29]:<30} {m['req']:>5} {m['size_ko']:>8.1f} {m['dom']:>6} "
-              f"{m['ecoindex']:>6} {m['grade']:>6} {m['on_load_ms']:>8}ms")
+              f"{m['ecoindex']:>6} {m['grade']:>6} {m['on_load_ms']:>8}ms {status_marker:<10}")
+        if m["mesure"]["statut"] != "ok":
+            print(f"  └→ {m['mesure']['statut']}: {m['mesure']['detail']}")
         if m["page_id"] in cwv:
             c = cwv[m["page_id"]]
             print(f"  CWV → LCP: {c.get('lcp','?')}s  INP: {c.get('inp','?')}ms  CLS: {c.get('cls','?')}")
+
+    print()
+    if failed_pages > 0:
+        print(f"⚠️  ATTENTION : {failed_pages} pages sur {total_pages} ont un DOM non mesuré")
+        print()
 
     print()
     # Validation contre ANTS connus (si P1 avec dom=483, req=82, poids=1930 → score=53)
