@@ -1,0 +1,85 @@
+@startuml eof-questionnaire-sequence-p2
+title Questionnaire EOF - Page 2/3 : générer et envoyer, hors pipeline
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Auditeur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+participant "generate_questionnaire.py" as GQ #DBDDE5
+actor "Équipe du service\naudité" as I #C8E6C9
+database "dossier-audit/" as FS #9BD0DD
+
+note over U, FS
+  ATTENTION. RIEN DE CETTE PAGE N'EST AUTOMATIQUE.
+  Aucune étape de l'audit n'appelle ce script : c'est une
+  commande à taper, après avoir lu le rapport de la page 1/3.
+end note
+
+== Générer le questionnaire ==
+
+U -> C : Demander le questionnaire
+C -> GQ : python3 generate_questionnaire.py <dossier-audit>
+GQ -> FS : Lire eof-audit-results.json
+FS -> GQ : Critères déjà tranchés par la mesure
+GQ -> GQ : Ne garder que les critères sans réponse,\net ceux répondus "à évaluer"
+GQ -> FS : questionnaire-produit-usage.md\n(17 questions)
+GQ -> FS : questionnaire-technique.md\n(45 questions)
+GQ -> C : 62 questions au plus,\nréparties en 2 fichiers
+
+note over GQ, FS
+  Deux fichiers parce que deux interlocuteurs différents.
+  Chaque question dit dans son titre à qui la poser :
+  le responsable produit, l'équipe de développement,
+  ou la personne qui exploite l'infrastructure.
+
+  Format : cases à cocher Markdown, avec des repères
+  cachés en commentaire HTML pour que la relecture ne
+  dépende pas de la mise en page.
+  Une case "Je ne sais pas" est toujours offerte, et
+  elle ne produit jamais de réponse.
+end note
+
+C -> U : Chemins des 2 fichiers
+
+== Envoyer, attendre, recevoir ==
+
+U -> I : Transmettre les 2 fichiers
+
+note over U, I
+  ATTENTE. Le délai est asynchrone et n'est pas outillé.
+  Rien dans le code ne fixe d'échéance, ne relance
+  l'interlocuteur, ni ne suit qui a répondu quoi.
+  Le transport est libre : courriel, dépôt partagé,
+  ce que le client accepte.
+end note
+
+I -> I : Cocher les cases,\nchacun sur son fichier
+I -> U : Renvoyer les 2 fichiers remplis
+U -> FS : Reposer les fichiers remplis\ndans le dossier d'audit
+
+note over U, FS
+  Les fichiers doivent revenir sous leurs noms d'origine,
+  dans le dossier d'audit : c'est là que la relecture les
+  cherche. Suite : page 3/3.
+end note
+
+@enduml

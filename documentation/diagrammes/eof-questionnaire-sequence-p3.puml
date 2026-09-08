@@ -1,0 +1,90 @@
+@startuml eof-questionnaire-sequence-p3
+title Questionnaire EOF - Page 3/3 : relire, fusionner, refaire le rapport
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Auditeur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+participant "parse_questionnaire.py" as PQ #DBDDE5
+participant "fusionner_lots.py" as FL #DBDDE5
+participant "generate_report_html.py" as GR #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+== Relire les cases cochées ==
+
+U -> C : Demander la relecture
+C -> PQ : python3 parse_questionnaire.py <dossier-audit>
+PQ -> FS : Lire les 2 questionnaires remplis
+FS -> PQ : Cases cochées
+PQ -> PQ : Se repérer sur les commentaires HTML,\njamais sur un numéro de ligne
+PQ -> FS : lots/relecture-questionnaire.json
+
+note over PQ, FS
+  Provenance posée sur ces réponses : "precise",
+  c'est-à-dire une case cochée par le service audité,
+  sans preuve apportée.
+  Une case "Je ne sais pas" ne devient jamais une
+  réponse : elle reste un simple commentaire.
+end note
+
+== Fusionner le mesuré et le déclaré ==
+
+C -> FL : python3 fusionner_lots.py <dossier-audit>
+FL -> FS : Lire tous les lots/*.json
+FS -> FL : Jugement automatique\n+ relecture questionnaire
+FL -> FL : Appliquer la précédence :\ncollecte > estime > declare > precise > suppose
+
+note over FL, FS
+  Ce que la précédence garantit :
+  une valeur que nous avons mesurée nous-mêmes ne peut
+  jamais être écrasée par une déclaration.
+  Mais une case cochée par le client passe AVANT une
+  déduction que nous ferions depuis un indice faible :
+  le client connaît son équipe, nous devinons.
+end note
+
+alt Deux lots se contredisent à provenance égale
+  FL -> C : Refus de fusionner, sortie en erreur
+else Divergence entre provenances différentes
+  FL -> FS : La provenance la plus haute gagne,\nl'écart est consigné dans le contexte
+end
+
+FL -> FS : eof-audit-results.json\n(réécrit : mesuré + déclaré)
+FL -> FS : eof-radar-<domaine>.svg\n(régénéré, 2 couches)
+
+== Refaire le rapport ==
+
+C -> GR : python3 generate_report_html.py <dossier-audit>
+GR -> FS : Lire eof-audit-results.json\n+ le radar régénéré
+GR -> FS : rapport-parcours-AAAA-MM-JJ.html
+C -> U : Rapport enrichi des réponses\nde l'équipe du service audité
+
+note over U, FS
+  PIÈGE. LE PIÈGE DE MANIPULATION À CONNAÎTRE.
+  run_eof.py réécrit eof-audit-results.json sans relire
+  les lots. Le relancer seul fait donc disparaître du
+  rapport toutes les réponses du questionnaire, en
+  silence. Il faut toujours relancer fusionner_lots.py
+  derrière run_eof.py.
+end note
+
+@enduml

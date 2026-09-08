@@ -1,0 +1,83 @@
+@startuml eof-questionnaire-sequence-p1
+title Questionnaire EOF - Page 1/3 : ce que l'audit lance tout seul
+
+skinparam backgroundColor #FFFFFF
+skinparam participant {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam actor {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+}
+skinparam ArrowColor #5BA1BC
+skinparam SequenceLifeLineBorderColor #5BA1BC
+skinparam SequenceGroupBodyBackgroundColor #ECECF2
+skinparam SequenceGroupBorderColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam responseMessageBelowArrow true
+
+actor "Auditeur" as U #82C1DD
+participant "Claude\n(skill analyse-parcours)" as C #82C1DD
+participant "run_eof.py" as REOF #DBDDE5
+participant "generate_report_html.py" as GR #DBDDE5
+database "dossier-audit/" as FS #9BD0DD
+
+note over U, FS
+  Vrai pour n'importe quel site audité.
+  Tout ce qui suit est déclenché par l'audit,
+  sans rien demander à personne.
+end note
+
+== Étapes 10 à 37 - Capture et mesures ==
+
+U -> C : /analyse-parcours <dossier-audit>
+C -> FS : HAR, Coverage, cwv.json, env-data.json,\nhtml-css-criteria.json, wellknown-scan.json
+
+note over C, FS
+  Toutes ces sondes observent le service depuis l'extérieur.
+  Aucune ne parle à l'équipe qui l'exploite.
+end note
+
+== Étape 39 - Audit EOF automatique ==
+
+C -> REOF : python3 run_eof.py <dossier-audit>
+REOF -> FS : Lire les fichiers déjà collectés
+FS -> REOF : Données observées
+REOF -> REOF : Trancher chaque critère du référentiel\nquand une donnée le permet
+REOF -> FS : lots/jugement-automatique.json
+REOF -> FS : eof-audit-results.json
+REOF -> FS : eof-rempli.md
+REOF -> FS : eof-radar-<domaine>.svg
+REOF -> C : Critères répondus sur 70,\npotentiel d'optimisation
+
+note over REOF, FS
+  Le plafond de cette étape n'est pas un défaut d'outillage.
+  La plupart des 70 critères portent sur des faits internes
+  à l'équipe : revues de code, tests, connaissance des
+  utilisateurs cibles. Aucune donnée technique ne les atteint.
+  Ces critères sortent en "aucune réponse".
+end note
+
+== Étape 40 - Rapport HTML ==
+
+C -> GR : python3 generate_report_html.py <dossier-audit>
+GR -> FS : Lire eof-audit-results.json\n+ eof-radar-<domaine>.svg
+FS -> GR : Résultats EOF
+GR -> FS : rapport-parcours-AAAA-MM-JJ.html
+C -> U : Rapport livré
+
+note over U, FS
+  ARRÊT. LE PIPELINE S'ARRÊTE ICI.
+  Aucune étape n'appelle generate_questionnaire.py.
+  Le rapport ne contient donc que du mesuré, jamais une
+  réponse de l'équipe qui exploite le service.
+  Suite : page 2/3.
+end note
+
+@enduml
