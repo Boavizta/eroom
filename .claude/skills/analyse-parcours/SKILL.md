@@ -151,6 +151,28 @@ rapport sans section EOF.
 
 ---
 
+## Étape 39b — Questionnaire EOF (génération et relecture)
+
+→ Voir `skill-steps/39b_questionnaire-eof.md`
+
+Étape **manuelle** (décision de mission, pas un calcul automatique), possible
+dès que l'Étape 39 a écrit `eof-audit-results.json`. Pose au service audité
+les critères que l'Étape 39 n'a pas pu trancher automatiquement :
+
+```bash
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <dossier-audit> --output-dir /tmp/questionnaire-<domaine>
+```
+
+**Ne jamais générer directement dans `audits/<domaine>/`** (le script le
+refuse par défaut, sortie 2) : un questionnaire généré est vierge, et
+`--dans-le-dossier-audit` ne doit être utilisé qu'au moment où il part
+réellement vers le client. Une fois le fichier revenu rempli, la relecture se
+fait avec `parse_questionnaire.py` (écrit `lots/relecture-questionnaire.json`) ;
+voir le fichier d'étape pour la suite (fusion des lots, avertissement sur
+`run_eof.py`).
+
+---
+
 ## Étape 40 — Rapport HTML
 
 → Voir `skill-steps/40_rapport.md`
