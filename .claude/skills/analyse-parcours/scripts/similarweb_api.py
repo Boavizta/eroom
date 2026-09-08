@@ -75,13 +75,19 @@ _MONTHS_FR = {
 def fetch_domain_data(domain, version=EXTENSION_VERSION, timeout=15):
     """Interroge l'API interne SimilarWeb pour un domaine.
 
-    Retourne (data_dict, None) en cas de succès, (None, message_erreur) sinon.
+    Retourne (data_dict, None, None) en cas de succès, (None, statut_echec, detail) sinon.
     N'envoie AUCUN en-tête Origin et un vrai User-Agent navigateur (les deux
     conditions du succès). Aucun cookie n'est nécessaire.
+
+    Statuts d'échec possibles :
+    - echec_lecture : domaine vide (erreur d'appel côté client)
+    - echec_reseau : timeout, DNS, connexion refusée, erreur HTTP
+    - rien_trouve : domaine absent de SimilarWeb (réponse 200 sans SiteName)
+    - echec_analyse : réponse 200 sans données exploitables (autre cause)
     """
     domain = (domain or "").strip().lower()
     if not domain:
-        return None, "domaine vide"
+        return None, "echec_lecture", "domaine vide"
     # Nettoyage : on veut un domaine nu (pas d'URL, pas de www.)
     if "://" in domain:
         domain = urllib.parse.urlparse(domain).netloc or domain
@@ -105,32 +111,37 @@ def fetch_domain_data(domain, version=EXTENSION_VERSION, timeout=15):
             raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            return None, ("403 CloudFront : en-têtes rejetés ou API durcie. "
+            return None, "echec_reseau", ("403 CloudFront : en-têtes rejetés ou API durcie. "
                           "Vérifier User-Agent navigateur + absence d'en-tête Origin, "
                           "ou revalider la version d'extension. Repli : Étape 20d assistée.")
-        return None, f"HTTP {e.code} : {e.reason}"
+        return None, "echec_reseau", f"HTTP {e.code} : {e.reason}"
     except Exception as e:
-        return None, f"erreur réseau : {e}"
+        return None, "echec_reseau", f"erreur réseau : {type(e).__name__} - {e}"
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return None, f"réponse non-JSON (extrait : {raw[:120]!r})"
+        return None, "echec_analyse", f"réponse non-JSON (extrait : {raw[:120]!r})"
 
     if not isinstance(data, dict) or not data.get("SiteName"):
-        return None, "domaine absent de SimilarWeb ou réponse vide (pas de SiteName)"
-    return data, None
+        return None, "rien_trouve", "domaine absent de SimilarWeb (réponse 200 sans SiteName)"
+    return data, None, None
 
 
 # ---------------------------------------------------------------------------
 # Transformation -> blocs env-data.json
 # ---------------------------------------------------------------------------
 
-def build_audience_block(data, source_url):
+def build_audience_block(data, source_url, domain):
     """Construit le bloc 'audience' au format attendu par resolve_audience().
 
-    Reprend TopCountryShares (part de trafic par pays). Retourne None si absent.
+    Reprend TopCountryShares (part de trafic par pays).
+    Retourne (bloc_dict, mesure_dict) en cas de succès,
+    (None, mesure_dict) si les données sont absentes.
+
+    Le dict mesure contient toujours : statut, cible, detail (null si ok).
     """
+    cible = f"API SimilarWeb : TopCountryShares pour {domain}"
     shares = data.get("TopCountryShares") or []
     mix = {}
     for entry in shares:
@@ -139,11 +150,16 @@ def build_audience_block(data, source_url):
         if cc and isinstance(val, (int, float)) and val > 0:
             mix[cc] = mix.get(cc, 0.0) + float(val)
     if not mix:
-        return None
+        mesure = {
+            "statut": "echec_analyse",
+            "cible": cible,
+            "detail": "TopCountryShares absent ou vide dans la réponse API"
+        }
+        return None, mesure
     # Renormalise (les Top Countries ne somment pas à 1 : reste du monde ignoré).
     total = sum(mix.values())
     mix = {cc: round(w / total, 4) for cc, w in mix.items()}
-    return {
+    bloc = {
         "mix": mix,
         # Libellé neutre affiché dans le rapport (n'expose pas la méthode technique
         # d'accès, cf. documentation/implementation/similarweb_api.md).
@@ -151,6 +167,8 @@ def build_audience_block(data, source_url):
         "source_url": source_url,
         "confidence": CONFIDENCE_MEDIUM,
     }
+    mesure = {"statut": "ok", "cible": cible, "detail": None}
+    return bloc, mesure
 
 
 def _snapshot_label(data):
@@ -188,16 +206,21 @@ def _avg_time_on_page_s(data):
     return time_on_site / page_per_visit
 
 
-def build_traffic_block(data, source_url):
+def build_traffic_block(data, source_url, domain):
     """Construit le bloc 'traffic' au format attendu par resolve_traffic().
 
     Base : le mois le plus récent d'EstimatedMonthlyVisits (repli Engagments.Visits),
     annualisé x12 pour rester cohérent avec monthly_visits (visits_per_year =
-    monthly_visits x 12). Retourne None si aucune donnée de visites.
+    monthly_visits x 12).
+    Retourne (bloc_dict, mesure_dict) en cas de succès,
+    (None, mesure_dict) si aucune donnée de visites.
 
     `avg_time_on_page_s`, s'il est disponible, sert au recalage Nielsen (Lot 4) :
     absent du dict si Engagments ne le fournit pas, jamais mis à 0 ou deviné.
+
+    Le dict mesure contient toujours : statut, cible, detail (null si ok).
     """
+    cible = f"API SimilarWeb : EstimatedMonthlyVisits et Engagments.Visits pour {domain}"
     monthly = None
     emv = data.get("EstimatedMonthlyVisits") or {}
     if isinstance(emv, dict) and emv:
@@ -213,7 +236,12 @@ def build_traffic_block(data, source_url):
         except (TypeError, ValueError):
             monthly = None
     if not monthly or monthly <= 0:
-        return None
+        mesure = {
+            "statut": "echec_analyse",
+            "cible": cible,
+            "detail": "EstimatedMonthlyVisits et Engagments.Visits absents ou invalides"
+        }
+        return None, mesure
 
     visits_per_year = int(round(monthly * 12 / 1000.0)) * 1000  # arrondi au millier
     block = {
@@ -228,7 +256,8 @@ def build_traffic_block(data, source_url):
     avg_time = _avg_time_on_page_s(data)
     if avg_time is not None:
         block["avg_time_on_page_s"] = round(avg_time, 3)
-    return block
+    mesure = {"statut": "ok", "cible": cible, "detail": None}
+    return block, mesure
 
 
 # ---------------------------------------------------------------------------
@@ -277,13 +306,17 @@ def infer_domain(source_dir):
     return None
 
 
-def merge_into_env_data(source_dir, audience_block, traffic_block):
-    """Écrit/actualise les blocs 'audience' et 'traffic' dans env-data.json.
+def merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_block, traffic_mesure):
+    """Écrit/actualise les blocs 'audience', 'traffic' et 'mesures' dans env-data.json.
 
     Si le fichier existe, on préserve tout le reste (HAR, device, serveur…) et on
-    ne remplace que ces deux blocs. Sinon on crée un fichier minimal : le run
+    ne remplace que ces blocs. Sinon on crée un fichier minimal : le run
     `collect_env_data.py --refresh` suivant complétera HAR/CrUX/ipinfo tout en
     relisant ces blocs (resolve_audience/resolve_traffic).
+
+    IMPORTANT : les mesures sont TOUJOURS écrites, même en cas d'échec. C'est le
+    point central de la convention d'état de mesure : un échec laisse une trace
+    sur le disque, au lieu de s'évaporer avec la session.
     """
     env_path = source_dir / "env-data.json"
     if env_path.exists():
@@ -291,10 +324,23 @@ def merge_into_env_data(source_dir, audience_block, traffic_block):
             env = json.load(f)
     else:
         env = {}
+
+    # Initialiser le dict mesures s'il n'existe pas
+    if "mesures" not in env:
+        env["mesures"] = {}
+
+    # Écrire les blocs de données seulement s'ils existent
     if audience_block:
         env["audience"] = audience_block
     if traffic_block:
         env["traffic"] = traffic_block
+
+    # Toujours écrire les mesures, même en cas d'échec
+    if audience_mesure:
+        env["mesures"]["audience"] = audience_mesure
+    if traffic_mesure:
+        env["mesures"]["traffic"] = traffic_mesure
+
     with open(env_path, "w", encoding="utf-8") as f:
         json.dump(env, f, ensure_ascii=False, indent=2)
     return env_path
@@ -330,10 +376,17 @@ def main():
         sys.exit(1)
 
     print(f"[similarweb] Interrogation API interne pour : {domain}")
-    data, err = fetch_domain_data(domain, version=args.version)
-    if err:
-        print(f"  ECHEC : {err}")
+    data, statut_echec, detail_echec = fetch_domain_data(domain, version=args.version)
+    if statut_echec:
+        print(f"  ECHEC ({statut_echec}) : {detail_echec}")
         print("  -> Repli attendu : récupération assistée (SKILL.md Étape 20d).")
+        # Construire les mesures d'échec avant de sortir
+        cible_base = f"https://data.similarweb.com/api/v1/data?domain={domain}"
+        audience_mesure = {"statut": statut_echec, "cible": cible_base, "detail": detail_echec}
+        traffic_mesure = {"statut": statut_echec, "cible": cible_base, "detail": detail_echec}
+        # Écrire les mesures d'échec dans env-data.json
+        env_path = merge_into_env_data(source_dir, None, audience_mesure, None, traffic_mesure)
+        print(f"\n[ECHEC] Traces d'échec écrites dans : {env_path}")
         sys.exit(2)
 
     if args.print_only:
@@ -341,28 +394,31 @@ def main():
         return
 
     source_url = f"https://www.similarweb.com/website/{domain}/"
-    audience_block = build_audience_block(data, source_url)
-    traffic_block = build_traffic_block(data, source_url)
+    audience_block, audience_mesure = build_audience_block(data, source_url, domain)
+    traffic_block, traffic_mesure = build_traffic_block(data, source_url, domain)
 
     if not audience_block and not traffic_block:
         print("  ECHEC : réponse API sans TopCountryShares ni visites exploitables.")
         print("  -> Repli attendu : récupération assistée (SKILL.md Étape 20d).")
+        # Écrire les mesures d'échec dans env-data.json
+        env_path = merge_into_env_data(source_dir, None, audience_mesure, None, traffic_mesure)
+        print(f"\n[ECHEC] Traces d'échec écrites dans : {env_path}")
         sys.exit(2)
 
     if audience_block:
         mix_str = ", ".join(f"{cc} {w:.0%}" for cc, w in audience_block["mix"].items())
         print(f"  Mix pays : {mix_str}")
     else:
-        print("  ⚠ Pas de mix pays (TopCountryShares absent) : bloc audience non écrit.")
+        print("  ⚠ Pas de mix pays (TopCountryShares absent) : bloc audience non écrit, mesure enregistrée.")
 
     if traffic_block:
         snap = traffic_block.get("snapshot") or "?"
         print(f"  Trafic : {traffic_block['monthly_visits']:,}/mois ({snap}) "
               f"-> {traffic_block['visits_per_year']:,}/an")
     else:
-        print("  ⚠ Pas de volume de visites : bloc traffic non écrit.")
+        print("  ⚠ Pas de volume de visites : bloc traffic non écrit, mesure enregistrée.")
 
-    env_path = merge_into_env_data(source_dir, audience_block, traffic_block)
+    env_path = merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_block, traffic_mesure)
     print(f"\n[OK] Blocs écrits dans : {env_path}")
     print(f"     Relancer ensuite : python3 collect_env_data.py \"{source_dir}\" --refresh")
 

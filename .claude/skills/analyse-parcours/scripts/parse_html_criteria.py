@@ -37,12 +37,34 @@ MAX_CSS_PER_PAGE = 8
 
 
 def fetch_text(url):
+    """Récupère le contenu textuel d'une URL.
+
+    Retourne un dict avec :
+    - content : str|None (contenu si succès)
+    - status : "ok" | "rien_trouve" | "echec_reseau" | "echec_lecture"
+    - error_detail : str|None (description de l'erreur si échec)
+    """
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            return resp.read().decode("utf-8", errors="replace")
-    except Exception:
-        return None
+            try:
+                content = resp.read().decode("utf-8", errors="replace")
+                return {"content": content, "status": "ok", "error_detail": None}
+            except Exception as exc:
+                return {"content": None, "status": "echec_lecture",
+                       "error_detail": f"Erreur de décodage: {type(exc).__name__}"}
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return {"content": None, "status": "rien_trouve",
+                   "error_detail": f"HTTP {exc.code}"}
+        return {"content": None, "status": "echec_reseau",
+               "error_detail": f"HTTP {exc.code}"}
+    except urllib.error.URLError as exc:
+        return {"content": None, "status": "echec_reseau",
+               "error_detail": f"URLError: {exc.reason}"}
+    except Exception as exc:
+        return {"content": None, "status": "echec_reseau",
+               "error_detail": f"{type(exc).__name__}: {str(exc)}"}
 
 
 def load_page_urls(source_dir):
@@ -304,26 +326,61 @@ def main():
         sys.exit(1)
 
     pages_result = []
+    stylesheets_failed = []
     all_css_texts = []
     for url in urls:
-        html = fetch_text(url)
-        if html is None:
-            print(f"  [parse_html] échec fetch : {url}")
+        fetch_result = fetch_text(url)
+        if fetch_result["status"] != "ok":
+            # Page non récupérée : créer une entrée avec bloc mesure
+            page_entry = {
+                "url": url,
+                "mesure": {
+                    "statut": fetch_result["status"],
+                    "cible": url,
+                    "detail": fetch_result["error_detail"]
+                }
+            }
+            pages_result.append(page_entry)
+            print(f"  [parse_html] échec fetch page : {url} — {fetch_result['status']}: {fetch_result['error_detail']}")
             continue
+
+        # Page récupérée : analyser
+        html = fetch_result["content"]
         page_data = analyze_html(html, url)
-        css_texts = []
+        # Ajouter le bloc mesure pour indiquer succès
+        page_data["mesure"] = {
+            "statut": "ok",
+            "cible": url,
+            "detail": None
+        }
+
+        # Récupérer les CSS
         for css_url in page_data["stylesheet_urls"]:
-            css = fetch_text(css_url)
-            if css:
-                css_texts.append(css)
-        all_css_texts.extend(css_texts)
+            css_result = fetch_text(css_url)
+            if css_result["status"] == "ok":
+                all_css_texts.append(css_result["content"])
+            else:
+                # CSS non récupéré : tracer l'échec
+                stylesheets_failed.append({
+                    "url": css_url,
+                    "source_page": url,
+                    "mesure": {
+                        "statut": css_result["status"],
+                        "cible": f"feuille de style {css_url} (liée depuis {url})",
+                        "detail": css_result["error_detail"]
+                    }
+                })
+                print(f"  [parse_html] échec fetch CSS : {css_url} — {css_result['status']}: {css_result['error_detail']}")
+
         pages_result.append(page_data)
         print(f"  [parse_html] {url} — autoplay={page_data['has_autoplay_media']} "
               f"adaptive_img_ratio={page_data['adaptive_img_ratio']} viewport_ok={page_data['viewport_ok']}")
 
-    if not pages_result:
-        print("Erreur : aucune page n'a pu être récupérée (réseau indisponible ?).")
-        sys.exit(1)
+    # Vérifier combien de pages ont été mesurées avec succès
+    pages_ok = [p for p in pages_result if p.get("mesure", {}).get("statut") == "ok"]
+    if not pages_ok:
+        print("Attention : aucune page n'a pu être récupérée avec succès (réseau indisponible ?). "
+              "Les entrées en échec seront tracées dans le fichier de sortie.")
 
     css_result = analyze_css(all_css_texts)
 
@@ -334,6 +391,9 @@ def main():
                 "env-data.json (le .har capturé ne contient pas les corps de réponse "
                 "HTML/CSS) — pas de nouveau périmètre de pages.",
     }
+
+    if stylesheets_failed:
+        result["stylesheets_failed"] = stylesheets_failed
 
     out_path = source_dir / "html-css-criteria.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

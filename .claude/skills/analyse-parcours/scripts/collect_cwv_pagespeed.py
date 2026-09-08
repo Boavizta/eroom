@@ -172,7 +172,14 @@ def find_har(audit_dir):
 
 
 def call_pagespeed(url, api_key, strategy="mobile"):
-    """Appelle l'API PageSpeed Insights. Retourne le JSON brut ou None si erreur."""
+    """Appelle l'API PageSpeed Insights.
+
+    Retourne un dict distinguant les cas d'échec :
+    - succès : {"ok": True, "data": json_data, "error_type": None, "message": None}
+    - HTTPError : {"ok": False, "data": None, "error_type": "http", "http_code": int, "message": str}
+    - timeout : {"ok": False, "data": None, "error_type": "timeout", "message": str}
+    - autre réseau : {"ok": False, "data": None, "error_type": "network", "message": str}
+    """
     params = {
         "url": url,
         "key": api_key,
@@ -182,18 +189,31 @@ def call_pagespeed(url, api_key, strategy="mobile"):
     full_url = PAGESPEED_API + "?" + urllib.parse.urlencode(params, doseq=True)
     try:
         req = urllib.request.urlopen(full_url, timeout=30)
-        return json.loads(req.read().decode("utf-8"))
+        data = json.loads(req.read().decode("utf-8"))
+        return {"ok": True, "data": data, "error_type": None, "message": None}
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         try:
             err = json.loads(body).get("error", {})
-            print(f"  [PageSpeed] Erreur HTTP {e.code} pour {url} : {err.get('message', body[:200])}")
+            message = err.get("message", body[:200])
+            print(f"  [PageSpeed] Erreur HTTP {e.code} pour {url} : {message}")
         except Exception:
+            message = f"HTTP {e.code}"
             print(f"  [PageSpeed] Erreur HTTP {e.code} pour {url}")
-        return None
+        return {"ok": False, "data": None, "error_type": "http", "http_code": e.code, "message": message}
+    except urllib.error.URLError as e:
+        if "timed out" in str(e.reason).lower() or "timeout" in str(e.reason).lower():
+            message = f"Timeout après 30s"
+            print(f"  [PageSpeed] Timeout pour {url}")
+            return {"ok": False, "data": None, "error_type": "timeout", "message": message}
+        else:
+            message = str(e.reason)
+            print(f"  [PageSpeed] Erreur réseau pour {url} : {message}")
+            return {"ok": False, "data": None, "error_type": "network", "message": message}
     except Exception as e:
-        print(f"  [PageSpeed] Erreur réseau pour {url} : {e}")
-        return None
+        message = str(e)
+        print(f"  [PageSpeed] Erreur réseau pour {url} : {message}")
+        return {"ok": False, "data": None, "error_type": "network", "message": message}
 
 
 def extract_crux(data):
@@ -327,29 +347,64 @@ def collect(audit_dir, urls, api_key, strategies=("mobile",)):
     """Collecte les CWV pour chaque URL et chaque stratégie.
 
     Retourne la liste au format cwv.json : une entrée par couple (url, strategy).
+    Chaque entrée porte un bloc `mesure` distinguant succès / échec selon la
+    convention d'état de mesure. Les pages dont la mesure a échoué SONT PRÉSENTES
+    dans le résultat (avec statut != "ok"), pour tracer l'échec de manière structurée.
     """
     results = []
     for page_id, url in urls:
         print(f"  [{page_id}] {url}")
         for strategy in strategies:
-            data = call_pagespeed(url, api_key, strategy)
-            if data is None:
-                print(f"    [{strategy}] -> Aucune réponse API, ignoré.")
+            result = call_pagespeed(url, api_key, strategy)
+
+            # Entrée de base, toujours présente
+            entry = {"page": page_id, "url": url, "strategy": strategy}
+
+            if not result["ok"]:
+                # Échec d'appel API : tracer comme echec_reseau
+                entry["mesure"] = {
+                    "statut": "echec_reseau",
+                    "cible": f"{url} (strategy={strategy})",
+                    "detail": f"{result['error_type']}: {result['message']}"
+                }
+                if result["error_type"] == "http":
+                    entry["mesure"]["detail"] = f"HTTP {result['http_code']}: {result['message']}"
+                results.append(entry)
+                print(f"    [{strategy}] -> Échec réseau ({result['error_type']}), tracé.")
+                time.sleep(0.5)
                 continue
 
+            data = result["data"]
             crux = extract_crux(data)
             if crux:
-                entry = {"page": page_id, "url": url, "strategy": strategy}
                 entry.update(crux)
+                entry["mesure"] = {
+                    "statut": "ok",
+                    "cible": f"{url} (strategy={strategy})",
+                    "detail": None
+                }
                 print(f"    [{strategy}] -> CrUX terrain : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')} [{entry.get('crux_category')}]")
             else:
                 lab = extract_lab(data)
                 if lab:
-                    entry = {"page": page_id, "url": url, "strategy": strategy}
                     entry.update(lab)
+                    entry["mesure"] = {
+                        "statut": "ok",
+                        "cible": f"{url} (strategy={strategy})",
+                        "detail": None
+                    }
                     print(f"    [{strategy}] -> Lab (CrUX absent) : LCP={entry.get('lcp')}s INP={entry.get('inp')}ms CLS={entry.get('cls')}")
                 else:
-                    print(f"    [{strategy}] -> Aucune métrique disponible.")
+                    # API répond 200 mais aucune métrique CrUX ni lab disponible
+                    # C'est un résultat d'audit valide : l'API n'a pas de données pour cette URL
+                    entry["mesure"] = {
+                        "statut": "rien_trouve",
+                        "cible": f"{url} (strategy={strategy})",
+                        "detail": "L'API PageSpeed n'a pas de données CrUX ni lab pour cette URL"
+                    }
+                    results.append(entry)
+                    print(f"    [{strategy}] -> Aucune métrique disponible (rien_trouve), tracé.")
+                    time.sleep(0.5)
                     continue
 
             lh_scores = extract_lighthouse_scores(data)
@@ -484,9 +539,23 @@ def main():
 
     entries = collect(audit_dir, urls, api_key, strategies=strategies)
 
-    if not entries:
-        print("\n[PageSpeed] Aucune métrique collectée — fallback Lighthouse.")
-        fallback_lighthouse(audit_dir, urls)
+    # Compter les entrées avec mesure OK (métriques exploitables)
+    ok_count = sum(1 for e in entries if e.get("mesure", {}).get("statut") == "ok")
+
+    if ok_count == 0:
+        print("\n[PageSpeed] Aucune métrique exploitable — fallback Lighthouse.")
+        if not fallback_lighthouse(audit_dir, urls):
+            # Fallback également échoué : écrire quand même les échecs tracés
+            cwv_path = audit_dir / "cwv.json"
+            merged = merge_with_existing(entries, cwv_path)
+            with open(cwv_path, "w", encoding="utf-8") as f:
+                json.dump(merged, f, ensure_ascii=False, indent=2)
+            echec_count = sum(1 for e in entries if e.get("mesure", {}).get("statut") in ("echec_reseau", "echec_analyse"))
+            rien_count = sum(1 for e in entries if e.get("mesure", {}).get("statut") == "rien_trouve")
+            print(f"\n[PageSpeed] cwv.json écrit malgré l'échec : {len(entries)} trace(s)")
+            print(f"  - {echec_count} échec(s) de mesure")
+            print(f"  - {rien_count} page(s) sans données disponibles")
+            print(f"  -> {cwv_path}")
         sys.exit(0)
 
     cwv_path = audit_dir / "cwv.json"
@@ -496,7 +565,9 @@ def main():
         json.dump(merged, f, ensure_ascii=False, indent=2)
 
     crux_count = sum(1 for e in entries if e.get("source") == "crux")
-    lab_count = len(entries) - crux_count
+    lab_count = sum(1 for e in entries if e.get("source") == "pagespeed_lab")
+    echec_count = sum(1 for e in entries if e.get("mesure", {}).get("statut") in ("echec_reseau", "echec_analyse"))
+    rien_count = sum(1 for e in entries if e.get("mesure", {}).get("statut") == "rien_trouve")
     mobile_count = sum(1 for e in entries if e.get("strategy") == "mobile")
     desktop_count = sum(1 for e in entries if e.get("strategy") == "desktop")
     print(f"\n[PageSpeed] cwv.json mis à jour : {len(entries)} entrée(s)")
@@ -505,6 +576,10 @@ def main():
         print(f"  - {crux_count} entrée(s) avec données terrain CrUX")
     if lab_count:
         print(f"  - {lab_count} entrée(s) avec données lab (CrUX absent)")
+    if echec_count:
+        print(f"  - {echec_count} échec(s) de mesure tracés")
+    if rien_count:
+        print(f"  - {rien_count} page(s) sans données disponibles")
     print(f"  -> {cwv_path}")
 
 

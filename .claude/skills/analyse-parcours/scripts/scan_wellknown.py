@@ -27,15 +27,22 @@ USER_AGENT = "Mozilla/5.0 (compatible; eof-audit-scan/1.0)"
 
 
 def fetch(url):
-    """GET simple. Retourne (status_code, text) ou (None, None) si erreur réseau."""
+    """GET simple. Retourne (status_code, text, error_detail).
+
+    - Succès HTTP : (status_code, text, None)
+    - Erreur HTTP : (status_code, None, None)
+    - Erreur réseau/autre : (None, None, error_description)
+    """
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            return resp.status, resp.read().decode("utf-8", errors="replace")
+            return resp.status, resp.read().decode("utf-8", errors="replace"), None
     except urllib.error.HTTPError as e:
-        return e.code, None
-    except Exception:
-        return None, None
+        return e.code, None, None
+    except urllib.error.URLError as e:
+        return None, None, f"URLError: {e.reason}"
+    except Exception as e:
+        return None, None, f"{type(e).__name__}: {str(e)}"
 
 
 def _looks_like_html(text):
@@ -49,27 +56,121 @@ def _looks_like_html(text):
 
 
 def scan_security_txt(domain):
-    for path in ("/.well-known/security.txt", "/security.txt"):
-        status, text = fetch(f"https://{domain}{path}")
+    """Scanne security.txt aux deux emplacements standards.
+
+    Retourne un dict avec present (bool) et mesure (dict avec statut/cible/detail).
+    """
+    paths = ("/.well-known/security.txt", "/security.txt")
+    last_status, last_error = None, None
+
+    for path in paths:
+        url = f"https://{domain}{path}"
+        status, text, error_detail = fetch(url)
+
+        # Cas de succès : 200 avec contenu valide
         if status == 200 and text and not _looks_like_html(text):
             fields = ("contact:", "expires:")
             well_formed = all(f in text.lower() for f in fields)
-            return {"present": True, "path": path, "well_formed": well_formed, "excerpt": text[:300]}
-    return {"present": False}
+            return {
+                "present": True,
+                "path": path,
+                "well_formed": well_formed,
+                "excerpt": text[:300],
+                "mesure": {"statut": "ok", "cible": url, "detail": None}
+            }
+
+        # Mémoriser le dernier résultat pour le rapport d'échec final
+        last_status = status
+        last_error = error_detail
+
+        # 200 mais contenu vide ou HTML : échec d'analyse
+        if status == 200 and (not text or _looks_like_html(text)):
+            return {
+                "present": False,
+                "mesure": {"statut": "echec_analyse", "cible": url, "detail": "contenu vide ou HTML"}
+            }
+
+    # Aucun des deux chemins n'a réussi : construire le bon statut d'échec
+    # On rapporte le résultat du second chemin essayé (dernier)
+    url = f"https://{domain}{paths[-1]}"
+
+    if last_status in (404, 410):
+        return {
+            "present": False,
+            "mesure": {"statut": "rien_trouve", "cible": url, "detail": f"HTTP {last_status}"}
+        }
+    elif last_status is not None:
+        # Autre code HTTP (403, 500, etc.)
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_reseau", "cible": url, "detail": f"HTTP {last_status}"}
+        }
+    else:
+        # Pas de code HTTP du tout : timeout, DNS, etc.
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_reseau", "cible": url, "detail": last_error or "erreur réseau"}
+        }
 
 
 def scan_robots_txt(domain):
-    status, text = fetch(f"https://{domain}/robots.txt")
-    if status != 200 or not text or _looks_like_html(text):
-        return {"present": False}
-    sitemap_urls = re.findall(r"(?im)^sitemap:\s*(\S+)", text)
-    return {"present": True, "sitemap_urls": sitemap_urls}
+    """Scanne robots.txt à la racine.
+
+    Retourne un dict avec present (bool), sitemap_urls (list) et mesure (dict).
+    """
+    url = f"https://{domain}/robots.txt"
+    status, text, error_detail = fetch(url)
+
+    # Succès : 200 avec contenu valide
+    if status == 200 and text and not _looks_like_html(text):
+        sitemap_urls = re.findall(r"(?im)^sitemap:\s*(\S+)", text)
+        return {
+            "present": True,
+            "sitemap_urls": sitemap_urls,
+            "mesure": {"statut": "ok", "cible": url, "detail": None}
+        }
+
+    # 200 mais contenu vide ou HTML : échec d'analyse
+    if status == 200 and (not text or _looks_like_html(text)):
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_analyse", "cible": url, "detail": "contenu vide ou HTML"}
+        }
+
+    # 404 ou 410 : vraiment absent
+    if status in (404, 410):
+        return {
+            "present": False,
+            "mesure": {"statut": "rien_trouve", "cible": url, "detail": f"HTTP {status}"}
+        }
+
+    # Autre code HTTP : échec réseau
+    if status is not None:
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_reseau", "cible": url, "detail": f"HTTP {status}"}
+        }
+
+    # Pas de code HTTP du tout : timeout, DNS, etc.
+    return {
+        "present": False,
+        "mesure": {"statut": "echec_reseau", "cible": url, "detail": error_detail or "erreur réseau"}
+    }
 
 
 def scan_sitemap(domain, sitemap_urls):
+    """Scanne sitemap.xml aux URLs données ou /sitemap.xml par défaut.
+
+    Retourne un dict avec present (bool), métadonnées du sitemap si trouvé,
+    et mesure (dict avec statut/cible/detail).
+    """
     urls_to_try = sitemap_urls or [f"https://{domain}/sitemap.xml"]
+    last_status, last_error = None, None
+
     for url in urls_to_try:
-        status, text = fetch(url)
+        status, text, error_detail = fetch(url)
+
+        # Succès : 200 avec contenu valide XML
         if status == 200 and text and not _looks_like_html(text):
             url_count = len(re.findall(r"<loc>", text, re.IGNORECASE))
             lastmods = re.findall(r"<lastmod>([^<]+)</lastmod>", text, re.IGNORECASE)
@@ -82,16 +183,54 @@ def scan_sitemap(domain, sitemap_urls):
                 except ValueError:
                     pass
             return {
-                "present": True, "url": url, "url_count": url_count,
-                "most_recent_lastmod": most_recent, "days_since_lastmod": days_ago,
+                "present": True,
+                "url": url,
+                "url_count": url_count,
+                "most_recent_lastmod": most_recent,
+                "days_since_lastmod": days_ago,
+                "mesure": {"statut": "ok", "cible": url, "detail": None}
             }
-    return {"present": False}
+
+        # Mémoriser le dernier résultat
+        last_status = status
+        last_error = error_detail
+
+        # 200 mais contenu vide ou HTML : échec d'analyse
+        if status == 200 and (not text or _looks_like_html(text)):
+            return {
+                "present": False,
+                "mesure": {"statut": "echec_analyse", "cible": url, "detail": "contenu vide ou HTML"}
+            }
+
+    # Aucune URL n'a réussi : construire le bon statut d'échec
+    # On rapporte le résultat de la dernière URL essayée
+    url = urls_to_try[-1]
+
+    if last_status in (404, 410):
+        return {
+            "present": False,
+            "mesure": {"statut": "rien_trouve", "cible": url, "detail": f"HTTP {last_status}"}
+        }
+    elif last_status is not None:
+        # Autre code HTTP
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_reseau", "cible": url, "detail": f"HTTP {last_status}"}
+        }
+    else:
+        # Pas de code HTTP du tout : timeout, DNS, etc.
+        return {
+            "present": False,
+            "mesure": {"statut": "echec_reseau", "cible": url, "detail": last_error or "erreur réseau"}
+        }
 
 
 def scan(domain):
+    """Scanne les trois fichiers publics standards."""
     security_txt = scan_security_txt(domain)
     robots = scan_robots_txt(domain)
     sitemap = scan_sitemap(domain, robots.get("sitemap_urls"))
+
     return {
         "domain": domain,
         "security_txt": security_txt,
@@ -144,6 +283,19 @@ def main():
     print(f"  robots.txt   : {'présent' if result['robots_txt']['present'] else 'absent'}")
     print(f"  sitemap.xml  : {'présent' if result['sitemap']['present'] else 'absent'}"
           + (f" ({result['sitemap'].get('url_count')} URLs)" if result["sitemap"]["present"] else ""))
+
+    # Avertissement si des échecs de mesure sont présents (calculé à la volée)
+    echecs = []
+    for nom, resultat in [("security.txt", result["security_txt"]), ("robots.txt", result["robots_txt"]), ("sitemap", result["sitemap"])]:
+        statut = resultat.get("mesure", {}).get("statut")
+        if statut and statut.startswith("echec_"):
+            detail = resultat["mesure"].get("detail", "")
+            echecs.append(f"{nom} : {statut} ({detail})")
+
+    if echecs:
+        print("\n⚠️  ÉCHECS DE MESURE DÉTECTÉS :")
+        for echec in echecs:
+            print(f"  - {echec}")
 
 
 if __name__ == "__main__":
