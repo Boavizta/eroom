@@ -2,6 +2,11 @@
 
 Ce document explique comment obtenir les clés API nécessaires.
 
+**Chaque personne qui reprend le projet crée sa propre clé, dans son propre compte Google
+personnel.** Rien n'est partagé : `.env` est local à chaque machine et jamais versionné (voir
+section Sécurité). Il ne s'agit donc pas de demander l'accès au projet GCP existant de qui a
+travaillé avant, mais de refaire les étapes ci-dessous depuis zéro, avec son propre compte.
+
 -----
 
 ## Sécurité - règle absolue
@@ -46,15 +51,34 @@ Les scripts ne chargent pas le `.env` via `python-dotenv` : ils le parsent eux-m
 Les deux APIs doivent donc bien être activées (voir Étape 1), mais elles ne sont pas appelées
 par le même script.
 
-### Projet GCP utilisé
+### Projet GCP à créer
 
-Nom du projet : **"Google API Key for Agent EROOM"**
-Nom de la clé : **"Clé API pour Agent EROOM"**
+Nom de projet suggéré : **"Google API Key for Agent EROOM"** (ou tout autre nom, c'est un
+projet perso, le nom n'est pas structurant). Nom de clé suggéré : **"Clé API GOOGLE pour Agent
+EROOM"**.
+
+### ⚠️ Piège fréquent — mauvais compte Google connecté
+
+Si tu utilises Chrome/un navigateur avec plusieurs comptes Google (perso + pro/organisation),
+la console peut s'ouvrir sur ton compte **professionnel** par défaut. Symptômes observés :
+- le sélecteur de projet ("Aucune organisation" / nom d'organisation) ne montre que des projets
+  d'entreprise sans rapport avec ce besoin ;
+- cliquer "Activer" déclenche "Nous avons essayé de créer un projet... vous ne disposez pas des
+  autorisations nécessaires pour créer un projet dans cette organisation" ;
+- sur un projet existant de l'organisation, la fiche API affiche "Vous ne disposez pas des
+  autorisations nécessaires pour vérifier l'état d'activation de ce produit."
+
+**Changer de profil Chrome ne suffit pas forcément** (le profil peut rester connecté au même
+compte Google). La solution qui fonctionne : cliquer sur l'avatar en haut à droite de
+`console.cloud.google.com` → choisir explicitement ton **compte Google personnel** (ou ouvrir
+une fenêtre de navigation privée et te connecter avec ce compte). Une fois sur le bon compte, le
+sélecteur de projet doit proposer de créer un nouveau projet perso sans blocage d'organisation.
 
 ### Étape 1 — Activer les deux APIs (AVANT de créer la clé)
 
-1. Aller sur https://console.cloud.google.com
-2. Sélectionner le projet "Google API Key for Agent EROOM"
+1. Aller sur https://console.cloud.google.com, connecté avec ton compte Google **personnel**
+   (voir piège ci-dessus si le bon compte n'apparaît pas)
+2. Créer un nouveau projet (ou sélectionner celui déjà créé pour ce besoin)
 3. Menu gauche : "API et services" → "Bibliothèque"
 4. Chercher **"PageSpeed Insights API"** → Activer
 5. Revenir à la bibliothèque, chercher **"Chrome UX Report API"** → Activer
@@ -63,7 +87,7 @@ Nom de la clé : **"Clé API pour Agent EROOM"**
 
 6. Menu gauche : "API et services" → "Identifiants"
 7. Cliquer "+ Créer des identifiants" → "Clé API"
-8. Nommer la clé : `Clé API pour Agent EROOM`
+8. Nommer la clé : `Clé API GOOGLE pour Agent EROOM` (ou tout autre nom, libre)
 9. Dans "API accessibles à l'aide de cette clé" : cliquer sur "Sélectionner des restrictions d'API"
    - Taper "PageSpeed" dans le filtre → cocher **"PageSpeed Insights API"**
    - Effacer, taper "Chrome UX" → cocher **"Chrome UX Report API"**

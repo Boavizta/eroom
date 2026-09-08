@@ -506,8 +506,8 @@ def main():
     if args.check:
         # Test rapide sur une URL simple
         print("[PageSpeed] Vérification clé API...")
-        data = call_pagespeed("https://www.google.com", api_key, "mobile")  # genericite: ok - URL neutre pour tester la clé API
-        if data and "loadingExperience" in data:
+        result = call_pagespeed("https://www.google.com", api_key, "mobile")  # genericite: ok - URL neutre pour tester la clé API
+        if result["ok"] and result["data"] and "lighthouseResult" in result["data"]:
             print("[PageSpeed] Clé API valide.")
         else:
             print("[PageSpeed] Clé API invalide ou APIs non activées.")

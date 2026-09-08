@@ -81,7 +81,7 @@
 ### 1.13 — Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Provenance** : collecte — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100]
+**Provenance** : collecte — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 
 ### 1.14 — Les écrans principaux sont-ils clairs et bien conçus ?
 
@@ -259,7 +259,7 @@
 ### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (suppose) : Audit Lighthouse - Bonnes Pratiques (pire page) : 81% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
+**Donnée indicative** (suppose) : Audit Lighthouse - Bonnes Pratiques (pire page) : 77% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
 
 ### 6.7 — Existe-t-il une documentation complète ?
 
