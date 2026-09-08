@@ -403,26 +403,27 @@ Dix fusions tentantes ont été examinées et rejetées, toutes sur le même mé
 
 ### La contrainte des deux vocabulaires
 
-Les 16 questions de diagnostic rapide 0.x offrent "Non applicable" et n'offrent PAS "À évaluer". Les critères détaillés des dimensions 1 à 5 offrent "À évaluer". La dimension 6 partage l'échelle du diagnostic rapide.
+⚠️ **Ce paragraphe affirmait l'inverse de ce que dit le référentiel, et il a été corrigé en session 26 après lecture directe de `eof-referentiel.json`. Le référentiel fait foi.**
 
-Conséquence : fusionner une 0.x avec un critère des dimensions 1 à 5 rend une réponse INEXPRIMABLE ("🚫 Non applicable" devient impossible à cocher).
+Les 44 critères des dimensions 1 à 5 offrent "🚫 Non applicable", coefficient 0, ainsi que "🤔 À évaluer". Les 16 questions de diagnostic rapide 0.x n'offrent NI l'un NI l'autre : elles portent des crans graduués, sans option de non-applicabilité. Les 10 critères de la dimension 6 portent leur propre échelle à trois crans, "🟢 Facile à modifier" / "🟡 Effort modéré" / "🔴 Difficile à changer", et n'offrent pas non plus "Non applicable".
+
+Conséquence, inchangée : fusionner une 0.x avec un critère des dimensions 1 à 5 rend une réponse INEXPRIMABLE. C'est le "🚫 Non applicable" du critère détaillé qui devient impossible à cocher, puisque les crans de la 0.x ne le proposent pas.
 
 C'est pour cela que le seul bloc composé touchant une 0.x associe 0.3 et 6.10.
 
 Conséquence pratique : sur 5 groupes de questions redondantes repérés, 4 traversent cette frontière et ne sont donc pas fusionnables ; seul 0.7 avec 0.10 l'est, pour un gain d'une seule question. La redondance apparente n'est PAS le levier.
 
-### "Non applicable" et sans_objet sont deux mécanismes distincts
+### "Non applicable" et sans_objet sont désormais UN SEUL mécanisme, le critère écarté
 
-⚠️ **À ne jamais confondre.**
+⚠️ **Réunifiés en session 26. Contrat complet dans `convention-critere-ecarte.md`, qui fait foi. Ce qui suit résume, et décrit au passage l'état d'AVANT, parce que c'est ce défaut-là qui a été fermé.**
 
-- La réponse "🚫 Non applicable" a un coefficient de 0, compte dans `criteres_repondus`, et NE RETIRE PAS le critère du dénominateur, ni celui de `completude_pct` ni celui de `potentiel_optimisation_pct`.
-- Elle se comporte donc EXACTEMENT comme "🤔 À évaluer" : les deux gonflent la complétude sans rien apporter au potentiel.
+Un critère est **écarté** quand il ne s'applique pas au service. Deux chemins mènent au même état et produisent exactement les mêmes chiffres : sa `reponse` vaut "🚫 Non applicable", ou son booléen `sans_objet` vaut vrai. Un critère écarté sort de TOUS les dénominateurs, ne compte dans aucun numérateur, et n'est visible que dans la nouvelle clé `criteres_ecartes`.
 
-Démonstration : 10 critères dont 3 répondus. Passer les 7 autres à "Non applicable" donne `criteres_repondus` 3 vers 10, `completude_pct` 30 % vers 100 %, et `potentiel_optimisation_pct` 15 % vers 15 %, INCHANGÉ.
+**L'état d'avant, à ne pas restaurer.** La réponse "🚫 Non applicable" comptait dans `criteres_repondus` et ne retirait le critère d'aucun dénominateur. Elle se comportait donc exactement comme "🤔 À évaluer" : les deux gonflaient la complétude sans rien apporter au potentiel. Démonstration : 10 critères dont 3 répondus, passer les 7 autres à "Non applicable" donnait `criteres_repondus` 3 vers 10, `completude_pct` 30 % vers 100 %, et `potentiel_optimisation_pct` 15 % vers 15 %, INCHANGÉ.
 
-Le champ `sans_objet`, lui, est un booléen distinct de la réponse. Il saute le critère avant tout comptage et retire son `potentiel_max` des DEUX dénominateurs.
+**Le piège de fond, qui a décidé du reste.** "🚫 Non applicable" et "✅ Point fort confirmé" portent le MÊME coefficient 0. Compter un critère écarté comme répondu le rend donc arithmétiquement identique à un point fort : un service sans base de données aurait vu sa dimension 4 affichée à 0 % de potentiel d'optimisation, c'est-à-dire comme la dimension la mieux notée de son rapport. D'où le troisième état `hors_perimetre` par dimension, qui sort `null` et jamais 0 %.
 
-**DIVERGENCE ENTRE LES DEUX PRODUCTEURS, à signaler comme un défaut ouvert et non corrigé** : `fusionner_lots.py` traite `sans_objet` et réduit les deux dénominateurs, `run_eof.py` ignore le champ et ne le pose jamais. Si un lot manuel le pose et qu'on relance `run_eof.py` seul, les chiffres changent en silence.
+**La divergence entre les deux producteurs est corrigée** : `run_eof.py` et `fusionner_lots.py` traitent désormais les deux chemins de la même façon. Au passage, une incohérence interne de `fusionner_lots.py` a été fermée : son total par dimension soustrayait déjà les écartés, son total global non.
 
 ### Un levier apparent, refusé : remplacer une question par un indice technique
 
@@ -434,13 +435,33 @@ Ce sont des proxys faibles. Un déploiement récent ne prouve pas qu'un pipeline
 page ne dit rien de la clarté d'un écran. Les transformer en réponses gagnerait 6 questions **en
 dégradant la précision**, c'est-à-dire l'inverse du but. Refusé.
 
-### Le levier qui reste : les questions filtres
+### Les questions filtres, implémentées en session 26
 
-Une question filtre ne fait pas répondre 2 critères, elle en fait répondre dix quand la réponse est "ça ne s'applique pas chez nous" : un service sans base de données propre réglerait la dimension 4 d'un coup, sans perte de précision puisque "Non applicable" est une réponse légitime du référentiel.
+Une question filtre ne fait pas répondre 2 critères, elle en fait répondre dix quand la réponse est "ça ne s'applique pas chez nous" : un service sans base de données propre règle la dimension 4 d'un coup, sans perte de précision puisque "Non applicable" est une réponse légitime du référentiel pour les dimensions 1 à 5.
 
-Ce levier n'est pas implémenté.
+**Contrat complet dans `convention-critere-ecarte.md`. Ce qui suit ne dit que ce qu'il faut savoir en lisant le code.**
 
-**GARDE-FOU OBLIGATOIRE** : le rapport devra afficher À PART le nombre de critères écartés, sinon on affiche une complétude de 100 % construite sur des exclusions, indiscernable d'un audit réellement instruit. Autrement dit on fabriquerait de la complétude.
+Un troisième `type` de bloc, `filtre`, à côté de `direct` et `compose`. Il porte une liste `criteres` au lieu d'un `critere` au singulier, plus un `libelle_ecarte` et un `libelle_applicable`. Cocher `libelle_ecarte` verse une entrée "🚫 Non applicable" par critère, sans promotion de provenance ; cocher `libelle_applicable` ne verse RIEN, les critères restent à poser.
+
+Les trois filtres livrés :
+
+| Filtre | Critères gouvernés | Potentiel |
+|---|---|---|
+| Pas d'interface utilisateur humaine | 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.14, 5.9 | 12,5 |
+| Pas de données persistantes propres | 4.1 à 4.6 | 8,0 |
+| Pas d'environnement de test distinct | 3.8, 3.9 | 4,5 |
+
+4.4 est volontairement laissé au filtre "données persistantes" seul : `valider_blocs_questionnaire.py` interdit le recouvrement entre deux filtres, alors qu'il tolère celui d'un filtre avec un bloc `direct`, qui est le principe même du levier.
+
+Trois règles qu'on ne devine pas en lisant le code :
+
+1. **Un filtre n'est imprimé que si aucun de ses critères ne porte déjà une réponse tranchante.** Si la mesure a tranché un seul de ses critères, elle a prouvé que le sujet s'applique. Sur `audits/octo.com`, le filtre "pas d'interface utilisateur" n'est donc PAS imprimé, parce que 1.5 et 1.13 sont tranchés par la collecte.
+2. **Un filtre est en phase `detail`, en tête de la partie détaillée**, jamais en phase `porte` : il ne gouverne que des critères du diagnostic détaillé, et le mettre en porte le ferait poser avant même la décision d'aller plus loin.
+3. ⚠️ **Un filtre ne RETIRE aucune question du document.** Le générateur ne connaît pas la réponse au filtre au moment où il écrit. Sans correctif, le levier allonge le questionnaire et n'économise rien : il ne rend que de la véracité au rapport, pas de l'effort au client. D'où la mention "À IGNORER" portée par tout bloc dont TOUS les critères sont gouvernés, avec une condition en **conjonction, jamais en disjonction**.
+
+**Ce levier n'est pas une réduction garantie.** Pour un site web classique, les filtres reçoivent "cela s'applique" et n'écartent rien : le questionnaire s'allonge alors de deux questions. Le gain n'existe que pour les services dont une partie du référentiel ne parle pas. C'est un pari sur la diversité des services audités, à présenter comme tel.
+
+**GARDE-FOU, tenu** : le rapport affiche À PART le nombre de critères écartés, via un KPI `Écartés` lisant `criteres_ecartes`. Sans lui, une complétude de 100 % construite sur des exclusions serait indiscernable d'un audit réellement instruit : on fabriquerait de la complétude.
 
 ### Le bloc mesure sur le lot de relecture
 
@@ -471,8 +492,9 @@ Le circuit complet est dessiné dans `documentation/diagrammes/eof-questionnaire
 La fusion en un seul fichier a d'abord été commitée après `py_compile` et `valider_coherence_cles.py`, SANS lancer `parse_questionnaire.py --autotest`. Cet autotest fabriquait ses fixtures sous les deux anciens noms de fichier : 6 cas sur 7 tombaient, et la fusion était donc livrée avec son propre filet de sécurité crevé. Corrigé, 7 sur 7.
 
 La batterie de `processus/CONTROLES.md` ne suffit donc pas : **un script qui porte un `--autotest`
-doit voir son `--autotest` rejoué avant tout commit.** Cette règle n'est pas encore inscrite dans
-`processus/CONTROLES.md`, c'est un chantier ouvert.
+doit voir son `--autotest` rejoué avant tout commit.** Cette règle est désormais inscrite dans
+`processus/CONTROLES.md`, avec la liste des **six** scripts concernés et la commande pour la
+retrouver plutôt que de lui faire confiance.
 
 ## Chantiers livrés
 

@@ -23,10 +23,63 @@ python3 processus/valider_sante_sondes.py audits/<domaine>
 
 | Contrôle | Ce qu'il garantit | Sortie attendue |
 |---|---|---|
-| `valider_coherence_cles.py` | les 8 clés canoniques sont écrites par les deux producteurs et lues par les deux consommateurs, sans nom mort ni clé inventée | `[SUCCÈS]` |
+| `valider_coherence_cles.py` | les 9 clés canoniques sont écrites par les deux producteurs et lues par les deux consommateurs, sans nom mort ni clé inventée | `[SUCCÈS]` |
 | `valider_manifeste.py` | le manifeste de lots est cohérent | `[SUCCÈS]`, 17 lots, 6 vagues |
 | `check_valeurs_rapport.py --autotest` | les accidents connus du rapport sont détectés et les usages légitimes ignorés | 28 cas passés |
 | `valider_sante_sondes.py` | **aucune sonde n'a échoué en silence** dans le dossier d'audit visé | `[SUCCÈS]`, ou la liste des échecs |
+
+-----
+
+## La règle des `--autotest`, à ne pas oublier
+
+⛔ **Cette batterie ne suffit pas.** Elle contrôle le dépôt, pas les scripts que vous venez de
+modifier.
+
+**Quand un changement touche un script qui porte un `--autotest`, rejouez cet `--autotest`.
+Et rejouez celui de TOUS les scripts touchés, pas seulement celui auquel vous pensez.**
+
+Cette erreur a été payée deux fois dans la même session, la seconde fois sans que personne la
+voie. Un refactoring a renommé une fonction sans toucher ses 16 sites d'appel dans l'autotest,
+qui est tombé de 15 cas sur 15 à **0 sur 15** ; les 5 contrôles de cette batterie sortaient
+tous en 0 pendant ce temps, parce qu'aucun ne regarde ce que fait un script. Un filet de
+sécurité crevé est plus dangereux qu'un filet absent : il rassure.
+
+Les **huit** scripts qui portent un `--autotest`. ⚠️ Ils ne sont **plus tous** dans le même
+dossier depuis la session 26 : `fusionner_lots.py` vit sous `processus/`. À lancer depuis la
+racine du dépôt :
+
+```bash
+S=.claude/skills/analyse-parcours/scripts
+python3 $S/check_valeurs_rapport.py       --autotest
+python3 $S/generate_questionnaire.py      --autotest
+python3 $S/parse_questionnaire.py         --autotest
+python3 $S/valider_blocs_questionnaire.py --autotest
+python3 $S/parse_html_criteria.py         --autotest
+python3 $S/parse_pages_publiques.py       --autotest
+python3 $S/run_eof.py                     --autotest
+python3 processus/fusionner_lots.py       --autotest
+```
+
+`parse_html_criteria.py` et `parse_pages_publiques.py` sont faciles à oublier, parce qu'on ne
+pense pas à un extracteur comme à un script testé. `parse_html_criteria.py` sort sur le réseau
+dans son usage normal ; son `--autotest`, lui, travaille sur des fixtures et n'écrit rien.
+
+Les deux derniers sont les **producteurs** du fichier de résultats, et leur `--autotest` est né
+en session 26 : l'arithmétique du critère écarté avait été livrée sans aucun test. Ils gardent
+notamment le cas qui prouve qu'une dimension entièrement écartée ne sort **jamais** 0 % de
+potentiel d'optimisation, ce qui la ferait passer pour la mieux notée du rapport.
+
+⚠️ Pour accueillir `--autotest`, leur argument positionnel est devenu optionnel (`nargs="?"`),
+avec un `parser.error` qui refuse l'appel sans argument. **Ne retirez pas ce garde-fou** : sans
+lui, un appel sans argument partirait avec un chemin `None`.
+
+Pour trouver la liste à jour plutôt que de faire confiance à celle-ci. Le `--` est
+indispensable, sinon `grep` prend `--autotest` pour une de ses propres options, et les
+guillemets le sont aussi, sinon zsh essaie de développer `*.py` :
+
+```bash
+grep -rl -- "--autotest" .claude/skills processus "--include=*.py"
+```
 
 -----
 
