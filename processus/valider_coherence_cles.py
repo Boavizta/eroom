@@ -51,7 +51,8 @@ CANONICAL_KEYS, plus bas dans ce fichier) :
   - completude_globale_pct
   - completude_pct (par dimension)
   - criteres_repondus
-  - criteres_total
+  - criteres_total (les critères RETENUS, écartés déduits)
+  - criteres_ecartes (critères hors périmètre, cf. convention-critere-ecarte.md)
   - potentiel_optimisation_global_pct
   - potentiel_optimisation_pct (par dimension)
   - repondus_par_provenance (lue par le radar depuis le chantier 13, plus par exemption)
@@ -82,6 +83,7 @@ CANONICAL_KEYS = {
     "completude_pct",
     "criteres_repondus",
     "criteres_total",
+    "criteres_ecartes",
     "potentiel_optimisation_global_pct",
     "potentiel_optimisation_pct",
     "repondus_par_provenance",
@@ -292,15 +294,18 @@ def check_invented_keys(written_keys, producer_name):
             continue
         for family in KEY_FAMILIES:
             if key.startswith(family) and key not in CANONICAL_KEYS:
-                # Clés autorisées en dehors des 7 canoniques :
+                # Clés autorisées en dehors des canoniques :
                 # - criteres_avec_indice_partiel : dans le contrat de sortie fusionné
                 # - potentiel_max : ajouté par fusionner_lots.py depuis le référentiel (cf. ligne 36 docstring)
                 # - potentiel_retenu, potentiel_total : variables de calcul internes
+                # - ecartes, hors_perimetre : nouvelles clés du contrat critère écarté (convention section 3.2)
                 allowed_extra = {
                     "criteres_avec_indice_partiel",
                     "potentiel_max",
                     "potentiel_retenu",
                     "potentiel_total",
+                    "ecartes",
+                    "hors_perimetre",
                 }
                 if key not in allowed_extra:
                     violations.append(

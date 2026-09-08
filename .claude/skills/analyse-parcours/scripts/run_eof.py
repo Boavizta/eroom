@@ -747,14 +747,33 @@ def compute_dimension_scores(criteres_results):
         by_dim.setdefault(c["dimension"], []).append(c)
     dimensions = []
     for dim, items in by_dim.items():
-        answered = [c for c in items if c["reponse"] is not None]
-        # Formule canonique : somme des potentiels retenus ÷ somme des potentiel_max de TOUS les critères de la dimension
-        total_potentiel_max = sum(c["potentiel_max"] for c in items) or 1e-9
-        if answered:
+        # Identifier les critères écartés (convention critère écarté, section 2)
+        ecartes = [c for c in items if c["reponse"] == "🚫 Non applicable"]
+        nb_ecartes = len(ecartes)
+
+        # Les critères écartés sortent de tous les dénominateurs (convention 2.1)
+        items_retenus = [c for c in items if c["reponse"] != "🚫 Non applicable"]
+        answered = [c for c in items_retenus if c["reponse"] is not None]
+
+        # Garde-fou : une dimension entièrement écartée ne doit JAMAIS sortir 0 %
+        hors_perimetre = (nb_ecartes == len(items))
+
+        # Formule canonique : somme des potentiels retenus ÷ somme des potentiel_max des critères RETENUS
+        # (les critères écartés sont retirés du dénominateur, convention 2.1)
+        total_potentiel_max = sum(c["potentiel_max"] for c in items_retenus) or 1e-9
+        if hors_perimetre:
+            potentiel_optimisation_pct = None
+            completude_pct = None
+            total = 0
+        elif answered:
             potentiel_optimisation_pct = sum(c["coefficient"] * c["potentiel_max"] for c in answered) / total_potentiel_max * 100
+            completude_pct = len(answered) / len(items_retenus) * 100 if items_retenus else 0
+            total = len(items_retenus)
         else:
             potentiel_optimisation_pct = None
-        completude_pct = len(answered) / len(items) * 100 if items else 0
+            completude_pct = len(answered) / len(items_retenus) * 100 if items_retenus else 0
+            total = len(items_retenus)
+
         # Comptage par provenance
         # Les 5 provenances de conventions.precedence_provenance, dans l'ordre. `suppose` y
         # figure depuis le 2026-09-07 : sans elle, le test `if prov in ...` juste en dessous
@@ -767,9 +786,11 @@ def compute_dimension_scores(criteres_results):
                 repondus_par_provenance[prov] += 1
         dimensions.append({
             "nom": dim, "potentiel_optimisation_pct": potentiel_optimisation_pct,
-            "repondus": len(answered), "total": len(items),
+            "repondus": len(answered), "total": total,
             "completude_pct": completude_pct,
             "repondus_par_provenance": repondus_par_provenance,
+            "ecartes": nb_ecartes,
+            "hors_perimetre": hors_perimetre,
         })
     return dimensions
 
@@ -821,11 +842,153 @@ def build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_aper
     return "\n".join(lines)
 
 
+def autotest():
+    """Rejoue les cas de test embarqués sur l'arithmétique du critère écarté."""
+    import tempfile
+
+    echecs = []
+    total = 0
+
+    # Cas 1 : Dimension entièrement écartée ne doit JAMAIS sortir 0 %
+    # POURQUOI 0 serait faux : "🚫 Non applicable" et "✅ Point fort confirmé" partagent le
+    # coefficient 0, donc une dimension entièrement écartée affichée à 0 % passerait pour
+    # la MIEUX notée du rapport.
+    total += 1
+    try:
+        criteres = [
+            {"id": "1.1", "dimension": "🛖 1 — Produit", "potentiel_max": 3.0, "reponse": "🚫 Non applicable", "coefficient": 0},
+            {"id": "1.2", "dimension": "🛖 1 — Produit", "potentiel_max": 2.5, "reponse": "🚫 Non applicable", "coefficient": 0},
+        ]
+        dimensions = compute_dimension_scores(criteres)
+        dim = next((d for d in dimensions if d["nom"] == "🛖 1 — Produit"), None)
+
+        if not dim:
+            echecs.append(("Dimension entièrement écartée", "dimension non trouvée"))
+        elif not dim["hors_perimetre"]:
+            echecs.append(("Dimension entièrement écartée", f"hors_perimetre devrait être True, obtenu {dim['hors_perimetre']}"))
+        elif dim["potentiel_optimisation_pct"] is not None:
+            echecs.append(("Dimension entièrement écartée", f"potentiel_optimisation_pct devrait être None, obtenu {dim['potentiel_optimisation_pct']}"))
+        elif dim["potentiel_optimisation_pct"] == 0:
+            echecs.append(("Dimension entièrement écartée", "potentiel_optimisation_pct vaut 0 (devrait être None) — POURQUOI 0 EST FAUX : coefficient 0 = aussi bien qu'un ✅ Point fort confirmé"))
+        elif dim["completude_pct"] is not None:
+            echecs.append(("Dimension entièrement écartée", f"completude_pct devrait être None, obtenu {dim['completude_pct']}"))
+        elif dim["total"] != 0:
+            echecs.append(("Dimension entièrement écartée", f"total devrait être 0, obtenu {dim['total']}"))
+        elif dim["ecartes"] != 2:
+            echecs.append(("Dimension entièrement écartée", f"ecartes devrait être 2, obtenu {dim['ecartes']}"))
+    except Exception as exc:
+        echecs.append(("Dimension entièrement écartée", f"Exception : {exc}"))
+
+    # Cas 2 : Dimension partiellement écartée (chiffres discriminants)
+    # Choisir des nombres où l'erreur se verrait : si on COMPTAIT les écartés,
+    # le calcul serait DIFFÉRENT.
+    # Critères : 2 écartés (potentiel_max 10 chacun), 2 retenus (potentiel_max 5 chacun).
+    # Un critère retenu a coefficient 0.5, l'autre 0.2.
+    # Potentiel retenu CORRECT : (0.5 * 5 + 0.2 * 5) / 10 = 3.5 / 10 = 35 %
+    # Potentiel retenu FAUX (si on comptait les écartés) : 3.5 / 30 = 11.67 %
+    total += 1
+    try:
+        criteres = [
+            {"id": "2.1", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 10.0, "reponse": "🚫 Non applicable", "coefficient": 0},
+            {"id": "2.2", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 10.0, "reponse": "🚫 Non applicable", "coefficient": 0},
+            {"id": "2.3", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 5.0, "reponse": "💡 Potentiel d'amélioration identifié", "coefficient": 0.5, "provenance": "collecte"},
+            {"id": "2.4", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 5.0, "reponse": "🤔 À évaluer", "coefficient": 0.2, "provenance": "estime"},
+        ]
+        dimensions = compute_dimension_scores(criteres)
+        dim = next((d for d in dimensions if d["nom"] == "🗺️ 2 — Architecture"), None)
+
+        attendu = 35.0
+        faux_calcul = 11.67
+        if not dim:
+            echecs.append(("Dimension partiellement écartée", "dimension non trouvée"))
+        elif dim["potentiel_optimisation_pct"] is None:
+            echecs.append(("Dimension partiellement écartée", "potentiel_optimisation_pct est None (devrait être 35.0)"))
+        elif abs(dim["potentiel_optimisation_pct"] - attendu) > 0.1:
+            echecs.append(("Dimension partiellement écartée", f"potentiel_optimisation_pct attendu {attendu}%, obtenu {dim['potentiel_optimisation_pct']:.2f}% — calcul FAUX donnerait {faux_calcul}%"))
+        elif dim["total"] != 2:
+            echecs.append(("Dimension partiellement écartée", f"total devrait être 2 (retenus), obtenu {dim['total']}"))
+        elif dim["ecartes"] != 2:
+            echecs.append(("Dimension partiellement écartée", f"ecartes devrait être 2, obtenu {dim['ecartes']}"))
+        elif dim["completude_pct"] is None:
+            echecs.append(("Dimension partiellement écartée", "completude_pct est None (devrait être 100.0)"))
+        elif abs(dim["completude_pct"] - 100.0) > 0.1:
+            echecs.append(("Dimension partiellement écartée", f"completude_pct devrait être 100%, obtenu {dim['completude_pct']:.2f}%"))
+    except Exception as exc:
+        echecs.append(("Dimension partiellement écartée", f"Exception : {exc}"))
+
+    # Cas 3 : criteres_total = retenus, criteres_total + criteres_ecartes = total référentiel
+    total += 1
+    try:
+        criteres = [
+            {"id": "3.1", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": "✅ Point fort confirmé", "coefficient": 0, "provenance": "collecte"},
+            {"id": "3.2", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": "🚫 Non applicable", "coefficient": 0},
+            {"id": "3.3", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": None, "coefficient": None},
+        ]
+        dimensions = compute_dimension_scores(criteres)
+        dim = next((d for d in dimensions if d["nom"] == "🏢 3 — Infrastructure"), None)
+
+        if not dim:
+            echecs.append(("criteres_total comptabilité", "dimension non trouvée"))
+        elif dim["total"] != 2:
+            echecs.append(("criteres_total comptabilité", f"total (retenus) devrait être 2, obtenu {dim['total']}"))
+        elif dim["ecartes"] != 1:
+            echecs.append(("criteres_total comptabilité", f"ecartes devrait être 1, obtenu {dim['ecartes']}"))
+        elif dim["total"] + dim["ecartes"] != 3:
+            echecs.append(("criteres_total comptabilité", f"total + ecartes devrait être 3 (total référentiel), obtenu {dim['total'] + dim['ecartes']}"))
+    except Exception as exc:
+        echecs.append(("criteres_total comptabilité", f"Exception : {exc}"))
+
+    # Cas 4 : Aucun critère écarté = chiffres identiques à avant session 26, criteres_ecartes == 0
+    total += 1
+    try:
+        criteres = [
+            {"id": "4.1", "dimension": "💾 4 — Stockage et données", "potentiel_max": 4.0, "reponse": "💡 Potentiel d'amélioration identifié", "coefficient": 0.5, "provenance": "collecte"},
+            {"id": "4.2", "dimension": "💾 4 — Stockage et données", "potentiel_max": 4.0, "reponse": "✅ Point fort confirmé", "coefficient": 0, "provenance": "collecte"},
+        ]
+        dimensions = compute_dimension_scores(criteres)
+        dim = next((d for d in dimensions if d["nom"] == "💾 4 — Stockage et données"), None)
+
+        attendu = 25.0  # (0.5 * 4) / 8 = 25%
+        if not dim:
+            echecs.append(("Aucun critère écarté", "dimension non trouvée"))
+        elif dim["ecartes"] != 0:
+            echecs.append(("Aucun critère écarté", f"ecartes devrait être 0, obtenu {dim['ecartes']}"))
+        elif dim["potentiel_optimisation_pct"] is None:
+            echecs.append(("Aucun critère écarté", "potentiel_optimisation_pct est None (devrait être 25.0)"))
+        elif abs(dim["potentiel_optimisation_pct"] - attendu) > 0.1:
+            echecs.append(("Aucun critère écarté", f"potentiel_optimisation_pct attendu {attendu}%, obtenu {dim['potentiel_optimisation_pct']:.2f}%"))
+        elif dim["total"] != 2:
+            echecs.append(("Aucun critère écarté", f"total devrait être 2, obtenu {dim['total']}"))
+        elif dim["hors_perimetre"]:
+            echecs.append(("Aucun critère écarté", f"hors_perimetre devrait être False, obtenu {dim['hors_perimetre']}"))
+    except Exception as exc:
+        echecs.append(("Aucun critère écarté", f"Exception : {exc}"))
+
+    if echecs:
+        print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
+        for libelle, erreur in echecs:
+            print(f"  - {libelle}")
+            print(f"      {erreur}")
+        return 1
+
+    print(f"Autotest : {total} cas passés.")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("source_dir")
+    parser.add_argument("source_dir", nargs="?")
     parser.add_argument("--domaine", default=None, help="Nom court utilisé pour eof-radar-<domaine>.svg (déduit du dossier sinon)")
+    parser.add_argument("--autotest", action="store_true", help="rejoue les cas de test embarqués et sort 1 si un cas échoue")
     args = parser.parse_args()
+
+    if args.autotest:
+        sys.exit(autotest())
+
+    if not args.source_dir:
+        parser.error("source_dir est requis (ou utiliser --autotest)")
+
+    source_dir = Path(args.source_dir).resolve()
 
     source_dir = Path(args.source_dir).resolve()
     domaine = args.domaine or source_dir.name
@@ -848,16 +1011,25 @@ def main():
     dimensions = compute_dimension_scores(results)
     diag_rapide_apercu = build_diag_rapide_apercu(referentiel, data)
 
-    auto_answered = [r for r in results if r["categorie"] == "automatisable" and r["reponse"] is not None]
-    all_answered = [r for r in results if r["reponse"] is not None]
-    partiel_with_context = [r for r in results if r["categorie"] == "partiel" and r["contexte"] is not None]
-    # Calcul global : même formule que par dimension, appliquée à tous les critères
-    total_potentiel_max_global = sum(r["potentiel_max"] for r in results) or None
+    # Identifier les critères écartés (convention critère écarté, section 2)
+    ecartes_global = [r for r in results if r["reponse"] == "🚫 Non applicable"]
+    criteres_ecartes = len(ecartes_global)
+
+    # Les critères écartés sortent de tous les dénominateurs (convention 2.1)
+    results_retenus = [r for r in results if r["reponse"] != "🚫 Non applicable"]
+
+    auto_answered = [r for r in results_retenus if r["categorie"] == "automatisable" and r["reponse"] is not None]
+    all_answered = [r for r in results_retenus if r["reponse"] is not None]
+    partiel_with_context = [r for r in results_retenus if r["categorie"] == "partiel" and r["contexte"] is not None]
+
+    # Calcul global : même formule que par dimension, appliquée aux critères RETENUS
+    # (les critères écartés sont retirés du dénominateur, convention 2.1)
+    total_potentiel_max_global = sum(r["potentiel_max"] for r in results_retenus) or None
     potentiel_optimisation_global_pct = (
         sum(r["coefficient"] * r["potentiel_max"] for r in all_answered) / total_potentiel_max_global * 100
         if total_potentiel_max_global else None
     )
-    completude_globale_pct = len(all_answered) / len(results) * 100 if results else 0
+    completude_globale_pct = len(all_answered) / len(results_retenus) * 100 if results_retenus else 0
     # Comptage par provenance global — mêmes 5 provenances qu'en compute_dimension_scores(),
     # `suppose` comprise, sinon une réponse posée en `suppose` disparaîtrait du décompte.
     repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
@@ -873,8 +1045,9 @@ def main():
     audit_results = {
         "generated_at": genere_le,
         "domaine": domaine,
-        "criteres_total": len(referentiel["criteres"]),
+        "criteres_total": len(results_retenus),
         "criteres_repondus": len(all_answered),
+        "criteres_ecartes": criteres_ecartes,
         "criteres_avec_indice_partiel": len(partiel_with_context),
         "completude_globale_pct": completude_globale_pct,
         "potentiel_optimisation_global_pct": potentiel_optimisation_global_pct,
