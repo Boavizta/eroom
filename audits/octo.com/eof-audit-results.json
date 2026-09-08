@@ -1,8 +1,9 @@
 {
-  "generated_at": "2026-09-07T20:49:06.262533+00:00",
+  "generated_at": "2026-09-08T14:32:05.717379+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
   "criteres_repondus": 7,
+  "criteres_ecartes": 0,
   "criteres_avec_indice_partiel": 16,
   "completude_globale_pct": 12.962962962962962,
   "potentiel_optimisation_global_pct": 1.875,
@@ -26,7 +27,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     },
     {
       "nom": "🗺️ 2 — Architecture",
@@ -40,7 +43,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     },
     {
       "nom": "🏢 3 — Infrastructure",
@@ -54,7 +59,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     },
     {
       "nom": "💾 4 — Stockage et données",
@@ -68,7 +75,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     },
     {
       "nom": "👨‍💻 5 — Algo & Code",
@@ -82,7 +91,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     },
     {
       "nom": "🛠 6 — Facilité de changement",
@@ -96,7 +107,9 @@
         "declare": 0,
         "precise": 0,
         "suppose": 0
-      }
+      },
+      "ecartes": 0,
+      "hors_perimetre": false
     }
   ],
   "diagnostic_rapide_apercu": {
@@ -296,7 +309,7 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
-      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 0 (sur l'ensemble des pages)"
+      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 1 (sur l'ensemble des pages)"
     },
     {
       "id": "1.5",
@@ -428,7 +441,7 @@
       "coefficient": null,
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
-      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "1.16",
@@ -440,7 +453,7 @@
       "coefficient": null,
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year",
-      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "2.1",

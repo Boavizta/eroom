@@ -1,6 +1,6 @@
 {
   "lot_id": "jugement-automatique",
-  "genere_le": "2026-09-07T20:49:06.262533+00:00",
+  "genere_le": "2026-09-08T14:32:05.717379+00:00",
   "entrees": [
     "env-data.json",
     "audit/har-analysis.json",
@@ -17,7 +17,7 @@
       "categorie": "partiel",
       "provenance": "suppose",
       "source": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
-      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 0 (sur l'ensemble des pages)"
+      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 1 (sur l'ensemble des pages)"
     },
     {
       "id": "1.5",
@@ -77,14 +77,14 @@
       "categorie": "partiel",
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
-      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "1.16",
       "categorie": "partiel",
       "provenance": "estime",
       "source": "env-data.json: traffic.visits_per_year",
-      "contexte": "Trafic estimé : 281 000 visites/an (SimilarWeb (estimation))"
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
     },
     {
       "id": "2.1",

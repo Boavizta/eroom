@@ -1,13 +1,28 @@
 {
   "domain": "octo.com",
   "security_txt": {
-    "present": false
+    "present": false,
+    "mesure": {
+      "statut": "echec_analyse",
+      "cible": "https://octo.com/.well-known/security.txt",
+      "detail": "contenu vide ou HTML"
+    }
   },
   "robots_txt": {
-    "present": false
+    "present": false,
+    "mesure": {
+      "statut": "echec_analyse",
+      "cible": "https://octo.com/robots.txt",
+      "detail": "contenu vide ou HTML"
+    }
   },
   "sitemap": {
-    "present": false
+    "present": false,
+    "mesure": {
+      "statut": "echec_analyse",
+      "cible": "https://octo.com/sitemap.xml",
+      "detail": "contenu vide ou HTML"
+    }
   },
   "note": "Fetch direct et public (aucune authentification), pas de nouvel appel au-delà de ces 2-3 requêtes HTTP par domaine."
 }

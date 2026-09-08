@@ -11,8 +11,14 @@
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/",
+        "detail": null
+      }
     },
     {
       "url": "https://octo.com/recrutement",
@@ -20,13 +26,19 @@
       "img_count": 11,
       "adaptive_img_ratio": 0.27,
       "native_buttons": 2,
-      "custom_role_buttons": 0,
+      "custom_role_buttons": 1,
       "viewport_content": "width=device-width,initial-scale=1",
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/recrutement",
+        "detail": null
+      }
     },
     {
       "url": "https://octo.com/recrutement/nos-offres",
@@ -39,8 +51,14 @@
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/recrutement/nos-offres",
+        "detail": null
+      }
     },
     {
       "url": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
@@ -53,8 +71,14 @@
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
+        "detail": null
+      }
     },
     {
       "url": "https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn",
@@ -67,8 +91,14 @@
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn",
+        "detail": null
+      }
     },
     {
       "url": "https://octo.com/publications",
@@ -81,8 +111,14 @@
       "viewport_ok": true,
       "stylesheet_urls": [
         "https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap",
-        "https://octo.com/style.css?v=2026-8-3-1-1"
-      ]
+        "https://octo.com/assets/orejime.css",
+        "https://octo.com/style.css?v=2026-8-8-1-1"
+      ],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://octo.com/publications",
+        "detail": null
+      }
     }
   ],
   "css": {

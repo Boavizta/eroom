@@ -39,7 +39,7 @@
 ### 1.4 — La conception comprend-elle des composants personnalisés plutôt que des composants natifs ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (suppose) : Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 0 (sur l'ensemble des pages) — _champ : html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons_
+**Donnée indicative** (suppose) : Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 1 (sur l'ensemble des pages) — _champ : html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons_
 
 ### 1.5 — Y a-t-il des animations, des vidéos, des sons, des cartes (...) qui sont lus automatiquement ?
 
@@ -91,12 +91,12 @@
 ### 1.15 — Ce service est-il fréquemment utilisé ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (estime) : Trafic estimé : 281 000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)_
+**Donnée indicative** (estime) : Trafic estimé : 293 000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)_
 
 ### 1.16 — Volume (nombre d'utilisateurs)
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (estime) : Trafic estimé : 281 000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year_
+**Donnée indicative** (estime) : Trafic estimé : 293 000 visites/an (SimilarWeb (estimation)) — _champ : env-data.json: traffic.visits_per_year_
 
 
 ## 🗺️ 2 — Architecture — potentiel d'optimisation : 0% (1/5 répondus)
