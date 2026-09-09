@@ -23,14 +23,14 @@ Le projet regroupe trois familles d'outils, complémentaires mais indépendantes
 
 - le détail du trafic réseau (requêtes, domaines, volumes, codes HTTP) ;
 - le score EcoIndex (0 à 100, grade A à G) et le code mort JS/CSS ;
-- les Core Web Vitals (mesurés ou estimés via Lighthouse) ;
+- les Core Web Vitals (données terrain via PageSpeed Insights/Chrome UX Report, à défaut mesurés en laboratoire via Lighthouse) ;
 - des recommandations croisées avec la stack technique détectée.
 
 → `.claude/skills/analyse-parcours/`
 
 ### `efootprint` : estimation CO2e du parcours
 
-Étape optionnelle du même skill, qui réutilise les données déjà capturées (HAR, mix d'appareils CrUX, trafic annuel SimilarWeb) pour construire un modèle avec la bibliothèque [e-footprint](https://github.com/Boavizta/e-footprint) de Boavizta, et insère une section "Impact environnemental" dans le rapport.
+Étape optionnelle du même skill, qui réutilise les données déjà capturées (HAR, mix d'appareils CrUX, pays et hébergeur du serveur via ipinfo.io, trafic annuel SimilarWeb) pour construire un modèle avec la bibliothèque [e-footprint](https://github.com/Boavizta/e-footprint) de Boavizta, et insère une section "Impact environnemental" dans le rapport. Quand le parcours appelle une IA générative tierce, e-footprint délègue ce calcul précis à une bibliothèque tierce, EcoLogits.
 
 Ce que la bibliothèque e-footprint mesure, sur quoi elle repose et où sont ses limites est documenté sans détour dans `documentation/implementation/methodologie_efootprint.md`.
 
@@ -51,7 +51,7 @@ Ces outils s'utilisent depuis [Claude Code](https://claude.com/claude-code), sou
 /efootprint <même-dossier>          # estimation CO2e seule
 ```
 
-Prérequis : Python 3 (bibliothèque `e-footprint`), Node.js (Lighthouse, installé une seule fois via `npm install --prefix .claude/skills/analyse-parcours/scripts/`).
+Prérequis : Python 3 (bibliothèque `e-footprint`), Node.js (Lighthouse, installé une seule fois via `npm install --prefix .claude/skills/analyse-parcours/scripts/`), et des clés API personnelles pour PageSpeed Insights/Chrome UX Report et ipinfo.io (voir `documentation/implementation/setup_Google_api_keys.md`).
 
 Procédure de capture du HAR et des fichiers de couverture : `.claude/skills/analyse-parcours/docs/capturer-har-et-coverage.md`.
 

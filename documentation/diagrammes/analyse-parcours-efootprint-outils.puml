@@ -49,6 +49,12 @@ partition "**Bloc 2 — Données récoltées** -> env-data.json" {
 }
 
 partition "**Bloc 3 — run_efootprint.py** (calcul e-footprint/Boavizta)" {
+  note right #FFF3CD
+    Cas optionnel : IA générative tierce détectée
+    -> e-footprint délègue ce calcul précis à
+    EcoLogits (bibliothèque tierce genai-impact),
+    jamais ajouté au total sans confirmation
+  end note
   :Modèle (mobile + desktop) ->
   impacts fabrication + énergie
   par poste (devices, réseau, serveur, stockage);
