@@ -36,13 +36,54 @@ Les critères sans réponse automatique aujourd'hui ne sont pas tous dans la mê
 
 ## Chantiers à explorer pour optimiser l'automatisation des réponses
 
-Ces chantiers ne changent pas le nombre de questions posées (ce plancher est déjà atteint, cf. section précédente) : ils augmentent la part de critères où l'humain répond avec un rappel des données déjà collectées "sur le disque", plutôt qu'à l'aveugle. Aucun n'a été implémenté dans cette étude.
+Ces chantiers ne changent pas le nombre de questions posées (ce plancher est déjà atteint, cf. section précédente) : ils augmentent la part de critères où l'humain répond avec un rappel des données déjà collectées "sur le disque", plutôt qu'à l'aveugle.
 
-1. **Étendre `parse_pages_publiques.py`** pour qu'il cherche aussi des motifs de rétention/suppression/archivage de données (ex. "protection des données", "durée de conservation", "droit à l'effacement"), en plus des motifs environnementaux actuels. Seul chantier de cette liste qui peut faire progresser un critère au-delà du rappel, potentiellement vers une réponse tranchée pour `0.15`.
-2. **Câbler le rappel de fait mesuré pour `0.7`** : la donnée existe déjà (CSP listant les hébergeurs backend type PaaS, CDN détectés dans `tech_stack`), il ne reste qu'à l'afficher dans la question, sur le même principe que ce qui existe déjà pour `0.4`.
-3. **Câbler le rappel de fait mesuré pour `0.11` et `0.12`** : les scores Core Web Vitals (accessibilité, bonnes pratiques, LCP/INP/CLS, catégorie CrUX) sont déjà collectés dans `cwv.json` et pourraient être rappelés dans les questions sur la fluidité UX/UI et la compatibilité matériel ancien, avec la réserve explicite que ce sont des indices techniques, pas une mesure directe du ressenti utilisateur.
+⚠️ **Mise à jour du 2026-09-10 : les chantiers 1, 2 et 3 ci-dessous sont FAITS** (numérotés 37, 38,
+39 dans `tmp/handoff.md`, commits `671b45d`/`3f45a3f`). Contrairement à l'espoir formulé au point 1,
+`0.15` n'a progressé que jusqu'au rappel (comme les autres), pas jusqu'à une réponse tranchée :
+aucune déclaration de rétention n'a été trouvée sur `audits/octo.com` (comportement attendu, testé
+positif sur un cas synthétique). Seul le chantier 4 (`0.10`) reste ouvert, volontairement laissé de
+côté : non vérifiable sur octo.com, qui n'a ni `robots.txt` ni `sitemap.xml` du tout.
+
+1. ✅ **FAIT.** ~~Étendre `parse_pages_publiques.py`~~ pour qu'il cherche aussi des motifs de rétention/suppression/archivage de données (ex. "protection des données", "durée de conservation", "droit à l'effacement"), en plus des motifs environnementaux actuels.
+2. ✅ **FAIT.** ~~Câbler le rappel de fait mesuré pour `0.7`~~ : la donnée existe déjà (CSP listant les hébergeurs backend type PaaS, CDN détectés dans `tech_stack`), il ne reste qu'à l'afficher dans la question, sur le même principe que ce qui existe déjà pour `0.4`.
+3. ✅ **FAIT.** ~~Câbler le rappel de fait mesuré pour `0.11` et `0.12`~~ : les scores Core Web Vitals (accessibilité, bonnes pratiques, LCP/INP/CLS, catégorie CrUX) sont déjà collectés dans `cwv.json` et pourraient être rappelés dans les questions sur la fluidité UX/UI et la compatibilité matériel ancien, avec la réserve explicite que ce sont des indices techniques, pas une mesure directe du ressenti utilisateur.
 4. **Vérifier si le sitemap peut être trouvé autrement pour `0.10`** : le mécanisme existe déjà (`diag_context_0_10`) mais reste inerte sur les sites sans `sitemap.xml` déclaré (cas d'octo.com). Pas prioritaire : même quand il fonctionne, c'est un proxy faible de la complexité fonctionnelle (une seule page peut porter une SPA complexe).
 5. **Ne pas chercher à automatiser les 15 critères structurels** (`0.1, 0.2, 0.3, 0.5, 0.6, 0.8, 0.9, 0.13, 0.14` et `6.2, 6.4, 6.5, 6.7, 6.9, 6.10`) : ce sont des faits internes à l'équipe, aucune donnée collectable depuis l'extérieur du service ne peut y répondre, quel que soit l'outil développé (cf. mémoire [[reference_eof_maturite_pas_surface]]).
+
+## Piste examinée le 2026-09-10 et écartée en l'état : précocher une case suggérée
+
+Demande initiale : sur les critères "partiel", au lieu d'un simple rappel en prose sous la
+question, précocher directement la case que le rappel suggère, la personne n'ayant plus qu'à
+confirmer ou corriger. Objectif recherché : accélérer le remplissage (59 questions, ça pèse).
+
+**Pourquoi ce n'est pas juste une automatisation "un peu plus timide"** : un critère est classé
+"partiel" précisément parce qu'aucun seuil fiable n'a été trouvé pour transformer l'indice en une
+case précise. S'il existait un tel seuil, le critère serait déjà "automatisable" et la case serait
+déjà cochée seule (comme `0.16`). Précocher une case reviendrait donc à inventer ce seuil qu'on a
+justement refusé d'inventer, avec le même risque qu'une automatisation, pas un risque moindre.
+
+**Deux risques concrets identifiés** :
+1. **Biais de défaut** : une case déjà cochée se confirme statistiquement plus souvent qu'elle ne
+   se corrige, même quand elle est fausse — biais cognitif documenté, pas une supposition.
+2. **Confirmation indiscernable de l'oubli** : `parse_questionnaire.py` ne lit qu'une case cochée
+   ou pas. Il ne peut pas distinguer "la personne a réfléchi et confirmé notre proposition" de "la
+   personne a renvoyé le fichier sans l'avoir vraiment relu". C'est exactement le type d'échec
+   silencieux que ce projet a mis beaucoup d'énergie à éliminer ailleurs (cf. mémoire
+   [[feedback_echec_silencieux_vs_absence]]) : une fausse confirmation humaine, indiscernable
+   d'une vraie, fabriquerait un chiffre faux avec une apparence de légitimité (une case cochée par
+   un humain) supérieure à celle d'un simple "je ne sais pas".
+
+**Ce qui existe déjà et couvre une partie du besoin, sans ce risque** : le rappel en prose *dit*
+déjà ce que la mesure suggère (ex. pour `0.7` : "3 composants détectés... ce qui suggère plusieurs
+briques séparées"). La personne n'a pas à chercher l'information, seulement à la lire et choisir.
+Le gain de vitesse de lecture est déjà acquis ; ce qui manquerait, c'est seulement le geste physique
+de cocher, pas la réflexion.
+
+**Décision** : idée non implémentée, pas rejetée définitivement. Si elle est reprise, elle a besoin
+d'un garde-fou de conception avant tout code : par exemple afficher la suggestion visuellement à
+part des cases à cocher (jamais dans une case déjà cochée), pour que cocher reste un geste actif
+et vérifiable, jamais un état par défaut qu'on n'aurait qu'à laisser filer.
 
 ## Conclusion honnête
 
@@ -58,5 +99,9 @@ Le levier qui reste n'est donc pas la réduction du nombre de questions (déjà 
 
 Cette étude n'a modifié aucun fichier de production, conformément au périmètre demandé. Les 5 chantiers listés plus haut ("Chantiers à explorer pour optimiser l'automatisation des réponses") nécessiteraient de toucher `run_eof.py`, `eof_criteria_mapping.py` et `parse_pages_publiques.py`, donc une décision et une session dédiées. En complément :
 
-1. **Retirer la question redondante sur `0.16`** (gain sûr de 1 question, sous réserve de confirmer que ce n'est pas une confirmation volontaire).
+1. ✅ **DÉJÀ ACQUIS, pas un chantier.** ~~Retirer la question redondante sur `0.16`~~ : vérifié le
+   2026-09-10 en rejouant `generate_questionnaire.py` pour de vrai sur `audits/octo.com`, `0.16`
+   n'apparaît déjà plus dans le questionnaire produit. Un mécanisme général déjà en place (pas
+   spécifique à `0.16`) retire automatiquement toute question dont le critère a déjà une réponse
+   tranchée. Le "25 questions" annoncé plus haut était donc déjà périmé au moment de l'écrire.
 2. **Ne pas rouvrir le regroupement QCM** sur ce périmètre : déjà testé, déjà écarté, le résultat réel (9/21 en 7 questions) est documenté ci-dessus et dans la mémoire du projet.
