@@ -54,6 +54,33 @@ KEYWORDS_SUIVI = [
     "mesure de la consommation",
 ]
 
+# Mots-clés de recherche pour les déclarations de rétention/suppression/
+# archivage/droit à l'effacement des données. Recherche insensible à la
+# casse. Aucun recoupement avec KEYWORDS_SUIVI (vérifié à la main).
+KEYWORDS_RETENTION = [
+    "durée de conservation",
+    "duree de conservation",
+    "droit à l'effacement",
+    "droit a l effacement",
+    "politique de suppression",
+    "politique d'archivage",
+    "politique d archivage",
+    "suppression des données",
+    "suppression des donnees",
+    "conservation des données",
+    "conservation des donnees",
+    "droit à l'oubli",
+    "droit a l oubli",
+    "durée de rétention",
+    "duree de retention",
+    "période de rétention",
+    "periode de retention",
+    "purge des données",
+    "purge des donnees",
+    "archivage des données",
+    "archivage des donnees",
+]
+
 
 class _PagePubliqueParser(HTMLParser):
     """Extrait le texte visible depuis une page HTML.
@@ -120,15 +147,18 @@ def split_into_sentences(text):
 
 
 def extract_declarations(html_text):
-    """Extrait les déclarations de suivi d'impact environnemental depuis un HTML.
+    """Extrait les déclarations publiques depuis un HTML : suivi d'impact
+    environnemental, et rétention/suppression/archivage des données.
 
     Retourne un dict avec :
     - declarations_suivi : list[dict] avec phrase complète, casse d'origine
+    - declarations_retention : list[dict] avec phrase complète, casse d'origine
     - parse_success : bool (True si le parsing HTML a réussi)
     - parse_error : str|None (message d'erreur si échec)
     """
     result = {
         "declarations_suivi": [],
+        "declarations_retention": [],
         "parse_success": False,
         "parse_error": None,
     }
@@ -145,20 +175,33 @@ def extract_declarations(html_text):
     text = parser.get_text()
     sentences = split_into_sentences(text)
 
-    # Recherche de déclarations de suivi/mesure - extraire la phrase entière
-    seen_phrases = set()
+    # Recherche de déclarations de suivi/mesure et de rétention - un seul
+    # passage sur les phrases déjà découpées, extraction de la phrase entière
+    seen_phrases_suivi = set()
+    seen_phrases_retention = set()
     for sentence in sentences:
         sentence_lower = sentence.lower()
+
         for keyword in KEYWORDS_SUIVI:
             if keyword in sentence_lower:
                 # Phrase entière, casse d'origine, jamais coupée au milieu d'un mot
-                if sentence not in seen_phrases:
+                if sentence not in seen_phrases_suivi:
                     result["declarations_suivi"].append({
                         "phrase": sentence,
                         "mot_cle_trouve": keyword,
                     })
-                    seen_phrases.add(sentence)
+                    seen_phrases_suivi.add(sentence)
                 break  # Une seule correspondance par phrase
+
+        for keyword in KEYWORDS_RETENTION:
+            if keyword in sentence_lower:
+                if sentence not in seen_phrases_retention:
+                    result["declarations_retention"].append({
+                        "phrase": sentence,
+                        "mot_cle_trouve": keyword,
+                    })
+                    seen_phrases_retention.add(sentence)
+                break
 
     return result
 
@@ -317,6 +360,35 @@ _AUTOTEST_CASES = [
      "<p>système   de    suivi    de  l'impact</p>",
      lambda r: len(r["declarations"]["declarations_suivi"]) >= 1,
      False),
+
+    # --- Déclarations de rétention/suppression/archivage (chantier 37) ---
+    ("déclaration de rétention explicite",
+     "<p>Nous avons fixé une durée de conservation des données limitée à 24 mois.</p>",
+     lambda r: len(r["declarations"]["declarations_retention"]) == 1 and
+              r["declarations"]["declarations_retention"][0]["phrase"].startswith("Nous avons"),
+     False),
+
+    ("droit à l'effacement",
+     "<p>Vous disposez d'un droit à l'effacement de vos données à tout moment.</p>",
+     lambda r: len(r["declarations"]["declarations_retention"]) >= 1,
+     False),
+
+    ("suivi et rétention distingués dans la même page",
+     "<p>Nous avons mis en place un système de suivi de l'impact environnemental.</p>"
+     "<p>Notre politique de suppression des données est appliquée chaque année.</p>",
+     lambda r: len(r["declarations"]["declarations_suivi"]) == 1 and
+              len(r["declarations"]["declarations_retention"]) == 1,
+     False),
+
+    ("aucune déclaration de rétention",
+     "<p>Nous mesurons notre empreinte carbone chaque trimestre.</p>",
+     lambda r: len(r["declarations"]["declarations_retention"]) == 0,
+     False),
+
+    ("mot-clé de rétention dans un attribut ne compte pas",
+     '<img alt="durée de conservation" src="x.png"><p>Aucune déclaration réelle.</p>',
+     lambda r: len(r["declarations"]["declarations_retention"]) == 0,
+     True),
 ]
 
 

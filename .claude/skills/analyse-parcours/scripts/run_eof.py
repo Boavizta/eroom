@@ -26,8 +26,8 @@ commentaire en annonce 7, et les deux sont exacts dans leur périmètre. Ne pas
 Les 16 questions de 🏦
 0-Diagnostic rapide ne sont JAMAIS remplies automatiquement (échelle 1-5
 différente, décision explicite), SAUF 0.16 : elles apparaissent en aperçu,
-avec pour 0.4 et 0.10 un indice contextuel affiché à titre indicatif (jamais
-une réponse cochée).
+avec pour 0.4, 0.7, 0.10, 0.11, 0.12 et 0.15 un indice contextuel affiché à
+titre indicatif (jamais une réponse cochée).
 
 Usage :
     python3 run_eof.py <source_dir>
@@ -624,7 +624,130 @@ def diag_context_0_10(data):
     return f"{n} URL(s) dans le sitemap (ordre de grandeur logarithmique : environ {math.log2(n):.1f})"
 
 
-DIAG_CONTEXTS = {"0.4": diag_context_0_4, "0.10": diag_context_0_10}
+def diag_context_0_7(data):
+    """Indice de complexité architecturale (composants d'hébergement/diffusion distincts déclarés au CSP)."""
+    headers = data["headers"]
+    inv = inventory_from_headers_analysis(headers)
+    if not inv:
+        return None
+    families = inv["familles"]
+    paas = families.get("paas_backend") or []
+    cdn = families.get("cdn_bibliotheques") or []
+    composants = paas + cdn
+    if not composants:
+        return None
+    return (
+        f"{len(composants)} composant(s) d'hébergement/diffusion distinct(s) déclaré(s) au CSP "
+        f"({', '.join(composants)}), ce qui suggère plusieurs briques séparées plutôt qu'un bloc unique. "
+        "Ce n'est qu'un indice indirect et partiel : il ne voit ni le nombre de microservices internes, "
+        "ni le couplage réel entre ces briques, ni la complexité fonctionnelle du site."
+    )
+
+
+_CRUX_CATEGORY_RANK = {"SLOW": 2, "AVERAGE": 1, "FAST": 0}
+
+
+def _cwv_status_rank(entry):
+    """0 = 'good', 1 = zone intermédiaire, 2 = 'poor' (mêmes seuils que rule_5_4)."""
+    lcp, inp, cls = entry.get("lcp"), entry.get("inp"), entry.get("cls")
+    if (lcp is not None and lcp > CWV_POOR["lcp"]) or \
+       (inp is not None and inp > CWV_POOR["inp"]) or \
+       (cls is not None and cls > CWV_POOR["cls"]):
+        return 2
+    if not ((lcp is None or lcp <= CWV_GOOD["lcp"]) and
+            (inp is None or inp <= CWV_GOOD["inp"]) and
+            (cls is None or cls <= CWV_GOOD["cls"])):
+        return 1
+    return 0
+
+
+def _cwv_worst_entry(entries):
+    if not entries:
+        return None
+    def sort_key(e):
+        return (_cwv_status_rank(e), _CRUX_CATEGORY_RANK.get(e.get("crux_category"), -1))
+    return max(entries, key=sort_key)
+
+
+def _describe_cwv_entry(entry):
+    label = entry.get("url") or entry.get("page") or "?"
+    strategy = entry.get("strategy") or "?"
+    lcp, inp, cls = entry.get("lcp"), entry.get("inp"), entry.get("cls")
+    category = entry.get("crux_category")
+    bits = []
+    if lcp is not None:
+        bits.append(f"LCP {lcp}s")
+    if inp is not None:
+        bits.append(f"INP {inp}ms")
+    if cls is not None:
+        bits.append(f"CLS {cls}")
+    metrics = ", ".join(bits) if bits else "métriques indisponibles"
+    cat_txt = f", catégorie CrUX '{category}'" if category else ""
+    return f"{label} ({strategy}) : {metrics}{cat_txt}"
+
+
+def diag_context_0_11(data):
+    cwv = data["cwv"]
+    if not cwv:
+        return None
+    worst = _cwv_worst_entry(cwv)
+    if worst is None:
+        return None
+    return (f"Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : {_describe_cwv_entry(worst)}. "
+            "Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur.")
+
+
+def diag_context_0_12(data):
+    cwv = data["cwv"]
+    if not cwv:
+        return None
+    mobile_entries = [e for e in cwv if e.get("strategy") == "mobile"]
+    if not mobile_entries:
+        return None
+    worst = _cwv_worst_entry(mobile_entries)
+    if worst is None:
+        return None
+    return (f"Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : {_describe_cwv_entry(worst)}. "
+            "Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement.")
+
+
+def diag_context_0_15(data):
+    """Indice de déclaration publique de rétention/suppression/archivage des données."""
+    pages_publiques = data["pages_publiques"]
+    if not pages_publiques:
+        return None
+    if pages_publiques.get("status") in ("no_directory", "no_files"):
+        return None
+
+    for file_analysis in pages_publiques.get("files_analyzed", []):
+        if not file_analysis.get("read_success"):
+            continue
+        decl = file_analysis.get("declarations")
+        if not decl or not decl.get("parse_success"):
+            continue
+        retention = decl.get("declarations_retention") or []
+        if not retention:
+            continue
+        phrase = retention[0]["phrase"]
+        filename = file_analysis.get("filename", "page publique")
+        if len(phrase) > 200:
+            coupe = phrase[:197].rfind(" ")
+            if coupe > 100:
+                phrase = phrase[:coupe] + "..."
+        return (
+            f"Déclaration sur {filename} : \"{phrase}\". "
+            "Une déclaration publique de conservation des données ne prouve pas qu'une politique "
+            "formalisée et appliquée existe réellement en interne, ni qu'elle couvre tous les "
+            "traitements du service : c'est seulement un indice qu'une politique de suppression et "
+            "d'archivage existe potentiellement."
+        )
+    return None
+
+
+DIAG_CONTEXTS = {
+    "0.4": diag_context_0_4, "0.7": diag_context_0_7, "0.10": diag_context_0_10,
+    "0.11": diag_context_0_11, "0.12": diag_context_0_12, "0.15": diag_context_0_15,
+}
 
 
 # ---------------------------------------------------------------------------
