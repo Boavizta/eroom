@@ -192,12 +192,14 @@ def get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref):
         # Bloc filtre : liste de critères écartés
         return bloc.get("criteres", [])
     else:
-        # Bloc composé : extraire tous les critères des options
+        # Bloc composé : extraire tous les critères des options. Ordre trié pour
+        # que la sortie soit déterministe (list(set(...)) dépend du hash-seed du
+        # process Python, donc changeait d'un rejeu à l'autre sans raison).
         criteres = set()
         for option in bloc.get("options", []):
             for cid in option.get("reponses", {}).keys():
                 criteres.add(cid)
-        return list(criteres)
+        return sorted(criteres)
 
 
 def compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref):

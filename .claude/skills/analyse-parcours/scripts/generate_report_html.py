@@ -2800,13 +2800,29 @@ def _section_eof(results, radar_svg_text=None):
     dimensions = results.get("dimensions", [])
     diag = results.get("diagnostic_rapide_apercu", {})
 
+    # "répondus" mélange plusieurs provenances : collecte/estime/suppose viennent de nos
+    # outils (automatique), declare vient d'une page publiée par le service audité,
+    # precise vient d'un humain qui a rempli le questionnaire pendant CET audit. Les
+    # confondre sous "répondus automatiquement" fabrique une phrase fausse dès qu'un
+    # questionnaire a été fusionné (vu en session 32 sur octo.com : 19 précisés annoncés
+    # comme automatiques). Distinguer les trois, jamais les agréger sous un seul mot.
+    provenance = results.get("repondus_par_provenance") or {}
+    n_auto = provenance.get("collecte", 0) + provenance.get("estime", 0) + provenance.get("suppose", 0)
+    n_declare = provenance.get("declare", 0)
+    n_precise = provenance.get("precise", 0)
+
+    phrase_repondus = f'<b>{n_auto}</b> ont pu être répondus automatiquement depuis les données d’audit'
+    if n_declare:
+        phrase_repondus += f', <b>{n_declare}</b> depuis une déclaration publique du service audité'
+    if n_precise:
+        phrase_repondus += f', <b>{n_precise}</b> par une personne du service audité via le questionnaire'
+
     warning = (
         f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
         f'padding:12px 16px;margin:16px 0;border-radius:4px">'
         f'<b>&#9888; Audit automatique très partiel</b><br>'
-        f'Sur {total} critères détaillés, seuls <b>{n_repondus}</b> ont pu être '
-        f'répondus automatiquement depuis les données d’audit (+ {n_partiel} '
-        f'indice(s) contextuel(s), jamais une réponse validée). Les autres '
+        f'Sur {total} critères détaillés, {phrase_repondus} '
+        f'(+ {n_partiel} indice(s) contextuel(s), jamais une réponse validée). Les autres '
         f'restent <b>"je ne sais pas"</b> par construction : ce sont des '
         f'questions organisationnelles ou produit, qu’aucune mesure technique '
         f'ne peut trancher. Détail complet critère par critère en annexe.'
