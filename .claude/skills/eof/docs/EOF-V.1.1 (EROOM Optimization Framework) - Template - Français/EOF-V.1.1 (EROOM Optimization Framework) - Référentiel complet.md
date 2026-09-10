@@ -8,12 +8,12 @@
 
 - [À lire](#à-lire)
 - [0 — Diagnostic rapide](#0--diagnostic-rapide)
+- [🛠 6 — Facilité de changement](#6--facilité-de-changement)
 - [🛖 1 — Produit](#1--produit)
 - [🗺️ 2 — Architecture](#2--architecture)
 - [🏢 3 — Infrastructure](#3--infrastructure)
 - [💾 4 — Stockage et données](#4--stockage-et-données)
 - [👨‍💻 5 — Algo & Code](#5--algo--code)
-- [🛠 6 — Facilité de changement](#6--facilité-de-changement)
 - [Synthèse](#🕸️-7--synthèse)
 
 ## 📖 À lire
@@ -370,6 +370,158 @@ La licence autorise l'utilisation commerciale. Si vous remixez, adaptez ou déve
 - [ ] Modéré
 - [ ] Significatif
 - [x] Déterminant
+
+
+-----
+
+## 🛠 6 — Facilité de changement
+
+*Identifiez les meilleures opportunités d'optimisation.*
+
+### 6.1 — Existe-t-il un dispositif d'observabilité efficace pour le produit ?
+
+**Explication supplémentaire** : Sans un minimum de connaissances sur le comportement du produit en cours d'exécution, il est difficile d'identifier les optimisations possibles. L'absence de surveillance implique un faible potentiel d'optimisation.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [ ] Significatif
+- [x] Déterminant
+
+### 6.2 — Existe-t-il des revues de code et/ou une programmation en binôme  ( pair programming)?
+
+**Explication supplémentaire** : Les revues de code et la programmation en binôme garantissent un niveau minimum de connaissances communes sur la base de code et une qualité minimale.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [x] Significatif
+- [ ] Déterminant
+
+### 6.3 — Existe-t-il un processus [CI/CD](https://fr.wikipedia.org/wiki/CI/CD) efficace ?
+
+**Explication supplémentaire** : La présence d'un CI/CD est un bon indicateur de la facilité avec laquelle il sera possible de travailler sur l'application en toute confiance.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [x] Significatif
+- [ ] Déterminant
+
+### 6.4 — Existe-t-il des tests de non-régression (tests unitaires, tests d'intégration, tests de bout en bout) ?
+
+**Explication supplémentaire** : La présence de tests de non-régression permet aux programmeurs de modifier le logiciel tout en étant assurés de l'absence de problèmes induits par leur travail.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [ ] Significatif
+- [x] Déterminant
+
+### 6.5 — Y a-t-il un fort découplage entre le domaine métier et l'intégration technique ?
+
+**Explication supplémentaire** : Les pratiques de découplage telles que l'injection de dépendances ou l'architecture hexagonale/propre/en oignon permettent des changements techniques plus efficaces et ambitieux.
+C'est le « D » (inversion des dépendances) des 5 principes fondamentaux.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [x] Significatif
+- [ ] Déterminant
+
+### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
+
+**Explication supplémentaire** : Comme la couverture de code, la complexité cyclomatique, le nombre de problèmes, le nombre de problèmes de livraison, le nombre de retours en arrière, le délai de modification, la fréquence de déploiement, le pourcentage d'échecs de modification, le temps de récupération après un déploiement échoué.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [ ] Significatif
+- [x] Déterminant
+
+### 6.7 — Existe-t-il une documentation complète ?
+
+**Explication supplémentaire** : La présence d'une documentation pertinente permet des changements plus ambitieux.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [x] Significatif
+- [ ] Déterminant
+
+### 6.8 — Y a-t-il du code dupliqué dans l'application ?
+
+**Explication supplémentaire** : Le code dupliqué peut être supprimé afin de simplifier la maintenance des produits.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [x] Modéré
+- [ ] Significatif
+- [ ] Déterminant
+
+### 6.9 — L'équipe dispose-t-elle d'une autonomie suffisante pour déployer les outils dont elle a besoin pour observer, mesurer ou optimiser le système ?
+
+**Explication supplémentaire** : La facilité de changement augmente lorsque les équipes peuvent compter sur les outils dont elles ont besoin pour surveiller les performances, mesurer l'impact ou analyser les comportements.
+Cette autonomie peut provenir de la possibilité d'installer des outils personnalisés ou de s'appuyer sur des outils intégrés complets fournis par la plateforme.
+Ce qui importe, ce n'est pas l'endroit où l'infrastructure est hébergée, mais la capacité de l'équipe à l'utiliser efficacement pour soutenir l'optimisation.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [x] Modéré
+- [ ] Significatif
+- [ ] Déterminant
+
+### 6.10 — Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?
+
+**Explication supplémentaire** : Les exigences de haute disponibilité peuvent réduire la capacité de l'équipe à modifier, migrer ou optimiser les composants.
+Les services qui doivent maintenir une disponibilité stricte laissent moins de possibilités pour les fenêtres de maintenance, les changements architecturaux ou l'optimisation des ressources.
+Comprendre ces contraintes aide à évaluer la facilité avec laquelle le système peut évoluer vers un impact environnemental moindre.
+
+**Évaluation**
+- [ ] 🟢 Facile à modifier
+- [ ] 🟡 Effort modéré
+- [ ] 🔴 Difficile à changer
+
+**Niveau d'impact**
+- [ ] Modéré
+- [x] Significatif
+- [ ] Déterminant
 
 
 -----
@@ -1127,161 +1279,9 @@ Elle contribue également à améliorer la qualité et facilite la modification 
 
 -----
 
-## 🛠 6 — Facilité de changement
-
-*Identifiez les meilleures opportunités d'optimisation.*
-
-### 6.1 — Existe-t-il un dispositif d'observabilité efficace pour le produit ?
-
-**Explication supplémentaire** : Sans un minimum de connaissances sur le comportement du produit en cours d'exécution, il est difficile d'identifier les optimisations possibles. L'absence de surveillance implique un faible potentiel d'optimisation.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [ ] Significatif
-- [x] Déterminant
-
-### 6.2 — Existe-t-il des revues de code et/ou une programmation en binôme  ( pair programming)?
-
-**Explication supplémentaire** : Les revues de code et la programmation en binôme garantissent un niveau minimum de connaissances communes sur la base de code et une qualité minimale.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [x] Significatif
-- [ ] Déterminant
-
-### 6.3 — Existe-t-il un processus [CI/CD](https://fr.wikipedia.org/wiki/CI/CD) efficace ?
-
-**Explication supplémentaire** : La présence d'un CI/CD est un bon indicateur de la facilité avec laquelle il sera possible de travailler sur l'application en toute confiance.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [x] Significatif
-- [ ] Déterminant
-
-### 6.4 — Existe-t-il des tests de non-régression (tests unitaires, tests d'intégration, tests de bout en bout) ?
-
-**Explication supplémentaire** : La présence de tests de non-régression permet aux programmeurs de modifier le logiciel tout en étant assurés de l'absence de problèmes induits par leur travail.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [ ] Significatif
-- [x] Déterminant
-
-### 6.5 — Y a-t-il un fort découplage entre le domaine métier et l'intégration technique ?
-
-**Explication supplémentaire** : Les pratiques de découplage telles que l'injection de dépendances ou l'architecture hexagonale/propre/en oignon permettent des changements techniques plus efficaces et ambitieux.
-C'est le « D » (inversion des dépendances) des 5 principes fondamentaux.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [x] Significatif
-- [ ] Déterminant
-
-### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
-
-**Explication supplémentaire** : Comme la couverture de code, la complexité cyclomatique, le nombre de problèmes, le nombre de problèmes de livraison, le nombre de retours en arrière, le délai de modification, la fréquence de déploiement, le pourcentage d'échecs de modification, le temps de récupération après un déploiement échoué.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [ ] Significatif
-- [x] Déterminant
-
-### 6.7 — Existe-t-il une documentation complète ?
-
-**Explication supplémentaire** : La présence d'une documentation pertinente permet des changements plus ambitieux.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [x] Significatif
-- [ ] Déterminant
-
-### 6.8 — Y a-t-il du code dupliqué dans l'application ?
-
-**Explication supplémentaire** : Le code dupliqué peut être supprimé afin de simplifier la maintenance des produits.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [x] Modéré
-- [ ] Significatif
-- [ ] Déterminant
-
-### 6.9 — L'équipe dispose-t-elle d'une autonomie suffisante pour déployer les outils dont elle a besoin pour observer, mesurer ou optimiser le système ?
-
-**Explication supplémentaire** : La facilité de changement augmente lorsque les équipes peuvent compter sur les outils dont elles ont besoin pour surveiller les performances, mesurer l'impact ou analyser les comportements.
-Cette autonomie peut provenir de la possibilité d'installer des outils personnalisés ou de s'appuyer sur des outils intégrés complets fournis par la plateforme.
-Ce qui importe, ce n'est pas l'endroit où l'infrastructure est hébergée, mais la capacité de l'équipe à l'utiliser efficacement pour soutenir l'optimisation.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [x] Modéré
-- [ ] Significatif
-- [ ] Déterminant
-
-### 6.10 — Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?
-
-**Explication supplémentaire** : Les exigences de haute disponibilité peuvent réduire la capacité de l'équipe à modifier, migrer ou optimiser les composants.
-Les services qui doivent maintenir une disponibilité stricte laissent moins de possibilités pour les fenêtres de maintenance, les changements architecturaux ou l'optimisation des ressources.
-Comprendre ces contraintes aide à évaluer la facilité avec laquelle le système peut évoluer vers un impact environnemental moindre.
-
-**Évaluation**
-- [ ] 🟢 Facile à modifier
-- [ ] 🟡 Effort modéré
-- [ ] 🔴 Difficile à changer
-
-**Niveau d'impact**
-- [ ] Modéré
-- [x] Significatif
-- [ ] Déterminant
-
-
------
-
 ## 🕸️ 7 — Synthèse
 
-Ce référentiel compte **54 critères détaillés** au total, répartis sur les 6 piliers ci-dessous (hors Diagnostic rapide, qui les recouvre en version condensée mais n'entre pas dans cette synthèse).
+Ce référentiel compte **54 critères détaillés** au total, répartis sur les 6 dimensions ci-dessous (hors Diagnostic rapide, qui les recouvre en version condensée mais n'entre pas dans cette synthèse).
 
 | Catégorie | Nombre de critères | Renvoi |
 |---|---|---|
@@ -1294,13 +1294,13 @@ Ce référentiel compte **54 critères détaillés** au total, répartis sur les
 
 **Note sur le total du Sheet source.** La formule Google Sheets qui compte le nombre total de critères référence des onglets qui n'existent plus (`#REF!` + anciens noms d'onglets) — sa valeur affichée est figée et fausse. Le total ci-dessus (54) est recompté directement depuis les données actuelles, un par un.
 
-**Radar.** Le Sheet source affiche un radar à 6 axes qui, à l'examen, n'en trace que 5 : la catégorie *Facilité de changement* est absente du graphique (bug constaté, pas une exclusion volontaire). Tant que ce template est vierge, aucun radar réel n'a de sens ici — un exemple de rendu (scores fictifs, 6 axes) est disponible via `.claude/skills/eof/scripts/generate_radar_svg.py`.
+**Radar.** Le Sheet source affiche un radar à 6 axes qui, à l'examen, n'en trace que 5 : la catégorie *Facilité de changement* est absente du graphique (bug constaté, pas une exclusion volontaire). Tant que ce template est vierge, aucun radar réel n'a de sens ici, un exemple de rendu (potentiels d'optimisation fictifs, 6 axes) est disponible via `.claude/skills/eof/scripts/generate_radar_svg.py`.
 
 ### Comment ce référentiel se lit
 
-- **Piliers 1 à 5 (Produit, Architecture, Infrastructure, Stockage, Algo & Code)** : chaque critère se répond par un choix unique parmi 5 (`✅ Point fort confirmé`, `💡 Potentiel d'amélioration identifié`, `🚫 Non applicable`, `🤔 À évaluer`, `⌛️ Évaluation en cours`), en cochant la case correspondante. Score brut observé sur le Sheet source : `✅`/`🚫`/`🤔`/vide = 0, `💡` = 1, `⌛️` = 0,5 (cette dernière valeur n'a été observée qu'une seule fois dans tout le classeur au moment de la génération — à confirmer si elle se reproduit ailleurs, ce n'est pas encore une règle certaine).
-- **Pilier 6 (Facilité de changement)** : dropdown **différent** des 5 autres piliers (confirmé par l'onglet "À lire" du Sheet source) : `🟢 Facile à modifier`, `🟡 Effort modéré`, `🔴 Difficile à changer`. Aucune réponse réelle n'existait sur cet onglet au moment de la génération — le mapping numérique (0 / 0,5 / 1 retenu ici) est une supposition par analogie avec les autres piliers, **non vérifiée** sur une donnée réelle.
-- **Score d'un pilier** = `Σ (score du critère × poids du critère)` ÷ `Σ (poids de TOUS les critères du pilier, répondus ou non)`. **Un critère non répondu compte 0 au numérateur mais son poids reste au dénominateur** — il ne pénalise donc jamais le score, et un pilier vierge affiche 0 % de potentiel d'optimisation, pas "inconnu". C'est un biais méthodologique du Sheet source, pas une correction faite ici.
-- **Poids "Sans objet"** : l'onglet "À lire" indique qu'on peut exclure complètement un critère en réglant son poids sur "Sans objet" (pas juste répondre "Non applicable" à l'évaluation, qui elle laisse le poids compter au dénominateur). Aucun exemple réel de ce réglage n'a été observé dans les données récupérées — mécanisme documenté ici tel que décrit par le Sheet, non vérifié sur un cas concret.
-- **Onglet 0 (Diagnostic rapide)** : logique différente, une échelle 1 à 5 par critère (`(5 − réponse) ÷ 4 × poids`), ne contribue pas à ce tableau de synthèse.
-- **Poids** : chaque critère porte son propre poids (visible dans le Sheet source, colonne poids), différent d'un critère à l'autre — ce n'est jamais 1 partout.
+- **Dimensions 1 à 5 (Produit, Architecture, Infrastructure, Stockage, Algo & Code)** : chaque critère se répond par un choix unique parmi 5 (`✅ Point fort confirmé`, `💡 Potentiel d'amélioration identifié`, `🚫 Non applicable`, `🤔 À évaluer`, `⌛️ Évaluation en cours`), en cochant la case correspondante. Coefficient observé sur le Sheet source : `✅`/`🚫`/`🤔`/vide = 0, `💡` = 1, `⌛️` = 0,5 (cette dernière valeur n'a été observée qu'une seule fois dans tout le classeur au moment de la génération, à confirmer si elle se reproduit ailleurs, ce n'est pas encore une règle certaine).
+- **Dimension 6 (Facilité de changement)** : dropdown **différent** des 5 autres dimensions (confirmé par l'onglet "À lire" du Sheet source) : `🟢 Facile à modifier`, `🟡 Effort modéré`, `🔴 Difficile à changer`. Aucune réponse réelle n'existait sur cet onglet au moment de la génération, le mapping numérique (0 / 0,5 / 1 retenu ici) est une supposition par analogie avec les autres dimensions, **non vérifiée** sur une donnée réelle.
+- **Potentiel d'optimisation d'une dimension** = `Σ (coefficient de la réponse × maximum de potentiel du critère)` ÷ `Σ (maximum de potentiel de TOUS les critères de la dimension, répondus ou non)`. **Un critère non répondu compte 0 au numérateur mais son maximum reste au dénominateur**, il ne pénalise donc jamais le potentiel d'optimisation, et une dimension vierge affiche 0 % de potentiel d'optimisation, pas "inconnu". C'est un biais méthodologique du Sheet source, pas une correction faite ici.
+- **Maximum de potentiel "Sans objet"** : l'onglet "À lire" indique qu'on peut exclure complètement un critère en réglant son maximum de potentiel sur "Sans objet" (pas juste répondre "Non applicable" à l'évaluation, qui elle laisse le maximum compter au dénominateur). Aucun exemple réel de ce réglage n'a été observé dans les données récupérées, mécanisme documenté ici tel que décrit par le Sheet, non vérifié sur un cas concret.
+- **Onglet 0 (Diagnostic rapide)** : logique différente, une échelle 1 à 5 par critère (`(5 − réponse) ÷ 4 × maximum de potentiel`), ne contribue pas à ce tableau de synthèse.
+- **Maximum de potentiel** : chaque critère porte son propre maximum de potentiel (visible dans le Sheet source, colonne correspondante), différent d'un critère à l'autre, ce n'est jamais 1 partout.
