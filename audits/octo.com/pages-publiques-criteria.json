@@ -24,8 +24,14 @@
             "mot_cle_trouve": "consommation d'énergie"
           }
         ],
+        "declarations_retention": [],
         "parse_success": true,
         "parse_error": null
+      },
+      "mesure": {
+        "statut": "ok",
+        "cible": "pages-publiques/eco-conception.html",
+        "detail": null
       }
     }
   ],

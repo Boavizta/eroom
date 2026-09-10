@@ -229,11 +229,15 @@ def analyze_pages_publiques(source_dir):
     """Analyse le dossier pages-publiques/ d'un audit.
 
     Retourne un dict avec :
-    - status : "success" | "no_directory" | "no_files" | "partial_success"
+    - status : "success" | "no_directory" | "no_files" | "partial_success" | "all_failed"
     - pages_publiques_dir_exists : bool
     - files_searched : list[str] motifs cherchés
     - files_found : list[str] chemins trouvés
-    - files_analyzed : list[dict] résultats par fichier
+    - files_analyzed : list[dict] résultats par fichier, chacun avec son propre
+      bloc "mesure" (statut/cible/detail, convention d'état de mesure)
+    - mesure : bloc top-level UNIQUEMENT dans les cas "no_directory"/"no_files"
+      (rien_trouve : la sonde a bien cherché à l'emplacement attendu et n'y a
+      réellement rien trouvé — ce n'est pas un échec de notre outil).
     """
     pages_publiques_dir = source_dir / "pages-publiques"
     result = {
@@ -243,8 +247,15 @@ def analyze_pages_publiques(source_dir):
         "files_analyzed": [],
     }
 
+    cible_dir = str(pages_publiques_dir.relative_to(source_dir))
+
     if not pages_publiques_dir.exists():
         result["status"] = "no_directory"
+        result["mesure"] = {
+            "statut": "rien_trouve",
+            "cible": cible_dir,
+            "detail": "dossier pages-publiques/ absent de cet audit",
+        }
         return result
 
     search_result = find_page_files(pages_publiques_dir)
@@ -252,12 +263,18 @@ def analyze_pages_publiques(source_dir):
 
     if not search_result["found"]:
         result["status"] = "no_files"
+        result["mesure"] = {
+            "statut": "rien_trouve",
+            "cible": cible_dir,
+            "detail": f"aucun fichier parmi les motifs cherchés : {', '.join(PAGE_NAME_PATTERNS)}",
+        }
         return result
 
     # Analyser chaque fichier trouvé
     any_success = False
     any_failure = False
     for path in search_result["found"]:
+        cible_fichier = str(path.relative_to(source_dir))
         file_result = {
             "filename": path.name,
             "read_success": False,
@@ -272,11 +289,22 @@ def analyze_pages_publiques(source_dir):
             file_result["declarations"] = decl
             if decl["parse_success"]:
                 any_success = True
+                file_result["mesure"] = {"statut": "ok", "cible": cible_fichier, "detail": None}
             else:
                 any_failure = True
+                file_result["mesure"] = {
+                    "statut": "echec_analyse",
+                    "cible": cible_fichier,
+                    "detail": decl.get("parse_error") or "échec de parsing HTML sans message",
+                }
         except Exception as exc:
             file_result["read_error"] = str(exc)
             any_failure = True
+            file_result["mesure"] = {
+                "statut": "echec_lecture",
+                "cible": cible_fichier,
+                "detail": str(exc),
+            }
 
         result["files_analyzed"].append(file_result)
 

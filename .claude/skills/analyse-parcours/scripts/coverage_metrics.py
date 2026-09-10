@@ -85,17 +85,34 @@ def classify(url):
 
 def read_entries(cov_path):
     """Lit un fichier Coverage. Deux formats selon la version de DevTools :
-    tableau direct, ou objet enveloppé sous la clé "entries"."""
-    with open(cov_path, encoding="utf-8") as f:
-        data = json.load(f)
+    tableau direct, ou objet enveloppé sous la clé "entries".
+
+    Retourne (entries, mesure) : `entries` est la liste (ou None en cas
+    d'échec), `mesure` suit la convention d'état de mesure (statut/cible/
+    detail). Ne lève jamais : un fichier illisible ou un format non reconnu
+    est renvoyé comme un échec de mesure, jamais comme une exception qui
+    interromprait l'analyse des autres fichiers Coverage du dossier.
+    """
+    cible = str(cov_path)
+    try:
+        with open(cov_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except OSError as e:
+        return None, {"statut": "echec_lecture", "cible": cible, "detail": f"fichier illisible : {e}"}
+    except json.JSONDecodeError as e:
+        return None, {"statut": "echec_lecture", "cible": cible, "detail": f"JSON invalide : {e}"}
+
     if isinstance(data, list):
-        return data
+        return data, {"statut": "ok", "cible": cible, "detail": None}
     if isinstance(data, dict) and isinstance(data.get("entries"), list):
-        return data["entries"]
-    raise ValueError(
-        f"{cov_path.name} : format Coverage non reconnu. Attendu un tableau, "
-        f'ou un objet avec la clé "entries". Trouvé : {type(data).__name__}.'
-    )
+        return data["entries"], {"statut": "ok", "cible": cible, "detail": None}
+
+    return None, {
+        "statut": "echec_analyse",
+        "cible": cible,
+        "detail": f'format Coverage non reconnu (attendu un tableau ou une clé "entries"), '
+                  f"trouvé : {type(data).__name__}",
+    }
 
 
 def measure(entries):
@@ -208,7 +225,30 @@ def analyse(source_dir):
 
     pages, all_resources = [], []
     for i, cf in enumerate(cov_files, 1):
-        entries = read_entries(cf)
+        entries, mesure = read_entries(cf)
+        if entries is None:
+            # Fichier illisible ou format non reconnu : la page reste dans le
+            # rapport (pas d'échec silencieux qui la ferait disparaître), avec
+            # des agrégats à zéro et un bloc mesure qui dit pourquoi.
+            pages.append({
+                "name": f"Page {i}",
+                "source_file": cf.name,
+                "url": "",
+                "url_provenance": "lecture du fichier Coverage impossible",
+                "js_total_kb": 0.0,
+                "js_unused_kb": 0.0,
+                "js_unused_pct": 0.0,
+                "css_total_kb": 0.0,
+                "css_unused_kb": 0.0,
+                "css_unused_pct": 0.0,
+                "resources_count": 0,
+                "no_js_no_css": False,
+                "top_js_unused": [],
+                "top_css_unused": [],
+                "mesure": mesure,
+            })
+            continue
+
         resources = measure(entries)
         all_resources.extend(resources)
         url, provenance = page_label(entries, har_docs)
@@ -241,6 +281,7 @@ def analyse(source_dir):
                 for r in sorted((r for r in resources if r["type"] == "css"),
                                 key=lambda r: -r["unused_bytes"])[:3]
             ],
+            "mesure": mesure,
         })
 
     js_all, css_all = aggregate(all_resources, "javascript"), aggregate(all_resources, "css")

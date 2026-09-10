@@ -412,53 +412,68 @@ def maybe_fetch_similarweb(source_dir, existing_audience, existing_traffic,
                            cli_audience=None, sw_domain=None):
     """Tente de compléter les blocs audience/traffic manquants via l'API SimilarWeb.
 
-    Retourne (audience_block, traffic_block) : les blocs construits pour ce qui
-    manquait, ou les blocs existants inchangés sinon. Ne touche PAS au disque : ces
-    blocs sont ensuite passés à resolve_audience/resolve_traffic puis réécrits en
-    une seule fois par build_env_data. Ne lève jamais : tout échec est loggé et on
-    renvoie les blocs d'origine.
+    Retourne (audience_block, traffic_block, mesures) : les blocs construits pour
+    ce qui manquait (ou les blocs existants inchangés sinon), et `mesures`, un
+    dict {"audience": mesure, "traffic": mesure} ne portant que les clés
+    effectivement tentées (convention d'état de mesure : statut/cible/detail).
+    Ne touche PAS au disque : ces blocs sont ensuite passés à
+    resolve_audience/resolve_traffic puis réécrits en une seule fois par
+    build_env_data. Ne lève jamais : tout échec est loggé et renvoyé comme
+    mesure, jamais comme exception.
 
     cli_audience : si fourni, la saisie manuelle prime → on n'écrit pas le mix pays.
     sw_domain    : force le domaine SimilarWeb (sinon déduit de env-data.json/HAR).
     """
+    mesures = {}
+
     if similarweb_api is None:
         print("  ⚠ module similarweb_api indisponible — appel automatique ignoré.")
-        return existing_audience, existing_traffic
+        return existing_audience, existing_traffic, mesures
 
     # Que manque-t-il ? Le mix pays n'est visé que si aucune saisie manuelle (--audience).
     need_audience = (not cli_audience) and _block_missing(existing_audience)
     need_traffic = _block_missing(existing_traffic)
     if not need_audience and not need_traffic:
-        return existing_audience, existing_traffic
+        return existing_audience, existing_traffic, mesures
 
     domain = sw_domain or similarweb_api.infer_domain(source_dir)
     if not domain:
         print("  ⚠ SimilarWeb : domaine introuvable (préciser --sw-domain) — appel ignoré.")
-        return existing_audience, existing_traffic
+        detail = "domaine introuvable (env-data.json/HAR insuffisants) — préciser --sw-domain"
+        cible = "SimilarWeb : déduction du domaine audité"
+        if need_audience:
+            mesures["audience"] = {"statut": "echec_analyse", "cible": cible, "detail": detail}
+        if need_traffic:
+            mesures["traffic"] = {"statut": "echec_analyse", "cible": cible, "detail": detail}
+        return existing_audience, existing_traffic, mesures
 
     print(f"  [similarweb] Interrogation de l'API interne pour : {domain} …")
-    data, err = similarweb_api.fetch_domain_data(domain)
-    if err:
-        print(f"  ⚠ SimilarWeb : {err}")
+    data, statut_echec, detail_echec = similarweb_api.fetch_domain_data(domain)
+    if statut_echec:
+        print(f"  ⚠ SimilarWeb : {detail_echec}")
         print("     Repli attendu : récupération assistée (SKILL.md Étape 20d), puis défaut.")
-        return existing_audience, existing_traffic
+        cible = f"API SimilarWeb : {domain}"
+        if need_audience:
+            mesures["audience"] = {"statut": statut_echec, "cible": cible, "detail": detail_echec}
+        if need_traffic:
+            mesures["traffic"] = {"statut": statut_echec, "cible": cible, "detail": detail_echec}
+        return existing_audience, existing_traffic, mesures
 
     source_url = f"https://www.similarweb.com/website/{domain}/"
     audience_block = existing_audience
     traffic_block = existing_traffic
-    got_audience = got_traffic = False
     if need_audience:
-        built = similarweb_api.build_audience_block(data, source_url)
+        built, mesure = similarweb_api.build_audience_block(data, source_url, domain)
+        mesures["audience"] = mesure
         if built:
             audience_block = built
-            got_audience = True
             mix_str = ", ".join(f"{cc} {w:.0%}" for cc, w in built["mix"].items())
             print(f"     Mix pays : {mix_str}")
     if need_traffic:
-        built = similarweb_api.build_traffic_block(data, source_url)
+        built, mesure = similarweb_api.build_traffic_block(data, source_url, domain)
+        mesures["traffic"] = mesure
         if built:
             traffic_block = built
-            got_traffic = True
             snap = built.get("snapshot") or "?"
             print(f"     Trafic : {built['monthly_visits']:,}/mois ({snap}) "
                   f"→ {built['visits_per_year']:,}/an")
@@ -466,17 +481,17 @@ def maybe_fetch_similarweb(source_dir, existing_audience, existing_traffic,
     # L'API peut répondre 200 sans donnée exploitable (domaine peu/pas suivi par
     # SimilarWeb : pas de TopCountryShares, visites nulles). On le signale au lieu
     # de retomber en silence sur les défauts.
-    if (need_audience and not got_audience) or (need_traffic and not got_traffic):
-        manque = []
-        if need_audience and not got_audience:
-            manque.append("mix pays")
-        if need_traffic and not got_traffic:
-            manque.append("trafic")
+    manque = []
+    if need_audience and not audience_block:
+        manque.append("mix pays")
+    if need_traffic and not traffic_block:
+        manque.append("trafic")
+    if manque:
         print(f"  ⚠ SimilarWeb : pas de {' ni de '.join(manque)} exploitable pour "
               f"{domain} (domaine peu suivi ?).")
         print("     Repli attendu : récupération assistée (SKILL.md Étape 20d), puis défaut.")
 
-    return audience_block, traffic_block
+    return audience_block, traffic_block, mesures
 
 
 # ---------------------------------------------------------------------------
@@ -832,8 +847,17 @@ def aggregate_page_metrics(pages):
 def call_crux(url, api_key):
     """
     Interroge l'API CrUX pour obtenir la répartition de formulaire d'utilisation.
-    Retourne le JSON brut ou None.
+
+    Retourne (data, mesure) : `data` est le JSON brut (ou None en cas d'échec),
+    `mesure` suit la convention d'état de mesure (statut/cible/detail).
+
+    CrUX répond HTTP 404 quand l'origine/l'URL n'a pas assez de trafic pour
+    publier des données : c'est une absence réelle du service mesuré
+    (rien_trouve), pas un échec de notre sonde. Toute autre erreur HTTP (quota
+    dépassé, requête invalide, panne serveur) ou d'E/S réseau est un
+    echec_reseau : notre outil n'a pas pu obtenir de réponse exploitable.
     """
+    cible = f"CrUX API : {url}"
     params = urllib.parse.urlencode({"key": api_key})
     full_url = CRUX_API + "?" + params
     body = json.dumps({"url": url, "metrics": ["form_factors"]}).encode("utf-8")
@@ -845,7 +869,8 @@ def call_crux(url, api_key):
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            data = json.loads(resp.read().decode("utf-8"))
+            return data, {"statut": "ok", "cible": cible, "detail": None}
     except urllib.error.HTTPError as e:
         body_err = e.read().decode("utf-8", errors="replace")
         try:
@@ -853,10 +878,12 @@ def call_crux(url, api_key):
         except Exception:
             msg = body_err[:200]
         print(f"  [CrUX] Erreur HTTP {e.code} : {msg}")
-        return None
+        if e.code == 404:
+            return None, {"statut": "rien_trouve", "cible": cible, "detail": msg}
+        return None, {"statut": "echec_reseau", "cible": cible, "detail": f"HTTP {e.code} : {msg}"}
     except Exception as e:
         print(f"  [CrUX] Erreur réseau : {e}")
-        return None
+        return None, {"statut": "echec_reseau", "cible": cible, "detail": str(e)}
 
 
 def extract_device_mix(crux_data):
@@ -890,24 +917,47 @@ def extract_device_mix(crux_data):
 
 
 def collect_device_mix(url, api_key):
-    """Collecte la répartition device pour une URL depuis CrUX."""
+    """Collecte la répartition device pour une URL depuis CrUX.
+
+    Retourne (mix, mesure) : `mix` est le dict de répartition (ou None),
+    `mesure` suit la convention d'état de mesure. Si l'appel réussit (HTTP 200)
+    mais que le champ form_factors.fractions attendu est absent, la mesure est
+    reclassée en echec_analyse (la sonde a parlé à l'API, mais le contenu
+    attendu n'y est pas) — jamais laissée à "ok" en dur.
+    """
     # Essai avec l'URL exacte, puis avec l'origine
     from urllib.parse import urlparse
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
     print(f"  [CrUX] {url}")
-    data = call_crux(url, api_key)
+    data, mesure = call_crux(url, api_key)
     mix = extract_device_mix(data)
+    if data is not None and mix is None:
+        mesure = {
+            "statut": "echec_analyse",
+            "cible": mesure["cible"],
+            "detail": "champ form_factors.fractions absent de la réponse CrUX",
+        }
 
     if mix is None and url != origin:
         print(f"  [CrUX] Pas de données pour l'URL, essai avec l'origine : {origin}")
-        data = call_crux(origin, api_key)
-        mix = extract_device_mix(data)
-        if mix:
-            mix["source"] = "crux_origin"
+        data2, mesure2 = call_crux(origin, api_key)
+        mix2 = extract_device_mix(data2)
+        if mix2:
+            mix2["source"] = "crux_origin"
+            mix = mix2
+            mesure = mesure2
+        elif data2 is not None:
+            mesure = {
+                "statut": "echec_analyse",
+                "cible": mesure2["cible"],
+                "detail": "champ form_factors.fractions absent de la réponse CrUX (origine)",
+            }
+        else:
+            mesure = mesure2
 
-    return mix
+    return mix, mesure
 
 
 # ---------------------------------------------------------------------------
@@ -915,16 +965,28 @@ def collect_device_mix(url, api_key):
 # ---------------------------------------------------------------------------
 
 def call_ipinfo(ip, token=None):
-    """Interroge ipinfo.io pour une IP. Retourne le JSON ou None."""
+    """Interroge ipinfo.io pour une IP.
+
+    Retourne (data, mesure) : `data` est le JSON (ou None en cas d'échec),
+    `mesure` suit la convention d'état de mesure (statut/cible/detail).
+    """
+    cible = f"https://ipinfo.io/{ip}/json"
     url = IPINFO_API.format(ip=ip)
     if token:
         url += f"?token={token}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            data = json.loads(resp.read().decode("utf-8"))
+            return data, {"statut": "ok", "cible": cible, "detail": None}
+    except urllib.error.HTTPError as e:
+        print(f"  [ipinfo] Erreur HTTP pour {ip} : {e}")
+        return None, {"statut": "echec_reseau", "cible": cible, "detail": f"HTTP {e.code} : {e.reason}"}
+    except json.JSONDecodeError as e:
+        print(f"  [ipinfo] Réponse illisible pour {ip} : {e}")
+        return None, {"statut": "echec_lecture", "cible": cible, "detail": f"JSON invalide : {e}"}
     except Exception as e:
         print(f"  [ipinfo] Erreur pour {ip} : {e}")
-        return None
+        return None, {"statut": "echec_reseau", "cible": cible, "detail": str(e)}
 
 
 def detect_cloud_provider(org_field):
@@ -1014,15 +1076,30 @@ def country_to_efootprint(country_code):
 def collect_server_info(ip, token=None):
     """
     Collecte pays + provider depuis l'IP du serveur via ipinfo.io.
-    Retourne un dict avec les infos ou None si échec.
+
+    Retourne (info, mesure) : `info` est le dict de résultat (ou None),
+    `mesure` suit la convention d'état de mesure. Une IP "bogon" (privée ou
+    réservée, RFC1918/loopback...) est un fait réel sur l'IP — ipinfo répond
+    normalement, mais il n'y a rien à géolocaliser — donc `rien_trouve`, pas un
+    échec de sonde.
     """
     if not ip:
-        return None
+        return None, {
+            "statut": "echec_analyse",
+            "cible": "ipinfo.io (IP indisponible)",
+            "detail": "aucune IP résolue pour cette cible (HAR sans serverIPAddress exploitable)",
+        }
 
     print(f"  [ipinfo] {ip}")
-    data = call_ipinfo(ip, token)
-    if not data or "bogon" in data:
-        return None
+    data, mesure = call_ipinfo(ip, token)
+    if not data:
+        return None, mesure
+    if "bogon" in data:
+        return None, {
+            "statut": "rien_trouve",
+            "cible": mesure["cible"],
+            "detail": "IP privée/réservée (bogon) : aucune géolocalisation possible",
+        }
 
     country_code = data.get("country", "")
     org = data.get("org", "")
@@ -1042,7 +1119,7 @@ def collect_server_info(ip, token=None):
         "carbon_intensity_g_kwh": carbon_intensity,
         "efootprint_country": country_to_efootprint(country_code),
         "source": "ipinfo",
-    }
+    }, mesure
 
 
 def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), token=None):
@@ -1052,14 +1129,16 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
 
     Retourne une liste de dicts (même forme que `collect_server_info()`, plus
     `host`, `hosts`, `request_count`, `transferred_bytes`, `cache_header_seen`,
-    `is_primary`), triée comme `detect_infrastructures()` (octets décroissants,
-    la première est l'infra principale). Une IP non résolue par ipinfo est
-    incluse quand même (host/hosts/octets connus, reste des champs à None) :
-    un échec réseau sur un serveur secondaire ne doit pas faire disparaître
-    l'infra elle-même du modèle.
+    `is_primary`, `mesure`), triée comme `detect_infrastructures()` (octets
+    décroissants, la première est l'infra principale). Une IP non résolue par
+    ipinfo est incluse quand même (host/hosts/octets connus, reste des champs à
+    None) : un échec réseau sur un serveur secondaire ne doit pas faire
+    disparaître l'infra elle-même du modèle — mais son bloc `mesure` porte
+    honnêtement l'échec (ou l'absence, ou le succès), infra par infra.
 
     Retourne [] si `detect_infrastructures` est indisponible (import guardé)
-    ou si le HAR n'a révélé aucune infra 1st-party.
+    ou si le HAR n'a révélé aucune infra 1st-party. Dans ce cas, aucun bloc
+    mesure n'est produit : aucune tentative de géolocalisation n'a eu lieu.
     """
     if detect_infrastructures is None or not har_path:
         return []
@@ -1069,7 +1148,11 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
     results = []
     for i, infra in enumerate(infrastructures):
         ip = infra["ips"][0] if infra["ips"] else None
-        info = collect_server_info(ip, token) or {}
+        info, mesure = collect_server_info(ip, token)
+        info = info or {}
+        if mesure.get("statut") != "ok" and mesure.get("detail"):
+            mesure = dict(mesure)
+            mesure["detail"] = f"[infra {infra['key']}] {mesure['detail']}"
         results.append({
             "host": infra["key"],
             "hosts": list(infra["hosts"]),
@@ -1086,6 +1169,7 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
             "transferred_bytes": infra["transferred_bytes"],
             "cache_header_seen": infra["cache_header_seen"],
             "is_primary": i == 0,
+            "mesure": mesure,
         })
     return results
 
@@ -1095,10 +1179,21 @@ def collect_multi_server_info(har_path, audited_domain, first_party_extra=(), to
 # ---------------------------------------------------------------------------
 
 def build_env_data(har_data, device_mix, server_info, audience=None, traffic=None,
-                   tech_stack=None, servers_info=None, ai_external_apis=None, mesures=None):
+                   tech_stack=None, servers_info=None, ai_external_apis=None, mesures=None,
+                   crux_mesure=None, ipinfo_mesure=None):
     """
     Assemble env-data.json depuis les données collectées.
     Chaque section indique les inputs e-footprint et leur niveau de confiance.
+
+    crux_mesure  : bloc mesure de l'appel CrUX (collect_device_mix), ou None si
+    aucune tentative n'a eu lieu (ex. GOOGLE_API_KEY absente). Embarqué dans
+    "device_mix.mesure" quand présent.
+
+    ipinfo_mesure : bloc mesure de l'appel ipinfo pour le serveur PRINCIPAL
+    (collect_server_info), ou None si aucune tentative n'a eu lieu (ex. aucune
+    IP détectée dans le HAR). Embarqué dans "server.mesure" quand présent. Les
+    infrastructures secondaires portent leur propre "mesure" directement dans
+    chaque entrée de "servers" (cf. collect_multi_server_info).
 
     servers_info : liste optionnelle produite par `collect_multi_server_info()`,
     UNE ENTRÉE PAR INFRASTRUCTURE 1st-party détectée dans le HAR (Lot 3). Écrite
@@ -1184,6 +1279,8 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
                     "part iOS, desktop via part macOS (pondérées par le mix pays d'audience) ; "
                     "tablette rattachée au mobile.",
         }
+        if crux_mesure:
+            device_section["mesure"] = crux_mesure
         # Réseau basé sur le mobile corrigé (phones+tablet = mobile ; desktop = wifi)
         network_mix = {
             "wifi": desktop_central,
@@ -1201,6 +1298,8 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             "note": "CrUX indisponible - valeurs par défaut (60% mobile, 40% desktop). "
                     "Pas de correction iOS/macOS appliquée (aucune donnée à corriger).",
         }
+        if crux_mesure:
+            device_section["mesure"] = crux_mesure
         network_mix = {"wifi": 0.4, "mobile": 0.6, "source": "default"}
 
     # --- Réseau ---
@@ -1225,6 +1324,8 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             "confidence_provider": CONFIDENCE_MEDIUM if server_info["detected_provider"] else CONFIDENCE_LOW,
             "confidence_carbon_intensity": CONFIDENCE_HIGH if server_info["country_code"] in _COUNTRY_CARBON_INTENSITY else CONFIDENCE_MEDIUM,
         }
+        if ipinfo_mesure:
+            server_section["mesure"] = ipinfo_mesure
     else:
         server_section = {
             "ip": None,
@@ -1238,6 +1339,8 @@ def build_env_data(har_data, device_mix, server_info, audience=None, traffic=Non
             "confidence_carbon_intensity": CONFIDENCE_DEFAULT,
             "note": "ipinfo indisponible - France par défaut",
         }
+        if ipinfo_mesure:
+            server_section["mesure"] = ipinfo_mesure
 
     # --- Détection CDN et ajustement de la confiance pays ---
     # Quand le service est derrière un CDN, l'IP observée est un point de présence
@@ -1448,20 +1551,22 @@ def main():
             from urllib.parse import urlparse
             test_url = "https://www.google.com"
             print(f"\n[check] Test CrUX sur {test_url}...")
-            mix = collect_device_mix(test_url, google_key)
+            mix, mix_mesure = collect_device_mix(test_url, google_key)
             if mix:
                 print(f"  -> OK : desktop={mix['desktop']:.0%} phone={mix['phone']:.0%}")
             else:
-                print("  -> ECHEC : vérifier que Chrome UX Report API est activée")
+                print(f"  -> ECHEC ({mix_mesure.get('statut')}) : {mix_mesure.get('detail')}")
+                print("    Vérifier que Chrome UX Report API est activée :")
                 print("    https://console.cloud.google.com/apis/library/chromeuxreport.googleapis.com")
 
         if ipinfo_token:
             print("\n[check] Test ipinfo.io...")
-            info = call_ipinfo("8.8.8.8", ipinfo_token)
+            info, info_mesure = call_ipinfo("8.8.8.8", ipinfo_token)
             if info:
                 print(f"  -> OK : {info.get('org', '')} ({info.get('country', '')})")
             else:
-                print("  -> ECHEC : vérifier le token ipinfo.io")
+                print(f"  -> ECHEC ({info_mesure.get('statut')}) : {info_mesure.get('detail')}")
+                print("    Vérifier le token ipinfo.io")
         return
 
     # --- Vérification cache ---
@@ -1498,18 +1603,20 @@ def main():
     # --- Collecte CrUX ---
     print("\n[2/3] Collecte répartition device (CrUX)...")
     device_mix = None
+    crux_mesure = None
     if google_key and pages:
         # Utiliser l'URL de la première page comme représentante de l'origine
         first_url = pages[0]["url"] if pages else None
         if first_url:
-            device_mix = collect_device_mix(first_url, google_key)
+            device_mix, crux_mesure = collect_device_mix(first_url, google_key)
             if device_mix:
                 print(f"  -> desktop={device_mix['desktop']:.0%} "
                       f"phone={device_mix['phone']:.0%} "
                       f"tablet={device_mix.get('tablet', 0):.0%} "
                       f"(source: {device_mix['source']})")
             else:
-                print("  -> Aucune donnée CrUX disponible — valeurs par défaut utilisées")
+                print(f"  -> Aucune donnée CrUX disponible ({crux_mesure.get('statut')}) "
+                      f"— valeurs par défaut utilisées")
     elif not google_key:
         print("  GOOGLE_API_KEY absente — valeurs par défaut (60% mobile, 40% desktop)")
         print(f"  (Pour activer : ajouter GOOGLE_API_KEY dans {project_root}/.env)")
@@ -1519,17 +1626,19 @@ def main():
     # --- Collecte ipinfo ---
     print("\n[3/3] Géolocalisation serveur (ipinfo.io)...")
     server_info = None
+    ipinfo_mesure = None
     if server_ip:
         if not ipinfo_token:
             print("  IPINFO_TOKEN absent — mode anonyme (limite 50k req/mois)")
             print(f"  (Pour activer : ajouter IPINFO_TOKEN dans {project_root}/.env)")
-        server_info = collect_server_info(server_ip, ipinfo_token)
+        server_info, ipinfo_mesure = collect_server_info(server_ip, ipinfo_token)
         if server_info:
             provider = server_info["detected_provider"] or "inconnu"
             print(f"  -> {server_info['country_code']} ({server_info['city']}) "
                   f"/ {provider} — {server_info['carbon_intensity_g_kwh']} g CO2/kWh")
         else:
-            print("  -> Echec ipinfo — France / provider inconnu par défaut")
+            print(f"  -> Echec ipinfo ({ipinfo_mesure.get('statut')}) "
+                  f"— France / provider inconnu par défaut")
     else:
         print("  Aucune IP serveur détectée dans le HAR")
 
@@ -1633,17 +1742,12 @@ def main():
     # Voie principale : compléter les blocs manquants via l'API interne SimilarWeb.
     # La saisie manuelle (--audience) prime et bloque l'écriture du mix pays.
     if not args.no_similarweb:
-        existing_audience, existing_traffic = maybe_fetch_similarweb(
+        existing_audience, existing_traffic, sw_mesures = maybe_fetch_similarweb(
             source_dir, existing_audience, existing_traffic,
             cli_audience=args.audience, sw_domain=args.sw_domain)
-        # Recharger les mesures après l'appel SimilarWeb (qui écrit dans env-data.json)
-        if env_data_path.exists():
-            try:
-                with open(env_data_path, encoding="utf-8") as f:
-                    _updated = json.load(f)
-                existing_mesures = _updated.get("mesures", {})
-            except (json.JSONDecodeError, OSError):
-                pass
+        # maybe_fetch_similarweb() ne touche jamais au disque (cf. sa docstring) :
+        # ses mesures fraîches priment sur toute valeur relue ci-dessous.
+        existing_mesures.update(sw_mesures)
 
     audience = resolve_audience(args.audience, existing_audience,
                                ios_override=args.ios_mobile_share,
@@ -1671,7 +1775,8 @@ def main():
     env_data = build_env_data((pages, server_ip), device_mix, server_info,
                               audience=audience, traffic=traffic,
                               tech_stack=tech_stack, servers_info=servers_info,
-                              ai_external_apis=ai_external_apis, mesures=existing_mesures)
+                              ai_external_apis=ai_external_apis, mesures=existing_mesures,
+                              crux_mesure=crux_mesure, ipinfo_mesure=ipinfo_mesure)
 
     with open(env_data_path, "w", encoding="utf-8") as f:
         json.dump(env_data, f, ensure_ascii=False, indent=2)
