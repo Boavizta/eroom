@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-08T20:46:05.344525+00:00",
+  "generated_at": "2026-09-10T09:50:00.528947+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
   "criteres_repondus": 7,
@@ -177,7 +177,7 @@
         "reponse": null,
         "provenance": null,
         "source": null,
-        "indice_contextuel": null
+        "indice_contextuel": "3 composant(s) d'hébergement/diffusion distinct(s) déclaré(s) au CSP (herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com), ce qui suggère plusieurs briques séparées plutôt qu'un bloc unique. Ce n'est qu'un indice indirect et partiel : il ne voit ni le nombre de microservices internes, ni le couplage réel entre ces briques, ni la complexité fonctionnelle du site."
       },
       {
         "id": "0.8",
@@ -213,7 +213,7 @@
         "reponse": null,
         "provenance": null,
         "source": null,
-        "indice_contextuel": null
+        "indice_contextuel": "Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur."
       },
       {
         "id": "0.12",
@@ -222,7 +222,7 @@
         "reponse": null,
         "provenance": null,
         "source": null,
-        "indice_contextuel": null
+        "indice_contextuel": "Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement."
       },
       {
         "id": "0.13",
