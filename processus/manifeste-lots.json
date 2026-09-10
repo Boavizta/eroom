@@ -175,6 +175,7 @@
         "collecte-metriques-externes"
       ],
       "entrees": ["audits/<domaine>/"],
+      "sorties_donnees": ["audits/<domaine>/eof-audit-results.json"],
       "sortie_de_lot": "audits/<domaine>/lots/jugement-automatique.json",
       "provenances_autorisees": ["collecte", "estime", "declare", "suppose"],
       "criteres_possedes": {
@@ -351,7 +352,7 @@
     {
       "id": "generation-questionnaire",
       "vague": "4-questionnaire",
-      "libelle": "Emission des deux fichiers a cocher, sur le residu reel",
+      "libelle": "Emission du fichier a cocher, sur le residu reel",
       "executeur": "script",
       "etat": "existant",
       "scripts": [
@@ -368,15 +369,14 @@
       ],
       "entrees": ["audits/<domaine>/eof-audit-results.json"],
       "sorties_donnees": [
-        "audits/<domaine>/questionnaire-produit-usage.md",
-        "audits/<domaine>/questionnaire-technique.md"
+        "audits/<domaine>/questionnaire-eof.md"
       ],
       "sortie_de_lot": null,
       "provenances_autorisees": [],
       "criteres_possedes": null,
       "rejouable_seul": true,
       "contrainte": "Le questionnaire est genere, jamais redige a la main : la couverture automatique differe d'un service a l'autre, donc un questionnaire fige serait faux au service suivant. Le travail de conception porte sur la bibliotheque de blocs de questions et les regles d'ordonnancement, pas sur un livrable.",
-      "note": "Deux fichiers separes, l'un pour le metier et l'autre pour la technique : un fichier unique et long est abandonne en route. Les deux sont ordonnes pour permettre la decision de la porte avant d'avoir tout rempli."
+      "note": "Un seul fichier a cocher, ordonne pour permettre la decision de la porte avant d'avoir tout rempli. Le decoupage en deux fichiers separes (metier et technique) a ete abandonne."
     },
     {
       "id": "relecture-questionnaire",
@@ -387,8 +387,7 @@
       "scripts": [".claude/skills/analyse-parcours/scripts/parse_questionnaire.py"],
       "depends_on": ["generation-questionnaire"],
       "entrees": [
-        "audits/<domaine>/questionnaire-produit-usage.md",
-        "audits/<domaine>/questionnaire-technique.md"
+        "audits/<domaine>/questionnaire-eof.md"
       ],
       "sortie_de_lot": "audits/<domaine>/lots/relecture-questionnaire.json",
       "provenances_autorisees": ["precise"],
