@@ -13,42 +13,45 @@
 <line x1="550.0" y1="360" x2="359.5" y2="470.0" stroke="#999" stroke-width="1"/>
 <line x1="550.0" y1="360" x2="359.5" y2="250.0" stroke="#999" stroke-width="1"/>
 <text x="550.0" y="85.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">🛖 1 — Produit</text>
-<text x="550.0" y="103.0" text-anchor="middle" font-size="13" font-weight="bold" fill="#2D4675">0,0 % de potentiel</text>
-<text x="550.0" y="119.0" text-anchor="middle" font-size="12" fill="#5F5F5F">4 critères renseignés sur 16</text>
+<text x="550.0" y="103.0" text-anchor="middle" font-size="13" font-weight="bold" fill="#2D4675">6,4 % de potentiel</text>
+<text x="550.0" y="119.0" text-anchor="middle" font-size="12" fill="#5F5F5F">9 critères renseignés sur 16</text>
 <text x="788.2" y="222.5" text-anchor="start" font-size="14" font-weight="bold" fill="#222">🗺️ 2 — Architecture</text>
 <text x="788.2" y="240.5" text-anchor="start" font-size="13" font-weight="bold" fill="#2D4675">0,0 % de potentiel</text>
-<text x="788.2" y="256.5" text-anchor="start" font-size="12" fill="#5F5F5F">1 critère renseigné sur 5</text>
+<text x="788.2" y="256.5" text-anchor="start" font-size="12" fill="#5F5F5F">3 critères renseignés sur 5</text>
 <text x="788.2" y="497.5" text-anchor="start" font-size="14" font-weight="bold" fill="#222">🏢 3 — Infrastructure</text>
 <text x="788.2" y="515.5" text-anchor="start" font-size="13" font-weight="bold" fill="#2D4675">12,5 % de potentiel</text>
-<text x="788.2" y="531.5" text-anchor="start" font-size="12" fill="#5F5F5F">1 critère renseigné sur 8</text>
+<text x="788.2" y="531.5" text-anchor="start" font-size="12" fill="#5F5F5F">3 critères renseignés sur 8</text>
 <text x="550.0" y="635.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">💾 4 — Stockage et données</text>
 <text x="550.0" y="653.0" text-anchor="middle" font-size="13" font-weight="bold" fill="#5F5F5F">aucune réponse</text>
 <text x="550.0" y="669.0" text-anchor="middle" font-size="12" fill="#5F5F5F">aucun critère renseigné sur 6</text>
 <text x="311.8" y="497.5" text-anchor="end" font-size="14" font-weight="bold" fill="#222">👨‍💻 5 — Algo &amp; Code</text>
-<text x="311.8" y="515.5" text-anchor="end" font-size="13" font-weight="bold" fill="#2D4675">0,0 % de potentiel</text>
-<text x="311.8" y="531.5" text-anchor="end" font-size="12" fill="#5F5F5F">1 critère renseigné sur 9</text>
+<text x="311.8" y="515.5" text-anchor="end" font-size="13" font-weight="bold" fill="#2D4675">11,5 % de potentiel</text>
+<text x="311.8" y="531.5" text-anchor="end" font-size="12" fill="#5F5F5F">2 critères renseignés sur 9</text>
 <text x="311.8" y="222.5" text-anchor="end" font-size="14" font-weight="bold" fill="#222">🛠 6 — Facilité de changement</text>
-<text x="311.8" y="240.5" text-anchor="end" font-size="13" font-weight="bold" fill="#5F5F5F">aucune réponse</text>
-<text x="311.8" y="256.5" text-anchor="end" font-size="12" fill="#5F5F5F">aucun critère renseigné sur 10</text>
-<polygon points="550.0,360.0 550.0,360.0 573.8,373.8 550.0,360.0 550.0,360.0 550.0,360.0" fill="url(#eof-radar-couche-declaree)" stroke="#2D4675" stroke-width="2.5" stroke-dasharray="7 4"/>
+<text x="311.8" y="240.5" text-anchor="end" font-size="13" font-weight="bold" fill="#2D4675">35,5 % de potentiel</text>
+<text x="311.8" y="256.5" text-anchor="end" font-size="12" fill="#5F5F5F">9 critères renseignés sur 10</text>
+<polygon points="550.0,346.0 550.0,360.0 573.8,373.8 550.0,360.0 528.0,372.7 482.4,321.0" fill="url(#eof-radar-couche-declaree)" stroke="#2D4675" stroke-width="2.5" stroke-dasharray="7 4"/>
 <polygon points="550.0,360.0 550.0,360.0 573.8,373.8 550.0,360.0 550.0,360.0 550.0,360.0" fill="#2D4675" fill-opacity="0.40" stroke="#2D4675" stroke-width="2.5"/>
 <text x="556.0" y="301.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">25 %</text>
 <text x="556.0" y="246.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">50 %</text>
 <text x="556.0" y="191.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">75 %</text>
 <text x="556.0" y="136.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">100 %</text>
-<circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛖 1 — Produit : 0,0 % de potentiel d'optimisation</title></circle>
+<circle cx="550.0" cy="346.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛖 1 — Produit : 6,4 % de potentiel d'optimisation</title></circle>
+<circle cx="550.0" cy="360.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🛖 1 — Produit : 6,4 % de potentiel d'optimisation, dont 0,0 % établi par nos mesures, le reste venant des réponses du service audité</title></circle>
 <circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🗺️ 2 — Architecture : 0,0 % de potentiel d'optimisation</title></circle>
 <circle cx="573.8" cy="373.8" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🏢 3 — Infrastructure : 12,5 % de potentiel d'optimisation</title></circle>
 <circle cx="550.0" cy="360.0" r="5" fill="white" stroke="#5F5F5F" stroke-width="2"><title>💾 4 — Stockage et données : aucune réponse, ce n'est pas un 0 %</title></circle>
-<circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>👨‍💻 5 — Algo &amp; Code : 0,0 % de potentiel d'optimisation</title></circle>
-<circle cx="550.0" cy="360.0" r="5" fill="white" stroke="#5F5F5F" stroke-width="2"><title>🛠 6 — Facilité de changement : aucune réponse, ce n'est pas un 0 %</title></circle>
+<circle cx="528.0" cy="372.7" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>👨‍💻 5 — Algo &amp; Code : 11,5 % de potentiel d'optimisation</title></circle>
+<circle cx="550.0" cy="360.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>👨‍💻 5 — Algo &amp; Code : 11,5 % de potentiel d'optimisation, dont 0,0 % établi par nos mesures, le reste venant des réponses du service audité</title></circle>
+<circle cx="482.4" cy="321.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛠 6 — Facilité de changement : 35,5 % de potentiel d'optimisation</title></circle>
+<circle cx="550.0" cy="360.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🛠 6 — Facilité de changement : 35,5 % de potentiel d'optimisation, dont 0,0 % établi par nos mesures, le reste venant des réponses du service audité</title></circle>
 <rect x="24" y="46" width="16" height="14" fill="#2D4675" fill-opacity="0.40" stroke="#2D4675" stroke-width="1.5"/>
 <text x="48" y="58" font-size="12" fill="#222">en plein : ce que nous avons établi nous-mêmes</text>
 <rect x="24" y="68" width="16" height="14" fill="url(#eof-radar-couche-declaree)" stroke="#2D4675" stroke-width="1.5"/>
-<text x="48" y="80" font-size="12" fill="#222">en hachuré : ce que le service audité a déclaré (aucune réponse à ce jour)</text>
-<text x="550.0" y="700" text-anchor="middle" font-size="12" fill="#222">Renseigné à ce jour : 11 % du potentiel maximum du référentiel (7 critères sur 54)</text>
+<text x="48" y="80" font-size="12" fill="#222">en hachuré : ce que le service audité a déclaré</text>
+<text x="550.0" y="700" text-anchor="middle" font-size="12" fill="#222">Renseigné à ce jour : 46 % du potentiel maximum du référentiel (26 critères sur 54)</text>
 <rect x="270.0" y="708" width="560" height="14" fill="#EEE" stroke="#5F5F5F" stroke-width="1"/>
-<rect x="270.0" y="708" width="63.0" height="14" fill="#2D4675"/>
-<text x="550.0" y="748" text-anchor="middle" font-size="12" fill="#5F5F5F">Provenance des réponses : collecte 4, estimation 3, déclaré 0, précisé 0, supposé 0</text>
+<rect x="270.0" y="708" width="259.0" height="14" fill="#2D4675"/>
+<text x="550.0" y="748" text-anchor="middle" font-size="12" fill="#5F5F5F">Provenance des réponses : collecte 4, estimation 3, déclaré 0, précisé 19, supposé 0</text>
 <text x="550.0" y="770" text-anchor="middle" font-size="12" fill="#666">Une dimension dont aucun critère n'a répondu est marquée "aucune réponse", jamais 0 % : un 0 % voudrait dire point fort confirmé sur toute la dimension.</text>
 </svg>

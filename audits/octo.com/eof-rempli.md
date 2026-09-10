@@ -14,8 +14,8 @@
 - **0.8** — L'infrastructure (nombre et taille des composants tels que les machines virtuelles et les conteneurs) est-elle très importante ? _(niveau d'impact : Déterminant)_
 - **0.9** — Un volume important de données est-il stocké ? _(niveau d'impact : Déterminant)_
 - **0.10** — La complexité fonctionnelle est-elle élevée ? _(niveau d'impact : Déterminant)_
-- **0.11** — « Les parcours utilisateurs sont-ils fluides, intuitifs et exempts de frictions UX/UI susceptibles d'être améliorées ? » _(niveau d'impact : Déterminant)_ — donnée indicative : Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur.
-- **0.12** — Le produit est-il compatible avec le matériel le plus ancien de la flotte cible et offre-t-il une expérience fluide sur celui-ci ? _(niveau d'impact : Déterminant)_ — donnée indicative : Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement.
+- **0.11** — « Les parcours utilisateurs sont-ils fluides, intuitifs et exempts de frictions UX/UI susceptibles d'être améliorées ? » _(niveau d'impact : Déterminant)_ — donnée indicative : Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : https://octo.com/ (desktop) : LCP 1.407s, INP 39.0ms, CLS 0.0, catégorie CrUX 'FAST'. Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur.
+- **0.12** — Le produit est-il compatible avec le matériel le plus ancien de la flotte cible et offre-t-il une expérience fluide sur celui-ci ? _(niveau d'impact : Déterminant)_ — donnée indicative : Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn (mobile) : LCP 1.331s, INP 82.0ms, CLS 0.0, catégorie CrUX 'FAST'. Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement.
 - **0.13** — Le backlog produit contient-il des problèmes de performance et des améliorations ? _(niveau d'impact : Déterminant)_
 - **0.14** — Les principales fonctionnalités sont-elles optimisées et efficaces ? _(niveau d'impact : Déterminant)_
 - **0.15** — Existe-t-il une politique relative à la suppression et à l'archivage des données ? _(niveau d'impact : Déterminant)_
@@ -81,7 +81,7 @@
 ### 1.13 — Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?
 
 **Réponse (automatique)** : ✅ Point fort confirmé
-**Provenance** : collecte — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+**Provenance** : collecte — **Source** : cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 
 ### 1.14 — Les écrans principaux sont-ils clairs et bien conçus ?
 
@@ -259,7 +259,7 @@
 ### 6.6 — Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?
 
 **Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)
-**Donnée indicative** (suppose) : Audit Lighthouse - Bonnes Pratiques (pire page) : 77% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
+**Donnée indicative** (suppose) : Audit Lighthouse - Bonnes Pratiques (pire page) : 73% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent — _champ : cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present_
 
 ### 6.7 — Existe-t-il une documentation complète ?
 

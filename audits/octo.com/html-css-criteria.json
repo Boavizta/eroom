@@ -17,7 +17,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     },
     {
@@ -37,7 +37,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/recrutement",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     },
     {
@@ -57,7 +57,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/recrutement/nos-offres",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     },
     {
@@ -77,7 +77,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     },
     {
@@ -97,7 +97,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/recrutement/offers/consultant-ai-engineer-senior-fhn",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     },
     {
@@ -117,7 +117,7 @@
       "mesure": {
         "statut": "ok",
         "cible": "https://octo.com/publications",
-        "detail": null
+        "detail": "lu depuis l'archive locale (pages-html/), aucune requête réseau"
       }
     }
   ],

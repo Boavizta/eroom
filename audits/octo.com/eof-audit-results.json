@@ -1,31 +1,31 @@
 {
-  "generated_at": "2026-09-10T11:07:59.957064+00:00",
+  "generated_at": "2026-09-10T21:02:58.963620+00:00",
   "domaine": "octo.com",
   "criteres_total": 54,
-  "criteres_repondus": 7,
+  "criteres_repondus": 26,
   "criteres_ecartes": 0,
-  "criteres_avec_indice_partiel": 16,
-  "completude_globale_pct": 12.962962962962962,
-  "potentiel_optimisation_global_pct": 1.875,
+  "criteres_avec_indice_partiel": 2,
+  "completude_globale_pct": 48.148148148148145,
+  "potentiel_optimisation_global_pct": 12.5,
   "repondus_par_provenance": {
     "collecte": 4,
     "estime": 3,
     "declare": 0,
-    "precise": 0,
+    "precise": 19,
     "suppose": 0
   },
   "dimensions": [
     {
       "nom": "🛖 1 — Produit",
-      "potentiel_optimisation_pct": 0.0,
-      "repondus": 4,
+      "potentiel_optimisation_pct": 6.382978723404255,
+      "completude_pct": 56.25,
+      "repondus": 9,
       "total": 16,
-      "completude_pct": 25.0,
       "repondus_par_provenance": {
         "collecte": 2,
         "estime": 2,
         "declare": 0,
-        "precise": 0,
+        "precise": 5,
         "suppose": 0
       },
       "ecartes": 0,
@@ -34,14 +34,14 @@
     {
       "nom": "🗺️ 2 — Architecture",
       "potentiel_optimisation_pct": 0.0,
-      "repondus": 1,
+      "completude_pct": 60.0,
+      "repondus": 3,
       "total": 5,
-      "completude_pct": 20.0,
       "repondus_par_provenance": {
         "collecte": 0,
         "estime": 1,
         "declare": 0,
-        "precise": 0,
+        "precise": 2,
         "suppose": 0
       },
       "ecartes": 0,
@@ -50,14 +50,14 @@
     {
       "nom": "🏢 3 — Infrastructure",
       "potentiel_optimisation_pct": 12.5,
-      "repondus": 1,
+      "completude_pct": 37.5,
+      "repondus": 3,
       "total": 8,
-      "completude_pct": 12.5,
       "repondus_par_provenance": {
         "collecte": 1,
         "estime": 0,
         "declare": 0,
-        "precise": 0,
+        "precise": 2,
         "suppose": 0
       },
       "ecartes": 0,
@@ -66,9 +66,9 @@
     {
       "nom": "💾 4 — Stockage et données",
       "potentiel_optimisation_pct": null,
+      "completude_pct": 0.0,
       "repondus": 0,
       "total": 6,
-      "completude_pct": 0.0,
       "repondus_par_provenance": {
         "collecte": 0,
         "estime": 0,
@@ -81,15 +81,15 @@
     },
     {
       "nom": "👨‍💻 5 — Algo & Code",
-      "potentiel_optimisation_pct": 0.0,
-      "repondus": 1,
+      "potentiel_optimisation_pct": 11.538461538461538,
+      "completude_pct": 22.22222222222222,
+      "repondus": 2,
       "total": 9,
-      "completude_pct": 11.11111111111111,
       "repondus_par_provenance": {
         "collecte": 1,
         "estime": 0,
         "declare": 0,
-        "precise": 0,
+        "precise": 1,
         "suppose": 0
       },
       "ecartes": 0,
@@ -97,15 +97,15 @@
     },
     {
       "nom": "🛠 6 — Facilité de changement",
-      "potentiel_optimisation_pct": null,
-      "repondus": 0,
+      "potentiel_optimisation_pct": 35.483870967741936,
+      "completude_pct": 90.0,
+      "repondus": 9,
       "total": 10,
-      "completude_pct": 0.0,
       "repondus_par_provenance": {
         "collecte": 0,
         "estime": 0,
         "declare": 0,
-        "precise": 0,
+        "precise": 9,
         "suppose": 0
       },
       "ecartes": 0,
@@ -120,126 +120,126 @@
         "id": "0.1",
         "critere": "La disparition du service numérique aurait-elle un impact important ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "3 - Impact modéré, mais des solutions de contournement existent",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.1, case cochée \"3 - Impact modéré, mais des solutions de contournement existent\"",
         "indice_contextuel": null
       },
       {
         "id": "0.2",
         "critere": "Y a-t-il des fonctionnalités redondantes ou des applications en double dans le système ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "5 - Totalement unique ; rien de similaire n'existe.",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.2, case cochée \"5 - Totalement unique ; rien de similaire n'existe.\"",
         "indice_contextuel": null
       },
       {
         "id": "0.3",
         "critere": "Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "5 - Pas de SLA/SLO",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-compose-haute-dispo-0.3, case cochée \"Aucun engagement de disponibilité\"",
         "indice_contextuel": null
       },
       {
         "id": "0.4",
         "critere": "Dépendances : combien de liens techniques vers d'autres systèmes sont en place ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
-        "indice_contextuel": "5 domaine(s) tiers détecté(s) lors de la capture (liste observée depuis l'extérieur, ne dit rien de l'architecture technique complète) : api.analytics.octo.tools, cdn.jsdelivr.net, fonts.googleapis.com, fonts.gstatic.com, swetrix.org"
+        "reponse": "2 - Le produit est connecté à quelques autres systèmes",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.4, case cochée \"2 - Le produit est connecté à quelques autres systèmes\"",
+        "indice_contextuel": null
       },
       {
         "id": "0.5",
         "critere": "Le code source du projet est-il entièrement ou partiellement accessible à l'équipe ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "2 - Le code source est principalement disponible (code accessible en interne, mais pas au public).",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.5, case cochée \"2 - Le code source est principalement disponible (code accessible en interne, mais pas au public).\"",
         "indice_contextuel": null
       },
       {
         "id": "0.6",
         "critere": "Les compétences nécessaires pour mettre à jour le service sont-elles disponibles ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "1 - L'équipe maîtrise bien la conception fonctionnelle et technique du projet et peut travailler en toute confiance.",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.6, case cochée \"1 - L'équipe maîtrise bien la conception fonctionnelle et technique du projet et peut travailler en toute confiance.\"",
         "indice_contextuel": null
       },
       {
         "id": "0.7",
         "critere": "La complexité de  l'architecture est-elle élevée ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
-        "indice_contextuel": "3 composant(s) d'hébergement/diffusion distinct(s) déclaré(s) au CSP (herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com), ce qui suggère plusieurs briques séparées plutôt qu'un bloc unique. Ce n'est qu'un indice indirect et partiel : il ne voit ni le nombre de microservices internes, ni le couplage réel entre ces briques, ni la complexité fonctionnelle du site."
+        "reponse": "3 - Moyen",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.7, case cochée \"3 - Moyen\"",
+        "indice_contextuel": null
       },
       {
         "id": "0.8",
         "critere": "L'infrastructure (nombre et taille des composants tels que les machines virtuelles et les conteneurs) est-elle très importante ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "4 - Plus petite que la plupart des services",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.8, case cochée \"4 - Plus petite que la plupart des services\"",
         "indice_contextuel": null
       },
       {
         "id": "0.9",
         "critere": "Un volume important de données est-il stocké ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "4 - Le produit stocke une quantité limitée de données.",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.9, case cochée \"4 - Le produit stocke une quantité limitée de données.\"",
         "indice_contextuel": null
       },
       {
         "id": "0.10",
         "critere": "La complexité fonctionnelle est-elle élevée ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "4 - Simple",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.10, case cochée \"4 - Simple\"",
         "indice_contextuel": null
       },
       {
         "id": "0.11",
         "critere": "« Les parcours utilisateurs sont-ils fluides, intuitifs et exempts de frictions UX/UI susceptibles d'être améliorées ? »",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
-        "indice_contextuel": "Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur."
+        "reponse": "4 - L'UX/UI est claire et agréable à utiliser, seules des améliorations mineures ont été identifiées",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.11, case cochée \"4 - L'UX/UI est claire et agréable à utiliser, seules des améliorations mineures ont été identifiées\"",
+        "indice_contextuel": null
       },
       {
         "id": "0.12",
         "critere": "Le produit est-il compatible avec le matériel le plus ancien de la flotte cible et offre-t-il une expérience fluide sur celui-ci ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
-        "indice_contextuel": "Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : https://octo.com/ (mobile) : LCP 2.192s, INP 94.0ms, CLS 0.0, catégorie CrUX 'AVERAGE'. Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement."
+        "reponse": "5 - Compatible et fluide (confortable et réactif même sur du matériel ancien)",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.12, case cochée \"5 - Compatible et fluide (confortable et réactif même sur du matériel ancien)\"",
+        "indice_contextuel": null
       },
       {
         "id": "0.13",
         "critere": "Le backlog produit contient-il des problèmes de performance et des améliorations ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "5 - Aucun problème de performance identifié",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.13, case cochée \"5 - Aucun problème de performance identifié\"",
         "indice_contextuel": null
       },
       {
         "id": "0.14",
         "critere": "Les principales fonctionnalités sont-elles optimisées et efficaces ?",
         "niveau_impact": "Déterminant",
-        "reponse": null,
-        "provenance": null,
-        "source": null,
+        "reponse": "4 - La plupart des fonctionnalités principales sont bien implémentées et fonctionnent efficacement",
+        "provenance": "precise",
+        "source": "questionnaire-eof.md: bloc porte-diag-0.14, case cochée \"4 - La plupart des fonctionnalités principales sont bien implémentées et fonctionnent efficacement\"",
         "indice_contextuel": null
       },
       {
@@ -273,7 +273,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.2",
@@ -285,7 +286,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.3",
@@ -297,19 +299,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.4",
       "dimension": "🛖 1 — Produit",
       "critere": "La conception comprend-elle des composants personnalisés plutôt que des composants natifs ?",
       "potentiel_max": 1.0,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
-      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 1 (sur l'ensemble des pages)"
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.4, case cochée \"✅ Point fort confirmé\"",
+      "contexte": "Boutons HTML natifs détectés : 14 ; boutons avec attribut role='button' : 1 (sur l'ensemble des pages)",
+      "sans_objet": null
     },
     {
       "id": "1.5",
@@ -321,7 +325,8 @@
       "coefficient": 0,
       "provenance": "collecte",
       "source": "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.6",
@@ -333,7 +338,8 @@
       "coefficient": 0,
       "provenance": "estime",
       "source": "html-css-criteria.json: adaptive_img_ratio par page = [0.66, 0.27, 0.0, 0.27, 0.27, 0.71] ; media_query_count = 228 (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.7",
@@ -345,7 +351,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.8",
@@ -357,19 +364,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.9",
       "dimension": "🛖 1 — Produit",
       "critere": "Faut-il un réseau à haut débit pour utiliser l'application ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
-      "contexte": "Données réellement transférées (page la plus lourde) : 702 Ko"
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.9, case cochée \"🤔 À évaluer\"",
+      "contexte": "Données réellement transférées (page la plus lourde) : 702 Ko",
+      "sans_objet": null
     },
     {
       "id": "1.10",
@@ -381,19 +390,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.11",
       "dimension": "🛖 1 — Produit",
       "critere": "Est-il possible de modifier les valeurs par défaut (nombre d'éléments affichés, qualité, fréquence de rafraîchissement, etc.) afin de réduire l'utilisation des ressources ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
-      "contexte": "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style"
+      "categorie": "aucune_donnee",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.11, case cochée \"💡 Potentiel d'amélioration identifié\"",
+      "contexte": "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style",
+      "sans_objet": null
     },
     {
       "id": "1.12",
@@ -405,7 +416,8 @@
       "coefficient": 0,
       "provenance": "estime",
       "source": "security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR (hs-analytics.net, hs-banner.com, hs-scripts.com, hsadspixel.net, hsforms.com, hsforms.net, hubapi.com, hubspot.com, licdn.com, linkedin.com, octo-6695516.hs-sites.com, static.hsappstatic.net) — probable capture sans accepter le consentement",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.13",
@@ -416,8 +428,9 @@
       "reponse": "✅ Point fort confirmé",
       "coefficient": 0,
       "provenance": "collecte",
-      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]",
-      "contexte": null
+      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]",
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "1.14",
@@ -429,31 +442,34 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
-      "contexte": "Page la plus lourde : https://octo.com/publications (1003 Ko)"
+      "contexte": "Page la plus lourde : https://octo.com/publications (1003 Ko) ; Question posée au service audité, réponse : ne sait pas",
+      "sans_objet": null
     },
     {
       "id": "1.15",
       "dimension": "🛖 1 — Produit",
       "critere": "Ce service est-il fréquemment utilisé ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "estime",
-      "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
-      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.15, case cochée \"✅ Point fort confirmé\"",
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))",
+      "sans_objet": null
     },
     {
       "id": "1.16",
       "dimension": "🛖 1 — Produit",
       "critere": "Volume (nombre d'utilisateurs)",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "estime",
-      "source": "env-data.json: traffic.visits_per_year",
-      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))"
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.16, case cochée \"✅ Point fort confirmé\"",
+      "contexte": "Trafic estimé : 293 000 visites/an (SimilarWeb (estimation))",
+      "sans_objet": null
     },
     {
       "id": "2.1",
@@ -465,7 +481,8 @@
       "coefficient": 0,
       "provenance": "estime",
       "source": "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "2.2",
@@ -477,19 +494,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "2.3",
       "dimension": "🗺️ 2 — Architecture",
       "critere": "Est-il possible d'optimiser la séparation et la communication entre les composants ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-      "contexte": "Plusieurs composants d'hébergement distincts détectés (herokuapp.com), ce qui suggère une architecture séparant les responsabilités. Nous ne pouvons pas évaluer de l'extérieur l'efficacité de leur couplage ni l'optimisation de leur communication."
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim2-2.3, case cochée \"🤔 À évaluer\"",
+      "contexte": "Plusieurs composants d'hébergement distincts détectés (herokuapp.com), ce qui suggère une architecture séparant les responsabilités. Nous ne pouvons pas évaluer de l'extérieur l'efficacité de leur couplage ni l'optimisation de leur communication.",
+      "sans_objet": null
     },
     {
       "id": "2.4",
@@ -501,19 +520,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "2.5",
       "dimension": "🗺️ 2 — Architecture",
       "critere": "Y a-t-il des calculs ou des requêtes lourds dont les résultats peuvent être mis en cache ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
-      "contexte": "https://api.analytics.octo.tools/log/hb chargé 54 fois ; https://api.analytics.octo.tools/log/ chargé 18 fois ; https://octo.com/style.css?v=2026-6-10-1-1 chargé 11 fois"
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim2-2.5, case cochée \"🤔 À évaluer\"",
+      "contexte": "https://api.analytics.octo.tools/log/hb chargé 54 fois ; https://api.analytics.octo.tools/log/ chargé 18 fois ; https://octo.com/style.css?v=2026-6-10-1-1 chargé 11 fois",
+      "sans_objet": null
     },
     {
       "id": "3.1",
@@ -525,19 +546,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "3.2",
       "dimension": "🏢 3 — Infrastructure",
       "critere": "Il n'existe aucun système de suivi de l'impact environnemental.",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "declare",
-      "source": "pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)",
-      "contexte": "Déclaration sur eco-conception.html : \"Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement.\""
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim3-3.2, case cochée \"🤔 À évaluer\"",
+      "contexte": "Déclaration sur eco-conception.html : \"Nous avons fixé plusieurs objectifs à notre démarche, notamment : Réduire l'empreinte environnementale de notre site internet en diminuant la consommation d'énergie nécessaire à son fonctionnement.\"",
+      "sans_objet": null
     },
     {
       "id": "3.3",
@@ -549,19 +572,21 @@
       "coefficient": 1,
       "provenance": "collecte",
       "source": "env-data.json: servers[] = octo.com (DE, 381 gCO2/kWh) (seuil 250 gCO2/kWh dépassé)",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "3.5",
       "dimension": "🏢 3 — Infrastructure",
       "critere": "L'infrastructure peut-elle être mutualisée ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
-      "contexte": "Votre service fait appel à 6 service(s) d'infrastructure externe(s) (hébergement, diffusion de contenu, cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com..."
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim3-3.5, case cochée \"✅ Point fort confirmé\"",
+      "contexte": "Votre service fait appel à 6 service(s) d'infrastructure externe(s) (hébergement, diffusion de contenu, cloud) : herokuapp.com, cdn.jsdelivr.net, cdnjs.cloudflare.com, amazonaws.com, googleapis.com...",
+      "sans_objet": null
     },
     {
       "id": "3.6",
@@ -571,9 +596,10 @@
       "categorie": "aucune_donnee",
       "reponse": null,
       "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-compose-dimensionnement, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas",
+      "sans_objet": null
     },
     {
       "id": "3.7",
@@ -585,7 +611,8 @@
       "coefficient": null,
       "provenance": "suppose",
       "source": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-      "contexte": "Votre service s'appuie sur une plate-forme d'hébergement (herokuapp.com) capable d'ajuster automatiquement ses ressources. Nous ne pouvons pas voir de l'extérieur si cet ajustement est activé chez vous, ni si votre charge varie assez pour le justifier."
+      "contexte": "Votre service s'appuie sur une plate-forme d'hébergement (herokuapp.com) capable d'ajuster automatiquement ses ressources. Nous ne pouvons pas voir de l'extérieur si cet ajustement est activé chez vous, ni si votre charge varie assez pour le justifier. ; Question posée au service audité, réponse : ne sait pas",
+      "sans_objet": null
     },
     {
       "id": "3.8",
@@ -597,7 +624,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "3.9",
@@ -609,7 +637,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.1",
@@ -621,7 +650,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.2",
@@ -633,7 +663,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.3",
@@ -645,7 +676,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.4",
@@ -657,7 +689,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.5",
@@ -669,7 +702,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "4.6",
@@ -681,7 +715,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.1",
@@ -693,7 +728,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.2",
@@ -705,7 +741,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.3",
@@ -717,7 +754,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.4",
@@ -729,19 +767,21 @@
       "coefficient": 0,
       "provenance": "collecte",
       "source": "cwv.json: toutes les pages sous les seuils CWV 'good'",
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.5",
       "dimension": "👨‍💻 5 — Algo & Code",
       "critere": "Les cas d'utilisation les plus critiques (parcours utilisateurs les plus fréquents) sont-ils optimisés ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
-      "contexte": "https://octo.com/ : JavaScript inutilisé 79.02% ; https://octo.com/recrutement : JavaScript inutilisé 71.68%"
+      "categorie": "aucune_donnee",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim5-5.5, case cochée \"💡 Potentiel d'amélioration identifié\"",
+      "contexte": "https://octo.com/ : JavaScript inutilisé 79.02% ; https://octo.com/recrutement : JavaScript inutilisé 71.68%",
+      "sans_objet": null
     },
     {
       "id": "5.6",
@@ -753,7 +793,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.7",
@@ -765,7 +806,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.8",
@@ -777,7 +819,8 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "5.9",
@@ -789,19 +832,21 @@
       "coefficient": null,
       "provenance": null,
       "source": null,
-      "contexte": null
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "6.1",
       "dimension": "🛠 6 — Facilité de changement",
       "critere": "Existe-t-il un dispositif d'observabilité efficace pour le produit ?",
       "potentiel_max": 2.0,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
-      "contexte": "Score en-têtes de sécurité HTTP : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn - indicateur parmi d'autres de la maturité en production"
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.1, case cochée \"🟡 Effort modéré\"",
+      "contexte": "Score en-têtes de sécurité HTTP : 70% (grade B) sur https://octo.com/recrutement/offers/consultant-mlops-engineer-confirmesenior-fhn - indicateur parmi d'autres de la maturité en production",
+      "sans_objet": null
     },
     {
       "id": "6.2",
@@ -809,23 +854,25 @@
       "critere": "Existe-t-il des revues de code et/ou une programmation en binôme  ( pair programming)?",
       "potentiel_max": 1.5,
       "categorie": "aucune_donnee",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.2, case cochée \"🟡 Effort modéré\"",
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "6.3",
       "dimension": "🛠 6 — Facilité de changement",
       "critere": "Existe-t-il un processus CI/CD efficace ?",
       "potentiel_max": 1.5,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
-      "contexte": "ressource de votre site la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; les adresses de vos fichiers portent une date (v=2026-6-10-1-1) qui concorde à 19 s près avec la date de dernière modification déclarée par votre serveur, donc produite par votre chaîne de fabrication"
+      "categorie": "aucune_donnee",
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.3, case cochée \"🟢 Facile à modifier\"",
+      "contexte": "ressource de votre site la plus récente : 0.5 jour(s) avant la capture (publiée à 01:01 UTC) ; les 24 ressources de code (HTML/CSS/JS) sont publiées en 13 s (mise en ligne en un seul bloc) ; les adresses de vos fichiers portent une date (v=2026-6-10-1-1) qui concorde à 19 s près avec la date de dernière modification déclarée par votre serveur, donc produite par votre chaîne de fabrication",
+      "sans_objet": null
     },
     {
       "id": "6.4",
@@ -835,9 +882,10 @@
       "categorie": "aucune_donnee",
       "reponse": null,
       "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.4, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas",
+      "sans_objet": null
     },
     {
       "id": "6.5",
@@ -845,23 +893,25 @@
       "critere": "Y a-t-il un fort découplage entre le domaine métier et l'intégration technique ?",
       "potentiel_max": 1.5,
       "categorie": "aucune_donnee",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "reponse": "🔴 Difficile à changer",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.5, case cochée \"🔴 Difficile à changer\"",
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "6.6",
       "dimension": "🛠 6 — Facilité de changement",
       "critere": "Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?",
       "potentiel_max": 2.0,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
-      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 77% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent"
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.6, case cochée \"🟡 Effort modéré\"",
+      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 73% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent",
+      "sans_objet": null
     },
     {
       "id": "6.7",
@@ -869,23 +919,25 @@
       "critere": "Existe-t-il une documentation complète ?",
       "potentiel_max": 1.5,
       "categorie": "aucune_donnee",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.7, case cochée \"🟡 Effort modéré\"",
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "6.8",
       "dimension": "🛠 6 — Facilité de changement",
       "critere": "Y a-t-il du code dupliqué dans l'application ?",
       "potentiel_max": 1.0,
-      "categorie": "partiel",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": "suppose",
-      "source": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
-      "contexte": "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée."
+      "categorie": "aucune_donnee",
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.8, case cochée \"🟢 Facile à modifier\"",
+      "contexte": "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée.",
+      "sans_objet": null
     },
     {
       "id": "6.9",
@@ -893,11 +945,12 @@
       "critere": "L'équipe dispose-t-elle d'une autonomie suffisante pour déployer les outils dont elle a besoin pour observer, mesurer ou optimiser le système ?",
       "potentiel_max": 1.0,
       "categorie": "aucune_donnee",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.9, case cochée \"🟡 Effort modéré\"",
+      "contexte": null,
+      "sans_objet": null
     },
     {
       "id": "6.10",
@@ -905,11 +958,12 @@
       "critere": "Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?",
       "potentiel_max": 1.5,
       "categorie": "aucune_donnee",
-      "reponse": null,
-      "coefficient": null,
-      "provenance": null,
-      "source": null,
-      "contexte": null
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-compose-haute-dispo-0.3, case cochée \"Aucun engagement de disponibilité\"",
+      "contexte": null,
+      "sans_objet": null
     }
   ]
 }

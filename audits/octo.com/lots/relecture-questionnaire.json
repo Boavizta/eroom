@@ -1,0 +1,292 @@
+{
+  "lot_id": "relecture-questionnaire",
+  "genere_le": "2026-09-10T20:56:20.478622+00:00",
+  "entrees": [
+    "questionnaire-eof.md"
+  ],
+  "criteres": [
+    {
+      "id": "0.3",
+      "categorie": "aucune_donnee",
+      "reponse": "5 - Pas de SLA/SLO",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-compose-haute-dispo-0.3, case cochée \"Aucun engagement de disponibilité\""
+    },
+    {
+      "id": "6.10",
+      "categorie": "aucune_donnee",
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-compose-haute-dispo-0.3, case cochée \"Aucun engagement de disponibilité\""
+    },
+    {
+      "id": "0.1",
+      "categorie": "aucune_donnee",
+      "reponse": "3 - Impact modéré, mais des solutions de contournement existent",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.1, case cochée \"3 - Impact modéré, mais des solutions de contournement existent\""
+    },
+    {
+      "id": "0.2",
+      "categorie": "aucune_donnee",
+      "reponse": "5 - Totalement unique ; rien de similaire n'existe.",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.2, case cochée \"5 - Totalement unique ; rien de similaire n'existe.\""
+    },
+    {
+      "id": "0.4",
+      "categorie": "aucune_donnee",
+      "reponse": "2 - Le produit est connecté à quelques autres systèmes",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.4, case cochée \"2 - Le produit est connecté à quelques autres systèmes\""
+    },
+    {
+      "id": "0.5",
+      "categorie": "aucune_donnee",
+      "reponse": "2 - Le code source est principalement disponible (code accessible en interne, mais pas au public).",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.5, case cochée \"2 - Le code source est principalement disponible (code accessible en interne, mais pas au public).\""
+    },
+    {
+      "id": "0.6",
+      "categorie": "aucune_donnee",
+      "reponse": "1 - L'équipe maîtrise bien la conception fonctionnelle et technique du projet et peut travailler en toute confiance.",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.6, case cochée \"1 - L'équipe maîtrise bien la conception fonctionnelle et technique du projet et peut travailler en toute confiance.\""
+    },
+    {
+      "id": "0.7",
+      "categorie": "aucune_donnee",
+      "reponse": "3 - Moyen",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.7, case cochée \"3 - Moyen\""
+    },
+    {
+      "id": "0.8",
+      "categorie": "aucune_donnee",
+      "reponse": "4 - Plus petite que la plupart des services",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.8, case cochée \"4 - Plus petite que la plupart des services\""
+    },
+    {
+      "id": "0.9",
+      "categorie": "aucune_donnee",
+      "reponse": "4 - Le produit stocke une quantité limitée de données.",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.9, case cochée \"4 - Le produit stocke une quantité limitée de données.\""
+    },
+    {
+      "id": "0.10",
+      "categorie": "aucune_donnee",
+      "reponse": "4 - Simple",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.10, case cochée \"4 - Simple\""
+    },
+    {
+      "id": "0.11",
+      "categorie": "aucune_donnee",
+      "reponse": "4 - L'UX/UI est claire et agréable à utiliser, seules des améliorations mineures ont été identifiées",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.11, case cochée \"4 - L'UX/UI est claire et agréable à utiliser, seules des améliorations mineures ont été identifiées\""
+    },
+    {
+      "id": "0.12",
+      "categorie": "aucune_donnee",
+      "reponse": "5 - Compatible et fluide (confortable et réactif même sur du matériel ancien)",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.12, case cochée \"5 - Compatible et fluide (confortable et réactif même sur du matériel ancien)\""
+    },
+    {
+      "id": "0.13",
+      "categorie": "aucune_donnee",
+      "reponse": "5 - Aucun problème de performance identifié",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.13, case cochée \"5 - Aucun problème de performance identifié\""
+    },
+    {
+      "id": "0.14",
+      "categorie": "aucune_donnee",
+      "reponse": "4 - La plupart des fonctionnalités principales sont bien implémentées et fonctionnent efficacement",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-diag-0.14, case cochée \"4 - La plupart des fonctionnalités principales sont bien implémentées et fonctionnent efficacement\""
+    },
+    {
+      "id": "6.1",
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.1, case cochée \"🟡 Effort modéré\""
+    },
+    {
+      "id": "6.2",
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.2, case cochée \"🟡 Effort modéré\""
+    },
+    {
+      "id": "6.3",
+      "categorie": "aucune_donnee",
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.3, case cochée \"🟢 Facile à modifier\""
+    },
+    {
+      "id": "6.4",
+      "categorie": "aucune_donnee",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.4, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas"
+    },
+    {
+      "id": "6.5",
+      "categorie": "aucune_donnee",
+      "reponse": "🔴 Difficile à changer",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.5, case cochée \"🔴 Difficile à changer\""
+    },
+    {
+      "id": "6.6",
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.6, case cochée \"🟡 Effort modéré\""
+    },
+    {
+      "id": "6.7",
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.7, case cochée \"🟡 Effort modéré\""
+    },
+    {
+      "id": "6.8",
+      "categorie": "aucune_donnee",
+      "reponse": "🟢 Facile à modifier",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.8, case cochée \"🟢 Facile à modifier\""
+    },
+    {
+      "id": "6.9",
+      "categorie": "aucune_donnee",
+      "reponse": "🟡 Effort modéré",
+      "coefficient": 0.5,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc porte-dim6-6.9, case cochée \"🟡 Effort modéré\""
+    },
+    {
+      "id": "3.6",
+      "categorie": "aucune_donnee",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-compose-dimensionnement, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas"
+    },
+    {
+      "id": "3.7",
+      "categorie": "aucune_donnee",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-compose-dimensionnement, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas"
+    },
+    {
+      "id": "1.4",
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.4, case cochée \"✅ Point fort confirmé\""
+    },
+    {
+      "id": "1.9",
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.9, case cochée \"🤔 À évaluer\""
+    },
+    {
+      "id": "1.11",
+      "categorie": "aucune_donnee",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.11, case cochée \"💡 Potentiel d'amélioration identifié\""
+    },
+    {
+      "id": "1.14",
+      "categorie": "aucune_donnee",
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-compose-parcours-ecrans, case cochée \"Je ne sais pas\"",
+      "contexte": "Question posée au service audité, réponse : ne sait pas"
+    },
+    {
+      "id": "1.15",
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.15, case cochée \"✅ Point fort confirmé\""
+    },
+    {
+      "id": "1.16",
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim1-1.16, case cochée \"✅ Point fort confirmé\""
+    },
+    {
+      "id": "2.3",
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim2-2.3, case cochée \"🤔 À évaluer\""
+    },
+    {
+      "id": "2.5",
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim2-2.5, case cochée \"🤔 À évaluer\""
+    },
+    {
+      "id": "3.2",
+      "categorie": "aucune_donnee",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim3-3.2, case cochée \"🤔 À évaluer\""
+    },
+    {
+      "id": "3.5",
+      "categorie": "aucune_donnee",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim3-3.5, case cochée \"✅ Point fort confirmé\""
+    },
+    {
+      "id": "5.5",
+      "categorie": "aucune_donnee",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "precise",
+      "source": "questionnaire-eof.md: bloc detail-dim5-5.5, case cochée \"💡 Potentiel d'amélioration identifié\""
+    }
+  ],
+  "mesure": {
+    "statut": "ok",
+    "cible": "questionnaire-eof.md",
+    "detail": "35 blocs répondus sur 59."
+  }
+}

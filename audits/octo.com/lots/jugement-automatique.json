@@ -1,6 +1,6 @@
 {
   "lot_id": "jugement-automatique",
-  "genere_le": "2026-09-10T11:07:59.957064+00:00",
+  "genere_le": "2026-09-10T14:43:07.638194+00:00",
   "entrees": [
     "env-data.json",
     "audit/har-analysis.json",
@@ -63,7 +63,7 @@
       "reponse": "✅ Point fort confirmé",
       "coefficient": 0,
       "provenance": "collecte",
-      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]"
+      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 100, valeurs = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]"
     },
     {
       "id": "1.14",
@@ -171,7 +171,7 @@
       "categorie": "partiel",
       "provenance": "suppose",
       "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
-      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 77% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent"
+      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 73% ; en-têtes de sécurité (pire page) : grade B ; fichier security.txt : absent"
     },
     {
       "id": "6.8",
