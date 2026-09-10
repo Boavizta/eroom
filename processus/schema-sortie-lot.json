@@ -24,6 +24,26 @@
         "type": "string"
       }
     },
+    "mesure": {
+      "type": "object",
+      "description": "Optionnel. Convention d'état de mesure (cf. documentation/implementation/convention-etat-de-mesure.md) : rend compte d'un échec de la SOURCE du lot elle-même (ex. fichier de questionnaire absent ou illisible), distinct d'un échec sur un critère individuel.",
+      "required": ["statut", "cible", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "statut": {
+          "type": "string",
+          "enum": ["ok", "rien_trouve", "echec_reseau", "echec_lecture", "echec_analyse"]
+        },
+        "cible": {
+          "type": "string",
+          "description": "Ce qui était cherché : chemin de fichier, URL, nom de champ."
+        },
+        "detail": {
+          "type": ["string", "null"],
+          "description": "Phrase courte, ou null si statut vaut 'ok' et qu'il n'y a rien à préciser."
+        }
+      }
+    },
     "criteres": {
       "type": "array",
       "description": "Liste des critères jugés par ce lot. Un critère peut être partiellement renseigné (contexte seulement) ou entièrement tranché (reponse + coefficient). Le script de fusion consolide ces entrées multiples en un seul verdict par critère.",

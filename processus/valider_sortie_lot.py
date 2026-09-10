@@ -49,6 +49,9 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from valider_sante_sondes import VALID_STATUSES  # noqa: E402
+
 # Racine du projet : ce script vit dans processus/
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REFERENTIEL_PATH = (
@@ -106,6 +109,30 @@ def load_referentiel():
 # Validation de structure
 # ---------------------------------------------------------------------------
 
+def validate_mesure_block(mesure, prefix):
+    """Valide un bloc `mesure` (convention d'état de mesure : statut/cible/detail)."""
+    violations = []
+    if not isinstance(mesure, dict):
+        return [(prefix, f"doit être un objet, trouvé {type(mesure).__name__}")]
+
+    required = {"statut", "cible", "detail"}
+    missing = required - set(mesure.keys())
+    if missing:
+        violations.append((prefix, f"champs requis manquants : {', '.join(sorted(missing))}"))
+    extra = set(mesure.keys()) - required
+    if extra:
+        violations.append((prefix, f"champs inconnus (rejet strict) : {', '.join(sorted(extra))}"))
+
+    if "statut" in mesure and mesure["statut"] not in VALID_STATUSES:
+        violations.append((f"{prefix}.statut", f"valeur '{mesure['statut']}' hors vocabulaire (autorisé : {', '.join(sorted(VALID_STATUSES))})"))
+    if "cible" in mesure and not isinstance(mesure["cible"], str):
+        violations.append((f"{prefix}.cible", f"doit être une chaîne, trouvé {type(mesure['cible']).__name__}"))
+    if "detail" in mesure and mesure["detail"] is not None and not isinstance(mesure["detail"], str):
+        violations.append((f"{prefix}.detail", f"doit être une chaîne ou null, trouvé {type(mesure['detail']).__name__}"))
+
+    return violations
+
+
 def validate_root_structure(data):
     """Valide les métadonnées racine. Retourne (violations, champs_a_valider)."""
     violations = []
@@ -118,9 +145,17 @@ def validate_root_structure(data):
     if missing:
         violations.append(("racine", f"champs requis manquants : {', '.join(sorted(missing))}"))
 
-    extra = set(data.keys()) - required
+    # "mesure" est optionnel en racine : convention d'état de mesure (cf.
+    # documentation/implementation/convention-etat-de-mesure.md), pour un lot
+    # dont la SOURCE elle-même (pas un critère individuel) peut échouer à être
+    # lue (ex. fichier de questionnaire absent ou illisible).
+    allowed = required | {"mesure"}
+    extra = set(data.keys()) - allowed
     if extra:
         violations.append(("racine", f"champs inconnus (rejet strict) : {', '.join(sorted(extra))}"))
+
+    if "mesure" in data:
+        violations.extend(validate_mesure_block(data["mesure"], "mesure"))
 
     if "lot_id" in data and not isinstance(data["lot_id"], str):
         violations.append(("lot_id", f"doit être une chaîne, trouvé {type(data['lot_id']).__name__}"))
