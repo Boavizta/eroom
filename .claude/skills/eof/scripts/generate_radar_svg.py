@@ -347,21 +347,36 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     # Polygones de données (lignes droites entre points, comme le Sheet source).
     # La couche hachurée d'abord, la pleine par-dessus : dans l'autre ordre les
     # hachures recouvriraient la couche pleine et les deux se confondraient.
-    def polygone(valeurs, fill, fill_opacity=None, stroke_dash=None):
+    def polygone(valeurs, fill, fill_opacity=None, stroke_dash=None, stroke=NAVY):
         pts = [point(i, v) for i, v in enumerate(valeurs)]
         pts_str = " ".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts)
         opacity = f' fill-opacity="{fill_opacity}"' if fill_opacity else ""
         dash = f' stroke-dasharray="{stroke_dash}"' if stroke_dash else ""
-        return (
-            f'<polygon points="{pts_str}" fill="{fill}"{opacity} '
-            f'stroke="{NAVY}" stroke-width="2.5"{dash}/>'
-        )
+        stroke_attr = f' stroke="{stroke}" stroke-width="2.5"' if stroke else ""
+        return f'<polygon points="{pts_str}" fill="{fill}"{opacity}{stroke_attr}{dash}/>'
+
+    def anneau_hachure(valeurs_ext, valeurs_int):
+        # Chemin à deux sous-chemins + fill-rule evenodd : le sous-chemin intérieur
+        # devient un trou dans le remplissage de l'extérieur. Corrige un bug constaté
+        # le 2026-09-11 : dessiner le hachuré sur TOUTE la surface du total, puis le
+        # plein par-dessus en semi-transparence (fill-opacity 0.40), laissait la
+        # texture hachurée visible PAR TRANSPARENCE même quand établi == total (marge
+        # d'incertitude nulle) — un axe sans aucune marge avait l'air d'en avoir une.
+        # La technique marche parce que chaque axe est un rayon depuis le centre :
+        # l'intérieur est toujours <= l'extérieur sur ce même rayon, donc entièrement
+        # contenu dedans, quels que soient les 6 axes.
+        pts_ext = [point(i, v) for i, v in enumerate(valeurs_ext)]
+        pts_int = [point(i, v) for i, v in enumerate(valeurs_int)]
+        d_ext = "M" + " L".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts_ext) + " Z"
+        d_int = "M" + " L".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts_int) + " Z"
+        return f'<path d="{d_ext} {d_int}" fill="url(#{HACHURE_ID})" fill-rule="evenodd" stroke="none"/>'
 
     valeurs_totales = [val for _, val in axes]
     if axes_etabli is None:
         svg.append(polygone(valeurs_totales, NAVY, fill_opacity="0.40"))
     else:
-        svg.append(polygone(valeurs_totales, f"url(#{HACHURE_ID})", stroke_dash="7 4"))
+        svg.append(polygone(valeurs_totales, "none", stroke_dash="7 4"))
+        svg.append(anneau_hachure(valeurs_totales, axes_etabli))
         svg.append(polygone(axes_etabli, NAVY, fill_opacity="0.40"))
 
     svg.extend(graduations)
