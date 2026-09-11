@@ -2841,11 +2841,11 @@ def _section_eof(results, radar_svg_text=None):
         if q.get("reponse"):
             valeur = f'{q["reponse"].replace("<", "&lt;")}{doublon}'
             conf = _provenance_de(q)
-            source = "—"
+            source = q.get("source") or "—"
         elif q.get("indice_contextuel"):
             valeur = f'je ne sais pas <span style="color:#888">— donnée indicative : {q["indice_contextuel"]}</span>{doublon}'
-            conf = None
-            source = "—"
+            conf = _provenance_de(q)
+            source = q.get("source") or "—"
         else:
             valeur = f'je ne sais pas{doublon}'
             conf = None
