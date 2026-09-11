@@ -2837,20 +2837,56 @@ def _section_eof(results, radar_svg_text=None):
     # de tentative de réponse automatique (échelle 1-5 différente, décision
     # explicite) : placé AVANT le radar des 6 dimensions détaillées.
     def _diag_row(q):
+        doublon = ' <span style="color:#888;font-size:12px">(doublon exact de 3.3)</span>' if q["id"] == "0.16" else ""
         if q.get("reponse"):
-            doublon = ' <span style="color:#888;font-size:12px">(doublon exact de 3.3)</span>' if q["id"] == "0.16" else ""
-            return (
-                f'<li>{q["id"]} — {q["critere"]} → <b>{q["reponse"].replace("<", "&lt;")}</b> '
-                f'{_confidence_badge(_provenance_de(q))}{doublon}</li>'
-            )
-        if q.get("indice_contextuel"):
-            return (
-                f'<li>{q["id"]} — {q["critere"]} '
-                f'<span style="color:#888;font-size:13px">— donnée indicative : {q["indice_contextuel"]}</span></li>'
-            )
-        return f'<li>{q["id"]} — {q["critere"]}</li>'
+            valeur = f'{q["reponse"].replace("<", "&lt;")}{doublon}'
+            conf = _provenance_de(q)
+            source = "—"
+        elif q.get("indice_contextuel"):
+            valeur = f'je ne sais pas <span style="color:#888">— donnée indicative : {q["indice_contextuel"]}</span>{doublon}'
+            conf = None
+            source = "—"
+        else:
+            valeur = f'je ne sais pas{doublon}'
+            conf = None
+            source = "réservé à l’évaluation humaine (échelle 1-5, non déductible des données d’audit)"
+        src_html = _confidence_badge(conf) if conf else '<span style="color:#aaa">—</span>'
+        return (
+            f'<tr>'
+            f'<td style="padding:5px 8px;white-space:nowrap">{q["id"]}</td>'
+            f'<td style="padding:5px 8px">{q["critere"]}</td>'
+            f'<td style="padding:5px 8px">{valeur}</td>'
+            f'<td style="padding:5px 8px">{src_html}</td>'
+            f'<td style="padding:5px 8px;font-size:13px;color:#666">{source}</td>'
+            f'</tr>'
+        )
 
+    diag_total = diag.get("total_questions", 0)
+    diag_repondus = sum(1 for q in diag.get("questions", []) if q.get("reponse"))
+    diag_pct = (diag_repondus / diag_total * 100) if diag_total else 0
+    diag_bar = (
+        f'<div style="background:#e0e0e0;border-radius:3px;height:10px;width:120px;'
+        f'display:inline-block;vertical-align:middle;margin-left:10px;overflow:hidden">'
+        f'<div style="background:{OCTO_BLUE};height:100%;width:{diag_pct:.0f}%"></div>'
+        f'</div>'
+    )
+    diag_header_row = (
+        f'<tr><td colspan="5" style="padding:10px 8px 6px;background:{OCTO_PALE};font-weight:bold">'
+        f'🏦 0 — Diagnostic rapide{diag_bar} '
+        f'<span style="font-weight:normal;font-size:13px;color:#555">{diag_repondus}/{diag_total}</span>'
+        f'</td></tr>'
+    )
     diag_rows = "".join(_diag_row(q) for q in diag.get("questions", []))
+    diag_table = f"""<table style="width:100%;border-collapse:collapse;font-size:14px">
+    <thead><tr style="background:{OCTO_PALE}">
+      <th style="padding:5px 8px;text-align:left">ID</th>
+      <th style="padding:5px 8px;text-align:left">Critère</th>
+      <th style="padding:5px 8px;text-align:left">Réponse</th>
+      <th style="padding:5px 8px;text-align:left">Provenance</th>
+      <th style="padding:5px 8px;text-align:left">Source / donnée exploitée</th>
+    </tr></thead>
+    <tbody>{diag_header_row}{diag_rows}</tbody>
+  </table>"""
     diag_block = f"""
   <h3>🏦 0 — Diagnostic rapide (aperçu)</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
@@ -2867,7 +2903,7 @@ def _section_eof(results, radar_svg_text=None):
     ci-dessous. Le potentiel d’optimisation est soit déjà faible, soit trop
     coûteux à atteindre. À évaluer humainement AVANT de lire la suite.
   </div>
-  <ul style="font-size:14px;color:#555;columns:2;column-gap:24px">{diag_rows}</ul>"""
+  {diag_table}"""
 
     # KPIs en tête, scopés aux 54 critères détaillés uniquement (décision du 2026-09-03)
     kpi_style = (
