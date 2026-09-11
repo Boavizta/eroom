@@ -67,7 +67,7 @@
           },
           "provenance": {
             "type": ["string", "null"],
-            "description": "Provenance du verdict ou de l'indice : 'collecte' (mesuré par nos scripts : HAR, en-têtes HTTP, API), 'estime' (déduit par un LLM à partir d'indices réels), 'declare' (déclaré publiquement par l'organisation auditée : page d'accessibilité, mentions légales), 'precise' (coché par le client dans le questionnaire, sans preuve), 'suppose' (déduit depuis un indice faible, signal ambigu). Requis si reponse ou contexte sont non null. Détermine la précédence de fusion : collecte > estime > declare > precise > suppose.",
+            "description": "Provenance du verdict ou de l'indice : 'collecte' (mesuré par nos scripts : HAR, en-têtes HTTP, API), 'estime' (déduit par un LLM à partir d'indices réels), 'declare' (déclaré publiquement par l'organisation auditée : page d'accessibilité, mentions légales), 'precise' (coché par le client dans le questionnaire, sans preuve), 'suppose' (déduit depuis un indice faible, signal ambigu). Requis si reponse ou contexte sont non null. Détermine la précédence de fusion : collecte > estime > precise > declare > suppose (revisé le 2026-09-11 : le client connaît sa réalité technique directement, plus fiable qu'une déclaration publique parfois générique ou datée).",
             "enum": ["collecte", "estime", "declare", "precise", "suppose", null]
           },
           "source": {

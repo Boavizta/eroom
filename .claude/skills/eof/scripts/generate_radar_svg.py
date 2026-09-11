@@ -20,11 +20,15 @@ exemplaire là où personne n'avait presque rien regardé.
 
 Trois éléments répondent à ça, et aucun n'invente de chiffre :
 
-  - la couche PLEINE : la part du potentiel affiché que nous avons établie
-    nous-mêmes (provenances de PROVENANCES_ETABLI) ;
-  - la couche HACHURÉE : ce que les réponses du service audité y ont ajouté
-    (provenances de PROVENANCES_DECLARE). La couche hachurée contient toujours la
-    pleine, puisqu'elle ajoute des termes positifs ;
+  - la couche PLEINE : le potentiel RETENU, c'est-à-dire tout ce qui n'est pas une
+    simple supposition depuis un indice faible (provenances de
+    PROVENANCES_RETENUES : mesuré, déduit d'un ordre de grandeur, déclaré
+    publiquement par le service, ou indiqué par le service via le questionnaire) ;
+  - la couche HACHURÉE : la MARGE D'INCERTITUDE, c'est-à-dire la part du potentiel
+    qui ne repose que sur une déduction depuis un indice faible (provenance
+    `suppose`, la seule dans PROVENANCES_MARGE_INCERTITUDE). Le contour extérieur
+    de la figure (plein + hachuré additionnés) reste l'estimation globale du
+    potentiel d'optimisation de l'axe ;
   - sous chaque axe, le nombre de critères renseignés sur son total ; et sous le
     radar, une jauge de ce qui est renseigné à l'échelle du référentiel.
 
@@ -49,7 +53,7 @@ SCALE = 100  # axe en pourcentage (0-100%), comme le radar du Google Sheet sourc
 # Identifiant du motif de hachures. Distinctif à dessein : le SVG est INLINÉ dans
 # le rapport HTML, au milieu d'autres SVG. Un id générique ("hachure") serait
 # capturé par le premier motif du document portant le même nom, et la couche
-# déclarée se remplirait avec les hachures d'un diagramme voisin.
+# de marge d'incertitude se remplirait avec les hachures d'un diagramme voisin.
 HACHURE_ID = "eof-radar-couche-declaree"
 
 AXES_EOF = [
@@ -63,18 +67,16 @@ AXES_EOF = [
 
 # Répartition des provenances entre les deux couches.
 #
-# La couche hachurée est celle du manifeste (`declare`, `precise`) : ce que le
-# service audité a répondu lui-même. Les trois autres provenances vont dans la
-# couche pleine parce qu'elles viennent toutes de NOUS : `collecte` est une
-# mesure, `estime` une déduction depuis un ordre de grandeur, `suppose` une
-# déduction depuis un indice faible. Les mêler au déclaratif ferait lire
-# "le client l'a dit" là où c'est nous qui l'avons avancé.
-#
-# `suppose` n'existait pas quand le manifeste a été écrit : sans cette liste
-# explicite, une réponse posée en `suppose` disparaîtrait des deux couches et le
-# polygone rétrécirait sans que rien ne le dise.
-PROVENANCES_ETABLI = ("collecte", "estime", "suppose")
-PROVENANCES_DECLARE = ("declare", "precise")
+# Décidé le 2026-09-11 avec l'utilisatrice : la couche pleine porte le potentiel
+# RETENU (tout ce qui n'est pas une simple supposition depuis un indice faible),
+# la couche hachurée porte la MARGE D'INCERTITUDE (uniquement `suppose`, la
+# provenance la plus fragile de l'axe de précédence du manifeste). Avant cette
+# date, la répartition opposait "nous" (collecte/estime/suppose) à "eux"
+# (declare/precise) ; ce découpage mélangeait la provenance la plus solide
+# (collecte) et la plus fragile (suppose) dans la même couche, ce qui ne
+# correspondait à aucune notion de fiabilité utile pour le lecteur.
+PROVENANCES_RETENUES = ("collecte", "estime", "declare", "precise")
+PROVENANCES_MARGE_INCERTITUDE = ("suppose",)
 
 # Libellés lisibles des provenances, pour la ligne de décompte sous le radar.
 # Le manifeste impose que les provenances restent distinguables sur le radar :
@@ -399,9 +401,9 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
         if axes_etabli is not None and axes_etabli[i] is not None and axes_etabli[i] < val:
             pe = point(i, axes_etabli[i])
             infobulle = (
-                f"{name} : {_pct(val)} de potentiel d'optimisation, "
-                f"dont {_pct(axes_etabli[i])} établi par nos mesures, "
-                f"le reste venant des réponses du service audité"
+                f"{name} : {_pct(val)} de potentiel d'optimisation au total, "
+                f"dont {_pct(val - axes_etabli[i])} de marge d'incertitude "
+                f"(déduction depuis un indice faible)"
             )
             svg.append(
                 f'<circle cx="{pe[0]:.1f}" cy="{pe[1]:.1f}" r="4.5" fill="white" '
@@ -412,19 +414,20 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     # chargé. Deux lignes plutôt qu'une : les libellés dépassent 40 caractères et
     # côte à côte ils atteindraient le libellé de l'axe du haut.
     if axes_etabli is not None:
-        # Tant que le service audité n'a rien répondu, les deux couches se
-        # superposent exactement et la couche hachurée est invisible. Le dire, plutôt
-        # que d'afficher une légende pour une couche absente : sans cette mention, le
-        # lecteur cherche des hachures qui n'existent pas et doute de la figure.
+        # Le cas où aucune réponse ne repose sur `suppose` est un cas SAIN (pas
+        # rare comme avant le 2026-09-11) : les deux couches se superposent et la
+        # marge d'incertitude est invisible. Le dire, plutôt que d'afficher une
+        # légende pour une couche absente : sans cette mention, le lecteur cherche
+        # des hachures qui n'existent pas et doute de la figure.
         rien_de_declare = all(
             e == t for e, (_, t) in zip(axes_etabli, axes)
         )
-        libelle_declare = "en hachuré : ce que le service audité a déclaré"
+        libelle_marge = "en hachuré : marge d'incertitude (déduction depuis un indice faible)"
         if rien_de_declare:
-            libelle_declare += " (aucune réponse à ce jour)"
+            libelle_marge = "en hachuré : marge d'incertitude (aucune à ce jour)"
         for k, (fill, opacity, libelle) in enumerate([
-            (NAVY, ' fill-opacity="0.40"', "en plein : ce que nous avons établi nous-mêmes"),
-            (f"url(#{HACHURE_ID})", "", libelle_declare),
+            (NAVY, ' fill-opacity="0.40"', "en plein : potentiel retenu (mesuré, déduit ou indiqué par le service)"),
+            (f"url(#{HACHURE_ID})", "", libelle_marge),
         ]):
             y = 46 + k * 22
             svg.append(
@@ -558,7 +561,7 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
         pmax_par_dimension[nom]["repondu"] += pmax
         coefficient = c.get("coefficient") or 0.0
         retenu[nom]["total"] += coefficient * pmax
-        if c.get("provenance") in PROVENANCES_ETABLI:
+        if c.get("provenance") in PROVENANCES_RETENUES:
             retenu[nom]["etabli"] += coefficient * pmax
 
     axes = []
@@ -609,6 +612,8 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
         title = f"EOF : potentiel d'optimisation ({domaine_txt})"
     if note is None:
         note = (
+            "Le bord extérieur de chaque axe donne l'estimation globale du potentiel "
+            "d'optimisation (plein et hachuré additionnés). "
             "Une dimension dont aucun critère n'a répondu est marquée \"aucune réponse\", "
             "jamais 0 % : un 0 % voudrait dire point fort confirmé sur toute la dimension."
         )
@@ -647,7 +652,11 @@ def _demo(output_path):
     svg_text = radar_svg(
         list(zip(AXES_EOF, totaux)),
         title="Radar EROOM : test complet (6 axes, valeurs fictives)",
-        note="Valeurs fictives de potentiel d'optimisation, uniquement pour valider le rendu visuel",
+        note=(
+            "Le bord extérieur de chaque axe donne l'estimation globale du potentiel "
+            "d'optimisation (plein et hachuré additionnés). Valeurs fictives, uniquement "
+            "pour valider le rendu visuel."
+        ),
         axes_etabli=etablis,
         axes_renseignes=renseignes,
         couverture=(48.0, 34, 54),

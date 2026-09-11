@@ -292,9 +292,9 @@ Question posée : accepterait-on une réponse **plus grossière** en échange d'
 
 **Réponse : l'axe de provenance ne sait pas l'exprimer, et on ne le modifie pas.**
 
-L'axe est fermé à 5 valeurs par `processus/valider_sortie_lot.py:65`, avec la précédence `collecte > estime > declare > precise > suppose`. Le manifeste dit ce qu'elles veulent dire (`processus/manifeste-lots.json:11`) :
+L'axe est fermé à 5 valeurs par `processus/valider_sortie_lot.py:65`, avec la précédence `collecte > estime > precise > declare > suppose` (décision du 2026-09-11 : `precise` passe devant `declare` car le client connaît directement sa réalité technique via le questionnaire, alors qu'une déclaration publique (CGU, mentions légales) est parfois générique, datée, ou rédigée sans vérification technique). Le manifeste dit ce qu'elles veulent dire (`processus/manifeste-lots.json:11`) :
 
-> La provenance 'suppose' designe une deduction depuis un indice faible : elle est placee en derniere position de precedence car une case cochee par le client sans preuve (precise) vaut davantage - le client connait son equipe alors que nous devinons depuis un signal qui parle souvent d'autre chose.
+> La provenance 'precise' (case cochee par le client sans preuve jointe) est placee au-dessus de 'declare' (declaration publique trouvee, ex. CGU) : le client connait son equipe et sa realite technique directement, alors qu'une declaration publique est parfois generique ou datee, redigee sans verification technique. La provenance 'suppose' designe une deduction depuis un indice faible : elle est placee en derniere position de precedence car une case cochee par le client sans preuve (precise) vaut davantage - le client connait son equipe alors que nous devinons depuis un signal qui parle souvent d'autre chose.
 
 L'axe répond donc à **"qui l'affirme, et sur quelle base ?"**, pas à **"à quel point la réponse est-elle fine ?"**. Y ajouter un 6ᵉ niveau mélangerait deux natures d'incertitude sur un seul axe, ce que la consigne du projet interdit, et casserait l'axe unique partagé avec la table de badges e-footprint.
 

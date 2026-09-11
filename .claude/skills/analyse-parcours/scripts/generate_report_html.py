@@ -2825,7 +2825,11 @@ def _section_eof(results, radar_svg_text=None):
         f'(+ {n_partiel} indice(s) contextuel(s), jamais une réponse validée). Les autres '
         f'restent <b>"je ne sais pas"</b> par construction : ce sont des '
         f'questions organisationnelles ou produit, qu’aucune mesure technique '
-        f'ne peut trancher. Détail complet critère par critère en annexe.'
+        f'ne peut trancher. Détail complet critère par critère en annexe. '
+        f'Pour combler ces critères, générez le questionnaire correspondant avec le script '
+        f'<code>generate_questionnaire.py</code> (il produit un fichier '
+        f'<code>questionnaire-eof.md</code>) et transmettez-le au service audité, qui pourra '
+        f'y répondre directement.'
         f'</div>'
     )
 
@@ -2915,9 +2919,23 @@ def _section_eof(results, radar_svg_text=None):
 
     radar_block = ""
     if radar_svg_text:
+        rappel_provenances = (
+            '<div style="margin-top:10px;font-size:13px;color:#444;text-align:left;'
+            'max-width:700px;margin-left:auto;margin-right:auto">'
+            '<b>Détail des 5 provenances possibles :</b><br>'
+            f'{_confidence_badge("collecte")} mesure réelle &middot; '
+            f'{_confidence_badge("estime")} déduction d\'un ordre de grandeur &middot; '
+            f'{_confidence_badge("declare")} déclaration publique trouvée &middot; '
+            f'{_confidence_badge("precise")} réponse du service via le questionnaire '
+            '&rarr; <b>potentiel retenu</b> (en plein)<br>'
+            f'{_confidence_badge("suppose")} déduction depuis un indice faible '
+            '&rarr; <b>marge d\'incertitude</b> (en hachuré)'
+            '</div>'
+        )
         radar_block = f"""
   <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white;text-align:center">
     {radar_svg_text}
+    {rappel_provenances}
   </div>"""
 
     criteres_list = results.get("criteres", [])
@@ -3588,6 +3606,17 @@ def _section_glossaire():
             f'<td style="color:#555;font-size:15px">{seuils}</td>'
             f'</tr>'
         )
+    ordre_fiabilite = (
+        '<p style="font-size:16px;color:#555;margin-top:16px">'
+        '<b>Ordre de fiabilité des provenances (du plus au moins fiable) :</b><br>'
+        f'{_confidence_badge("collecte")} (mesure réelle) &gt; '
+        f'{_confidence_badge("estime")} (déduction d\'un ordre de grandeur) &gt; '
+        f'{_confidence_badge("precise")} (réponse du service via le questionnaire) &gt; '
+        f'{_confidence_badge("declare")} (déclaration publique trouvée) &gt; '
+        f'{_confidence_badge("suppose")} (déduction depuis un indice faible).<br>'
+        'En cas de désaccord entre deux sources sur un même critère, c\'est la provenance la plus '
+        'haute dans cet ordre qui est retenue dans le rapport.</p>\n'
+    )
     return (
         '<section id="glossaire">\n'
         '<h2>Glossaire</h2>\n'
@@ -3598,6 +3627,7 @@ def _section_glossaire():
         '<thead><tr><th>Terme</th><th>Définition</th><th>Seuils</th></tr></thead>\n'
         f'<tbody>{rows}</tbody>\n'
         '</table>\n'
+        f'{ordre_fiabilite}'
         '</section>'
     )
 

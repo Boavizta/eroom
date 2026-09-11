@@ -16,7 +16,7 @@ produisent le même fichier, au champ d'horodatage près (idempotence).
 RÈGLES DE FUSION (impératives, non négociables)
 -----------------------------------------------
 1. Précédence par provenance (lue depuis le manifeste) :
-   collecte > estime > declare > precise > suppose
+   collecte > estime > precise > declare > suppose
    Une provenance haute ne peut JAMAIS être écrasée par une provenance plus basse.
 
 2. Divergence (deux provenances DIFFÉRENTES avec réponses DIFFÉRENTES) :
