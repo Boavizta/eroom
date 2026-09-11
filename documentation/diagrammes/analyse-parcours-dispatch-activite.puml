@@ -42,10 +42,9 @@ partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
   fork
     :Dispatch A — Analyse HAR
     (20_analyse-har.md)
-    20a — trafic (requêtes, domaines,
-    codes HTTP, volume Mo)
-    20b — performance (cache,
-    doublons, ressources bloquantes)
+    python3 analyze_har.py <dossier-source>
+    Trafic + performance (requêtes, domaines,
+    codes HTTP, doublons, ressources bloquantes)
     -> har-analysis.json;
   fork again
     :Dispatch B — Analyse Coverage
@@ -80,27 +79,55 @@ partition "**Merge + suite** (contexte principal)" {
   end note
 
   if (cwv.json présent ?) then (oui)
-    :Étape 37 — Lighthouse skippé;
-  else (non)
+    :Étape 37 — collecte CWV skippée;
+  elseif (GOOGLE_API_KEY disponible ?) then (oui, voie prioritaire)
+    :collect_cwv_pagespeed.py
+    PageSpeed Insights API
+    (CrUX terrain + Lighthouse lab, par page)
+    -> cwv.json {lcp, inp, cls, source: "pagespeed/crux"};
+  else (non, repli)
     fork
       :run_lighthouse.sh
       Extraire URLs du HAR
       Lighthouse CLI par page (mode lab)
-      -> cwv.json {lcp, inp, cls};
+      -> cwv.json {lcp, inp, cls, source: "lighthouse"};
     fork again
       note right #FFECB3
         Si Lighthouse indisponible :
         warning, rapport sans CWV
+        (onLoad du HAR utilisé comme proxy du LCP)
       end note
     end fork
   endif
+
+  :Étape 39 — run_eof.py
+  (+ extracteurs annexes : parse_html_criteria.py,
+  analyze_security_headers.py, scan_wellknown.py)
+  Confronte les données déjà collectées à
+  eof-referentiel.json (54 critères + 16 diagnostic rapide)
+  -> eof-audit-results.json, eof-rempli.md,
+  eof-radar-<domaine>.svg;
+
+  note right #FFECB3
+    ARRÊT ICI, rien n'est automatique après :
+    generate_questionnaire.py / parse_questionnaire.py /
+    fusionner_lots.py sont des étapes manuelles assumées
+    (décision de mission), jamais déclenchées par ce skill.
+    Piège : ne jamais relancer run_eof.py seul après une
+    relecture de questionnaire (écrase les réponses en silence).
+    Toujours parse_questionnaire.py -> fusionner_lots.py
+    -> generate_report_html.py.
+  end note
 
   :Étape 40 — generate_report_html.py
   Sections : Recommandations P1/P2/P3,
   Bonnes pratiques GreenIT, CWV (si cwv.json),
   e-footprint CO2e (si efootprint-synthese-python.json),
+  Potentiel d'optimisation EOF (si eof-audit-results.json,
+  mesuré + questionnaire fusionné),
   Annexes (EcoIndex, Trafic, Code mort)
-  -> rapport-parcours-YYYY-MM-DD.html;
+  -> rapport-parcours-YYYY-MM-DD.html
+  (check_valeurs_rapport.py interne, non bloquant);
 
   :livrer chemin rapport à l'utilisateur;
 

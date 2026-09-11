@@ -1,0 +1,67 @@
+@startuml analyse-parcours-vue-generale
+title Analyse de parcours web — Vue generale du workflow (par thematique)
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #E0F0F4
+  BorderColor #5BA1BC
+  FontColor #1C2856
+  DiamondBackgroundColor #E0F0F4
+  DiamondBorderColor #5BA1BC
+}
+skinparam ArrowColor #5BA1BC
+skinparam ActivityBarColor #5BA1BC
+skinparam NoteBackgroundColor #E0F0F4
+skinparam NoteBorderColor #9BD0DD
+skinparam PartitionBackgroundColor #ECECF2
+skinparam PartitionBorderColor #5BA1BC
+
+start
+
+partition "**COLLECTE** (automatique)" {
+  :HAR, Coverage, Core Web Vitals
+  (analyze_har.py, coverage_metrics.py,
+  collect_cwv_pagespeed.py ou run_lighthouse.sh en repli);
+}
+
+partition "**JUGEMENT AUTOMATIQUE EOF** (automatique)" {
+  :run_eof.py confronte les donnees
+  deja collectees au referentiel EOF
+  (~10 criteres sur 54 tranches par script,
+  le reste reste "je ne sais pas");
+}
+
+partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #DBDDE5 {
+  :Quand : apres le jugement automatique,
+  uniquement sur les criteres restes
+  "je ne sais pas" - jamais avant,
+  jamais declenche seul;
+  :Comment : genere, envoye au client,
+  rempli, relu (parse_questionnaire.py),
+  fusionne (fusionner_lots.py) selon la
+  precedence collecte > estime > precise
+  > declare > suppose;
+}
+
+note right #ECECF2
+  Piege a eviter : ne jamais relancer run_eof.py
+  seul apres une relecture de questionnaire
+  (ecrase les reponses en silence). Toujours
+  parse_questionnaire.py -> fusionner_lots.py
+  -> generate_report_html.py.
+end note
+
+partition "**RAPPORT** (automatique)" {
+  :generate_report_html.py
+  (+ check_valeurs_rapport.py, controle
+  interne non bloquant);
+}
+
+partition "**IMPACT CO2e** (optionnel, a la demande)" #9BD0DD {
+  :/efootprint -> modele Boavizta
+  -> section CO2e ajoutee au rapport;
+}
+
+stop
+
+@enduml

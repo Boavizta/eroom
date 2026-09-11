@@ -51,7 +51,7 @@ end note
 C -> FL : python3 fusionner_lots.py <dossier-audit>
 FL -> FS : Lire tous les lots/*.json
 FS -> FL : Jugement automatique\n+ relecture questionnaire
-FL -> FL : Appliquer la précédence :\ncollecte > estime > declare > precise > suppose
+FL -> FL : Appliquer la précédence :\ncollecte > estime > precise > declare > suppose
 
 note over FL, FS
   Ce que la précédence garantit :
