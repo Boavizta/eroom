@@ -2123,6 +2123,21 @@ def load_synthese_python(audit_dir):
     return None
 
 
+def load_recommendations_gains(audit_dir):
+    """Cherche efootprint-recommendations-gains.json dans audit_dir ou son parent
+    (source_dir) : gains CO2e par palier de recommandations, écrits par
+    `run_efootprint.py::run_recommendation_scenarios()`. Optionnel — absent sur un
+    audit pas encore rejoué avec cette version du script (rapport rétrocompatible,
+    même principe que load_synthese_python())."""
+    audit_dir = Path(audit_dir)
+    for candidate in [audit_dir / "efootprint-recommendations-gains.json",
+                      audit_dir.parent / "efootprint-recommendations-gains.json"]:
+        if candidate.exists():
+            with open(candidate, encoding="utf-8") as f:
+                return json.load(f)
+    return {}
+
+
 def load_topology_svg(audit_dir):
     """Cherche un topologie-*.svg dans audit_dir ou son parent (source_dir).
 
@@ -3520,9 +3535,129 @@ def _methodo_trafic(synthese_python=None):
     )
 
 
-def _section_methodologie(synthese_python, cwv, eof_results=None):
+# Interface publique Boavizta pour recharger un .e-f.json et explorer le détail
+# (répartition par composant) - plafonnée à 2 modèles par comparaison (MAX_SLOTS=2,
+# vérifié dans le code de l'interface), d'où l'export en fichiers individuels.
+_MODEL_BUILDER_URL = "https://e-footprint.boavizta.org/model_builder/"
+
+# Libellés lisibles des recommandations chiffrées (efootprint-recommendations-gains.json).
+_RECO_LABELS = {
+    "js_dead": "Code JS mort",
+    "css_dead": "Code CSS mort",
+    "duplicates": "Ressources en double",
+    "brotli": "Compression Brotli",
+}
+
+# Libellés de palier utilisés à la fois pour le "tier" d'une recommandation
+# (reductions_detail/excluded_recommendations : prio1/prio2/prio3, parfois
+# prio1_2/prio1_2_3 côté excluded_recommendations) et, avec la variante
+# _PALIER_LABELS ci-dessous, pour les clés cumulatives de "paliers".
+_TIER_LABELS = {
+    "prio1": "Prio 1",
+    "prio2": "Prio 2",
+    "prio3": "Prio 3",
+    "prio1_2": "Prio 1 + 2",
+    "prio1_2_3": "Prio 1 + 2 + 3",
+}
+_PALIER_LABELS = {
+    "prio1": "Prio 1 seule",
+    "prio1_2": "Prio 1 + 2",
+    "prio1_2_3": "Prio 1 + 2 + 3",
+}
+
+
+def _methodo_recommendations(gains):
+    """Sous-section G : détail du recalcul CO2e par palier de recommandations
+    (efootprint-recommendations-gains.json, écrit par
+    run_efootprint.py::run_recommendation_scenarios()).
+
+    Un VRAI recalcul du modèle e-footprint par palier cumulatif (pas une
+    approximation forfaitaire), le détail par type de recommandation (regroupé
+    par (recommendation, tier), pas par Job/page), et la liste explicite des
+    recommandations exclues du calcul chiffré et pourquoi."""
+    if not gains:
+        return ""
+
+    reductions = gains.get("reductions_detail") or []
+    excluded = gains.get("excluded_recommendations") or []
+    hypotheses = gains.get("hypotheses_generales") or []
+
+    intro = (
+        '<p style="font-size:16px;color:#555;margin-bottom:8px">'
+        'Chaque palier (Prio 1, Prio 1 + 2, Prio 1 + 2 + 3) est un recalcul RÉEL du modèle '
+        'e-footprint (nouvelle SiteSpec avec le poids transféré réduit, Job par Job), pas une '
+        'approximation forfaitaire appliquée après coup : le calcul CO2e n\'est pas strictement '
+        'linéaire au poids transféré.</p>'
+    )
+
+    if reductions:
+        groups = {}
+        order = []
+        for r in reductions:
+            key = (r.get("recommendation"), r.get("tier"))
+            if key not in groups:
+                groups[key] = {"bytes": 0.0, "count": 0,
+                               "comment": (r.get("traced") or {}).get("comment")}
+                order.append(key)
+            groups[key]["bytes"] += r.get("bytes_removed") or 0
+            groups[key]["count"] += 1
+
+        rows = []
+        note_items = ""
+        for key in order:
+            reco, tier = key
+            g = groups[key]
+            label = _RECO_LABELS.get(reco, reco or "?")
+            tier_label = _TIER_LABELS.get(tier, tier or "?")
+            ko = round(g["bytes"] / 1024, 1)
+            n = g["count"]
+            value = f'{ko} Ko sur {n} page{"s" if n > 1 else ""} ({tier_label})'
+            rows.append((label, value, "medium"))
+            if g["comment"]:
+                note_items += f'<li><b>{label} ({tier_label})</b> : {g["comment"]}</li>'
+
+        table_html = _methodo_table(rows)
+        notes_html = (
+            f'<h4 style="margin:14px 0 4px">Notes par type de recommandation</h4>'
+            f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#666;line-height:1.5">'
+            f'{note_items}</ul>'
+        ) if note_items else ""
+    else:
+        table_html = (
+            '<p style="font-size:15px;color:#555">Aucune recommandation chiffrable trouvée sur '
+            'cet audit (données Coverage/HAR manquantes, ou aucun seuil chiffrable dépassé).</p>'
+        )
+        notes_html = ""
+
+    excluded_html = ""
+    if excluded:
+        items = "".join(
+            f'<li><b>{_RECO_LABELS.get(e.get("recommendation"), e.get("recommendation") or "?")}</b> '
+            f'({_TIER_LABELS.get(e.get("tier"), e.get("tier") or "?")}) : {e.get("reason", "?")}</li>'
+            for e in excluded
+        )
+        excluded_html = (
+            '<h4 style="margin:14px 0 4px">Recommandations non incluses dans le calcul chiffré, et pourquoi</h4>'
+            f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#555;line-height:1.5">{items}</ul>'
+        )
+
+    hyp_html = ""
+    if hypotheses:
+        hyp_items = "".join(f'<li>{h}</li>' for h in hypotheses)
+        hyp_html = (
+            '<h4 style="margin:14px 0 4px">Hypothèses générales</h4>'
+            f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#555;line-height:1.5">{hyp_items}</ul>'
+        )
+
+    return (
+        '<h3 id="methodo-recommandations" style="margin-top:20px">G. Recommandations &amp; gain estimé</h3>'
+        f'{intro}{table_html}{notes_html}{excluded_html}{hyp_html}'
+    )
+
+
+def _section_methodologie(synthese_python, cwv, eof_results=None, recommendations_gains=None):
     """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
-    E: médias, F: EOF).
+    E: médias, F: EOF, G: recommandations & gain estimé).
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
@@ -3533,6 +3668,7 @@ def _section_methodologie(synthese_python, cwv, eof_results=None):
         _methodo_trafic(synthese_python),
         _methodo_medias(),
         _methodo_eof(eof_results),
+        _methodo_recommendations(recommendations_gains),
     ]
     body = "".join(p for p in parts if p)
     return (
@@ -3700,7 +3836,67 @@ def _cwv_reco_signal_html(metric, traffic, greenit, coverage_by_page):
             f'(détail en <a href="#cwv-analyse">section Analyse CWV</a>).</span>')
 
 
-def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None, greenit=None):
+def _recommendations_gains_block(gains):
+    """Bloc synthétique "Gain CO2e estimé" pour _section_recommendations, à partir
+    d'efootprint-recommendations-gains.json. Rien n'est ajouté si `gains` est
+    vide/absent (rapport rétrocompatible pour les audits sans ce fichier)."""
+    if not gains:
+        return ""
+
+    paliers = gains.get("paliers") or {}
+    reductions = gains.get("reductions_detail")
+    reference = gains.get("reference") or {}
+    ref_scenario = reference.get("scenario_file")
+
+    if reductions == []:
+        body = (
+            '<p style="font-size:15px;color:#555;margin:6px 0">'
+            'Aucune recommandation chiffrable trouvée sur cet audit '
+            '(données manquantes ou aucun seuil dépassé).</p>'
+        )
+    else:
+        rows_html = ""
+        for key in ("prio1", "prio1_2", "prio1_2_3"):
+            p = paliers.get(key)
+            if not p:
+                continue
+            label = _PALIER_LABELS.get(key, key)
+            delta_kg = p.get("delta_kg_co2e_per_year")
+            delta_pct = p.get("delta_pct")
+            scenario_file = p.get("scenario_file")
+            kg_txt = f'{delta_kg:.2f} kg CO2e/an' if isinstance(delta_kg, (int, float)) else "?"
+            pct_txt = f' ({delta_pct:.2f} %)' if isinstance(delta_pct, (int, float)) else ""
+            link = (f' &middot; <a href="{scenario_file}">télécharger le JSON</a>'
+                    f' &middot; <a href="{_MODEL_BUILDER_URL}" target="_blank" rel="noopener">'
+                    f'ouvrir sur e-footprint.boavizta.org</a>'
+                    if scenario_file else "")
+            rows_html += f'<li>-<b>{kg_txt}</b>{pct_txt} en appliquant <b>{label}</b>{link}</li>'
+        ref_link = (f' <a href="{ref_scenario}" target="_blank" rel="noopener">scénario de référence</a>'
+                    if ref_scenario else "")
+        body = (
+            f'<ul style="margin-top:6px;padding-left:20px">'
+            f'{rows_html or "<li>Aucun palier calculé.</li>"}</ul>'
+            f'<p style="font-size:15px;color:#555;margin:8px 0 4px">'
+            f'Téléchargez le fichier <code>.e-f.json</code> du palier qui vous intéresse, puis '
+            f'chargez-le (bouton "Open file") sur '
+            f'<a href="{_MODEL_BUILDER_URL}" target="_blank" rel="noopener">'
+            f'e-footprint.boavizta.org/model_builder</a> pour explorer le détail (répartition par '
+            f'composant) ; comparez-le au{ref_link} pour vérifier l\'écart manuellement.</p>'
+        )
+
+    return f"""
+  <div class="prio" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
+    <b>Gain CO2e estimé si vous appliquez ces recommandations</b>
+    {body}
+    <p style="font-size:13px;color:#888;margin:4px 0 0">
+      Certaines recommandations (Core Web Vitals, EcoIndex, DOM, CDN/scripts tiers, domaines tiers)
+      ne sont pas incluses dans ce calcul chiffré, faute de paramètre e-footprint fiable ou de cible
+      mesurée, voir le détail en <a href="#methodologie">annexe Méthodologie</a>.
+    </p>
+  </div>"""
+
+
+def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None, greenit=None, gains=None):
     prio1, prio2, prio3 = [], [], []
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
@@ -3919,6 +4115,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     <ul style="margin-top:6px;padding-left:20px">{_items(prio3)}</ul>
     {_see_also(prio3, ("trafic", "A.2 Trafic réseau"), ("greenit", "2. Bonnes pratiques GreenIT"))}
   </div>
+  {_recommendations_gains_block(gains)}
 </section>"""
 
 
@@ -3970,6 +4167,7 @@ def generate(audit_dir, output_path=None):
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
     synthese_python = load_synthese_python(audit_dir)
+    recommendations_gains = load_recommendations_gains(audit_dir)
     topology_svg = load_topology_svg(audit_dir)
     tech_stack = load_tech_stack(audit_dir)
     eof_results = load_eof_results(audit_dir)
@@ -4148,7 +4346,7 @@ def generate(audit_dir, output_path=None):
 </nav>
 <main id="contenu">
 """
-    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack, greenit)
+    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack, greenit, gains=recommendations_gains)
     html += _section_greenit(greenit)
     if has_medias:
         html += _section_medias(greenit)
@@ -4175,7 +4373,7 @@ def generate(audit_dir, output_path=None):
     _annexe_ids = [sid for sid, _ in annexe_sections]
     methodo_num = f"A.{_annexe_ids.index('methodologie') + 1}"
     glossaire_num = f"A.{_annexe_ids.index('glossaire') + 1}"
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results), methodo_num)}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results, recommendations_gains), methodo_num)}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), glossaire_num)}</div>\n'
     html += '</section>\n'
 

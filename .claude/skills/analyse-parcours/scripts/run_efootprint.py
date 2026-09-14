@@ -30,6 +30,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
@@ -43,12 +44,15 @@ from efootprint_model.build import (  # noqa: E402
 from efootprint_model.compose import (  # noqa: E402
     collect_sources, primary_server, servers_note)
 from efootprint_model.ranges import footprint_ranges_kg  # noqa: E402
+from efootprint_model.recommendations import (  # noqa: E402
+    apply_recommendations, brotli_reductions, dead_code_reductions, duplicate_reductions)
 from efootprint_model.sizing_report import servers_sizing  # noqa: E402
-from efootprint_model.to_plantuml import site_to_plantuml  # noqa: E402
+from efootprint_model.to_plantuml import site_to_plantuml, _sanitize_alias  # noqa: E402
 from efootprint_model import topology_overview  # noqa: E402
 from efootprint_model.temps_utilisateur import (  # noqa: E402
     is_within_nielsen_domain, nielsen_raw_seconds, recalibration_factor,
     NIELSEN_BASE_SECONDS, NIELSEN_SECONDS_PER_100_WORDS)
+import coverage_metrics  # noqa: E402
 
 # Module frère (même dossier) : détection des technologies (stack) par règles
 # maison sur le HAR, réutilisée pour la vue d'ensemble avant calcul (Étape 25).
@@ -364,6 +368,15 @@ def print_results(spec, built, ranges):
 # Sérialisation
 # ---------------------------------------------------------------------------
 
+def export_system_json(built, out_path):
+    """Sérialisation NATIVE e-footprint (Boavizta) d'un `built` (retour de
+    `build_system()`) vers `out_path`, via `system_to_json`. Facteur commun à
+    `save_boavizta_model()` (scénario de référence) et aux scénarios de
+    recommandations cumulatifs (`run_recommendation_scenarios()`)."""
+    from efootprint.api_utils.system_to_json import system_to_json
+    system_to_json(built.system, save_calculated_attributes=False, output_filepath=str(out_path))
+
+
 def save_boavizta_model(built, source_dir):
     """Écrit efootprint-boavizta-model.json : sérialisation NATIVE de la
     bibliothèque e-footprint (Boavizta) via `system_to_json`, indépendante de
@@ -371,9 +384,8 @@ def save_boavizta_model(built, source_dir):
     e-footprint (model_builder) ou via `json_to_system`, jamais lu par
     `generate_report_html.py` ni `check_efootprint_contract.py` (cf.
     `save_synthese_python()` pour le format consommé par ce projet)."""
-    from efootprint.api_utils.system_to_json import system_to_json
     out_path = source_dir / "efootprint-boavizta-model.json"
-    system_to_json(built.system, save_calculated_attributes=False, output_filepath=str(out_path))
+    export_system_json(built, out_path)
     print(f"  Modèle sérialisé : {out_path}")
 
 
@@ -612,6 +624,172 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
 
 
 # ---------------------------------------------------------------------------
+# Scénarios de recommandations (cumulatifs prio1 / prio1+2 / prio1+2+3)
+# ---------------------------------------------------------------------------
+
+# Recommandations qualitatives du rapport HTML sans paramètre e-footprint
+# natif : exclues du calcul chiffré (cf. justification détaillée par entrée),
+# mais listées ici pour que le fichier de gains explique explicitement ce
+# qu'il ne chiffre pas plutôt que de le passer sous silence.
+_EXCLUDED_RECOMMENDATIONS = [
+    {
+        "recommendation": "cwv",
+        "tier": "prio1_2",
+        "reason": ("Aucun paramètre e-footprint natif pour LCP/INP/CLS (vérifié dans "
+                   "efootprint_model/spec.py, build.py, from_har.py) - exclu du calcul "
+                   "chiffré, garde une note qualitative de lien avec le poids de page "
+                   "dans le rapport quand pertinent."),
+    },
+    {
+        "recommendation": "ecoindex",
+        "tier": "prio1_2",
+        "reason": ("Indicateur dérivé du poids de page et du nombre d'éléments, pas un "
+                   "paramètre e-footprint indépendant - le gain qu'il reflète est déjà "
+                   "compté via JS/CSS mort et doublons."),
+    },
+    {
+        "recommendation": "dom",
+        "tier": "prio1_2",
+        "reason": ("Nombre d'éléments DOM, sans lien réseau direct - exclu du calcul "
+                   "chiffré, reste qualitatif."),
+    },
+    {
+        "recommendation": "cdn_scripts_tiers_qualitatif",
+        "tier": "prio3",
+        "reason": ("\"CDN déjà en place\"/\"Scripts tiers détectés\" sont des détections "
+                   "de présence sans seuil numérique - aucun octet ni pourcentage "
+                   "associé, exclu du calcul chiffré."),
+    },
+    {
+        "recommendation": "domaines_tiers_nombreux",
+        "tier": "prio3",
+        "reason": ("Le poids tiers réel par page existe (third_party_bytes) mais aucune "
+                   "cible de réduction n'est mesurée - poser un pourcentage aurait été "
+                   "une invention, exclu du calcul chiffré."),
+    },
+]
+
+_HYPOTHESES_GENERALES = [
+    "Un seul levier e-footprint exploitable pour toutes les recommandations chiffrées : "
+    "JobSpec.data_transferred (poids transféré/compressé par page/Job), appliqué par "
+    "Job/serveur - pas un total site unique.",
+    "Les réductions de recommandations différentes sur le même Job ne sont pas "
+    "dédupliquées entre elles (un fichier dupliqué peut aussi contenir du code mort "
+    "compté séparément) : le cumul peut légèrement surestimer le gain réel.",
+    "Le pourcentage de code mort JS/CSS utilisé ici vient de "
+    "coverage_metrics.py::analyse(), une implémentation distincte de celle utilisée en "
+    "direct par _section_recommendations() dans le rapport (qui construit son propre "
+    "agrégat coverage_by_page depuis les Coverage-*.json bruts) - les deux mesurent la "
+    "même donnée source mais peuvent diverger légèrement sur les cas ambigus de "
+    "détection d'URL de page.",
+    "Le recalcul par palier est un VRAI recalcul du modèle e-footprint (build_system() "
+    "sur une SiteSpec modifiée), pas une simple soustraction forfaitaire - nécessaire "
+    "car le calcul n'est pas strictement linéaire.",
+    "Le site public e-footprint (model_builder) plafonne les comparaisons à 2 modèles "
+    "(MAX_SLOTS=2, vérifié dans le code de l'interface) : chaque scénario est donc "
+    "exporté en fichier individuel, sans fichier de comparaison pré-fabriqué - décision "
+    "explicite de l'utilisatrice, qui compare elle-même les fichiers si besoin sur le "
+    "site.",
+]
+
+# (palier apply_recommendations(), suffixe de fichier de sortie)
+_PALIERS = [
+    ("prio1", "prio1"),
+    ("prio1_2", "prio1-2"),
+    ("prio1_2_3", "prio1-2-3"),
+]
+
+
+def load_coverage_pages(source_dir):
+    """Pages Coverage (JS/CSS mort) pour le calcul de gain par palier, en
+    DÉGRADÉ : liste vide (pas d'erreur qui arrête le script) si aucun fichier
+    Coverage-*.json n'est trouvé - même logique que les autres données
+    optionnelles du pipeline (cf. `cwv = load_cwv(...) if cwv_path.exists()
+    else {}` et la section conditionnelle équivalente de
+    `generate_report_html.py`)."""
+    try:
+        coverage = coverage_metrics.analyse(source_dir)
+    except FileNotFoundError:
+        print("  ⚠ Pas de données Coverage : JS/CSS mort exclu du calcul de gain par palier.")
+        return []
+    return coverage.get("pages") or []
+
+
+def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
+    """Calcule et exporte les 3 scénarios cumulatifs de recommandations
+    (prio1, prio1+2, prio1+2+3) à partir du scénario de référence déjà
+    calculé (`built`), puis écrit `efootprint-recommendations-gains.json`
+    (synthèse consommée par une étape ultérieure du rapport HTML).
+
+    Le scénario de référence (`efootprint-boavizta-model.json`, déjà écrit
+    par `save_boavizta_model()`) n'est ni recalculé ni dupliqué ici : ce
+    fichier de gains le référence par son nom actuel.
+    """
+    print("[e-footprint] Scénarios de recommandations (prio1 / prio1+2 / prio1+2+3)...")
+
+    coverage_pages = load_coverage_pages(source_dir)
+
+    dead = dead_code_reductions(spec, env_data, coverage_pages)
+    dup = duplicate_reductions(spec, har_path)
+    try:
+        brotli = brotli_reductions(spec, env_data, har_path)
+    except ImportError:
+        print("  ⚠ Bibliothèque 'brotli' absente : recommandation Brotli exclue du "
+              "calcul de gain.")
+        brotli = []
+    all_reductions = dead + dup + brotli
+
+    reference_total = total_kg(built)
+
+    paliers_result = {}
+    for palier, suffixe in _PALIERS:
+        palier_spec = apply_recommendations(spec, all_reductions, palier)
+        palier_built = build_system(palier_spec)
+        palier_total = total_kg(palier_built)
+
+        out_path = source_dir / f"efootprint-scenario-{suffixe}.e-f.json"
+        export_system_json(palier_built, out_path)
+
+        delta = reference_total - palier_total
+        delta_pct = round(delta / reference_total * 100, 2) if reference_total > 0 else None
+        print(f"  Scénario {palier} : {palier_total:.2f} kg CO2e/an "
+              f"(Δ {delta:+.2f} kg vs référence)")
+
+        paliers_result[palier] = {
+            "total_kg_co2e_per_year": round(palier_total, 3),
+            "delta_kg_co2e_per_year": round(delta, 3),
+            "delta_pct": delta_pct,
+            "scenario_file": out_path.name,
+        }
+
+    gains = {
+        "generated_at": env_data.get("collected_at") or datetime.now().isoformat(),
+        "reference": {
+            "total_kg_co2e_per_year": round(reference_total, 3),
+            "scenario_file": "efootprint-boavizta-model.json",
+        },
+        "paliers": paliers_result,
+        "reductions_detail": [
+            {
+                "job_key": r.job_key,
+                "recommendation": r.recommendation,
+                "tier": r.tier,
+                "bytes_removed": round(r.bytes_removed, 1),
+                "traced": r.traced.as_dict(),
+            }
+            for r in all_reductions
+        ],
+        "excluded_recommendations": _EXCLUDED_RECOMMENDATIONS,
+        "hypotheses_generales": _HYPOTHESES_GENERALES,
+    }
+
+    out_path = source_dir / "efootprint-recommendations-gains.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(gains, f, indent=2, ensure_ascii=False)
+    print(f"  Gains par palier sérialisés : {out_path}")
+
+
+# ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
 
@@ -700,6 +878,8 @@ def main():
     save_boavizta_model(built, source_dir)
     save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves)
 
+    run_recommendation_scenarios(spec, built, env_data, har_path, source_dir)
+
     # Régénère le .puml (Étape 25) avec la part d'impact par étape (Lot 10),
     # connue seulement maintenant que le calcul a tourné. Le fichier écrit à
     # l'Étape 25 (avant calcul, sans part d'impact) est donc remplacé par
@@ -715,8 +895,24 @@ def main():
         puml_path = source_dir / f"topologie-{audited_domain}.puml"
         puml_path.write_text(puml, encoding="utf-8")
         print(f"  Diagramme régénéré (avec part d'impact) : {puml_path}")
-        print("  Recompiler en SVG avant de régénérer le rapport HTML : "
-              f"plantuml -tsvg {puml_path}")
+        # `@startuml <id>` pilote le nom du SVG produit par plantuml (cf.
+        # to_plantuml.py), jamais le nom du .puml en entrée : on retrouve donc
+        # ce nom via le même alias plutôt que de renommer le diagramme, pour
+        # ne pas dupliquer la logique de site_to_plantuml().
+        svg_path = source_dir / f"topologie-{audited_domain}.svg"
+        try:
+            result = subprocess.run(
+                ["plantuml", "-tsvg", str(puml_path)], capture_output=True, text=True)
+        except FileNotFoundError:
+            result = None
+        if result is None or result.returncode != 0:
+            print("  PlantUML introuvable ou échec de compilation : lancer "
+                  f"manuellement `plantuml -tsvg {puml_path}`, puis renommer "
+                  f"le SVG produit en {svg_path.name}.")
+        else:
+            diagram_id = _sanitize_alias(f"site_{spec.name}")
+            (source_dir / f"{diagram_id}.svg").replace(svg_path)
+            print(f"  Diagramme compilé en SVG : {svg_path}")
     print()
     visits = spec.audience.visits_per_year.value if spec.audience and spec.audience.visits_per_year else 0
     print(f"  Trafic retenu : {visits:,.0f} visites/an")

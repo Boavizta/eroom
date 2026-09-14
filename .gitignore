@@ -27,6 +27,8 @@ pages-html/
 # Outputs e-footprint (générés, non versionnés)
 efootprint-synthese-python.json
 efootprint-boavizta-model.json
+efootprint-scenario-*.e-f.json
+efootprint-recommendations-gains.json
 topologie-*.puml
 topologie-*.svg
 topologie-*.pdf
