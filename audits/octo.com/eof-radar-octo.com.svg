@@ -33,10 +33,10 @@
 <polygon points="550.0,346.0 550.0,360.0 573.8,373.8 550.0,360.0 528.0,372.7 482.4,321.0" fill="none" stroke="#2D4675" stroke-width="2.5" stroke-dasharray="7 4"/>
 <path d="M550.0,346.0 L550.0,360.0 L573.8,373.8 L550.0,360.0 L528.0,372.7 L482.4,321.0 Z M550.0,346.0 L550.0,360.0 L573.8,373.8 L550.0,360.0 L528.0,372.7 L482.4,321.0 Z" fill="url(#eof-radar-couche-declaree)" fill-rule="evenodd" stroke="none"/>
 <polygon points="550.0,346.0 550.0,360.0 573.8,373.8 550.0,360.0 528.0,372.7 482.4,321.0" fill="#2D4675" fill-opacity="0.40" stroke="#2D4675" stroke-width="2.5"/>
-<text x="556.0" y="301.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">25 %</text>
-<text x="556.0" y="246.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">50 %</text>
-<text x="556.0" y="191.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">75 %</text>
-<text x="556.0" y="136.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="3">100 %</text>
+<text x="556.0" y="301.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="1.5">25 %</text>
+<text x="556.0" y="246.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="1.5">50 %</text>
+<text x="556.0" y="191.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="1.5">75 %</text>
+<text x="556.0" y="136.0" font-size="12" fill="#666" paint-order="stroke" stroke="white" stroke-width="1.5">100 %</text>
 <circle cx="550.0" cy="346.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛖 1 — Produit : 6,4 % de potentiel d'optimisation</title></circle>
 <circle cx="550.0" cy="346.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🛖 1 — Produit : 6,4 % de potentiel d'optimisation au total, dont 0,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
 <circle cx="550.0" cy="360.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🗺️ 2 — Architecture : 0,0 % de potentiel d'optimisation</title></circle>

@@ -260,9 +260,10 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     #
     # Les graduations sont mises de côté et rendues APRÈS les polygones, avec un halo
     # blanc. Elles sont posées sur l'axe vertical, à l'endroit exact où passe le
-    # polygone : dessinées avant, la couche pleine les recouvre. Vu sur le rendu de
-    # démonstration, où le "2" de "25 %" avait disparu et où la graduation se lisait
-    # "5 %".
+    # polygone : dessinées avant, la couche pleine les recouvre. stroke-width doit
+    # rester fin (1.5) : à 3, le halo d'un chiffre comme "25 %" devient un bloc plein
+    # qui avale le texte au lieu de le souligner (vu sur le rendu de démonstration,
+    # où le "2" disparaissait et la graduation se lisait "5 %").
     graduations = []
     for ring in (25, 50, 75, 100):
         color = "#333" if ring == 100 else "#ccc"
@@ -272,8 +273,8 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
         )
         lx, ly = cx, cy - R * ring / SCALE
         graduations.append(
-            f'<text x="{lx+6:.1f}" y="{ly-4:.1f}" font-size="12" fill="#666" '
-            f'paint-order="stroke" stroke="white" stroke-width="3">{ring} %</text>'
+            f'<text x="{lx+6:.1f}" y="{ly-4:.1f}" font-size="12" fill="#000" '
+            f'paint-order="stroke" stroke="white" stroke-width="1.5">{ring} %</text>'
         )
 
     # axes = lignes droites du centre au bord
@@ -654,16 +655,44 @@ def build_radar_from_results(audit_results, domaine=None, title=None, note=None)
 
 
 def _demo(output_path):
-    """Radar de démonstration : le rendu complet, y compris les cas rares.
+    """Radar de démonstration : le rendu complet, y compris le cas rare.
 
-    Les valeurs sont fictives et choisies pour montrer d'un coup les quatre
-    situations qu'on ne voit jamais toutes sur un même audit réel : un axe sans
-    aucune réponse, un axe où tout vient de nos mesures, un axe où tout vient du
-    déclaratif du service audité, et un axe partagé entre les deux.
+    Les valeurs sont fictives, mais chaque pourcentage est vérifié contre les
+    poids réels du référentiel (`eof-referentiel.json`) : un pourcentage ne
+    peut jamais dépasser ce que le nombre de critères répondus peut porter au
+    maximum (formule canonique, `run_eof.py::compute_dimension_scores` —
+    somme des `coefficient × potentiel_max` des critères répondus ÷ somme des
+    `potentiel_max` de TOUS les critères retenus de la dimension, répondus ou
+    pas). Exemple : Stockage & Données pèse 8,0 au total sur 6 critères ; les
+    2 mieux pondérés ne pèsent que 3,0 ensemble → le maximum atteignable avec
+    2 répondus est 3,0 / 8,0 = 37,5 %, jamais 85 % (valeur trouvée dans une
+    version antérieure de cette démo, corrigée le 2026-09-15 — l'Architecture
+    affichait le même défaut : 70 % annoncés pour un maximum réel de 62,5 %
+    avec 3 répondus sur 5).
+
+    Depuis le 2026-09-11 (cf. PROVENANCES_RETENUES / PROVENANCES_MARGE_INCERTITUDE
+    plus haut), la couche hachurée ne porte plus que la provenance `suppose` :
+    dans un audit normal, elle reste minoritaire face au plein, car `suppose`
+    est la provenance la plus fragile et la moins fréquente. Les valeurs
+    ci-dessous illustrent, dans l'ordre des axes :
+
+      - Produit                : aucune supposition (marge nulle) ;
+      - Architecture            : cas courant, une petite marge minoritaire ;
+      - Infrastructure          : cas courant, marge minoritaire elle aussi ;
+      - Stockage & Données      : marge non négligeable en valeur absolue,
+                                  mais toujours minoritaire par rapport au plein ;
+      - Algo & Code             : cas RARE et volontairement extrême où la marge
+                                  dépasse le plein (beaucoup de `suppose`), gardé
+                                  pour vérifier que le rendu reste lisible même
+                                  dans ce cas defavorable — ne pas le lire comme
+                                  une situation représentative ;
+      - Facilité de changement : cas courant, même profil qu'Architecture/
+                                  Infrastructure (le cas "aucune réponse" est
+                                  illustré à part, voir `_demo_comparaison`).
     """
-    totaux = [35, 70, 15, 85, 50, None]
-    etablis = [35, 20, 15, 0, 32, None]
-    renseignes = [(16, 16), (3, 5), (8, 8), (2, 6), (5, 9), (0, 10)]
+    totaux = [35, 55, 15, 30, 50, 25]
+    etablis = [35, 48, 12, 25, 10, 22]
+    renseignes = [(16, 16), (3, 5), (8, 8), (2, 6), (5, 9), (4, 10)]
     svg_text = radar_svg(
         list(zip(AXES_EOF, totaux)),
         title="Radar EROOM : test complet (6 axes, valeurs fictives)",
@@ -674,12 +703,63 @@ def _demo(output_path):
         ),
         axes_etabli=etablis,
         axes_renseignes=renseignes,
-        couverture=(48.0, 34, 54),
-        provenances={"collecte": 18, "estime": 6, "declare": 8, "precise": 2, "suppose": 0},
+        couverture=(34.0, 38, 54),
+        provenances={"collecte": 16, "estime": 6, "declare": 9, "precise": 1, "suppose": 6},
     )
     with open(output_path, "w") as f:
         f.write(svg_text)
     print(f"SVG de démonstration écrit : {output_path}")
+
+
+def _demo_comparaison(output_path):
+    """Radar de démonstration : "aucune réponse" vs "hors périmètre".
+
+    Reprend les mêmes axes que `_demo`, corrigés le 2026-09-15, sauf deux :
+
+      - Stockage & Données      : ici HORS PÉRIMÈTRE (les 6 critères de la
+                                  dimension sont écartés, `axes_hors_perimetre`) ;
+      - Facilité de changement : ici SANS RÉPONSE (0 critère répondu sur 10),
+                                  contrairement à `_demo` où cet axe porte
+                                  maintenant une vraie valeur (25 %, 4/10) —
+                                  volontairement différent, pour isoler le cas
+                                  "aucune réponse" sur un axe dédié plutôt que
+                                  de prétendre reprendre "le même axe vide du
+                                  radar de référence" (affirmation fausse dans
+                                  la version précédente : Stockage & Données
+                                  n'y était jamais vide, il portait déjà 2
+                                  critères répondus).
+    """
+    totaux = [35, 55, 15, None, 50, None]
+    etablis = [35, 48, 12, None, 10, None]
+    renseignes = [(16, 16), (3, 5), (8, 8), (0, 6), (5, 9), (0, 10)]
+    svg_text = radar_svg(
+        list(zip(AXES_EOF, totaux)),
+        title="Radar EROOM : aucune réponse vs hors périmètre (valeurs fictives)",
+        note=(
+            "Deux façons différentes de ne pas remplir un axe : \"Stockage & Données\" "
+            "est hors périmètre (les 6 critères sont écartés, la dimension ne concerne "
+            "pas ce service), \"Facilité de changement\" reste sans réponse (nous "
+            "n'avons pas su l'instruire). Les autres axes reprennent les valeurs "
+            "corrigées du radar de référence. Valeurs fictives, uniquement pour "
+            "comparer le rendu visuel."
+        ),
+        axes_etabli=etablis,
+        axes_renseignes=renseignes,
+        axes_hors_perimetre=[False, False, False, True, False, False],
+        axes_ecartes=[None, None, None, 6, None, None],
+        # Stockage & Données est hors périmètre : ses 6 critères (potentiel_max
+        # total 8,0) sortent du dénominateur, comme le ferait le vrai calcul
+        # (`criteres_des_dimensions` exclut une dimension écartée en bloc dans
+        # `run_eof.py`). D'où 48 critères (54 - 6) et un pourcentage différent
+        # de celui de `_demo` (29,1 % ici contre 34,0 % côté référence) : les
+        # deux jauges ne sont PAS comparables terme à terme, seule la figure
+        # radar l'est axe par axe.
+        couverture=(29.1, 32, 48),
+        provenances={"collecte": 13, "estime": 6, "declare": 8, "precise": 1, "suppose": 4},
+    )
+    with open(output_path, "w") as f:
+        f.write(svg_text)
+    print(f"SVG de démonstration (comparaison) écrit : {output_path}")
 
 
 if __name__ == "__main__":

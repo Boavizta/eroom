@@ -2295,7 +2295,7 @@ def _section_tech(tech_stack):
 </section>"""
 
 
-def _section_efootprint(results, topology_svg=None):
+def _section_efootprint(results, topology_svg=None, gains=None):
     """Section 'Impact environnemental (estimation hypothétique)' - CO2e depuis e-footprint."""
     if not results:
         return ""
@@ -2740,6 +2740,19 @@ def _section_efootprint(results, topology_svg=None):
     {topology_svg}
   </div>"""
 
+    # Renvoi vers le gain CO2e par palier de recommandations (efootprint-recommendations-gains.json),
+    # calculé et affiché dans _recommendations_gains_block() (section Recommandations) : pas dupliqué
+    # ici, seulement référencé, pour garder un seul calcul et un seul endroit à corriger.
+    gains_ref_html = ""
+    if gains and gains.get("paliers"):
+        gains_ref_html = (
+            '<p style="font-size:15px;color:#555;margin:8px 0 0">'
+            'Le gain estimé si vous appliquez les recommandations priorisées (paliers prio1 / '
+            'prio1+2 / prio1+2+3) est détaillé dans le bloc '
+            '<a href="#gain-co2e">Gain CO2e estimé</a> de la section '
+            '<a href="#recommandations">Recommandations</a>.</p>'
+        )
+
     return f"""<section id="efootprint">
   <h2>Impact environnemental (estimation {_glossary_link("CO2e")})</h2>
   {synthese_html}
@@ -2750,6 +2763,7 @@ def _section_efootprint(results, topology_svg=None):
   </p>
   {warning}
   {kpis}
+  {gains_ref_html}
   {ranges_html}
   {topology_block}
 
@@ -4095,7 +4109,7 @@ def _recommendations_gains_block(gains):
         )
 
     return f"""
-  <div class="prio" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
+  <div class="prio" id="gain-co2e" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
     <b>Gain CO2e estimé si vous appliquez ces recommandations</b>
     {body}
     <p style="font-size:13px;color:#888;margin:4px 0 0">
@@ -4585,6 +4599,9 @@ def generate(audit_dir, output_path=None):
         for i, (anchor, title) in enumerate(present_main, start=1)
     )
     annexes_num = len(present_main) + 1
+    # Numéro de sommaire par ancre, pour préfixer le <h2> de chaque section principale
+    # (même numéro que le lien "N. Titre" du sommaire, cf. _prefix_h2_main plus bas).
+    main_num = {anchor: i for i, (anchor, _) in enumerate(present_main, start=1)}
 
     # Méthodologie calculée avant le sommaire : ses lettres A/B/C... dépendent des
     # sous-parties effectivement présentes pour cet audit, il faut donc son résultat
@@ -4628,18 +4645,29 @@ def generate(audit_dir, output_path=None):
 </nav>
 <main id="contenu">
 """
-    html += _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack, greenit, gains=recommendations_gains)
-    html += _section_greenit(greenit)
-    if has_medias:
-        html += _section_medias(greenit)
-    if cwv:
-        html += _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page)
-    if synthese_python:
-        html += _section_efootprint(synthese_python, topology_svg)
-    if eof_results:
-        html += _section_eof(eof_results, eof_radar_svg)
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
+
+    def _prefix_h2_main(html_str, anchor):
+        # Même mécanisme que _prefix_h2 pour les annexes, mais "N. " (comme le
+        # sommaire) plutôt que "N — " : ce sont les 6 sections de tête, pas des
+        # sous-parties d'annexe.
+        return html_str.replace('<h2>', f'<h2>{main_num[anchor]}. ', 1)
+
+    html += _prefix_h2_main(
+        _section_recommendations(page_metrics, traffic, coverage_by_page, cwv, tech_stack, greenit, gains=recommendations_gains),
+        "recommandations")
+    html += _prefix_h2_main(_section_greenit(greenit), "greenit")
+    if has_medias:
+        html += _prefix_h2_main(_section_medias(greenit), "medias")
+    if cwv:
+        html += _prefix_h2_main(
+            _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page), "cwv-analyse")
+    if synthese_python:
+        html += _prefix_h2_main(
+            _section_efootprint(synthese_python, topology_svg, gains=recommendations_gains), "efootprint")
+    if eof_results:
+        html += _prefix_h2_main(_section_eof(eof_results, eof_radar_svg), "eof")
 
     # Numérotation {annexes_num}.N dérivée uniformément de la position dans
     # annexe_sections (même mécanisme pour toutes les annexes, plus de cas particulier).
@@ -4670,7 +4698,7 @@ def generate(audit_dir, output_path=None):
   <div style="max-width:700px;margin:0 auto 0 40px">
     <details style="padding:0.75rem 1rem;background:white;border:1px solid #ccc;border-radius:4px;">
       <summary style="cursor:pointer;font-weight:600;">Coûts de génération (<span data-cost-field="cout">—</span> [*])</summary>
-      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. Durée et tokens peuvent inclure des échanges hors analyse. Coût aux tarifs API Anthropic publics ; sous AWS Bedrock, consulter AWS Cost Explorer.</p>
+      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. La durée est un temps d'horloge entre le premier et le dernier message de la session (lecture, rédaction, allers-retours avec l'utilisateur inclus), pas un temps de calcul actif ; elle et les tokens peuvent donc inclure des échanges hors analyse. Coût aux tarifs API Anthropic publics ; sous AWS Bedrock, consulter AWS Cost Explorer.</p>
       <p style="margin:0.3rem 0;"><strong>Modèle :</strong> <span data-cost-field="modele">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Effort :</strong> <span data-cost-field="effort">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Durée :</strong> <span data-cost-field="duree">—</span></p>
