@@ -1,0 +1,155 @@
+{
+  "lot_id": "jugement-automatique",
+  "genere_le": "2026-09-15T16:53:53.011310+00:00",
+  "entrees": [
+    "env-data.json",
+    "audit/har-analysis.json",
+    "audit/coverage-analysis.json",
+    "cwv.json",
+    "security-headers-analysis.json",
+    "wellknown-scan.json",
+    "html-css-criteria.json"
+  ],
+  "criteres": [
+    {
+      "id": "1.5",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
+    },
+    {
+      "id": "1.6",
+      "categorie": "automatisable",
+      "reponse": "💡 Potentiel d'amélioration identifié",
+      "coefficient": 1,
+      "provenance": "estime",
+      "source": "html-css-criteria.json: adaptive_img_ratio par page = [] ; media_query_count = 0"
+    },
+    {
+      "id": "1.9",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
+      "contexte": "Données réellement transférées (page la plus lourde) : 2628 Ko"
+    },
+    {
+      "id": "1.11",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
+      "contexte": "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style"
+    },
+    {
+      "id": "1.12",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "estime",
+      "source": "security-headers-analysis.json + har-analysis.json: aucun pistage ni analytics détecté"
+    },
+    {
+      "id": "1.13",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = 91, valeurs = [91, 93, 100]"
+    },
+    {
+      "id": "1.14",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
+      "contexte": "Page la plus lourde : https://moncompte.ants.gouv.fr/connexion?lang=fr (9380 Ko) ; la plus légère : https://moncompte.ants.gouv.fr/backend/api/procedure/start?procedureKey=driverLicence (2126 Ko)"
+    },
+    {
+      "id": "1.15",
+      "categorie": "partiel",
+      "provenance": "estime",
+      "source": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
+      "contexte": "Trafic estimé : 30 066 000 visites/an (SimilarWeb (estimation))"
+    },
+    {
+      "id": "1.16",
+      "categorie": "partiel",
+      "provenance": "estime",
+      "source": "env-data.json: traffic.visits_per_year",
+      "contexte": "Trafic estimé : 30 066 000 visites/an (SimilarWeb (estimation))"
+    },
+    {
+      "id": "2.1",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "estime",
+      "source": "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée"
+    },
+    {
+      "id": "2.5",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
+      "contexte": "https://storage.googleapis.com/genii-public/project-5e05e2c5-2a6c-401f-b529-77b6aeeb5435/css/%20//cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.11/dist/fonts/Marianne-Light.woff2 chargé 6 fois ; https://storage.googleapis.com/genii-public/project-5e05e2c5-2a6c-401f-b529-77b6aeeb5435/css/%20//cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.11/dist/fonts/Marianne-Regular.woff2 chargé 6 fois ; https://storage.googleapis.com/genii-public/project-5e05e2c5-2a6c-401f-b529-77b6aeeb5435/css/%20//cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.11/dist/fonts/Marianne-Medium.woff2 chargé 6 fois"
+    },
+    {
+      "id": "3.3",
+      "categorie": "automatisable",
+      "reponse": "✅ Point fort confirmé",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "env-data.json: servers[] = moncompte.ants.gouv.fr (FR, 56 gCO2/kWh); permisdeconduire.ants.gouv.fr (FR, 56 gCO2/kWh); predemande-permisdeconduire.ants.gouv.fr (FR, 56 gCO2/kWh) (sous le seuil 250 gCO2/kWh)"
+    },
+    {
+      "id": "5.4",
+      "categorie": "automatisable",
+      "reponse": "🤔 À évaluer",
+      "coefficient": 0,
+      "provenance": "collecte",
+      "source": "cwv.json: zone intermédiaire ('needs improvement'), aucune page 'poor'"
+    },
+    {
+      "id": "5.5",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
+      "contexte": "https://predemande-permisdeconduire.ants.gouv.fr/ihm-spd/pages/premotifdemandeform.action : JavaScript inutilisé 76.55% ; https://moncompte.ants.gouv.fr/connexion?lang=fr : JavaScript inutilisé 62.55%"
+    },
+    {
+      "id": "6.1",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
+      "contexte": "Score en-têtes de sécurité HTTP : 90% (grade A) sur https://moncompte.ants.gouv.fr/connexion?lang=fr - indicateur parmi d'autres de la maturité en production"
+    },
+    {
+      "id": "6.3",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
+      "contexte": "ressource de votre site la plus récente : 23.4 jour(s) avant la capture (publiée à 13:33 UTC) ; dispersion des publications de code : 21.1 jour(s) (mises en ligne échelonnées)"
+    },
+    {
+      "id": "6.6",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
+      "contexte": "Audit Lighthouse - Bonnes Pratiques (pire page) : 73% ; en-têtes de sécurité (pire page) : grade A ; fichier security.txt : absent"
+    },
+    {
+      "id": "6.8",
+      "categorie": "partiel",
+      "provenance": "suppose",
+      "source": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
+      "contexte": "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée."
+    },
+    {
+      "id": "0.16",
+      "categorie": "automatisable",
+      "reponse": "5- < 100 gCO2e / kWh",
+      "provenance": "collecte",
+      "source": "env-data.json: servers[].carbon_intensity_g_kwh = 56 gCO2e/kWh (doublon de 3.3, même donnée)"
+    }
+  ]
+}

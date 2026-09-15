@@ -1,0 +1,108 @@
+{
+  "pages": [
+    {
+      "url": "https://permisdeconduire.ants.gouv.fr/demarches-en-ligne/deterioration-remplacement-du-permis-pliant-3-volets-ou-fin-de-validite",
+      "score_pct": 100,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "frame-ancestors 'self'",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=63072000; includeSubDomains; preload",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "SAMEORIGIN",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "camera=(), geolocation=(), microphone=()",
+          "poids": 10
+        }
+      ]
+    },
+    {
+      "url": "https://moncompte.ants.gouv.fr/connexion?lang=fr",
+      "score_pct": 90,
+      "grade": "A",
+      "detail": [
+        {
+          "header": "content-security-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "default-src 'self';       script-src 'self' 'nonce-d0b41343390e882205941b8a144d4afa' https://captcha.liveidentity.com/ https://cdn.woopic.com/ https://xgyj.ants.gouv.fr https://ajcb.moncompte.ants.gouv.fr;       object-src 'none';       style-src 'self' 'unsafe-inline';       img-src 'self' data: https://captcha.liveidentity.com/ https://cdn.woopic.com/ https://xgyj.ants.gouv.fr https://ajcb.moncompte.ants.gouv.fr;       media-src 'self' https://captcha.liveidentity.com/ https://cdn.woopic.com/;       font-src 'self' data:;       frame-ancestors 'none';       connect-src 'self' https://captcha.liveidentity.com/ https://cdn.woopic.com/ https://xgyj.ants.gouv.fr https://ajcb.moncompte.ants.gouv.fr https://geo.api.gouv.fr/;",
+          "poids": 25
+        },
+        {
+          "header": "strict-transport-security",
+          "present": true,
+          "valide": true,
+          "valeur": "max-age=31536000; includesubdomains",
+          "poids": 20
+        },
+        {
+          "header": "x-content-type-options",
+          "present": true,
+          "valide": true,
+          "valeur": "nosniff",
+          "poids": 15
+        },
+        {
+          "header": "x-frame-options",
+          "present": true,
+          "valide": true,
+          "valeur": "DENY",
+          "poids": 15
+        },
+        {
+          "header": "referrer-policy",
+          "present": true,
+          "valide": true,
+          "valeur": "strict-origin-when-cross-origin",
+          "poids": 15
+        },
+        {
+          "header": "permissions-policy",
+          "present": false,
+          "valide": false,
+          "valeur": null,
+          "poids": 10
+        }
+      ]
+    }
+  ],
+  "worst_page": {
+    "url": "https://moncompte.ants.gouv.fr/connexion?lang=fr",
+    "score_pct": 90,
+    "grade": "A"
+  },
+  "note": "Score calculé localement (pondération inspirée de securityheaders.com), depuis les en-têtes déjà capturés dans le .har — aucun appel réseau."
+}

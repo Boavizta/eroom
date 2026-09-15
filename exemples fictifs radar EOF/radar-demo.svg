@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="806" viewBox="0 0 1100 806" font-family="sans-serif">
+<defs><pattern id="eof-radar-couche-declaree" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="9" stroke="#2D4675" stroke-width="2.5"/></pattern></defs>
+<rect width="1100" height="806" fill="white"/>
+<text x="550.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Radar EROOM : test complet (6 axes, valeurs fictives)</text>
+<circle cx="550.0" cy="360" r="55.0" fill="none" stroke="#ccc" stroke-width="1"/>
+<circle cx="550.0" cy="360" r="110.0" fill="none" stroke="#ccc" stroke-width="1"/>
+<circle cx="550.0" cy="360" r="165.0" fill="none" stroke="#ccc" stroke-width="1"/>
+<circle cx="550.0" cy="360" r="220.0" fill="none" stroke="#333" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="550.0" y2="140.0" stroke="#999" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="740.5" y2="250.0" stroke="#999" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="740.5" y2="470.0" stroke="#999" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="550.0" y2="580.0" stroke="#999" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="359.5" y2="470.0" stroke="#999" stroke-width="1"/>
+<line x1="550.0" y1="360" x2="359.5" y2="250.0" stroke="#999" stroke-width="1"/>
+<text x="550.0" y="85.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">🛖 Produit</text>
+<text x="550.0" y="103.0" text-anchor="middle" font-size="13" font-weight="bold" fill="#2D4675">35,0 % de potentiel</text>
+<text x="550.0" y="119.0" text-anchor="middle" font-size="12" fill="#5F5F5F">16 critères renseignés sur 16</text>
+<text x="788.2" y="222.5" text-anchor="start" font-size="14" font-weight="bold" fill="#222">🗺️ Architecture</text>
+<text x="788.2" y="240.5" text-anchor="start" font-size="13" font-weight="bold" fill="#2D4675">55,0 % de potentiel</text>
+<text x="788.2" y="256.5" text-anchor="start" font-size="12" fill="#5F5F5F">3 critères renseignés sur 5</text>
+<text x="788.2" y="497.5" text-anchor="start" font-size="14" font-weight="bold" fill="#222">🏢 Infrastructure</text>
+<text x="788.2" y="515.5" text-anchor="start" font-size="13" font-weight="bold" fill="#2D4675">15,0 % de potentiel</text>
+<text x="788.2" y="531.5" text-anchor="start" font-size="12" fill="#5F5F5F">8 critères renseignés sur 8</text>
+<text x="550.0" y="635.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">💾 Stockage &amp; Données</text>
+<text x="550.0" y="653.0" text-anchor="middle" font-size="13" font-weight="bold" fill="#2D4675">30,0 % de potentiel</text>
+<text x="550.0" y="669.0" text-anchor="middle" font-size="12" fill="#5F5F5F">2 critères renseignés sur 6</text>
+<text x="311.8" y="497.5" text-anchor="end" font-size="14" font-weight="bold" fill="#222">👨‍💻 Algo &amp; Code</text>
+<text x="311.8" y="515.5" text-anchor="end" font-size="13" font-weight="bold" fill="#2D4675">50,0 % de potentiel</text>
+<text x="311.8" y="531.5" text-anchor="end" font-size="12" fill="#5F5F5F">5 critères renseignés sur 9</text>
+<text x="311.8" y="222.5" text-anchor="end" font-size="14" font-weight="bold" fill="#222">🛠 Facilité de changement</text>
+<text x="311.8" y="240.5" text-anchor="end" font-size="13" font-weight="bold" fill="#2D4675">25,0 % de potentiel</text>
+<text x="311.8" y="256.5" text-anchor="end" font-size="12" fill="#5F5F5F">4 critères renseignés sur 10</text>
+<polygon points="550.0,283.0 654.8,299.5 578.6,376.5 550.0,426.0 454.7,415.0 502.4,332.5" fill="none" stroke="#2D4675" stroke-width="2.5" stroke-dasharray="7 4"/>
+<path d="M550.0,283.0 L654.8,299.5 L578.6,376.5 L550.0,426.0 L454.7,415.0 L502.4,332.5 Z M550.0,283.0 L641.5,307.2 L572.9,373.2 L550.0,415.0 L530.9,371.0 L508.1,335.8 Z" fill="url(#eof-radar-couche-declaree)" fill-rule="evenodd" stroke="none"/>
+<polygon points="550.0,283.0 641.5,307.2 572.9,373.2 550.0,415.0 530.9,371.0 508.1,335.8" fill="#2D4675" fill-opacity="0.40" stroke="#2D4675" stroke-width="2.5"/>
+<text x="556.0" y="301.0" font-size="12" fill="#000" paint-order="stroke" stroke="white" stroke-width="1.5">25 %</text>
+<text x="556.0" y="246.0" font-size="12" fill="#000" paint-order="stroke" stroke="white" stroke-width="1.5">50 %</text>
+<text x="556.0" y="191.0" font-size="12" fill="#000" paint-order="stroke" stroke="white" stroke-width="1.5">75 %</text>
+<text x="556.0" y="136.0" font-size="12" fill="#000" paint-order="stroke" stroke="white" stroke-width="1.5">100 %</text>
+<circle cx="550.0" cy="283.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛖 Produit : 35,0 % de potentiel d'optimisation</title></circle>
+<circle cx="654.8" cy="299.5" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🗺️ Architecture : 55,0 % de potentiel d'optimisation</title></circle>
+<circle cx="641.5" cy="307.2" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🗺️ Architecture : 55,0 % de potentiel d'optimisation au total, dont 7,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
+<circle cx="578.6" cy="376.5" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🏢 Infrastructure : 15,0 % de potentiel d'optimisation</title></circle>
+<circle cx="572.9" cy="373.2" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🏢 Infrastructure : 15,0 % de potentiel d'optimisation au total, dont 3,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
+<circle cx="550.0" cy="426.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>💾 Stockage &amp; Données : 30,0 % de potentiel d'optimisation</title></circle>
+<circle cx="550.0" cy="415.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>💾 Stockage &amp; Données : 30,0 % de potentiel d'optimisation au total, dont 5,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
+<circle cx="454.7" cy="415.0" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>👨‍💻 Algo &amp; Code : 50,0 % de potentiel d'optimisation</title></circle>
+<circle cx="530.9" cy="371.0" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>👨‍💻 Algo &amp; Code : 50,0 % de potentiel d'optimisation au total, dont 40,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
+<circle cx="502.4" cy="332.5" r="6" fill="#2D4675" stroke="white" stroke-width="1.5"><title>🛠 Facilité de changement : 25,0 % de potentiel d'optimisation</title></circle>
+<circle cx="508.1" cy="335.8" r="4.5" fill="white" stroke="#2D4675" stroke-width="2"><title>🛠 Facilité de changement : 25,0 % de potentiel d'optimisation au total, dont 3,0 % de marge d'incertitude (déduction depuis un indice faible)</title></circle>
+<rect x="24" y="46" width="16" height="14" fill="#2D4675" fill-opacity="0.40" stroke="#2D4675" stroke-width="1.5"/>
+<text x="48" y="58" font-size="12" fill="#222">en plein : potentiel retenu (mesuré, déduit ou indiqué par le service)</text>
+<rect x="24" y="68" width="16" height="14" fill="url(#eof-radar-couche-declaree)" stroke="#2D4675" stroke-width="1.5"/>
+<text x="48" y="80" font-size="12" fill="#222">en hachuré : marge d'incertitude (déduction depuis un indice faible)</text>
+<text x="550.0" y="700" text-anchor="middle" font-size="12" fill="#222">Renseigné à ce jour : 34 % du potentiel maximum du référentiel (38 critères sur 54)</text>
+<rect x="270.0" y="708" width="560" height="14" fill="#EEE" stroke="#5F5F5F" stroke-width="1"/>
+<rect x="270.0" y="708" width="190.4" height="14" fill="#2D4675"/>
+<text x="550.0" y="748" text-anchor="middle" font-size="12" fill="#5F5F5F">Provenance des réponses : collecte 16, estimation 6, déclaré 9, précisé 1, supposé 6</text>
+<text x="550.0" y="766" text-anchor="middle" font-size="12" fill="#666">Le bord extérieur de chaque axe donne l'estimation globale du potentiel d'optimisation (plein et hachuré</text>
+<text x="550.0" y="784" text-anchor="middle" font-size="12" fill="#666">additionnés). Valeurs fictives, uniquement pour valider le rendu visuel.</text>
+</svg>

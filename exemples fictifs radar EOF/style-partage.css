@@ -1,0 +1,60 @@
+body {
+  font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+  max-width: 980px;
+  margin: 32px auto;
+  padding: 0 24px;
+  color: #222;
+  background: #fafafa;
+}
+h1 { font-size: 22px; }
+h2 { font-size: 17px; margin-top: 36px; }
+.bandeau-fictif {
+  background: #fdecea;
+  border-left: 4px solid #d9534f;
+  padding: 10px 14px;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.radar-bloc {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+.radar-bloc img { max-width: 620px; width: 100%; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 14px;
+}
+th, td {
+  border-bottom: 1px solid #eee;
+  padding: 8px 10px;
+  text-align: left;
+}
+th { background: #f2f2f2; }
+nav.variantes {
+  margin: 18px 0 30px;
+  font-size: 14px;
+}
+nav.variantes a {
+  margin-right: 14px;
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #333;
+}
+nav.variantes a.actif {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+.famille-note {
+  font-size: 13px;
+  color: #555;
+  margin: 6px 0 16px;
+}

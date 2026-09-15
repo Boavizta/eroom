@@ -1,0 +1,41 @@
+{
+  "pages": [
+    {
+      "url": "https://permisdeconduire.ants.gouv.fr/demarches-en-ligne/deterioration-remplacement-du-permis-pliant-3-volets-ou-fin-de-validite",
+      "has_autoplay_media": false,
+      "img_count": 0,
+      "adaptive_img_ratio": null,
+      "native_buttons": 0,
+      "custom_role_buttons": 0,
+      "viewport_content": null,
+      "viewport_ok": false,
+      "stylesheet_urls": [],
+      "mesure": {
+        "statut": "ok",
+        "cible": "https://permisdeconduire.ants.gouv.fr/demarches-en-ligne/deterioration-remplacement-du-permis-pliant-3-volets-ou-fin-de-validite",
+        "detail": null
+      }
+    },
+    {
+      "url": "https://moncompte.ants.gouv.fr/connexion?lang=fr",
+      "mesure": {
+        "statut": "echec_reseau",
+        "cible": "https://moncompte.ants.gouv.fr/connexion?lang=fr",
+        "detail": "HTTP 403"
+      }
+    },
+    {
+      "url": "https://moncompte.ants.gouv.fr/backend/api/procedure/start?procedureKey=driverLicence",
+      "mesure": {
+        "statut": "echec_reseau",
+        "cible": "https://moncompte.ants.gouv.fr/backend/api/procedure/start?procedureKey=driverLicence",
+        "detail": "HTTP 403"
+      }
+    }
+  ],
+  "css": {
+    "media_query_count": 0,
+    "has_prefers_reduced_or_scheme": false
+  },
+  "note": "HTML/CSS re-fetchés en direct sur les mêmes URLs déjà listées dans env-data.json (le .har capturé ne contient pas les corps de réponse HTML/CSS) — pas de nouveau périmètre de pages."
+}
