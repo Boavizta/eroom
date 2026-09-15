@@ -22,7 +22,7 @@ version: 1.0.0
 
 | Diagramme | Fichiers source (`.puml`) | Fichiers produits | Source de vérité | Régénérer si... |
 |-----------|--------------------------|-------------------|------------------|-----------------|
-| Vue générale (macro, par thématique) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthèse des 5 lignes ci-dessous (Collecte, Jugement auto EOF, Questionnaire EOF, Rapport, Impact CO2e) : pas de source unique, c'est un résumé volontairement macro | l'un des diagrammes détaillés ci-dessous change de thématique (nouvelle étape majeure, fusion/scission d'un bloc), ou la règle de précédence des provenances change (`processus/manifeste-lots.json::regle_de_precedence`) |
+| Vue générale (macro, par thématique) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthèse des 6 blocs ci-dessous (Collecte, Jugement auto EOF, Impact CO2e, Rapport - première génération, Questionnaire EOF, Rapport - régénération) : pas de source unique, c'est un résumé volontairement macro. Rapport apparaît deux fois (avant et après le questionnaire) pour montrer les deux passes ; Impact CO2e est positionné avant la première génération car ses données, une fois calculées, alimentent la prochaine génération de rapport, pas un ajout final isolé. Légende à 2 couleurs (fond gris pâle `#ECECF2` = automatique, fond bleu clair Octo `#9BD0DD` = action humaine requise) sur les blocs Impact CO2e et Questionnaire EOF | l'un des diagrammes détaillés ci-dessous change de thématique (nouvelle étape majeure, fusion/scission d'un bloc), ou la règle de précédence des provenances change (`processus/manifeste-lots.json::regle_de_precedence`) |
 | Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 | e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
@@ -431,11 +431,14 @@ end note
 ### Contenu de référence — analyse-parcours-p5.puml
 
 **Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 30, 40, 50) + `run_efootprint.py`
-(modèle Boavizta, schéma `efootprint-synthese-python.json`) + `generate_report_html.py`
-(section CO2e). Points à revérifier si le code change : structure d'`efootprint-synthese-python.json`
-(bloc `traffic`, `totals` avec dicts `fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`,
-gros bloc `hypotheses`), position de la section (entre CWV et Annexes), trafic réutilisé
-depuis le bloc `traffic` s'il est déjà résolu.
+(modèle Boavizta, schéma `efootprint-synthese-python.json`, et `run_recommendation_scenarios()` pour
+`efootprint-recommendations-gains.json`) + `generate_report_html.py` (section CO2e, blocs
+"Gain CO2e estimé" / "Gain EcoIndex & LCP estimé", annexe F/G). Points à revérifier si le code
+change : structure d'`efootprint-synthese-python.json` (bloc `traffic`, `totals` avec dicts
+`fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`, gros bloc `hypotheses`), position de
+la section (entre CWV et Annexes), trafic réutilisé depuis le bloc `traffic` s'il est déjà résolu,
+lettrage des sous-sections de l'annexe Méthodologie (actuellement A à H, cf. Diagramme 3 pour le
+détail du chantier EcoIndex/LCP par palier).
 
 ```plantuml
 @startuml analyse-parcours-p5
@@ -533,6 +536,16 @@ note over REF, FS
   }
 end note
 
+REF -> REF : Automatique — Scénarios de recommandations\n(recommendations.py) : recalcul RÉEL du modèle\npour 3 paliers cumulés (prio1 / prio1+2 / prio1+2+3)
+REF -> FS : efootprint-scenario-{palier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
+
+note over REF, FS
+  Aucune question posée à l'utilisateur pour cette étape :
+  entièrement automatique, à partir des mêmes seuils
+  prio1/prio2/prio3 déjà utilisés par les recommandations
+  qualitatives du rapport (JS/CSS mort, doublons, Brotli).
+end note
+
 REF -> C : stdout : tableau hypothèses\n+ résultats CO2e bruts
 
 == Étape 50 — Synthèse et enrichissement rapport ==
@@ -546,9 +559,10 @@ alt Régénérer le rapport HTML
   GR -> FS : Lire efootprint-synthese-python.json\n(+ har, coverage, cwv, tech_stack)
   FS -> GR : Données rapport
   GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
+  GR -> GR : Recommandations -> bloc "Gain CO2e estimé"\n+ bloc "Gain EcoIndex & LCP estimé"\n(si efootprint-recommendations-gains.json présent)
   GR -> FS : rapport-parcours-YYYY-MM-DD.html
   GR -> C : Chemin rapport
-  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A/B/C/D)
+  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A à H,\ndont F. Recommandations et G. EcoIndex/LCP)
 end
 
 note over U, C
@@ -692,20 +706,26 @@ stop
 
 ## Diagramme 3 — e-footprint (pipeline outils CO2e)
 
-**Source de vérité :** le code réel des 3 scripts (pas de doc markdown intermédiaire,
+**Source de vérité :** le code réel des scripts (pas de doc markdown intermédiaire,
 car les entrées/sorties précises — noms de champs JSON, sous-outils appelés — ne
 sont fiables qu'en lisant le code) :
 - `analyse-parcours/scripts/collect_env_data.py` (orchestrateur collecte : HAR,
   API CrUX, ipinfo.io, `detect_tech.py`, `similarweb_api.py`)
 - `analyse-parcours/scripts/run_efootprint.py` (orchestrateur calcul : librairie
-  e-footprint/Boavizta)
-- `analyse-parcours/scripts/generate_report_html.py` (restitution section CO2e)
+  e-footprint/Boavizta, et `run_recommendation_scenarios()` pour les paliers)
+- `analyse-parcours/scripts/efootprint_model/recommendations.py` (calcul des
+  réductions par recommandation et des 3 scénarios cumulés)
+- `analyse-parcours/scripts/har_metrics.py` (`ecoindex_score`/`ecoindex_grade`/
+  `lcp_delta_s`, appelées par `generate_report_html.py` pour le Bloc 4)
+- `analyse-parcours/scripts/generate_report_html.py` (restitution section CO2e
+  + blocs de gain CO2e/EcoIndex/LCP)
 
 ### Description
 
-Diagramme d'activité (PlantUML) en 4 blocs séquentiels verticaux (format A4
+Diagramme d'activité (PlantUML) en 5 blocs séquentiels verticaux (format A4
 portrait) : outils de collecte -> données récoltées (env-data.json) -> calcul
-e-footprint/Boavizta -> restitution. Une étape de départ séparée représente la
+e-footprint/Boavizta (scénario de référence) -> scénarios de recommandations
+(3 paliers cumulés) -> restitution. Une étape de départ séparée représente la
 capture manuelle Chrome DevTools (source du .har et du Coverage-*.json).
 
 Le Bloc 1 liste les 5 sous-outils de `collect_env_data.py` dans leur ordre
@@ -714,6 +734,16 @@ parallèle (contrairement au DISPATCH HAR/Coverage du diagramme 1, qui utilise
 de vrais sous-agents concurrents). Vérifié en lisant le code, pas supposé.
 Les notes de paramètres CLI (Blocs 2 et 3) sont volontairement compactes (une
 ligne, noms de flags seulement, sans description).
+
+Le Bloc 3bis (ajouté lors du chantier "gain CO2e puis EcoIndex/LCP par palier
+de recommandations") recalcule RÉELLEMENT le modèle Boavizta pour 3 paliers
+cumulés (prio1 / prio1+2 / prio1+2+3), à partir des mêmes seuils que les
+recommandations qualitatives déjà affichées dans le rapport (JS/CSS mort,
+doublons, Brotli). Le poids décompressé des doublons exclut les revalidations
+HTTP 304 (leur contenu n'est jamais retéléchargé). Le Bloc 4 lit le fichier de
+gains résultant et rend deux blocs synthétiques (Gain CO2e, Gain EcoIndex &
+LCP) plus deux sous-sections d'annexe (F, G) — omis ou en repli "non
+disponible" si le fichier est absent ou d'un schéma antérieur à ce chantier.
 
 Différence avec le diagramme 1 (workflow séquence, pages 4-5) : celui-ci se
 concentre sur les **outils et leurs contrats de données** (paramètres CLI, champs

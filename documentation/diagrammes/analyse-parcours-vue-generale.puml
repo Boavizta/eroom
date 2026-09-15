@@ -18,6 +18,17 @@ skinparam PartitionBorderColor #5BA1BC
 
 start
 
+note right #ECECF2
+  **Legende**
+  Fond gris pale : automatique
+  (calcul machine, aucune action humaine)
+end note
+
+note right #9BD0DD
+  Fond bleu clair : action humaine requise
+  (saisie, decision, ou reponse d'un tiers externe)
+end note
+
 partition "**COLLECTE** (automatique)" {
   :HAR, Coverage, Core Web Vitals
   (analyze_har.py, coverage_metrics.py,
@@ -31,12 +42,37 @@ partition "**JUGEMENT AUTOMATIQUE EOF** (automatique)" {
   le reste reste "je ne sais pas");
 }
 
-partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #DBDDE5 {
+partition "**IMPACT CO2e** (optionnel, a tout moment)" #9BD0DD {
+  :/efootprint -> modele Boavizta (reference
+  + 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)
+  -> donnees disponibles pour la PROCHAINE
+  generation du rapport, pas un ajout final isole;
+  :Action humaine possible : trafic annuel et
+  taille d'instance cloud, si non auto-detectes;
+}
+
+note right #ECECF2
+  Peut se lancer avant ou apres le premier rapport,
+  avant ou apres le questionnaire EOF : chaque
+  generation du rapport reprend simplement les
+  donnees alors disponibles sur disque.
+end note
+
+partition "**RAPPORT — premiere generation** (automatique)" {
+  :generate_report_html.py
+  (+ check_valeurs_rapport.py, controle
+  interne non bloquant)
+  -> contient deja le jugement EOF automatique
+  (partiel) et le CO2e si deja calcule;
+}
+
+partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #9BD0DD {
   :Quand : apres le jugement automatique,
   uniquement sur les criteres restes
   "je ne sais pas" - jamais avant,
   jamais declenche seul;
-  :Comment : genere, envoye au client,
+  :generate_questionnaire.py -> fichier a remplir
+  (questionnaire-eof.md), envoye au client,
   rempli, relu (parse_questionnaire.py),
   fusionne (fusionner_lots.py) selon la
   precedence collecte > estime > precise
@@ -51,15 +87,10 @@ note right #ECECF2
   -> generate_report_html.py.
 end note
 
-partition "**RAPPORT** (automatique)" {
+partition "**RAPPORT — regeneration** (automatique)" {
   :generate_report_html.py
-  (+ check_valeurs_rapport.py, controle
-  interne non bloquant);
-}
-
-partition "**IMPACT CO2e** (optionnel, a la demande)" #9BD0DD {
-  :/efootprint -> modele Boavizta
-  -> section CO2e ajoutee au rapport;
+  -> reflete les reponses du questionnaire
+  fusionnees (+ CO2e si calcule entre-temps);
 }
 
 stop

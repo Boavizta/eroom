@@ -48,7 +48,7 @@ partition "**Bloc 2 — Données récoltées** -> env-data.json" {
   end note
 }
 
-partition "**Bloc 3 — run_efootprint.py** (calcul e-footprint/Boavizta)" {
+partition "**Bloc 3 — run_efootprint.py** (calcul e-footprint/Boavizta, scénario de référence)" {
   note right #FFF3CD
     Cas optionnel : IA générative tierce détectée
     -> e-footprint délègue ce calcul précis à
@@ -66,15 +66,51 @@ partition "**Bloc 3 — run_efootprint.py** (calcul e-footprint/Boavizta)" {
   + efootprint-synthese-python.json;
 }
 
+partition "**Bloc 3bis — Scénarios de recommandations** (recommendations.py, dans run_efootprint.py)" {
+  :dead_code_reductions, duplicate_reductions,
+  brotli_reductions -> une Reduction par
+  (Job, recommandation) avec octets transférés,
+  octets décompressés, requêtes retirées;
+  note right #FFF3CD
+    Poids décompressé DIRECT (Coverage mesure déjà
+    le code mort sur le décompressé) - sauf doublons
+    HTTP 304 (revalidation cache), exclus du poids
+    décompressé retirable, comptés seulement en
+    requêtes et en octets transférés (déjà minimes)
+  end note
+  :apply_recommendations -> 3 SiteSpec cumulées
+  (prio1, prio1+2, prio1+2+3), recalcul RÉEL
+  du modèle Boavizta pour chacune;
+  :Écrire efootprint-scenario-{palier}.e-f.json
+  (4 fichiers : référence + 3 paliers,
+  rechargeables sur e-footprint.boavizta.org)
+  + efootprint-recommendations-gains.json
+  (gain CO2e par palier, reductions_detail
+  par page, recommandations exclues,
+  hypothèses générales);
+}
+
 partition "**Bloc 4 — generate_report_html.py** (restitution)" {
   :Lire les résultats du calcul CO2e
   (efootprint-synthese-python.json)
   et la stack technique détectée (tech_stack);
   :parsing des fichiers Coverage-*.json
   pour la section Code mort JS/CSS;
+  :Lire efootprint-recommendations-gains.json
+  (si absent ou schéma antérieur : sections
+  omises ou "non disponible", pas d'exception);
   :Générer section CO2e (KPIs,
   fabrication/énergie, hypothèses,
   stack technique, recommandations);
+  :Recommandations -> bloc "Gain CO2e estimé"
+  + bloc "Gain EcoIndex & LCP estimé"
+  (recalcul par page via har_metrics.py
+  ecoindex_score/ecoindex_grade/lcp_delta_s,
+  LCP = estimation grossière, surestimation
+  possible, dit explicitement);
+  :Annexe Méthodologie -> F. Recommandations
+  & gain CO2e, G. Gain EcoIndex & LCP par page
+  (3 tableaux, un par palier, delta par page);
 }
 
 stop

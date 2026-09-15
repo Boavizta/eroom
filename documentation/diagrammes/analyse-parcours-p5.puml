@@ -93,6 +93,16 @@ note over REF, FS
   }
 end note
 
+REF -> REF : Automatique — Scénarios de recommandations\n(recommendations.py) : recalcul RÉEL du modèle\npour 3 paliers cumulés (prio1 / prio1+2 / prio1+2+3)
+REF -> FS : efootprint-scenario-{palier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
+
+note over REF, FS
+  Aucune question posée à l'utilisateur pour cette étape :
+  entièrement automatique, à partir des mêmes seuils
+  prio1/prio2/prio3 déjà utilisés par les recommandations
+  qualitatives du rapport (JS/CSS mort, doublons, Brotli).
+end note
+
 REF -> C : stdout : tableau hypothèses\n+ résultats CO2e bruts
 
 == Étape 50 — Synthèse et enrichissement rapport ==
@@ -106,9 +116,10 @@ alt Régénérer le rapport HTML
   GR -> FS : Lire efootprint-synthese-python.json\n(+ har, coverage, cwv, tech_stack)
   FS -> GR : Données rapport
   GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
+  GR -> GR : Recommandations -> bloc "Gain CO2e estimé"\n+ bloc "Gain EcoIndex & LCP estimé"\n(si efootprint-recommendations-gains.json présent)
   GR -> FS : rapport-parcours-YYYY-MM-DD.html
   GR -> C : Chemin rapport
-  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A/B/C/D)
+  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A à H,\ndont F. Recommandations et G. EcoIndex/LCP)
 end
 
 note over U, C
