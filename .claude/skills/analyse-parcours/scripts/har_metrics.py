@@ -56,6 +56,29 @@ def ecoindex_grade(score):
     return "G", "#ED2124"
 
 
+# Débit du profil de throttling "mobileSlow4G" utilisé par Lighthouse
+# (`throttlingMethod: 'simulate'`, réglage par défaut mobile). RE-VÉRIFIÉ le
+# 2026-09-14 dans le paquet npm @paulirish/trace_engine@0.0.65
+# (models/trace/lantern/simulation/Constants.js), vers lequel
+# GoogleChrome/lighthouse (core/config/constants.js, branche main) réexporte
+# désormais sa constante de throttling : throughputKbps=1.6*1024=1638.4,
+# downloadThroughputKbps = throughputKbps * DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR
+# (0.9) = 1474.56 kbit/s - c'est ce débit de TÉLÉCHARGEMENT (pas le brut) qui
+# s'applique réellement au chargement d'une page.
+LIGHTHOUSE_SLOW4G_DOWNLOAD_BPS = 1474.56 * 1000  # kbit/s -> bit/s
+
+
+def lcp_delta_s(bytes_removed_transferred, download_bps=LIGHTHOUSE_SLOW4G_DOWNLOAD_BPS):
+    """Delta de temps de transfert estimé pour un retrait d'octets transférés.
+
+    ESTIMATION GROSSIÈRE : (octets retirés x 8) / débit Lighthouse Slow4G.
+    Ignore la latence (RTT), la parallélisation HTTP/2+ et le cache
+    navigateur - RISQUE DE SURESTIMATION du gain réel de LCP, à dire
+    explicitement partout où ce chiffre est affiché.
+    """
+    return (bytes_removed_transferred * 8) / download_bps
+
+
 def count_dom_elements(html_text):
     """Compte les balises ouvrantes dans un corps HTML."""
     if not html_text:

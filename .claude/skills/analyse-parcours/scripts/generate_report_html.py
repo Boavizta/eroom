@@ -116,7 +116,7 @@ if _skill_md.exists():
 
 # ── Imports EcoIndex ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from har_metrics import extract_page_metrics, load_cwv
+from har_metrics import extract_page_metrics, load_cwv, ecoindex_score, ecoindex_grade, lcp_delta_s
 from efootprint_model.temps_utilisateur import nielsen_raw_seconds as _nielsen_raw_seconds
 
 
@@ -483,13 +483,21 @@ def _bar(used_pct):
             f'</div>')
 
 
+def _normalize_page_url(url):
+    """Normalisation partagée d'une URL de page : sans query string, sans slash
+    final. Utilisée pour dédupliquer `page_metrics` (repli 1st-party/dédup HAR)
+    et pour apparier `page_url` (venant de `reductions_detail`, brut) aux
+    entrées `page_metrics` correspondantes."""
+    return url.split("?")[0].rstrip("/") or url
+
+
 def _dedup_page_metrics(page_metrics):
     """Déduplique par URL canonique : garde la ligne avec mesure réussie (statut ok), sinon la plus lourde.
     Ajoute un champ page_num (1-indexé) dans l'ordre de première apparition."""
     seen = {}
     order = []
     for m in page_metrics:
-        url = m["title"].split("?")[0].rstrip("/") or m["title"]
+        url = _normalize_page_url(m["title"])
         prev = seen.get(url)
         if prev is None:
             seen[url] = m
@@ -3081,7 +3089,7 @@ def _methodo_eof(results):
             f'</tr>'
         )
     return f"""
-  <h3 style="margin-top:24px">Détail des 54 critères EOF</h3>
+  <h3 id="methodo-eof" style="margin-top:20px">H. Détail des 54 critères EOF</h3>
   <p style="font-size:15px;color:#666">
     {_confidence_badge("collecte")} mesuré par nos scripts (CrUX, ipinfo, PageSpeed Insights, en-têtes HTTP)
     &nbsp;·&nbsp;
@@ -3546,6 +3554,8 @@ _RECO_LABELS = {
     "css_dead": "Code CSS mort",
     "duplicates": "Ressources en double",
     "brotli": "Compression Brotli",
+    "inp": "INP (interactivité)",
+    "cls": "CLS (stabilité visuelle)",
 }
 
 # Libellés de palier utilisés à la fois pour le "tier" d'une recommandation
@@ -3565,11 +3575,151 @@ _PALIER_LABELS = {
     "prio1_2_3": "Prio 1 + 2 + 3",
 }
 
+# Mêmes ensembles de tiers cumulatifs que efootprint_model/recommendations.py::_TIER_SETS
+# (non importés d'ici : ce module ne dépend jamais d'efootprint_model, il ne fait que
+# lire le JSON déjà écrit par run_efootprint.py).
+_ECOINDEX_TIER_SETS = {
+    "prio1": frozenset({"prio1"}),
+    "prio1_2": frozenset({"prio1", "prio2"}),
+    "prio1_2_3": frozenset({"prio1", "prio2", "prio3"}),
+}
+
+
+def _ecoindex_reductions_by_page(gains):
+    """Agrège `reductions_detail` par page normalisée x palier cumulatif.
+
+    Retourne `{url_normalisee: {palier: {"decomp": .., "transfer": .., "requests": ..}}}`,
+    ou `None` si `gains` est vide OU si aucune entrée ne porte `page_url` (schéma
+    antérieur au chantier EcoIndex/LCP) - distinct de `{}` ("disponible mais
+    aucune réduction chiffrable"), pour que l'appelant affiche "non disponible,
+    régénérer..." plutôt qu'un tableau vide silencieux."""
+    if not gains:
+        return None
+    reductions = gains.get("reductions_detail") or []
+    if not any(r.get("page_url") for r in reductions):
+        return None
+
+    result = {}
+    for r in reductions:
+        page_url = r.get("page_url")
+        tier = r.get("tier")
+        if not page_url or tier is None:
+            continue
+        url = _normalize_page_url(page_url)
+        for palier, tiers in _ECOINDEX_TIER_SETS.items():
+            if tier not in tiers:
+                continue
+            bucket = result.setdefault(url, {}).setdefault(
+                palier, {"decomp": 0.0, "transfer": 0.0, "requests": 0}
+            )
+            bucket["decomp"] += r.get("bytes_removed_decompressed") or 0.0
+            bucket["transfer"] += r.get("bytes_removed") or 0.0
+            bucket["requests"] += r.get("requests_removed") or 0
+    return result
+
+
+def _lcp_baseline_s(m, cwv):
+    """LCP de référence pour une page, même hiérarchie que `_section_dashboard` :
+    CWV réel (pire des deux stratégies) si disponible, sinon repli onLoad HAR
+    (proxy). Retourne (valeur_s, est_un_proxy)."""
+    cwv_data, _ = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
+    if cwv_data and isinstance(cwv_data.get("lcp"), (int, float)):
+        return cwv_data["lcp"], False
+    return m["on_load_ms"] / 1000, True
+
+
+def _ecoindex_lcp_for_tier(m, cwv, reductions_for_tier):
+    """Recalcule EcoIndex et LCP grossier pour une page, à un palier donné.
+
+    `new_size_ko` retranche le poids DÉCOMPRESSÉ (EcoIndex se calcule sur ce
+    poids, cf. `har_metrics.py::extract_page_metrics` qui somme déjà
+    `content.size`) ; `lcp_delta_s` retranche lui le poids TRANSFÉRÉ (le débit
+    réseau simulé s'applique aux octets réellement envoyés sur le fil). Le DOM
+    est inchangé : aucune recommandation de ce chantier ne retire un nœud DOM."""
+    decomp = reductions_for_tier.get("decomp", 0.0)
+    transfer = reductions_for_tier.get("transfer", 0.0)
+    req_removed = reductions_for_tier.get("requests", 0)
+
+    # `duplicate_reductions()` détecte les doublons sur l'ensemble du HAR, pas
+    # page par page (cf. efootprint_model/recommendations.py) : les octets/
+    # requêtes attribués à CETTE page peuvent dépasser son propre poids/nombre
+    # de requêtes si des doublons d'autres pages lui sont rattachés. `size_ko`/
+    # `req` sont alors CLAMPÉS à 0, pas négatifs - à signaler explicitement
+    # plutôt que de laisser croire que la page devient vide.
+    size_clamped = (decomp / 1024) > m["size_ko"]
+    req_clamped = req_removed > m["req"]
+    new_size_ko = max(0.0, m["size_ko"] - decomp / 1024)
+    new_req = max(0, m["req"] - req_removed)
+    dom = m["dom"]
+    score = ecoindex_score(dom, new_req, new_size_ko)
+    grade, color = ecoindex_grade(score)
+
+    lcp_baseline, lcp_is_proxy = _lcp_baseline_s(m, cwv)
+    new_lcp = max(0.0, lcp_baseline - lcp_delta_s(transfer))
+
+    return {
+        "size_ko": new_size_ko, "req": new_req, "dom": dom,
+        "score": score, "grade": grade, "grade_color": color,
+        "lcp": new_lcp, "lcp_baseline": lcp_baseline, "lcp_is_proxy": lcp_is_proxy,
+        "size_clamped": size_clamped, "req_clamped": req_clamped,
+    }
+
+
+def _ecoindex_tier_table(page_metrics, gains, cwv, tier, tier_label):
+    """Tableau annexe détaillé pour un palier : une ligne par page, colonnes
+    Page / EcoIndex / Requêtes / Poids / DOM / LCP - PAS de colonnes INP/CLS
+    (non estimés, cf. `_EXCLUDED_RECOMMENDATIONS` côté run_efootprint.py).
+    Chaque cellule montre la nouvelle valeur avec le delta entre parenthèses."""
+    reductions_by_page = _ecoindex_reductions_by_page(gains)
+    if not reductions_by_page:
+        return ""
+
+    deduped = [m for m in _dedup_page_metrics(page_metrics)
+               if m.get("mesure", {}).get("statut") == "ok"]
+
+    rows = ""
+    for m in deduped:
+        url = _normalize_page_url(m["title"])
+        reductions_for_tier = (reductions_by_page.get(url) or {}).get(tier)
+        if not reductions_for_tier:
+            continue
+        t = _ecoindex_lcp_for_tier(m, cwv, reductions_for_tier)
+        num = m.get("page_num", "")
+        badge = _badge(t["grade"], t["grade_color"])
+        eco_delta = t["score"] - m["ecoindex"]
+        req_delta = t["req"] - m["req"]
+        size_delta = t["size_ko"] - m["size_ko"]
+        lcp_delta = t["lcp"] - t["lcp_baseline"]
+        lcp_suffix = " *" if t["lcp_is_proxy"] else ""
+        req_suffix = " &dagger;" if t["req_clamped"] else ""
+        size_suffix = " &dagger;" if t["size_clamped"] else ""
+        rows += f"""<tr>
+      <td>P{num} {url}</td>
+      <td style="text-align:center">{badge} {t['score']}/100 ({eco_delta:+.0f})</td>
+      <td style="text-align:right">{t['req']} ({req_delta:+.0f}){req_suffix}</td>
+      <td style="text-align:right">{t['size_ko']:.0f} Ko ({size_delta:+.0f}){size_suffix}</td>
+      <td style="text-align:right">{t['dom']}</td>
+      <td style="text-align:right">{t['lcp']:.2f} s ({lcp_delta:+.2f}){lcp_suffix}</td>
+    </tr>"""
+
+    if not rows:
+        return ""
+    return f"""<h5 style="margin:10px 0 4px">Palier {tier_label}</h5>
+  <table>
+    <thead><tr>
+      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requêtes</th>
+      <th>Poids</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>"""
+
 
 def _methodo_recommendations(gains):
-    """Sous-section G : détail du recalcul CO2e par palier de recommandations
+    """Sous-section F : détail du recalcul CO2e par palier de recommandations
     (efootprint-recommendations-gains.json, écrit par
-    run_efootprint.py::run_recommendation_scenarios()).
+    run_efootprint.py::run_recommendation_scenarios()). Le détail par page du
+    recalcul EcoIndex/LCP par palier vit dans la sous-section G séparée
+    (`_methodo_ecoindex_lcp`), pas ici.
 
     Un VRAI recalcul du modèle e-footprint par palier cumulatif (pas une
     approximation forfaitaire), le détail par type de recommandation (regroupé
@@ -3650,14 +3800,61 @@ def _methodo_recommendations(gains):
         )
 
     return (
-        '<h3 id="methodo-recommandations" style="margin-top:20px">G. Recommandations &amp; gain estimé</h3>'
+        '<h3 id="methodo-recommandations" style="margin-top:20px">F. Recommandations &amp; gain estimé</h3>'
         f'{intro}{table_html}{notes_html}{excluded_html}{hyp_html}'
     )
 
 
-def _section_methodologie(synthese_python, cwv, eof_results=None, recommendations_gains=None):
+def _methodo_ecoindex_lcp(gains, page_metrics, cwv):
+    """Sous-section G : détail par page du recalcul EcoIndex/LCP par palier de
+    recommandations (mêmes `reductions_detail` que la sous-section F, vues
+    sous l'angle EcoIndex/LCP plutôt que CO2e). Section autonome plutôt que
+    sous-bloc de F : contenu substantiel (3 tableaux par page), pas une note
+    annexe au calcul CO2e."""
+    if not gains or page_metrics is None:
+        return ""
+
+    reductions_by_page = _ecoindex_reductions_by_page(gains)
+    if reductions_by_page is None:
+        return (
+            '<h3 id="methodo-ecoindex-lcp" style="margin-top:20px">G. Gain EcoIndex &amp; LCP par page</h3>'
+            '<p style="font-size:15px;color:#888">Non disponible pour cet audit (fichier de '
+            'gains généré avant le chantier EcoIndex/LCP) - régénérer '
+            '<code>run_efootprint.py</code> pour l\'obtenir.</p>'
+        )
+
+    tier_tables = "".join(
+        _ecoindex_tier_table(page_metrics, gains, cwv, tier, _PALIER_LABELS.get(tier, tier))
+        for tier in ("prio1", "prio1_2", "prio1_2_3")
+    )
+    if not tier_tables:
+        return ""
+
+    return (
+        '<h3 id="methodo-ecoindex-lcp" style="margin-top:20px">G. Gain EcoIndex &amp; LCP par page</h3>'
+        '<p style="font-size:15px;color:#555">EcoIndex recalculé sur le poids '
+        'DÉCOMPRESSÉ (calcul direct, pas de transposition contrairement au CO2e en F ci-dessus). '
+        'LCP grossier via la formule sourcée en F - <b>risque de surestimation</b>. '
+        'Le DOM n\'est pas modifié par ces recommandations. INP et CLS ne sont pas estimés '
+        '(voir "Recommandations non incluses" en F ci-dessus). '
+        '<b>&dagger;</b> : le calcul des doublons HAR détecte les doublons sur '
+        'l\'ENSEMBLE du parcours capturé, pas page par page - le nombre de requêtes '
+        'qu\'il attribue à une page peut donc dépasser son propre nombre de requêtes '
+        'si des doublons chargés sur d\'AUTRES pages lui sont rattachés (première '
+        'occurrence vue ailleurs dans le parcours). Un &dagger; marque une valeur '
+        'ramenée à 0 dans ce cas - la page ne devient pas réellement vide, c\'est un '
+        'artefact de cette attribution cross-page (le poids, lui, exclut déjà les '
+        'revalidations HTTP 304 du calcul - seul un vrai re-téléchargement complet '
+        'compte comme poids supprimable - donc bien moins exposé au même artefact, '
+        'mais pas totalement à l\'abri si plusieurs re-téléchargements complets se '
+        'chevauchent entre pages).</p>'
+        f'{tier_tables}'
+    )
+
+
+def _section_methodologie(synthese_python, cwv, eof_results=None, recommendations_gains=None, page_metrics=None):
     """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
-    E: médias, F: EOF, G: recommandations & gain estimé).
+    E: médias, F: recommandations & gain estimé, G: gain EcoIndex &amp; LCP par page, H: EOF).
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
@@ -3667,8 +3864,9 @@ def _section_methodologie(synthese_python, cwv, eof_results=None, recommendation
         _methodo_ecoindex(),
         _methodo_trafic(synthese_python),
         _methodo_medias(),
-        _methodo_eof(eof_results),
         _methodo_recommendations(recommendations_gains),
+        _methodo_ecoindex_lcp(recommendations_gains, page_metrics, cwv),
+        _methodo_eof(eof_results),
     ]
     body = "".join(p for p in parts if p)
     return (
@@ -3896,6 +4094,60 @@ def _recommendations_gains_block(gains):
   </div>"""
 
 
+def _ecoindex_gains_block(gains, page_metrics, cwv):
+    """Bloc synthétique "Gain EcoIndex &amp; LCP estimé", même style visuel que
+    `_recommendations_gains_block` (OCTO_PALE/OCTO_BLUE). Agrégation : moyenne
+    du delta EcoIndex et du delta LCP sur les pages avec `mesure.statut == "ok"`
+    (une page = une voix, pas pondérée par trafic - cohérent avec le filtre déjà
+    appliqué par le tableau de bord). Retourne "" si aucune donnée exploitable
+    (gains absents, schéma pré-chantier, ou aucune page avec mesure réussie)."""
+    reductions_by_page = _ecoindex_reductions_by_page(gains)
+    if not reductions_by_page:
+        return ""
+
+    deduped = [m for m in _dedup_page_metrics(page_metrics)
+               if m.get("mesure", {}).get("statut") == "ok"]
+    if not deduped:
+        return ""
+
+    rows_html = ""
+    for key in ("prio1", "prio1_2", "prio1_2_3"):
+        deltas_eco = []
+        deltas_lcp = []
+        for m in deduped:
+            url = _normalize_page_url(m["title"])
+            reductions_for_tier = (reductions_by_page.get(url) or {}).get(key)
+            if not reductions_for_tier:
+                continue
+            t = _ecoindex_lcp_for_tier(m, cwv, reductions_for_tier)
+            deltas_eco.append(t["score"] - m["ecoindex"])
+            deltas_lcp.append(t["lcp_baseline"] - t["lcp"])
+        if not deltas_eco:
+            continue
+        label = _PALIER_LABELS.get(key, key)
+        avg_eco = sum(deltas_eco) / len(deltas_eco)
+        avg_lcp = sum(deltas_lcp) / len(deltas_lcp)
+        rows_html += (
+            f'<li>+<b>{avg_eco:.1f} points EcoIndex</b> en moyenne, et '
+            f'&asymp; -<b>{avg_lcp:.2f} s</b> de LCP (estimation grossière) en appliquant <b>{label}</b></li>'
+        )
+
+    if not rows_html:
+        return ""
+
+    return f"""
+  <div class="prio" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
+    <b>Gain EcoIndex &amp; LCP estimé si vous appliquez ces recommandations</b>
+    <ul style="margin-top:6px;padding-left:20px">{rows_html}</ul>
+    <p style="font-size:13px;color:#888;margin:4px 0 0">
+      <b>Estimation grossière du LCP : risque de surestimation</b> (ignore la latence, la
+      parallélisation HTTP/2+ et le cache navigateur). Le DOM n'est pas modifié par ces
+      recommandations. L'INP et le CLS ne sont pas estimés, voir le détail en
+      <a href="#methodologie">annexe Méthodologie</a>.
+    </p>
+  </div>"""
+
+
 def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, tech_stack=None, greenit=None, gains=None):
     prio1, prio2, prio3 = [], [], []
     cwv = cwv or {}
@@ -4116,6 +4368,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     {_see_also(prio3, ("trafic", "A.2 Trafic réseau"), ("greenit", "2. Bonnes pratiques GreenIT"))}
   </div>
   {_recommendations_gains_block(gains)}
+  {_ecoindex_gains_block(gains, page_metrics, cwv)}
 </section>"""
 
 
@@ -4290,7 +4543,6 @@ def generate(audit_dir, output_path=None):
     has_medias = bool((greenit or {}).get("media", {}).get("video", {}).get("count") or
                        (greenit or {}).get("media", {}).get("pdf", {}).get("count"))
 
-    letters = "abcdefgh"
     n = 3  # 1=Recommandations, 2=GreenIT, puis suit
     medias_nav = ""
     if has_medias:
@@ -4309,8 +4561,12 @@ def generate(audit_dir, output_path=None):
         eof_nav = f'<li><a href="#eof">{n}. Potentiel d’optimisation (EOF)</a></li>'
         n += 1
     annexes_num = n
+    # "A.N" pour matcher exactement la numérotation du corps des annexes
+    # (_prefix_h2 avec methodo_num/glossaire_num/tech_num, plus bas dans cette
+    # fonction) - avant ce correctif, le sommaire affichait encore l'ancienne
+    # notation "6.a...6.g", introuvable dans le corps du rapport.
     annexe_inline = " &nbsp;·&nbsp; ".join(
-        f'<a href="#{sid}">{annexes_num}.{letters[i]} {slabel}</a>'
+        f'<a href="#{sid}">A.{i+1} {slabel}</a>'
         for i, (sid, slabel) in enumerate(annexe_sections)
     )
     nav_items = (
@@ -4373,7 +4629,7 @@ def generate(audit_dir, output_path=None):
     _annexe_ids = [sid for sid, _ in annexe_sections]
     methodo_num = f"A.{_annexe_ids.index('methodologie') + 1}"
     glossaire_num = f"A.{_annexe_ids.index('glossaire') + 1}"
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results, recommendations_gains), methodo_num)}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results, recommendations_gains, page_metrics), methodo_num)}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), glossaire_num)}</div>\n'
     html += '</section>\n'
 

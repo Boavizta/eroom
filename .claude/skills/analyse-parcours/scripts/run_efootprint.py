@@ -628,9 +628,11 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
 # ---------------------------------------------------------------------------
 
 # Recommandations qualitatives du rapport HTML sans paramètre e-footprint
-# natif : exclues du calcul chiffré (cf. justification détaillée par entrée),
-# mais listées ici pour que le fichier de gains explique explicitement ce
-# qu'il ne chiffre pas plutôt que de le passer sous silence.
+# natif, ni paramètre EcoIndex/CWV chiffrable : exclues du calcul chiffré (cf.
+# justification détaillée par entrée), mais listées ici pour que le fichier
+# de gains explique explicitement ce qu'il ne chiffre pas plutôt que de le
+# passer sous silence. Couvre à la fois les exclusions CO2e (chantier
+# initial) et les exclusions EcoIndex/CWV (chantier LCP/EcoIndex).
 _EXCLUDED_RECOMMENDATIONS = [
     {
         "recommendation": "cwv",
@@ -666,6 +668,21 @@ _EXCLUDED_RECOMMENDATIONS = [
         "reason": ("Le poids tiers réel par page existe (third_party_bytes) mais aucune "
                    "cible de réduction n'est mesurée - poser un pourcentage aurait été "
                    "une invention, exclu du calcul chiffré."),
+    },
+    {
+        "recommendation": "inp",
+        "tier": "prio1_2",
+        "reason": ("Aucune règle publique fiable pour estimer un delta d'INP : la seule "
+                   "règle connue (~1 ms de parsing JS par Ko) date de 2018 et les moteurs "
+                   "JS ont progressé depuis - exclu de toute estimation, pas seulement du "
+                   "calcul CO2e."),
+    },
+    {
+        "recommendation": "cls",
+        "tier": "prio1_2",
+        "reason": ("Le CLS dépend d'éléments qui se chargent tardivement et décalent la "
+                   "mise en page, sans rapport structurel avec une réduction de poids - "
+                   "exclu de toute estimation, pas seulement du calcul CO2e."),
     },
 ]
 
@@ -776,6 +793,9 @@ def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
                 "tier": r.tier,
                 "bytes_removed": round(r.bytes_removed, 1),
                 "traced": r.traced.as_dict(),
+                "page_url": r.page_url,
+                "bytes_removed_decompressed": round(r.bytes_removed_decompressed, 1),
+                "requests_removed": r.requests_removed,
             }
             for r in all_reductions
         ],

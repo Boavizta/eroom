@@ -76,6 +76,9 @@ class Reduction:
     tier: str            # "prio1" / "prio2" / "prio3"
     bytes_removed: float
     traced: Traced
+    page_url: Optional[str] = None
+    bytes_removed_decompressed: float = 0.0
+    requests_removed: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +104,16 @@ def _url_to_job_key(site_spec: SiteSpec) -> Dict[str, str]:
         if url is not None:
             mapping[url] = job.key
     return mapping
+
+
+def _job_key_to_url(site_spec: SiteSpec) -> Dict[str, str]:
+    """Inverse de `_url_to_job_key` : clé du Job -> URL de page qu'il porte.
+
+    Injectif par construction (`_job_url()` ne retient qu'un Job "page" par
+    URL) : utile pour reconstituer `page_url` sur une `Reduction` construite à
+    partir d'un `job_key` (doublons, Brotli) plutôt que d'une URL directe.
+    """
+    return {job_key: url for url, job_key in _url_to_job_key(site_spec).items()}
 
 
 def _entry_transfer_bytes(entry: dict) -> float:
@@ -192,6 +205,26 @@ def _page_weight_by_type_transfer_bytes(page: dict) -> dict:
     return (page.get("breakdown") or {}).get("by_type_transfer_bytes", {}) or {}
 
 
+def _page_weight_by_type_bytes(page: dict) -> dict:
+    """Octets DÉCOMPRESSÉS par type de ressource pour une page `env_data`.
+
+    Même repli que `_page_weight_by_type_transfer_bytes` : direct au premier
+    niveau (`weight_by_type_bytes`), sinon `breakdown.by_type_bytes`
+    (`collect_env_data.py::_page_breakdown()`, lignes 601/622). Contrairement
+    au poids transféré, ce calcul est DIRECT (pas de transposition) : Coverage
+    mesure déjà le code mort sur le poids décompressé.
+    """
+    direct = page.get("weight_by_type_bytes")
+    if direct is not None:
+        return direct
+    return (page.get("breakdown") or {}).get("by_type_bytes", {}) or {}
+
+
+def _entry_decompressed_bytes(entry: dict) -> float:
+    """Octets DÉCOMPRESSÉS d'une entrée HAR (`content.size`, jamais transposé)."""
+    return entry.get("response", {}).get("content", {}).get("size", 0) or 0
+
+
 def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                           coverage_pages: List[dict]) -> List[Reduction]:
     """Réduction de `data_transferred` liée au JS et au CSS mort, par page.
@@ -227,6 +260,14 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
         js_bytes = weight_by_type.get("js", 0) or 0
         css_bytes = weight_by_type.get("css", 0) or 0
 
+        # Poids DÉCOMPRESSÉ : même page canonique `env_page` (choisie sur le
+        # critère transféré par `_best_env_page_by_url()`), lue une seconde
+        # fois sous son angle décompressé - une seule répétition canonique
+        # pour les deux poids, pas une sélection séparée.
+        weight_by_type_decompressed = _page_weight_by_type_bytes(env_page)
+        js_bytes_decompressed = weight_by_type_decompressed.get("js", 0) or 0
+        css_bytes_decompressed = weight_by_type_decompressed.get("css", 0) or 0
+
         js_pct = cov_page.get("js_unused_pct", 0.0) or 0.0
         css_pct = cov_page.get("css_unused_pct", 0.0) or 0.0
 
@@ -248,6 +289,10 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                         "code mort JS (Coverage Chrome DevTools)",
                         comment=_DEAD_CODE_COMMENT,
                     ),
+                    page_url=url,
+                    # Calcul DIRECT (pas de transposition) : Coverage mesure
+                    # déjà le code mort sur le poids décompressé.
+                    bytes_removed_decompressed=js_bytes_decompressed * (js_pct / 100.0),
                 ))
 
         if css_pct > 80:
@@ -263,6 +308,8 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                         "code mort CSS (Coverage Chrome DevTools)",
                         comment=_DEAD_CODE_COMMENT,
                     ),
+                    page_url=url,
+                    bytes_removed_decompressed=css_bytes_decompressed * (css_pct / 100.0),
                 ))
 
     return reductions
@@ -286,13 +333,24 @@ def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
     elle est survenue - si cette page ne correspond à aucun Job du modèle
     (page non canonique ou hors périmètre 1st-party), ses octets sont ignorés :
     ce calcul est volontairement un PLANCHER, pas un total exhaustif.
+
+    `bytes_removed` (octets TRANSFÉRÉS) compte TOUTES les occurrences 2e+,
+    y compris les revalidations HTTP 304 (coût réseau réel, mais minime :
+    seulement les en-têtes). `bytes_removed_decompressed`, lui, EXCLUT les
+    304 : leur corps n'est jamais retransféré ni redécodé (le navigateur
+    réutilise le contenu déjà en cache), donc leur poids décompressé compte
+    déjà dans le poids EcoIndex de la page qu'on retire le doublon ou pas -
+    seul un vrai re-téléchargement complet (200) libère ce poids.
     """
     har = _load_har(har_path)
     log = har.get("log", {})
     pageref_to_url = _pageref_to_url(har)
     url_to_job = _url_to_job_key(site_spec)
+    job_key_to_url = _job_key_to_url(site_spec)
 
     totals: Dict[str, float] = {}
+    decompressed_totals: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
     seen_urls = set()
     for entry in log.get("entries", []):
         req_url = entry.get("request", {}).get("url", "")
@@ -307,6 +365,20 @@ def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
             continue
 
         totals[job_key] = totals.get(job_key, 0.0) + _entry_transfer_bytes(entry)
+        # Une revalidation 304 ne redécode jamais le corps de la ressource :
+        # son poids DÉCOMPRESSÉ compte déjà dans le poids EcoIndex de la page
+        # (le navigateur réutilise le contenu déjà en cache) - le retirer ne
+        # l'enlève pas réellement. Seul un vrai re-téléchargement complet
+        # (200) libère ce poids. Les octets TRANSFÉRÉS (déjà minimes pour une
+        # 304) et le compte de requêtes, eux, restent inchangés : la requête
+        # de revalidation elle-même disparaîtrait bien avec un cache plus
+        # long (Cache-Control max-age), et son coût réseau réel est déjà
+        # correctement compté ci-dessus.
+        if (entry.get("response", {}) or {}).get("status") != 304:
+            decompressed_totals[job_key] = (
+                decompressed_totals.get(job_key, 0.0) + _entry_decompressed_bytes(entry)
+            )
+        counts[job_key] = counts.get(job_key, 0) + 1
 
     reductions: List[Reduction] = []
     for job_key, total in totals.items():
@@ -328,6 +400,12 @@ def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
                     "total exhaustif des doublons."
                 ),
             ),
+            page_url=job_key_to_url.get(job_key),
+            bytes_removed_decompressed=decompressed_totals.get(job_key, 0.0),
+            # Seule des 3 fonctions de réduction où une requête entière
+            # disparaît (JS/CSS mort et Brotli ne suppriment jamais une
+            # requête, seulement la taille d'une requête déjà comptée).
+            requests_removed=counts.get(job_key, 0),
         ))
     return reductions
 
@@ -366,6 +444,7 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
     log = har.get("log", {})
     pageref_to_url = _pageref_to_url(har)
     url_to_job = _url_to_job_key(site_spec)
+    job_key_to_url = _job_key_to_url(site_spec)
 
     measured_bytes: Dict[str, float] = {}   # octets actuels, entries mesurées
     saved_bytes: Dict[str, float] = {}      # octets économisés, entries mesurées
@@ -449,6 +528,11 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
                 "l'échantillon capturé, extrapolée au reste",
                 comment=comment,
             ),
+            page_url=job_key_to_url.get(job_key),
+            # Zéro EXACT, pas une approximation : Brotli ne change jamais
+            # `content.size` (poids décompressé) ni le nombre de requêtes.
+            bytes_removed_decompressed=0.0,
+            requests_removed=0,
         ))
     return reductions
 
