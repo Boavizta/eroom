@@ -3036,8 +3036,9 @@ def _section_eof(results, radar_svg_text=None):
 </section>"""
 
 
-def _methodo_eof(results):
-    """Annexe méthodologique EOF : le détail des 54 critères, un par un —
+def _section_eof_detail(results):
+    """Annexe autonome (pas une sous-partie de Méthodologie & hypothèses,
+    contenu trop substantiel pour ça) : le détail des critères EOF, un par un —
     réponse ou "je ne sais pas", confidence, source/donnée exploitée. Jamais
     de valeur masquée : c'est ici qu'on voit explicitement les critères
     sans aucune donnée, pas seulement le résumé optimiste du corps."""
@@ -3088,8 +3089,8 @@ def _methodo_eof(results):
             f'<td style="padding:5px 8px;font-size:13px;color:#666">{source}</td>'
             f'</tr>'
         )
-    return f"""
-  <h3 id="methodo-eof" style="margin-top:20px">H. Détail des 54 critères EOF</h3>
+    return f"""<section id="eof-detail">
+  <h2>Détail des critères EOF</h2>
   <p style="font-size:15px;color:#666">
     {_confidence_badge("collecte")} mesuré par nos scripts (CrUX, ipinfo, PageSpeed Insights, en-têtes HTTP)
     &nbsp;·&nbsp;
@@ -3122,7 +3123,8 @@ def _methodo_eof(results):
     <code>cwv.json</code> (catégories PageSpeed Insights ajoutées à l'appel existant).
     Régénérer après une nouvelle collecte de données :
     <code>python3 run_eof.py &lt;source_dir&gt;</code> puis régénérer le rapport.
-  </p>"""
+  </p>
+</section>"""
 
 
 def _methodo_table(rows):
@@ -3406,7 +3408,7 @@ def _methodo_efootprint(synthese_python):
         '</ul>'
     )
 
-    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">A. Impact environnemental ({_glossary_link("CO2e")})</h3>'
+    return (f'<h3 id="methodo-efootprint" style="margin-top:20px">__LETTRE__. Impact environnemental ({_glossary_link("CO2e")})</h3>'
             f'<p style="font-size:16px;color:#555;margin-bottom:8px">Ce n\'est pas une {_glossary_link("ACV")} '
             f'complète : e-footprint ne modélise que 2 phases (fabrication + usage), pas le transport ni la fin de vie.</p>'
             f'{table}{audience_html}{scenarios_html}{har_facts_html}{reading_html}{methods}')
@@ -3424,7 +3426,7 @@ def _methodo_cwv(cwv):
         for s in ("crux", "pagespeed_lab", "lighthouse") if s in sources
     ) or '<li>Source non renseignée</li>'
     return (
-        '<h3 id="methodo-cwv" style="margin-top:20px">B. Core Web Vitals</h3>'
+        '<h3 id="methodo-cwv" style="margin-top:20px">__LETTRE__. Core Web Vitals</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         f'<li><b>Sources présentes :</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
         f'<li><b>{_glossary_link("CrUX")} = terrain Chrome.</b> Les données "terrain" proviennent du champ '
@@ -3455,7 +3457,7 @@ def _methodo_cwv(cwv):
 def _methodo_ecoindex():
     """Sous-section C : formule EcoIndex."""
     return (
-        f'<h3 id="methodo-ecoindex" style="margin-top:20px">C. {_glossary_link("EcoIndex")} / {_glossary_link("GreenIT")}</h3>'
+        f'<h3 id="methodo-ecoindex" style="margin-top:20px">__LETTRE__. {_glossary_link("EcoIndex")} / {_glossary_link("GreenIT")}</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Formule (cnumr/ecoindex_reference) :</b> '
         '<code>score = 100 − 5 × (3·q_DOM + 2·q_req + q_poids) / 6</code>, '
@@ -3470,7 +3472,7 @@ def _methodo_ecoindex():
 def _methodo_medias():
     """Sous-section E : limites des règles médias (Lot 4)."""
     return (
-        '<h3 id="methodo-medias" style="margin-top:20px">E. Médias et documents à surveiller</h3>'
+        '<h3 id="methodo-medias" style="margin-top:20px">__LETTRE__. Médias et documents à surveiller</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Seuils "image bitmap lourde" (200 Ko) et "SVG suspect" (30 Ko).</b> '
         'Heuristiques internes non sourcées (aucun référentiel GreenIT-Analysis/EcoIndex '
@@ -3534,7 +3536,7 @@ def _methodo_trafic(synthese_python=None):
         )
 
     return (
-        '<h3 id="methodo-trafic" style="margin-top:20px">D. Trafic &amp; réseau</h3>'
+        '<h3 id="methodo-trafic" style="margin-top:20px">__LETTRE__. Trafic &amp; réseau</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         f'{volume_li}'
         '<li><b>Volumétrie réseau.</b> Le poids transféré et le nombre de requêtes viennent '
@@ -3718,8 +3720,8 @@ def _methodo_recommendations(gains):
     """Sous-section F : détail du recalcul CO2e par palier de recommandations
     (efootprint-recommendations-gains.json, écrit par
     run_efootprint.py::run_recommendation_scenarios()). Le détail par page du
-    recalcul EcoIndex/LCP par palier vit dans la sous-section G séparée
-    (`_methodo_ecoindex_lcp`), pas ici.
+    recalcul EcoIndex/LCP par palier vit dans l'annexe autonome séparée
+    "Gain EcoIndex & LCP par page" (`_section_gain_ecoindex_lcp`), pas ici.
 
     Un VRAI recalcul du modèle e-footprint par palier cumulatif (pas une
     approximation forfaitaire), le détail par type de recommandation (regroupé
@@ -3800,27 +3802,29 @@ def _methodo_recommendations(gains):
         )
 
     return (
-        '<h3 id="methodo-recommandations" style="margin-top:20px">F. Recommandations &amp; gain estimé</h3>'
+        '<h3 id="methodo-recommandations" style="margin-top:20px">__LETTRE__. Recommandations &amp; gain estimé</h3>'
         f'{intro}{table_html}{notes_html}{excluded_html}{hyp_html}'
     )
 
 
-def _methodo_ecoindex_lcp(gains, page_metrics, cwv):
-    """Sous-section G : détail par page du recalcul EcoIndex/LCP par palier de
-    recommandations (mêmes `reductions_detail` que la sous-section F, vues
-    sous l'angle EcoIndex/LCP plutôt que CO2e). Section autonome plutôt que
-    sous-bloc de F : contenu substantiel (3 tableaux par page), pas une note
-    annexe au calcul CO2e."""
+def _section_gain_ecoindex_lcp(gains, page_metrics, cwv):
+    """Annexe autonome (pas une sous-partie de Méthodologie & hypothèses,
+    contenu trop substantiel pour ça) : détail par page du recalcul EcoIndex/LCP
+    par palier de recommandations (mêmes `reductions_detail` que la sous-partie F
+    de Méthodologie & hypothèses, vues sous l'angle EcoIndex/LCP plutôt que CO2e).
+    3 tableaux par page : contenu de résultat, pas une note de méthode."""
     if not gains or page_metrics is None:
         return ""
 
     reductions_by_page = _ecoindex_reductions_by_page(gains)
     if reductions_by_page is None:
         return (
-            '<h3 id="methodo-ecoindex-lcp" style="margin-top:20px">G. Gain EcoIndex &amp; LCP par page</h3>'
+            '<section id="gain-ecoindex-lcp">\n'
+            '<h2>Gain EcoIndex &amp; LCP par page</h2>'
             '<p style="font-size:15px;color:#888">Non disponible pour cet audit (fichier de '
             'gains généré avant le chantier EcoIndex/LCP) - régénérer '
-            '<code>run_efootprint.py</code> pour l\'obtenir.</p>'
+            '<code>run_efootprint.py</code> pour l\'obtenir.</p>\n'
+            '</section>'
         )
 
     tier_tables = "".join(
@@ -3831,12 +3835,15 @@ def _methodo_ecoindex_lcp(gains, page_metrics, cwv):
         return ""
 
     return (
-        '<h3 id="methodo-ecoindex-lcp" style="margin-top:20px">G. Gain EcoIndex &amp; LCP par page</h3>'
+        '<section id="gain-ecoindex-lcp">\n'
+        '<h2>Gain EcoIndex &amp; LCP par page</h2>'
         '<p style="font-size:15px;color:#555">EcoIndex recalculé sur le poids '
-        'DÉCOMPRESSÉ (calcul direct, pas de transposition contrairement au CO2e en F ci-dessus). '
-        'LCP grossier via la formule sourcée en F - <b>risque de surestimation</b>. '
+        'DÉCOMPRESSÉ (calcul direct, pas de transposition contrairement au CO2e '
+        'détaillé en F de l\'annexe Méthodologie &amp; hypothèses, plus bas). '
+        'LCP grossier via la formule sourcée dans cette même annexe (F) - '
+        '<b>risque de surestimation</b>. '
         'Le DOM n\'est pas modifié par ces recommandations. INP et CLS ne sont pas estimés '
-        '(voir "Recommandations non incluses" en F ci-dessus). '
+        '(voir "Recommandations non incluses", annexe Méthodologie &amp; hypothèses, F). '
         '<b>&dagger;</b> : le calcul des doublons HAR détecte les doublons sur '
         'l\'ENSEMBLE du parcours capturé, pas page par page - le nombre de requêtes '
         'qu\'il attribue à une page peut donc dépasser son propre nombre de requêtes '
@@ -3848,28 +3855,46 @@ def _methodo_ecoindex_lcp(gains, page_metrics, cwv):
         'compte comme poids supprimable - donc bien moins exposé au même artefact, '
         'mais pas totalement à l\'abri si plusieurs re-téléchargements complets se '
         'chevauchent entre pages).</p>'
-        f'{tier_tables}'
+        f'{tier_tables}\n'
+        '</section>'
     )
 
 
-def _section_methodologie(synthese_python, cwv, eof_results=None, recommendations_gains=None, page_metrics=None):
-    """Annexe méthodologique structurée par section (A: CO2e, B: CWV, C: EcoIndex, D: trafic,
-    E: médias, F: recommandations & gain estimé, G: gain EcoIndex &amp; LCP par page, H: EOF).
+def _section_methodologie(synthese_python, cwv, recommendations_gains=None):
+    """Annexe méthodologique structurée par sous-partie (CO2e, CWV, EcoIndex, trafic,
+    médias, recommandations & gain estimé) : uniquement des notes de méthode/hypothèses
+    (formules, sources, limites, niveau de confiance). Le détail du gain EcoIndex/LCP
+    par page et le détail des critères EOF n'en font plus partie : contenu de résultat
+    substantiel, ce sont des annexes autonomes (`_section_gain_ecoindex_lcp`,
+    `_section_eof_detail`), pas des notes de méthode.
+
+    Les lettres A, B, C... ne sont pas câblées en dur dans chaque sous-fonction :
+    elles sont calculées ici en énumérant uniquement les sous-parties dont le HTML
+    rendu est non vide, pour que la lettre affichée corresponde toujours à la position
+    réelle (une sous-partie absente pour un audit donné ne laisse plus de trou de
+    lettre). Retourne (html, nav_entries) : nav_entries = [(lettre, ancre, titre), ...]
+    pour que generate() puisse construire la ligne "A · B · C..." du sommaire sans
+    recalculer les sous-parties une deuxième fois.
 
     Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
     et les méthodes/formules appliquées."""
-    parts = [
-        _methodo_efootprint(synthese_python),
-        _methodo_cwv(cwv),
-        _methodo_ecoindex(),
-        _methodo_trafic(synthese_python),
-        _methodo_medias(),
-        _methodo_recommendations(recommendations_gains),
-        _methodo_ecoindex_lcp(recommendations_gains, page_metrics, cwv),
-        _methodo_eof(eof_results),
+    entries = [
+        ("methodo-efootprint", "Impact environnemental (CO2e)", _methodo_efootprint(synthese_python)),
+        ("methodo-cwv", "Core Web Vitals", _methodo_cwv(cwv)),
+        ("methodo-ecoindex", "EcoIndex / GreenIT", _methodo_ecoindex()),
+        ("methodo-trafic", "Trafic & réseau", _methodo_trafic(synthese_python)),
+        ("methodo-medias", "Médias et documents à surveiller", _methodo_medias()),
+        ("methodo-recommandations", "Recommandations & gain estimé", _methodo_recommendations(recommendations_gains)),
     ]
-    body = "".join(p for p in parts if p)
-    return (
+    present = [(anchor, title, html) for anchor, title, html in entries if html]
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    body_parts = []
+    nav_entries = []
+    for letter, (anchor, title, html) in zip(letters, present):
+        body_parts.append(html.replace("__LETTRE__", letter, 1))
+        nav_entries.append((letter, anchor, title))
+    body = "".join(body_parts)
+    html_out = (
         '<section id="methodologie">\n'
         '<h2>Méthodologie &amp; hypothèses</h2>\n'
         '<p style="font-size:16px;color:#555;margin-bottom:8px">'
@@ -3878,6 +3903,7 @@ def _section_methodologie(synthese_python, cwv, eof_results=None, recommendation
         f'{body}\n'
         '</section>'
     )
+    return html_out, nav_entries
 
 
 def _glossary_link(acronym):
@@ -3964,56 +3990,6 @@ def _section_glossaire():
         f'{ordre_fiabilite}'
         '</section>'
     )
-
-
-def _section_couts(page_metrics):
-    # Formule EcoIndex officielle : 1 visite = (1.8 - score/100 * 1.8) gCO2e (approx cnumr)
-    # Source : https://www.ecoindex.fr/comment-ca-marche
-    deduped = _dedup_page_metrics(page_metrics)
-    rows = ""
-    total_co2 = 0.0
-    total_energy = 0.0
-    for m in deduped:
-        score = m["ecoindex"]
-        co2 = round((1.0 - score / 100) * 1.8 + 0.013, 3)   # gCO2e / visite
-        energy = round((1.0 - score / 100) * 1.5 + 0.013, 3) # Wh / visite
-        total_co2 += co2
-        total_energy += energy
-        url = m["title"]
-        label = "/" + url.split("//", 1)[-1].split("/", 1)[-1] if "//" in url else url
-        badge = _badge(m["grade"], m["grade_color"])
-        rows += (
-            f'<tr><td>{badge}</td>'
-            f'<td><a href="{url}" target="_blank" title="{url}">{label}</a></td>'
-            f'<td style="text-align:right">{score}/100</td>'
-            f'<td style="text-align:right">{co2:.3f} gCO2e</td>'
-            f'<td style="text-align:right">{energy:.3f} Wh</td></tr>\n'
-        )
-    return f"""<section id="couts">
-  <h2>Couts de generation</h2>
-  <p style="font-size:16px;color:#666;margin-bottom:12px">
-    Estimation par visite, basee sur le score EcoIndex (formule cnumr/ecoindex_reference).
-    1 visite = transfert reseau + rendu navigateur + serveur.
-  </p>
-  <table>
-    <thead><tr>
-      <th style="width:48px">Grade</th>
-      <th>Page</th>
-      <th style="text-align:right">EcoIndex</th>
-      <th style="text-align:right">CO2 / visite</th>
-      <th style="text-align:right">Energie / visite</th>
-    </tr></thead>
-    <tbody>{rows}</tbody>
-    <tfoot><tr style="font-weight:bold;background:#f4f6fa">
-      <td colspan="3">Total parcours ({len(deduped)} pages)</td>
-      <td style="text-align:right">{total_co2:.3f} gCO2e</td>
-      <td style="text-align:right">{total_energy:.3f} Wh</td>
-    </tr></tfoot>
-  </table>
-  <p style="font-size:15px;color:#999;margin-top:8px">
-    Pour reference : un email envoye = ~4 gCO2e ; une recherche Google = ~0.2 gCO2e.
-  </p>
-</section>"""
 
 
 def _cwv_reco_signal_html(metric, traffic, greenit, coverage_by_page):
@@ -4527,7 +4503,16 @@ def generate(audit_dir, output_path=None):
     # La section techno n'est rendue que si des technologies ont été détectées
     has_tech = bool(tech_stack and tech_stack.get("technologies"))
 
-    # Sections présentes (pour le sommaire)
+    # Gain EcoIndex/LCP par page et détail EOF calculés tôt : ce sont des annexes
+    # autonomes (résultat substantiel, pas des notes de méthode - cf. leurs docstrings)
+    # dont la présence conditionne à la fois la liste des annexes du sommaire et le
+    # corps du rapport plus bas ; on ne les calcule qu'une fois.
+    gain_lcp_html = _section_gain_ecoindex_lcp(recommendations_gains, page_metrics, cwv)
+    eof_detail_html = _section_eof_detail(eof_results)
+
+    # Sections présentes (pour le sommaire). Méthodologie & hypothèses en dernière
+    # position (après Glossaire, pas avant) : demande explicite, pour que ses
+    # sous-parties A→F poursuivent la même séquence sans rien laisser derrière elles.
     annexe_sections = [
         ("dashboard", "Tableau de bord EcoIndex"),
         ("trafic",    "Trafic réseau"),
@@ -4537,52 +4522,57 @@ def generate(audit_dir, output_path=None):
         annexe_sections.append(("cwv", "Core Web Vitals"))
     if has_tech:
         annexe_sections.append(("stack-technique", "Stack technique"))
-    annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
+    if gain_lcp_html:
+        annexe_sections.append(("gain-ecoindex-lcp", "Gain EcoIndex & LCP par page"))
+    if eof_detail_html:
+        annexe_sections.append(("eof-detail", "Détail des critères EOF"))
     annexe_sections.append(("glossaire", "Glossaire"))
+    annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
 
     has_medias = bool((greenit or {}).get("media", {}).get("video", {}).get("count") or
                        (greenit or {}).get("media", {}).get("pdf", {}).get("count"))
 
-    n = 3  # 1=Recommandations, 2=GreenIT, puis suit
-    medias_nav = ""
-    if has_medias:
-        medias_nav = f'<li><a href="#medias">{n}. Médias et documents à surveiller</a></li>'
-        n += 1
-    cwv_nav = ""
-    if cwv:
-        cwv_nav = f'<li><a href="#cwv-analyse">{n}. Analyse Core Web Vitals</a></li>'
-        n += 1
-    efootprint_nav = ""
-    if synthese_python:
-        efootprint_nav = f'<li><a href="#efootprint">{n}. Impact environnemental (CO2e)</a></li>'
-        n += 1
-    eof_nav = ""
-    if eof_results:
-        eof_nav = f'<li><a href="#eof">{n}. Potentiel d’optimisation (EOF)</a></li>'
-        n += 1
-    annexes_num = n
-    # "A.N" pour matcher exactement la numérotation du corps des annexes
-    # (_prefix_h2 avec methodo_num/glossaire_num/tech_num, plus bas dans cette
-    # fonction) - avant ce correctif, le sommaire affichait encore l'ancienne
-    # notation "6.a...6.g", introuvable dans le corps du rapport.
+    # Sections principales (1-6) numérotées en énumérant uniquement celles présentes -
+    # remplace l'ancien compteur manuel `n`, qui pouvait se désynchroniser du sommaire
+    # si une section était ajoutée au corps du rapport sans être répercutée ici.
+    main_sections = [
+        ("recommandations", "Recommandations", True),
+        ("greenit", "Bonnes pratiques GreenIT", True),
+        ("medias", "Médias et documents à surveiller", has_medias),
+        ("cwv-analyse", "Analyse Core Web Vitals", bool(cwv)),
+        ("efootprint", "Impact environnemental (CO2e)", bool(synthese_python)),
+        ("eof", "Potentiel d’optimisation (EOF)", bool(eof_results)),
+    ]
+    present_main = [(anchor, title) for anchor, title, present in main_sections if present]
+    main_nav_items = "".join(
+        f'<li><a href="#{anchor}">{i}. {title}</a></li>'
+        for i, (anchor, title) in enumerate(present_main, start=1)
+    )
+    annexes_num = len(present_main) + 1
+
+    # Méthodologie calculée avant le sommaire : ses lettres A/B/C... dépendent des
+    # sous-parties effectivement présentes pour cet audit, il faut donc son résultat
+    # pour construire le sommaire, avant même d'assembler le corps du rapport plus bas.
+    methodo_html, methodo_nav_entries = _section_methodologie(synthese_python, cwv, recommendations_gains)
+    methodo_inline = " &nbsp;·&nbsp; ".join(
+        f'<a href="#{manchor}">{letter}. {mtitle}</a>' for letter, manchor, mtitle in methodo_nav_entries
+    )
+
+    # "{annexes_num}.N" pour matcher exactement la numérotation du corps des annexes
+    # (_prefix_h2 avec _anum(), plus bas dans cette fonction).
     annexe_inline = " &nbsp;·&nbsp; ".join(
-        f'<a href="#{sid}">A.{i+1} {slabel}</a>'
+        f'<a href="#{sid}">{annexes_num}.{i+1} {slabel}</a>'
         for i, (sid, slabel) in enumerate(annexe_sections)
     )
     nav_items = (
-        f'<li><a href="#recommandations">1. Recommandations</a></li>'
-        f'<li><a href="#greenit">2. Bonnes pratiques GreenIT</a></li>'
-        f'{medias_nav}'
-        f'{cwv_nav}'
-        f'{efootprint_nav}'
-        f'{eof_nav}'
-        f'<li style="display:flex;flex-direction:column;gap:2px">'
-        f'<span style="display:flex;flex-direction:row;align-items:baseline;gap:12px">'
+        f'{main_nav_items}'
+        f'<li>'
         f'<a href="#annexes">{annexes_num}. Annexes</a>'
-        f'<a href="#couts">&#9658; Couts de generation</a>'
-        f'</span>'
-        f'<span style="font-size:15px;opacity:.75;padding-left:4px">{annexe_inline}</span>'
-        f'</li>'
+        f'<div style="margin-top:6px;margin-left:18px;font-size:15px;opacity:.85">{annexe_inline}</div>'
+        + (f'<div style="margin-top:4px;margin-left:36px;font-size:14px;opacity:.85">{methodo_inline}</div>'
+           if methodo_nav_entries else '')
+        + f'</li>'
+        f'<li><a href="#couts" style="opacity:.75">Coûts de génération</a></li>'
     )
 
     html = _html_head(title)
@@ -4615,22 +4605,28 @@ def generate(audit_dir, output_path=None):
     def _prefix_h2(html_str, prefix):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
+    # Numérotation {annexes_num}.N dérivée uniformément de la position dans
+    # annexe_sections (même mécanisme pour toutes les annexes, plus de cas particulier).
+    _annexe_ids = [sid for sid, _ in annexe_sections]
+
+    def _anum(sid):
+        return f"{annexes_num}.{_annexe_ids.index(sid) + 1}"
+
     html += '<section id="annexes" style="background:#f4f6fa;border:2px solid var(--octo-blue);border-radius:6px;padding:24px 24px 8px;margin-bottom:40px">\n'
     html += '<h2 style="border-left:none;padding-left:0;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:20px">Annexes</h2>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_dashboard(page_metrics, cwv), "A.1")}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_traffic(traffic), "A.2")}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), "A.3")}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_dashboard(page_metrics, cwv), _anum("dashboard"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_traffic(traffic), _anum("trafic"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), _anum("coverage"))}</div>\n'
     if cwv:
-        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_cwv(page_metrics, cwv), "A.4")}</div>\n'
+        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_cwv(page_metrics, cwv), _anum("cwv"))}</div>\n'
     if has_tech:
-        # Numéro dérivé de la position dans annexe_sections (robuste à la présence de cwv)
-        tech_num = f"A.{[sid for sid, _ in annexe_sections].index('stack-technique') + 1}"
-        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_tech(tech_stack), tech_num)}</div>\n'
-    _annexe_ids = [sid for sid, _ in annexe_sections]
-    methodo_num = f"A.{_annexe_ids.index('methodologie') + 1}"
-    glossaire_num = f"A.{_annexe_ids.index('glossaire') + 1}"
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_methodologie(synthese_python, cwv, eof_results, recommendations_gains, page_metrics), methodo_num)}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), glossaire_num)}</div>\n'
+        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_tech(tech_stack), _anum("stack-technique"))}</div>\n'
+    if gain_lcp_html:
+        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(gain_lcp_html, _anum("gain-ecoindex-lcp"))}</div>\n'
+    if eof_detail_html:
+        html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(eof_detail_html, _anum("eof-detail"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), _anum("glossaire"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(methodo_html, _anum("methodologie"))}</div>\n'
     html += '</section>\n'
 
     html += "</main>\n"
