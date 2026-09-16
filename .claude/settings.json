@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM/.claude/hooks/generate-diagram-jpg.sh\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

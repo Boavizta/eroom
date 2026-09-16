@@ -1,5 +1,12 @@
 @startuml analyse-parcours-vue-generale-horizontal-light
-title Analyse de parcours web — Vue generale du workflow (par thematique)-horizontal-light
+' NE PAS regenerer le .svg/.pdf de ce diagramme avec `plantuml -tsvg` : ce
+' fichier documente uniquement le CONTENU (textes, ordre logique). Le rendu
+' reel (2 colonnes, RAPPORT aligne en haut avec COLLECTE, connecteur en U) est
+' construit a la main dans le .svg du meme nom - PlantUML (activity beta) ne
+' sait pas produire cette disposition sans inverser l'ordre des colonnes
+' (teste le 2026-09-16, 5 approches differentes, meme limite chaque fois).
+' Si le contenu change ici, reporter le meme changement de texte dans le .svg.
+title Analyse de parcours web — Vue generale du workflow (par thematique, 2 colonnes)
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -20,37 +27,26 @@ partition "**COLLECTE** (automatique)" {
   (*) --> "HAR, Coverage, Core Web Vitals\n(analyze_har.py, coverage_metrics.py,\ncollect_cwv_pagespeed.py ou run_lighthouse.sh en repli)" as C1
 }
 
-note right #ECECF2
-  **Legende**
-  Fond gris pale : automatique
-  (calcul machine, aucune action humaine)
-end note
-
-note right #9BD0DD
-  Fond bleu clair : action humaine requise
-  (saisie, decision, ou reponse d'un tiers externe)
-end note
-
 partition "**JUGEMENT AUTOMATIQUE EOF** (automatique)" {
-  C1 -right-> "run_eof.py confronte les donnees\ndeja collectees au referentiel EOF\n(~10 criteres sur 54 tranches par script,\nle reste reste 'je ne sais pas')" as J1
+  C1 -down-> "run_eof.py confronte les donnees\ndeja collectees au referentiel EOF\n(~10 criteres sur 54 tranches par script,\nle reste reste 'je ne sais pas')" as J1
 }
 
 partition "**IMPACT CO2e** (optionnel, a tout moment)" #9BD0DD {
-  J1 -right-> "/efootprint -> modele Boavizta (reference\n+ 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)\n-> donnees disponibles pour la PROCHAINE\ngeneration du rapport, pas un ajout final isole" as I1
-  I1 --> "Action humaine possible : trafic annuel et\ntaille d'instance cloud, si non auto-detectes" as I2
+  J1 -down-> "/efootprint -> modele Boavizta (reference\n+ 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)\n-> donnees disponibles pour la PROCHAINE\ngeneration du rapport, pas un ajout final isole" as I1
+  I1 -down-> "Action humaine possible : trafic annuel et\ntaille d'instance cloud, si non auto-detectes" as I2
 }
 
 partition "**RAPPORT — premiere generation** (automatique)" {
-  I2 -right-> "generate_report_html.py\n(+ check_valeurs_rapport.py, controle\ninterne non bloquant)\n-> contient deja le jugement EOF automatique\n(partiel) et le CO2e si deja calcule" as R1
+  I2 -down-> "generate_report_html.py\n(+ check_valeurs_rapport.py, controle\ninterne non bloquant)\n-> contient deja le jugement EOF automatique\n(partiel) et le CO2e si deja calcule" as R1
 }
 
 partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #9BD0DD {
-  R1 -right-> "Quand : apres le jugement automatique,\nuniquement sur les criteres restes\n'je ne sais pas' - jamais avant,\njamais declenche seul" as Q1
-  Q1 --> "generate_questionnaire.py -> fichier a remplir\n(questionnaire-eof.md), envoye au client,\nrempli, relu (parse_questionnaire.py),\nfusionne (fusionner_lots.py) selon la\nprecedence collecte > estime > precise\n> declare > suppose" as Q2
+  R1 -down-> "Quand : apres le jugement automatique,\nuniquement sur les criteres restes\n'je ne sais pas' - jamais avant,\njamais declenche seul" as Q1
+  Q1 -down-> "generate_questionnaire.py -> fichier a remplir\n(questionnaire-eof.md), envoye au client,\nrempli, relu (parse_questionnaire.py),\nfusionne (fusionner_lots.py) selon la\nprecedence collecte > estime > precise\n> declare > suppose" as Q2
 }
 
 partition "**RAPPORT — regeneration** (automatique)" {
-  Q2 -right-> "generate_report_html.py\n-> reflete les reponses du questionnaire\nfusionnees (+ CO2e si calcule entre-temps)" as R2
+  Q2 -down-> "generate_report_html.py\n-> reflete les reponses du questionnaire\nfusionnees (+ CO2e si calcule entre-temps)" as R2
 }
 
 R2 --> (*)

@@ -41,9 +41,36 @@ Pour chaque diagramme modifié :
 1. Modifier le `.puml` dans `documentation/diagrammes/` en cohérence avec la source de vérité
 2. Générer le SVG : `plantuml -tsvg <fichier>.puml`
 3. Convertir en PDF via `rsvg-convert`
-4. Vérifier + ouvrir
+4. Générer aussi le JPG léger (voir "JPG léger" ci-dessous) — systématique, pas seulement à la demande
+5. Vérifier + ouvrir
 
 **Ne jamais générer directement en PNG ou PDF depuis plantuml.** Toujours passer par SVG (vecteur) puis `rsvg-convert` pour le PDF.
+
+### JPG léger (systématique après chaque régénération de SVG)
+
+Chaque `.svg` de ce dossier a une version `.jpg` légère à côté (même nom, 800px de
+large, qualité 85) — pour partage/insertion dans un doc ou un slide sans le poids
+du PDF/SVG. À régénérer après CHAQUE modification d'un `.svg` (y compris pour un
+diagramme construit à la main, comme `analyse-parcours-vue-generale-horizontal-light.svg`).
+
+```bash
+f=<nom-sans-extension>
+rsvg-convert -b white -w 800 documentation/diagrammes/$f.svg -o /tmp/$f.png \
+  && magick /tmp/$f.png -quality 85 documentation/diagrammes/$f.jpg \
+  && rm /tmp/$f.png
+```
+
+Pour tout régénérer d'un coup (ex. après un changement de convention) :
+
+```bash
+cd documentation/diagrammes
+for f in *.svg; do
+  base="${f%.svg}"
+  rsvg-convert -b white -w 800 "$f" -o "/tmp/${base}.png" \
+    && magick "/tmp/${base}.png" -quality 85 "${base}.jpg" \
+    && rm "/tmp/${base}.png"
+done
+```
 
 -----
 
