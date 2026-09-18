@@ -1137,10 +1137,10 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
             marker_o, txt_o, sup_o, status_o, color_o = _render_value(metric, other_strat, other_row[metric])
             style_o = f"color:{color_o};font-weight:bold"
             line2 = f'<div style="font-size:14px;{style_o}">{marker_o} {txt_o}{sup_o}</div>'
-        elif other_row and other_row.get("mesure", {}).get("statut") not in (None, "ok"):
+        elif other_row and (mesure := other_row.get("mesure", {})).get("statut") not in (None, "ok"):
             # Mesure tentée mais échouée (ex. timeout réseau) : le dire plutôt
             # que de la faire disparaître silencieusement (cf. absence != échec).
-            detail = other_row.get("mesure", {}).get("detail", "")
+            detail = mesure.get("detail", "")
             title_attr = f' title="{detail}"' if detail else ""
             marker_fail = _cwv_device_marker(other_strat)
             line2 = (f'<div style="font-size:14px;color:{STATUS_NEUTRAL}"{title_attr}>'
@@ -1158,7 +1158,7 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         # Ignorer les stratégies dont la mesure a échoué (pas de "source") :
         # sinon un échec réseau sur une seule stratégie (ex. mobile) efface le
         # badge de la source réellement utilisée par l'autre stratégie.
-        sources = {r.get("source") for r in by_strat.values() if r and r.get("source")}
+        sources = {s for r in by_strat.values() if r and (s := r.get("source"))}
         page_badge = _cwv_source_badge(next(iter(sources))) if len(sources) == 1 else ""
 
         if by_strat:

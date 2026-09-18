@@ -8,12 +8,16 @@
 
 PROJECT_DIR="/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
 
-cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null)
-
-case "$cmd" in
+# Filtre d'abord sur le JSON brut (pas de spawn `jq`) : la commande n'apparait
+# de toute facon que sous forme de sous-chaine du JSON, donc ce filtre grossier
+# suffit a ecarter les >99% d'appels Bash qui ne concernent pas plantuml.
+input=$(cat)
+case "$input" in
   *plantuml*-tsvg*documentation/diagrammes*) ;;
   *) exit 0 ;;
 esac
+
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null)
 
 echo "$cmd" | grep -oE '[A-Za-z0-9._/-]*documentation/diagrammes/[A-Za-z0-9_.-]+\.puml' | while read -r f; do
   case "$f" in
