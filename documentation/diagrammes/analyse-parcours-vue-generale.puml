@@ -15,18 +15,38 @@ skinparam NoteBackgroundColor #E0F0F4
 skinparam NoteBorderColor #9BD0DD
 skinparam PartitionBackgroundColor #ECECF2
 skinparam PartitionBorderColor #5BA1BC
+skinparam LegendBackgroundColor #FFFFFF
+skinparam LegendBorderColor #000000
+skinparam LegendFontSize 14
 
 start
 
-note right #ECECF2
-  **Legende**
-  Fond gris pale : automatique
-  (calcul machine, aucune action humaine)
-end note
+legend top right
+  **Légende**
 
-note right #9BD0DD
-  Fond bleu clair : action humaine requise
-  (saisie, decision, ou reponse d'un tiers externe)
+  <back:#ECECF2><color:#ECECF2>XXXXXX</color></back>  Fond gris pâle : automatique
+  (calcul machine, aucune action humaine)
+
+  <back:#9BD0DD><color:#9BD0DD>XXXXXX</color></back>  Fond bleu clair : action humaine requise
+  (saisie, décision, ou réponse d'un tiers externe)
+
+  [réf] Doc de référence : capturer-har-et-coverage.md
+  ../../.claude/skills/analyse-parcours/docs/
+endlegend
+
+partition "**CAPTURE MANUELLE** [réf] (prealable, humain, hors skill)" #9BD0DD {
+  :Network : Preserve log + Disable cache
+  Parcours complet, cookies acceptes
+  -> "Save all as HAR with content" (.har);
+  :Coverage panel (Cmd+Shift+P)
+  Enregistrer, recharger, scroller
+  -> export JSON par page (Coverage-*.json);
+}
+
+note right #ECECF2
+  cwv.json (Core Web Vitals) optionnel : Lighthouse se
+  lance automatiquement si absent (collect_cwv_pagespeed.py),
+  ou fourni par l'utilisateur (RUM/PageSpeed).
 end note
 
 partition "**COLLECTE** (automatique)" {

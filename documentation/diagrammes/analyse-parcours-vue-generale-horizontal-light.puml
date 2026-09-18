@@ -6,7 +6,9 @@
 ' sait pas produire cette disposition sans inverser l'ordre des colonnes
 ' (teste le 2026-09-16, 5 approches differentes, meme limite chaque fois).
 ' Si le contenu change ici, reporter le meme changement de texte dans le .svg.
-title Analyse de parcours web — Vue generale du workflow (par thematique, 2 colonnes)
+' Procedure de capture manuelle detaillee (bloc CAPTURE MANUELLE ci-dessous) :
+' .claude/skills/analyse-parcours/docs/capturer-har-et-coverage.md
+title Analyse de parcours web — Vue générale du workflow (par thématique, version compacte)
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -23,30 +25,35 @@ skinparam NoteBorderColor #9BD0DD
 skinparam PartitionBackgroundColor #ECECF2
 skinparam PartitionBorderColor #5BA1BC
 
+partition "**CAPTURE MANUELLE** (préalable, humain, hors skill)" #9BD0DD {
+  (*) --> "Network : Preserve log + Disable cache\nParcours complet, cookies acceptés\n-> 'Save all as HAR with content' (.har)" as M1
+  M1 -down-> "Coverage panel (Cmd+Shift+P)\nEnregistrer, recharger, scroller\n-> export JSON par page (Coverage-*.json)" as M2
+}
+
 partition "**COLLECTE** (automatique)" {
-  (*) --> "HAR, Coverage, Core Web Vitals\n(analyze_har.py, coverage_metrics.py,\ncollect_cwv_pagespeed.py ou run_lighthouse.sh en repli)" as C1
+  M2 -down-> "HAR, Coverage, Core Web Vitals\n(analyze_har.py, coverage_metrics.py,\ncollect_cwv_pagespeed.py ou run_lighthouse.sh en repli)" as C1
 }
 
 partition "**JUGEMENT AUTOMATIQUE EOF** (automatique)" {
-  C1 -down-> "run_eof.py confronte les donnees\ndeja collectees au referentiel EOF\n(~10 criteres sur 54 tranches par script,\nle reste reste 'je ne sais pas')" as J1
+  C1 -down-> "run_eof.py confronte les données\ndéjà collectées au référentiel EOF\n(~10 critères sur 54 tranchés par script,\nle reste reste 'je ne sais pas')" as J1
 }
 
-partition "**IMPACT CO2e** (optionnel, a tout moment)" #9BD0DD {
-  J1 -down-> "/efootprint -> modele Boavizta (reference\n+ 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)\n-> donnees disponibles pour la PROCHAINE\ngeneration du rapport, pas un ajout final isole" as I1
-  I1 -down-> "Action humaine possible : trafic annuel et\ntaille d'instance cloud, si non auto-detectes" as I2
+partition "**IMPACT CO2e** (optionnel, à tout moment)" #9BD0DD {
+  J1 -down-> "/efootprint -> modèle Boavizta (référence\n+ 3 scénarios cumulés prio1 / prio1+2 / prio1+2+3)\n-> données disponibles pour la PROCHAINE\ngénération du rapport, pas un ajout final isolé" as I1
+  I1 -down-> "Action humaine possible : trafic annuel et\ntaille d'instance cloud, si non auto-détectés" as I2
 }
 
-partition "**RAPPORT — premiere generation** (automatique)" {
-  I2 -down-> "generate_report_html.py\n(+ check_valeurs_rapport.py, controle\ninterne non bloquant)\n-> contient deja le jugement EOF automatique\n(partiel) et le CO2e si deja calcule" as R1
+partition "**RAPPORT — première génération** (automatique)" {
+  I2 -down-> "generate_report_html.py\n(+ check_valeurs_rapport.py, contrôle\ninterne non bloquant)\n-> contient déjà le jugement EOF automatique\n(partiel) et le CO2e si déjà calculé" as R1
 }
 
-partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #9BD0DD {
-  R1 -down-> "Quand : apres le jugement automatique,\nuniquement sur les criteres restes\n'je ne sais pas' - jamais avant,\njamais declenche seul" as Q1
-  Q1 -down-> "generate_questionnaire.py -> fichier a remplir\n(questionnaire-eof.md), envoye au client,\nrempli, relu (parse_questionnaire.py),\nfusionne (fusionner_lots.py) selon la\nprecedence collecte > estime > precise\n> declare > suppose" as Q2
+partition "**QUESTIONNAIRE EOF** (manuel, décision de mission)" #9BD0DD {
+  R1 -down-> "Quand : après le jugement automatique,\nuniquement sur les critères restés\n'je ne sais pas' - jamais avant,\njamais déclenché seul" as Q1
+  Q1 -down-> "generate_questionnaire.py -> fichier à remplir\n(questionnaire-eof.md), envoyé au client,\nrempli, relu (parse_questionnaire.py),\nfusionné (fusionner_lots.py) selon la\nprécédence collecte > estime > précise\n> déclaré > supposé" as Q2
 }
 
-partition "**RAPPORT — regeneration** (automatique)" {
-  Q2 -down-> "generate_report_html.py\n-> reflete les reponses du questionnaire\nfusionnees (+ CO2e si calcule entre-temps)" as R2
+partition "**RAPPORT — régénération** (automatique)" {
+  Q2 -down-> "generate_report_html.py\n-> reflète les réponses du questionnaire\nfusionnées (+ CO2e si calculé entre-temps)" as R2
 }
 
 R2 --> (*)

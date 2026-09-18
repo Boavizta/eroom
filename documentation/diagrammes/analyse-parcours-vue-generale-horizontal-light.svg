@@ -2,111 +2,166 @@
 <!--
   Diagramme construit A LA MAIN (coordonnees fixes), pas via `plantuml`.
   Raison : PlantUML (activity beta) ne sait pas produire cette disposition precise
-  (2 colonnes, RAPPORT aligne exactement en haut avec COLLECTE, connecteur en U
-  dans la gouttiere) sans inverser l'ordre des colonnes - teste et confirme le
-  2026-09-16 (5 approches differentes, meme limite chaque fois).
+  (2 colonnes, connecteur en U dans la gouttiere) sans inverser l'ordre des
+  colonnes - teste et confirme le 2026-09-16 (5 approches differentes, meme
+  limite chaque fois).
   Le fichier .puml du meme nom reste la reference du CONTENU textuel ; ne pas
   regenerer ce .svg avec `plantuml -tsvg`, il serait ecrase par une disposition
   degradee.
+  Largeur des colonnes calee sur la ligne de texte la plus longue, mesuree au
+  pixel (rendu reel + detection d'encre via magick -threshold -trim, pas une
+  estimation) le 2026-09-18 : "QUESTIONNAIRE EOF (manuel, decision de mission)"
+  = 403px de texte a 16px gras. Bloc exterieur 440px (403 + 15px pad gauche +
+  22px marge droite), rectangle interieur 410px, police corps 14px / titres 16px.
+  Legende en haut a droite (occupe l'espace mort au-dessus de RAPPORT) depuis le
+  2026-09-18 : RAPPORT n'est donc plus aligne en haut avec COLLECTE, et le
+  connecteur en U entre par le cote gauche de RAPPORT plutot que par le haut.
+  Icone livre dessinee en vectoriel (pas un emoji couleur : teste et confirme
+  le 2026-09-18, rsvg-convert rend tout emoji couleur en carre noir plein, meme
+  avec Apple Color Emoji explicite - la meme limite s'appliquerait au PPTX,
+  fabrique a partir d'un PNG rendu par rsvg-convert). Rappel du dessin (rect +
+  1 ligne verticale "reliure" + 2 lignes horizontales "texte") : voir usages
+  ci-dessous (marqueur mini pres du titre CAPTURE MANUELLE, taille normale
+  dans la Legende).
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="900" viewBox="0 0 1560 900" style="background:#FFFFFF">
-  <rect x="0" y="0" width="1560" height="900" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1130" viewBox="0 0 1100 1130" style="background:#FFFFFF">
+  <rect x="0" y="0" width="1100" height="1130" fill="#FFFFFF"/>
 
-  <text x="40" y="28" font-family="sans-serif" font-size="20" font-weight="bold" fill="#000000">Analyse de parcours web — Vue generale du workflow (par thematique, 2 colonnes)</text>
+  <text x="40" y="28" font-family="sans-serif" font-size="20" font-weight="bold" fill="#000000">Analyse de parcours web — Vue générale du workflow (par thématique, version compacte)</text>
 
   <!-- start -->
-  <circle cx="360" cy="70" r="9" fill="#222222"/>
-  <line x1="360" y1="79" x2="360" y2="96" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="354,90 366,90 360,100" fill="#5BA1BC"/>
+  <circle cx="260" cy="70" r="9" fill="#222222"/>
+  <line x1="260" y1="79" x2="260" y2="96" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="254,90 266,90 260,100" fill="#5BA1BC"/>
+
+  <!-- CAPTURE MANUELLE (special, prealable, une seule colonne) -->
+  <rect x="40" y="100" width="440" height="249" fill="#9BD0DD" stroke="#000000" stroke-width="1.5"/>
+  <text x="55" y="126" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">CAPTURE MANUELLE (préalable, humain, hors skill)</text>
+  <!-- icone livre mini : renvoi vers la doc detaillee, cf. 3e ligne de la Legende -->
+  <rect x="459" y="112" width="14" height="10" rx="1" fill="#FFFFFF" stroke="#1C2856" stroke-width="0.6"/>
+  <line x1="463.5" y1="112" x2="463.5" y2="122" stroke="#1C2856" stroke-width="0.6"/>
+  <line x1="465.5" y1="115.5" x2="470.5" y2="115.5" stroke="#1C2856" stroke-width="0.6"/>
+  <line x1="465.5" y1="118.5" x2="470.5" y2="118.5" stroke="#1C2856" stroke-width="0.6"/>
+  <line x1="40" y1="140" x2="480" y2="140" stroke="#000000" stroke-width="1.5"/>
+  <rect x="55" y="153" width="410" height="82" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="176" font-family="sans-serif" font-size="14" fill="#1C2856">Network : Preserve log + Disable cache</text>
+  <text x="70" y="195" font-family="sans-serif" font-size="14" fill="#1C2856">Parcours complet, cookies acceptés</text>
+  <text x="70" y="214" font-family="sans-serif" font-size="14" fill="#1C2856">-&gt; 'Save all as HAR with content' (.har)</text>
+  <rect x="55" y="251" width="410" height="82" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="274" font-family="sans-serif" font-size="14" fill="#1C2856">Coverage panel (Cmd+Shift+P)</text>
+  <text x="70" y="293" font-family="sans-serif" font-size="14" fill="#1C2856">Enregistrer, recharger, scroller</text>
+  <text x="70" y="312" font-family="sans-serif" font-size="14" fill="#1C2856">-&gt; export JSON par page (Coverage-*.json)</text>
+
+  <line x1="260" y1="349" x2="260" y2="369" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="254,369 266,369 260,379" fill="#5BA1BC"/>
 
   <!-- COLLECTE -->
-  <rect x="40" y="100" width="640" height="143" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
-  <rect x="40" y="100" width="640" height="38" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
-  <text x="55" y="125" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">COLLECTE (automatique)</text>
-  <rect x="55" y="150" width="610" height="78" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="70" y="172" font-family="sans-serif" font-size="13" fill="#1C2856">HAR, Coverage, Core Web Vitals</text>
-  <text x="70" y="190" font-family="sans-serif" font-size="13" fill="#1C2856">(analyze_har.py, coverage_metrics.py,</text>
-  <text x="70" y="208" font-family="sans-serif" font-size="13" fill="#1C2856">collect_cwv_pagespeed.py ou run_lighthouse.sh en repli)</text>
+  <rect x="40" y="379" width="440" height="151" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+  <rect x="40" y="379" width="440" height="40" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
+  <text x="55" y="405" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">COLLECTE (automatique)</text>
+  <rect x="55" y="432" width="410" height="82" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="455" font-family="sans-serif" font-size="14" fill="#1C2856">HAR, Coverage, Core Web Vitals</text>
+  <text x="70" y="474" font-family="sans-serif" font-size="14" fill="#1C2856">(analyze_har.py, coverage_metrics.py,</text>
+  <text x="70" y="493" font-family="sans-serif" font-size="14" fill="#1C2856">collect_cwv_pagespeed.py ou run_lighthouse.sh en repli)</text>
 
-  <line x1="360" y1="243" x2="360" y2="261" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="354,255 366,255 360,265" fill="#5BA1BC"/>
+  <line x1="260" y1="530" x2="260" y2="550" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="254,550 266,550 260,560" fill="#5BA1BC"/>
 
   <!-- JUGEMENT AUTOMATIQUE EOF -->
-  <rect x="40" y="273" width="640" height="161" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
-  <rect x="40" y="273" width="640" height="38" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
-  <text x="55" y="298" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">JUGEMENT AUTOMATIQUE EOF (automatique)</text>
-  <rect x="55" y="323" width="610" height="96" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="70" y="345" font-family="sans-serif" font-size="13" fill="#1C2856">run_eof.py confronte les donnees</text>
-  <text x="70" y="363" font-family="sans-serif" font-size="13" fill="#1C2856">deja collectees au referentiel EOF</text>
-  <text x="70" y="381" font-family="sans-serif" font-size="13" fill="#1C2856">(~10 criteres sur 54 tranches par script,</text>
-  <text x="70" y="399" font-family="sans-serif" font-size="13" fill="#1C2856">le reste reste 'je ne sais pas')</text>
+  <rect x="40" y="560" width="440" height="170" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+  <rect x="40" y="560" width="440" height="40" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
+  <text x="55" y="586" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">JUGEMENT AUTOMATIQUE EOF (automatique)</text>
+  <rect x="55" y="613" width="410" height="101" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="636" font-family="sans-serif" font-size="14" fill="#1C2856">run_eof.py confronte les données</text>
+  <text x="70" y="655" font-family="sans-serif" font-size="14" fill="#1C2856">déjà collectées au référentiel EOF</text>
+  <text x="70" y="674" font-family="sans-serif" font-size="14" fill="#1C2856">(~10 critères sur 54 tranchés par script,</text>
+  <text x="70" y="693" font-family="sans-serif" font-size="14" fill="#1C2856">le reste reste 'je ne sais pas')</text>
 
-  <line x1="360" y1="434" x2="360" y2="452" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="354,446 366,446 360,456" fill="#5BA1BC"/>
+  <line x1="260" y1="730" x2="260" y2="750" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="254,750 266,750 260,760" fill="#5BA1BC"/>
 
   <!-- IMPACT CO2e (special) -->
-  <rect x="40" y="464" width="640" height="236" fill="#9BD0DD" stroke="#000000" stroke-width="1.5"/>
-  <text x="55" y="489" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">IMPACT CO2e (optionnel, a tout moment)</text>
-  <line x1="40" y1="502" x2="680" y2="502" stroke="#000000" stroke-width="1.5"/>
-  <rect x="55" y="514" width="610" height="96" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="70" y="536" font-family="sans-serif" font-size="13" fill="#1C2856">/efootprint -&gt; modele Boavizta (reference</text>
-  <text x="70" y="554" font-family="sans-serif" font-size="13" fill="#1C2856">+ 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)</text>
-  <text x="70" y="572" font-family="sans-serif" font-size="13" fill="#1C2856">-&gt; donnees disponibles pour la PROCHAINE</text>
-  <text x="70" y="590" font-family="sans-serif" font-size="13" fill="#1C2856">generation du rapport, pas un ajout final isole</text>
-  <rect x="55" y="625" width="610" height="60" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="70" y="647" font-family="sans-serif" font-size="13" fill="#1C2856">Action humaine possible : trafic annuel et</text>
-  <text x="70" y="665" font-family="sans-serif" font-size="13" fill="#1C2856">taille d'instance cloud, si non auto-detectes</text>
+  <rect x="40" y="760" width="440" height="249" fill="#9BD0DD" stroke="#000000" stroke-width="1.5"/>
+  <text x="55" y="786" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">IMPACT CO2e (optionnel, à tout moment)</text>
+  <line x1="40" y1="800" x2="480" y2="800" stroke="#000000" stroke-width="1.5"/>
+  <rect x="55" y="813" width="410" height="101" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="836" font-family="sans-serif" font-size="14" fill="#1C2856">/efootprint -&gt; modèle Boavizta (référence</text>
+  <text x="70" y="855" font-family="sans-serif" font-size="14" fill="#1C2856">+ 3 scénarios cumulés prio1 / prio1+2 / prio1+2+3)</text>
+  <text x="70" y="874" font-family="sans-serif" font-size="14" fill="#1C2856">-&gt; données disponibles pour la PROCHAINE</text>
+  <text x="70" y="893" font-family="sans-serif" font-size="14" fill="#1C2856">génération du rapport, pas un ajout final isolé</text>
+  <rect x="55" y="930" width="410" height="63" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="70" y="953" font-family="sans-serif" font-size="14" fill="#1C2856">Action humaine possible : trafic annuel et</text>
+  <text x="70" y="972" font-family="sans-serif" font-size="14" fill="#1C2856">taille d'instance cloud, si non auto-détectés</text>
 
-  <!-- connecteur en U : IMPACT CO2e -> RAPPORT (premiere generation) -->
-  <polyline points="360,700 360,725 780,725 780,85 1180,85 1180,97" fill="none" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="1174,91 1186,91 1180,101" fill="#5BA1BC"/>
+  <!-- Légende (haut a droite, remplace l'espace mort au-dessus de RAPPORT) -->
+  <rect x="620" y="100" width="440" height="195" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+  <text x="635" y="126" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">Légende</text>
+  <rect x="635" y="141" width="26" height="18" fill="#ECECF2" stroke="#5BA1BC" stroke-width="1"/>
+  <text x="672" y="155" font-family="sans-serif" font-size="14" fill="#1C2856">Fond gris pâle : automatique</text>
+  <text x="672" y="173" font-family="sans-serif" font-size="13" fill="#1C2856">(calcul machine, aucune action humaine)</text>
+  <rect x="635" y="192" width="26" height="18" fill="#9BD0DD" stroke="#5BA1BC" stroke-width="1"/>
+  <text x="672" y="206" font-family="sans-serif" font-size="14" fill="#1C2856">Fond bleu clair : action humaine requise</text>
+  <text x="672" y="223" font-family="sans-serif" font-size="13" fill="#1C2856">(saisie, décision, ou réponse d'un tiers externe)</text>
+  <!-- icone livre (meme dessin que le marqueur mini pres de CAPTURE MANUELLE) -->
+  <rect x="635" y="243" width="26" height="18" rx="1" fill="#FFFFFF" stroke="#1C2856" stroke-width="0.75"/>
+  <line x1="643" y1="243" x2="643" y2="261" stroke="#1C2856" stroke-width="0.75"/>
+  <line x1="648" y1="249" x2="657" y2="249" stroke="#1C2856" stroke-width="0.75"/>
+  <line x1="648" y1="255" x2="657" y2="255" stroke="#1C2856" stroke-width="0.75"/>
+  <text x="672" y="257" font-family="sans-serif" font-size="14" fill="#1C2856">Doc de référence : capturer-har-et-coverage.md</text>
+  <text x="672" y="274" font-family="sans-serif" font-size="13" fill="#1C2856">../../.claude/skills/analyse-parcours/docs/</text>
+
+  <!-- connecteur en U (coins arrondis) : IMPACT CO2e -> RAPPORT (premiere generation)
+       entre par le cote gauche de RAPPORT (pas par le haut, occupe par la Legende) -->
+  <path d="M 260,1009 L 260,1021 Q 260,1039 278,1039 L 532,1039 Q 550,1039 550,1021 L 550,438 Q 550,420 568,420 L 606,420"
+        fill="none" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="610,414 610,426 620,420" fill="#5BA1BC"/>
 
   <!-- RAPPORT - premiere generation -->
-  <rect x="860" y="100" width="640" height="179" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
-  <rect x="860" y="100" width="640" height="38" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
-  <text x="875" y="125" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">RAPPORT — premiere generation (automatique)</text>
-  <rect x="875" y="150" width="610" height="114" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="890" y="172" font-family="sans-serif" font-size="13" fill="#1C2856">generate_report_html.py</text>
-  <text x="890" y="190" font-family="sans-serif" font-size="13" fill="#1C2856">(+ check_valeurs_rapport.py, controle</text>
-  <text x="890" y="208" font-family="sans-serif" font-size="13" fill="#1C2856">interne non bloquant)</text>
-  <text x="890" y="226" font-family="sans-serif" font-size="13" fill="#1C2856">-&gt; contient deja le jugement EOF automatique</text>
-  <text x="890" y="244" font-family="sans-serif" font-size="13" fill="#1C2856">(partiel) et le CO2e si deja calcule</text>
+  <rect x="620" y="325" width="440" height="189" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+  <rect x="620" y="325" width="440" height="40" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
+  <text x="635" y="351" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">RAPPORT — première génération (automatique)</text>
+  <rect x="635" y="378" width="410" height="120" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="650" y="401" font-family="sans-serif" font-size="14" fill="#1C2856">generate_report_html.py</text>
+  <text x="650" y="420" font-family="sans-serif" font-size="14" fill="#1C2856">(+ check_valeurs_rapport.py, contrôle</text>
+  <text x="650" y="439" font-family="sans-serif" font-size="14" fill="#1C2856">interne non bloquant)</text>
+  <text x="650" y="458" font-family="sans-serif" font-size="14" fill="#1C2856">-&gt; contient déjà le jugement EOF automatique</text>
+  <text x="650" y="477" font-family="sans-serif" font-size="14" fill="#1C2856">(partiel) et le CO2e si déjà calculé</text>
 
-  <line x1="1180" y1="279" x2="1180" y2="297" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="1174,291 1186,291 1180,301" fill="#5BA1BC"/>
+  <line x1="840" y1="514" x2="840" y2="534" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="834,534 846,534 840,544" fill="#5BA1BC"/>
 
   <!-- QUESTIONNAIRE EOF (special) -->
-  <rect x="860" y="309" width="640" height="308" fill="#9BD0DD" stroke="#000000" stroke-width="1.5"/>
-  <text x="875" y="334" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">QUESTIONNAIRE EOF (manuel, decision de mission)</text>
-  <line x1="860" y1="347" x2="1500" y2="347" stroke="#000000" stroke-width="1.5"/>
-  <rect x="875" y="359" width="610" height="96" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="890" y="381" font-family="sans-serif" font-size="13" fill="#1C2856">Quand : apres le jugement automatique,</text>
-  <text x="890" y="399" font-family="sans-serif" font-size="13" fill="#1C2856">uniquement sur les criteres restes</text>
-  <text x="890" y="417" font-family="sans-serif" font-size="13" fill="#1C2856">'je ne sais pas' - jamais avant,</text>
-  <text x="890" y="435" font-family="sans-serif" font-size="13" fill="#1C2856">jamais declenche seul</text>
-  <rect x="875" y="470" width="610" height="132" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="890" y="492" font-family="sans-serif" font-size="13" fill="#1C2856">generate_questionnaire.py -&gt; fichier a remplir</text>
-  <text x="890" y="510" font-family="sans-serif" font-size="13" fill="#1C2856">(questionnaire-eof.md), envoye au client,</text>
-  <text x="890" y="528" font-family="sans-serif" font-size="13" fill="#1C2856">rempli, relu (parse_questionnaire.py),</text>
-  <text x="890" y="546" font-family="sans-serif" font-size="13" fill="#1C2856">fusionne (fusionner_lots.py) selon la</text>
-  <text x="890" y="564" font-family="sans-serif" font-size="13" fill="#1C2856">precedence collecte &gt; estime &gt; precise</text>
-  <text x="890" y="582" font-family="sans-serif" font-size="13" fill="#1C2856">&gt; declare &gt; suppose</text>
+  <rect x="620" y="544" width="440" height="325" fill="#9BD0DD" stroke="#000000" stroke-width="1.5"/>
+  <text x="635" y="570" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">QUESTIONNAIRE EOF (manuel, décision de mission)</text>
+  <line x1="620" y1="584" x2="1060" y2="584" stroke="#000000" stroke-width="1.5"/>
+  <rect x="635" y="597" width="410" height="101" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="650" y="620" font-family="sans-serif" font-size="14" fill="#1C2856">Quand : après le jugement automatique,</text>
+  <text x="650" y="639" font-family="sans-serif" font-size="14" fill="#1C2856">uniquement sur les critères restés</text>
+  <text x="650" y="658" font-family="sans-serif" font-size="14" fill="#1C2856">'je ne sais pas' - jamais avant,</text>
+  <text x="650" y="677" font-family="sans-serif" font-size="14" fill="#1C2856">jamais déclenché seul</text>
+  <rect x="635" y="714" width="410" height="139" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="650" y="737" font-family="sans-serif" font-size="14" fill="#1C2856">generate_questionnaire.py -&gt; fichier à remplir</text>
+  <text x="650" y="756" font-family="sans-serif" font-size="14" fill="#1C2856">(questionnaire-eof.md), envoyé au client,</text>
+  <text x="650" y="775" font-family="sans-serif" font-size="14" fill="#1C2856">rempli, relu (parse_questionnaire.py),</text>
+  <text x="650" y="794" font-family="sans-serif" font-size="14" fill="#1C2856">fusionné (fusionner_lots.py) selon la</text>
+  <text x="650" y="813" font-family="sans-serif" font-size="14" fill="#1C2856">précédence collecte &gt; estime &gt; précise</text>
+  <text x="650" y="832" font-family="sans-serif" font-size="14" fill="#1C2856">&gt; déclaré &gt; supposé</text>
 
-  <line x1="1180" y1="617" x2="1180" y2="635" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="1174,629 1186,629 1180,639" fill="#5BA1BC"/>
+  <line x1="840" y1="869" x2="840" y2="889" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="834,889 846,889 840,899" fill="#5BA1BC"/>
 
   <!-- RAPPORT - regeneration -->
-  <rect x="860" y="647" width="640" height="143" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
-  <rect x="860" y="647" width="640" height="38" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
-  <text x="875" y="672" font-family="sans-serif" font-size="15" font-weight="bold" fill="#000000">RAPPORT — regeneration (automatique)</text>
-  <rect x="875" y="697" width="610" height="78" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
-  <text x="890" y="719" font-family="sans-serif" font-size="13" fill="#1C2856">generate_report_html.py</text>
-  <text x="890" y="737" font-family="sans-serif" font-size="13" fill="#1C2856">-&gt; reflete les reponses du questionnaire</text>
-  <text x="890" y="755" font-family="sans-serif" font-size="13" fill="#1C2856">fusionnees (+ CO2e si calcule entre-temps)</text>
+  <rect x="620" y="899" width="440" height="151" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+  <rect x="620" y="899" width="440" height="40" fill="#ECECF2" stroke="#000000" stroke-width="1.5"/>
+  <text x="635" y="925" font-family="sans-serif" font-size="16" font-weight="bold" fill="#000000">RAPPORT — régénération (automatique)</text>
+  <rect x="635" y="952" width="410" height="82" rx="12" ry="12" fill="#E0F0F4" stroke="#5BA1BC" stroke-width="0.75"/>
+  <text x="650" y="975" font-family="sans-serif" font-size="14" fill="#1C2856">generate_report_html.py</text>
+  <text x="650" y="994" font-family="sans-serif" font-size="14" fill="#1C2856">-&gt; reflète les réponses du questionnaire</text>
+  <text x="650" y="1013" font-family="sans-serif" font-size="14" fill="#1C2856">fusionnées (+ CO2e si calculé entre-temps)</text>
 
   <!-- stop -->
-  <line x1="1180" y1="790" x2="1180" y2="815" stroke="#5BA1BC" stroke-width="1.5"/>
-  <polygon points="1174,809 1186,809 1180,819" fill="#5BA1BC"/>
-  <circle cx="1180" cy="830" r="11" fill="none" stroke="#222222" stroke-width="1.5"/>
-  <circle cx="1180" cy="830" r="6" fill="#222222"/>
+  <line x1="840" y1="1050" x2="840" y2="1075" stroke="#5BA1BC" stroke-width="1.5"/>
+  <polygon points="834,1069 846,1069 840,1079" fill="#5BA1BC"/>
+  <circle cx="840" cy="1090" r="11" fill="none" stroke="#222222" stroke-width="1.5"/>
+  <circle cx="840" cy="1090" r="6" fill="#222222"/>
 </svg>

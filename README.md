@@ -44,6 +44,89 @@ Une grille de qualification à 16 critères / 6 piliers, dérivée du référent
 
 → `.claude/skills/analyse-parcours/docs/Référenciel EROOM/`
 
+-----
+
+## Diagrammes
+
+Vue générale du workflow (par thématique), du recueil manuel du parcours jusqu'à la régénération du rapport après questionnaire :
+
+![Vue générale du workflow](documentation/diagrammes/analyse-parcours-vue-generale.jpg)
+
+Zoom sur l'étape DISPATCH (répartition de l'analyse HAR/Coverage en 2 sous-agents parallèles) :
+
+![DISPATCH — flux des vagues](documentation/diagrammes/analyse-parcours-dispatch-activite.jpg)
+
+Workflow principal en diagramme de séquence (5 pages : localisation, DISPATCH, rapport, puis collecte et calcul e-footprint) :
+
+![Séquence — page 1/5](documentation/diagrammes/analyse-parcours-p1.jpg)
+
+![Séquence — page 2/5](documentation/diagrammes/analyse-parcours-p2.jpg)
+
+![Séquence — page 3/5](documentation/diagrammes/analyse-parcours-p3.jpg)
+
+![Séquence — page 4/5](documentation/diagrammes/analyse-parcours-p4.jpg)
+
+![Séquence — page 5/5](documentation/diagrammes/analyse-parcours-p5.jpg)
+
+Pipeline outils de l'estimation e-footprint (collecte → calcul Boavizta → scénarios de recommandations → restitution) :
+
+![e-footprint — pipeline outils](documentation/diagrammes/analyse-parcours-efootprint-outils.jpg)
+
+Versions imprimables (PDF) : [vue générale](documentation/diagrammes/analyse-parcours-vue-generale.pdf) · [DISPATCH](documentation/diagrammes/analyse-parcours-dispatch-activite.pdf) · [workflow (séquence, 5 pages)](documentation/diagrammes/analyse-parcours-workflow.pdf) · [e-footprint (pipeline outils)](documentation/diagrammes/analyse-parcours-efootprint-outils.pdf).
+
+Les sources `.puml`/`.svg` et la procédure de régénération (registre complet de tous les diagrammes du projet) sont documentées dans le skill `.claude/skills/diagrammes-analyse-parcours/SKILL.md`.
+
+-----
+
+## Structure du dépôt
+
+```
+.
+├── .claude/skills/
+│   ├── analyse-parcours/                      # Le skill principal (diagnostic + e-footprint)
+│   │   ├── SKILL.md                           # Workflow complet (référence technique)
+│   │   ├── docs/                              # Guides (capture HAR/Coverage, clés API...)
+│   │   ├── skill-steps/                       # Étapes détaillées du workflow
+│   │   └── scripts/                           # analyze_har.py, run_efootprint.py, efootprint_model/...
+│   ├── diagrammes-analyse-parcours/           # Skill de génération/maintenance des diagrammes
+│   └── eof/                                   # Skill de fabrication du template EOF (référentiel source)
+├── audits/<nom-du-site-audité>/                # Résultats d'audits réels (rapports HTML, e-footprint, EOF, topologie)
+├── documentation/
+│   ├── diagrammes/                            # Diagrammes PlantUML (.puml, .svg, .pdf, .jpg, .pptx)
+│   └── implementation/                        # Méthodologie e-footprint, setup clés API
+├── EOF_study_Quick_and_fast_first_questionary/  # Étude du référentiel EOF -> questionnaire
+├── exemples fictifs radar EOF/                 # Démonstration du rendu radar SVG (données fictives)
+├── processus/                                  # Fusion multi-agents des lots d'analyse EOF
+├── LICENSE
+└── README.md
+```
+
+Sous `audits/`, les données brutes potentiellement sensibles (`donnees-brutes-potentiellement-sensibles/`, `pages-html/`, `PERIMETRE-CAPTURE.md`) sont exclues du dépôt à n'importe quelle profondeur ; `tmp/` (handoffs, brouillons de travail) et `documentation/en cours/` restent entièrement exclus. Liste complète : voir `.gitignore`.
+
+-----
+
+## Prérequis
+
+- [Claude Code](https://claude.com/claude-code)
+- **Google Chrome** — capture manuelle du HAR et des données de couverture JS/CSS via DevTools (voir `.claude/skills/analyse-parcours/docs/capturer-har-et-coverage.md`)
+- **Python 3**, avec la bibliothèque [`e-footprint`](https://github.com/Boavizta/e-footprint) (estimation CO2e)
+- **Node.js** — pour Lighthouse (mesure Core Web Vitals en repli si les données terrain CrUX/PageSpeed ne sont pas disponibles), installé une seule fois via `npm install --prefix .claude/skills/analyse-parcours/scripts/`
+- **Clés API personnelles** : PageSpeed Insights/Chrome UX Report et ipinfo.io (voir `documentation/implementation/setup_Google_api_keys.md`)
+- Pour régénérer les diagrammes : `plantuml`, `rsvg-convert`, `magick` (ImageMagick) et `soffice` (LibreOffice, pour l'export `.pptx`)
+
+-----
+
+## Installation
+
+```bash
+git clone git@github.com:Boavizta/eroom.git
+cd eroom
+```
+
+Ouvrir le dossier avec Claude Code : les skills (`analyse-parcours`, `diagrammes-analyse-parcours`, `eof`) sont détectés automatiquement (`.claude/skills/`).
+
+-----
+
 ## Démarrage rapide
 
 Ces outils s'utilisent depuis [Claude Code](https://claude.com/claude-code), sous forme de skills invoqués en langage naturel ou par commande explicite :
@@ -52,10 +135,6 @@ Ces outils s'utilisent depuis [Claude Code](https://claude.com/claude-code), sou
 /analyse-parcours <dossier-contenant-le-har-et-les-fichiers-de-couverture>
 /efootprint <même-dossier>          # estimation CO2e seule
 ```
-
-Prérequis : Python 3 (bibliothèque `e-footprint`), Node.js (Lighthouse, installé une seule fois via `npm install --prefix .claude/skills/analyse-parcours/scripts/`), et des clés API personnelles pour PageSpeed Insights/Chrome UX Report et ipinfo.io (voir `documentation/implementation/setup_Google_api_keys.md`).
-
-Procédure de capture du HAR et des fichiers de couverture : `.claude/skills/analyse-parcours/docs/capturer-har-et-coverage.md`.
 
 ## Statut
 

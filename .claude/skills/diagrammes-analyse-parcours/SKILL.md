@@ -22,7 +22,8 @@ version: 1.0.0
 
 | Diagramme | Fichiers source (`.puml`) | Fichiers produits | Source de vérité | Régénérer si... |
 |-----------|--------------------------|-------------------|------------------|-----------------|
-| Vue générale (macro, par thématique) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthèse des 6 blocs ci-dessous (Collecte, Jugement auto EOF, Impact CO2e, Rapport - première génération, Questionnaire EOF, Rapport - régénération) : pas de source unique, c'est un résumé volontairement macro. Rapport apparaît deux fois (avant et après le questionnaire) pour montrer les deux passes ; Impact CO2e est positionné avant la première génération car ses données, une fois calculées, alimentent la prochaine génération de rapport, pas un ajout final isolé. Légende à 2 couleurs (fond gris pâle `#ECECF2` = automatique, fond bleu clair Octo `#9BD0DD` = action humaine requise) sur les blocs Impact CO2e et Questionnaire EOF | l'un des diagrammes détaillés ci-dessous change de thématique (nouvelle étape majeure, fusion/scission d'un bloc), ou la règle de précédence des provenances change (`processus/manifeste-lots.json::regle_de_precedence`) |
+| Vue générale (macro, par thématique) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthèse de 7 blocs (Capture manuelle, Collecte, Jugement auto EOF, Impact CO2e, Rapport - première génération, Questionnaire EOF, Rapport - régénération) : pas de source unique, c'est un résumé volontairement macro. Le bloc Capture manuelle (HAR puis Coverage, séquentiel, une seule colonne) précède Collecte : c'est l'étape humaine hors skill, avant tout automatisme — détaillée dans [`capturer-har-et-coverage.md`](../analyse-parcours/docs/capturer-har-et-coverage.md), référencée dans le diagramme par un marqueur `[réf]` (titre du bloc + 3e ligne de la légende ; pas d'icône dessinée ici, ce diagramme est généré par `plantuml`, pas construit à la main). Depuis le 2026-09-18, la légende est un unique bloc `legend top right`/`endlegend` (un seul rectangle bordé, comme dans `analyse-parcours-vue-generale-horizontal-light.svg`) et non plus 3 notes séparées : piège rencontré, `<back:#couleur>` sur du texte vide ou des espaces (y compris des `&nbsp;`/NBSP Unicode) ne produit AUCUNE pastille visible, PlantUML les élague avant le rendu — il faut des caractères de remplissage non-blancs colorés dans la MÊME couleur que le fond (`<back:#ECECF2><color:#ECECF2>XXXXXX</color></back>`) pour obtenir une pastille pleine et invisible en texte. Rapport apparaît deux fois (avant et après le questionnaire) pour montrer les deux passes ; Impact CO2e est positionné avant la première génération car ses données, une fois calculées, alimentent la prochaine génération de rapport, pas un ajout final isolé. Légende à 2 couleurs (fond gris pâle `#ECECF2` = automatique, fond bleu clair Octo `#9BD0DD` = action humaine requise) sur les blocs Capture manuelle, Impact CO2e et Questionnaire EOF | l'un des diagrammes détaillés ci-dessous change de thématique (nouvelle étape majeure, fusion/scission d'un bloc), la procédure de capture manuelle change, ou la règle de précédence des provenances change (`processus/manifeste-lots.json::regle_de_precedence`) |
+| Vue générale (macro, horizontal, 2 colonnes) | `analyse-parcours-vue-generale-horizontal-light.puml` (texte de référence uniquement, ne pilote pas le rendu) | `analyse-parcours-vue-generale-horizontal-light.svg` (**construit à la main, ne JAMAIS régénérer via `plantuml -tsvg`** — PlantUML ne sait pas produire cette mise en page, cf. commentaire en tête du `.svg`) + `.pdf` + `.jpg` + `.pptx` | Le `.svg` lui-même est la source de vérité de la mise en page (2 colonnes de 440px chacune, largeur mesurée au pixel sur la ligne de texte la plus longue — `magick -threshold -trim` sur le rendu réel, pas une estimation, cf. commentaire en tête du `.svg` — le 2026-09-18, police corps 14px / titres 16px, connecteur en U à coins arrondis flush avec les blocs, bloc Capture manuelle en tête en une seule colonne HAR puis Coverage, légende en haut à droite — occupe l'espace mort au-dessus de Rapport, qui n'est donc plus aligné avec Collecte, le connecteur entre par le côté gauche de Rapport plutôt que par le haut) ; le `.puml` ne sert qu'à garder le texte en synchronisation avec les autres diagrammes de ce projet. Contenu du bloc Capture manuelle détaillé dans [`capturer-har-et-coverage.md`](../analyse-parcours/docs/capturer-har-et-coverage.md), référencé DANS le `.svg` depuis le 2026-09-18 par une icône livre dessinée en vectoriel (rect + spine + 2 lignes, PAS un emoji couleur — testé et confirmé : rsvg-convert rend tout emoji couleur en carré noir plein, y compris avec Apple Color Emoji explicite, et le PPTX en hériterait puisqu'il repasse par un PNG rendu par rsvg-convert) : mini marqueur à côté du titre Capture manuelle + icône pleine taille en 3e ligne de la Légende (nom du fichier + chemin relatif) | le texte change (reporter à la main dans le `.puml` ET le `.svg`), ou la mise en page change (largeurs, police, coins, flèches, légende) — puis régénérer `.pdf`/`.jpg`/`.pptx` via les procédures ci-dessous |
 | Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
 | DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
 | e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
@@ -42,7 +43,8 @@ Pour chaque diagramme modifié :
 2. Générer le SVG : `plantuml -tsvg <fichier>.puml`
 3. Convertir en PDF via `rsvg-convert`
 4. Générer aussi le JPG léger (voir "JPG léger" ci-dessous) — systématique, pas seulement à la demande
-5. Vérifier + ouvrir
+5. Si ce diagramme a un `.pptx` (cf. colonne "Fichiers produits" du registre), le régénérer aussi (voir "PPTX" ci-dessous) — sinon il reste périmé silencieusement
+6. Vérifier + ouvrir
 
 **Ne jamais générer directement en PNG ou PDF depuis plantuml.** Toujours passer par SVG (vecteur) puis `rsvg-convert` pour le PDF.
 
@@ -71,6 +73,42 @@ for f in *.svg; do
     && rm "/tmp/${base}.png"
 done
 ```
+
+### PPTX (uniquement pour les diagrammes qui en ont besoin, ex. vue générale horizontal-light)
+
+Certains diagrammes (aujourd'hui : `analyse-parcours-vue-generale-horizontal-light`)
+ont aussi une version `.pptx`, pour insertion dans une présentation. Ce `.pptx` a
+été créé une première fois (2026-09-16) **manuellement** hors du repo (export
+SVG → PowerPoint), sans procédure de régénération — un piège identifié le
+2026-09-18 : toute future modification du `.svg` laissait le `.pptx` périmé sans
+que personne ne s'en rende compte.
+
+Depuis, la régénération est scriptée par
+`.claude/skills/diagrammes-analyse-parcours/scripts/svg_to_pptx.sh` :
+
+```bash
+.claude/skills/diagrammes-analyse-parcours/scripts/svg_to_pptx.sh documentation/diagrammes/<f>.svg
+```
+
+Le script rend le SVG en PNG haute résolution (`rsvg-convert`), fabrique un `.odp`
+minimal à la main (une diapositive, l'image en plein cadre, format 16:9 standard
+PowerPoint) puis le convertit en `.pptx` via `soffice --headless` (LibreOffice,
+déjà installé — `/opt/homebrew/bin/soffice`). Détour nécessaire : LibreOffice n'a
+pas de filtre d'export direct SVG/PNG → PPTX (ces formats s'ouvrent comme des
+documents Draw, qui ne savent exporter qu'en formats Draw) ; il sait en revanche
+très bien convertir un document de présentation (ODP) vers PPTX.
+
+**Limite à connaître :** le diagramme est incrusté en image dans la diapositive
+(comme dans le PDF/JPG), pas en formes vectorielles éditables dans PowerPoint —
+cohérent avec le fait que le `.svg` lui-même est construit à la main, pas généré
+depuis des formes structurées.
+
+**Piège rencontré à l'écriture du script :** `awk` respecte la locale système pour
+le séparateur décimal. Sur ce Mac (locale FR), `awk '{printf "%.3f", ...}'` sans
+précaution produit `19,538` (virgule) au lieu de `19.538` (point) — une dimension
+ODF invalide qui fait retomber LibreOffice sur une hauteur de diapositive quasi
+nulle (l'image apparaît alors juste vide/blanche). Toujours forcer
+`LC_NUMERIC=C awk ...` pour les calculs de dimensions destinés à du XML.
 
 -----
 
@@ -616,9 +654,12 @@ Mono-fichier, une seule page.
 
 ```
 Wave 0  — Localisation (contexte principal)
-Wave 1  — Analyse HAR + Analyse Coverage en parallèle (2 sous-agents)
-Merge   — lecture har-analysis.json + coverage-analysis.json
-Suite   — Étape 35 EcoIndex + Étape 40 Rapport HTML (contexte principal)
+Wave 1  — HAR + Coverage + CWV + env-data + Sécurité en parallèle (5 sous-agents)
+Wave 2  — Extracteurs HTML/CSS + well-known en parallèle (2 sous-agents,
+          dépendance DURE sur env-data.json produit en Wave 1)
+Merge   — lecture des 7 fichiers Wave 1/2 (2 obligatoires, 5 best-effort)
+Suite   — Étape 35 EcoIndex + Étape 39 EOF (run_eof.py) + Étape 40 Rapport HTML
+          (contexte principal, séquentiel, hors dispatch)
 ```
 
 ### Commandes
@@ -674,9 +715,9 @@ note right #C8E6C9
   Les dispatches suivants lisent les fichiers disque.
 end note
 
-partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
+partition "**Wave 1 — HAR + Coverage + CWV + env-data + Sécurité** (5 sous-agents en parallèle)" {
   fork
-    :Dispatch A — Analyse HAR
+    :Dispatch analyse-har
     (20_analyse-har.md)
     20a — trafic (requêtes, domaines,
     codes HTTP, volume Mo)
@@ -684,7 +725,7 @@ partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
     doublons, ressources bloquantes)
     -> har-analysis.json;
   fork again
-    :Dispatch B — Analyse Coverage
+    :Dispatch analyse-coverage
     (30_analyse-coverage.md)
     Format A ou B détecté
     Métriques JS/CSS par page
@@ -692,18 +733,58 @@ partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
     Top 5 JS + Top 3 CSS inutilisés
     Synthèse multi-pages + outliers
     -> coverage-analysis.json;
+  fork again
+    :Dispatch collecte-cwv
+    (37_lighthouse.md)
+    collect_cwv_pagespeed.py --strategy both
+    -> cwv.json;
+  fork again
+    :Dispatch collecte-env-data
+    (45_efootprint.md, Étape 20)
+    collect_env_data.py
+    -> env-data.json;
+  fork again
+    :Dispatch extracteur-security-headers
+    (39_eof-audit.md)
+    analyze_security_headers.py
+    -> security-headers-analysis.json;
   end fork
 }
 
 note right
   Condition de réussite :
   har-analysis.json et coverage-analysis.json
-  doivent exister avec données valides.
-  Sinon : relancer le dispatch une fois.
+  obligatoires (avertissement bloquant si absents).
+  cwv.json / env-data.json / security-headers-analysis.json
+  best-effort (dégradation DOUCE vérifiée en code,
+  jamais un crash). Sinon : relancer le dispatch une fois.
+end note
+
+partition "**Wave 2 — Extracteurs EOF dépendants d'env-data.json** (2 sous-agents en parallèle)" {
+  fork
+    :Dispatch extracteur-html-css
+    depends_on="collecte-env-data"
+    parse_html_criteria.py
+    -> html-css-criteria.json;
+  fork again
+    :Dispatch extracteur-wellknown
+    depends_on="collecte-env-data"
+    scan_wellknown.py
+    -> wellknown-scan.json;
+  end fork
+}
+
+note right #FFECB3
+  Dépendance DURE (pas une dégradation) : les deux
+  scripts font sys.exit(1) si env-data.json est absent.
+  Ne pas dispatcher avant confirmation d'env-data.json
+  sur disque (Wave 1 terminée).
 end note
 
 partition "**Merge + suite** (contexte principal)" {
-  :Lire har-analysis.json + coverage-analysis.json;
+  :Lire har-analysis.json + coverage-analysis.json
+  (+ cwv.json/env-data.json/security-headers-analysis.json/
+  html-css-criteria.json/wellknown-scan.json en best-effort);
   :Étape 35 — har_metrics.py
   Calcul score/grade A-G par page
   (formule officielle cnumr/ecoindex);
@@ -715,9 +796,16 @@ partition "**Merge + suite** (contexte principal)" {
     -> documenté dans le rapport
   end note
 
+  :Étape 39 — run_eof.py puis
+  processus/fusionner_lots.py
+  (fusionne les critères automatiques avec un
+  questionnaire déjà relu, si présent)
+  -> eof-audit-results.json;
+
   :Étape 40 — generate_report_html.py
   Sections : EcoIndex, Trafic réseau,
   Code mort, CWV (si cwv.json),
+  Potentiel d'optimisation EOF (si eof-audit-results.json)
   Recommandations P1/P2/P3
   -> rapport-parcours-YYYY-MM-DD.html;
 
