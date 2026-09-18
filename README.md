@@ -101,7 +101,7 @@ Les sources `.puml`/`.svg` et la procédure de régénération (registre complet
 └── README.md
 ```
 
-Sous `audits/`, les données brutes potentiellement sensibles (`donnees-brutes-potentiellement-sensibles/`, `pages-html/`, `PERIMETRE-CAPTURE.md`) sont exclues du dépôt à n'importe quelle profondeur ; `tmp/` (handoffs, brouillons de travail) et `documentation/en cours/` restent entièrement exclus. Liste complète : voir `.gitignore`.
+Sous `audits/`, les données brutes potentiellement sensibles (`donnees-brutes-potentiellement-sensibles/`, `pages-html/`, `PERIMETRE-CAPTURE.md`) sont exclues du dépôt à n'importe quelle profondeur.
 
 -----
 
@@ -119,7 +119,7 @@ Sous `audits/`, les données brutes potentiellement sensibles (`donnees-brutes-p
 ## Installation
 
 ```bash
-git clone git@github.com:Boavizta/eroom.git
+git clone <URL_du_dépôt_distant>/eroom.git
 cd eroom
 ```
 
