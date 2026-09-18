@@ -38,16 +38,16 @@ note right #C8E6C9
   Les dispatches suivants lisent les fichiers disque.
 end note
 
-partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
+partition "**Wave 1 — HAR + Coverage + CWV + env-data + Sécurité** (5 sous-agents en parallèle)" {
   fork
-    :Dispatch A — Analyse HAR
+    :Dispatch analyse-har
     (20_analyse-har.md)
     python3 analyze_har.py <dossier-source>
     Trafic + performance (requêtes, domaines,
     codes HTTP, doublons, ressources bloquantes)
     -> har-analysis.json;
   fork again
-    :Dispatch B — Analyse Coverage
+    :Dispatch analyse-coverage
     (30_analyse-coverage.md)
     Format A ou B détecté
     Métriques JS/CSS par page
@@ -55,18 +55,80 @@ partition "**Wave 1 — HAR + Coverage** (2 sous-agents en parallèle)" {
     Top 5 JS + Top 3 CSS inutilisés
     Synthèse multi-pages + outliers
     -> coverage-analysis.json;
+  fork again
+    :Dispatch collecte-cwv
+    (37_lighthouse.md)
+    collect_cwv_pagespeed.py --strategy both
+    PageSpeed Insights + CrUX (mobile+desktop,
+    accessibility/best-practices inclus dès le
+    départ) ; fallback Lighthouse auto si
+    GOOGLE_API_KEY absente ou 0 métrique exploitable
+    -> cwv.json;
+  fork again
+    :Dispatch collecte-env-data
+    (45_efootprint.md, Étape 20)
+    collect_env_data.py <dossier-source>
+    HAR + CrUX (mix device) + ipinfo.io
+    (pays/provider) + API interne SimilarWeb
+    (mix pays + trafic)
+    -> env-data.json;
+  fork again
+    :Dispatch extracteur-security-headers
+    (39_eof-audit.md)
+    analyze_security_headers.py <dossier-source>
+    Score sécurité local depuis les en-têtes
+    déjà dans le .har, aucun appel réseau
+    -> security-headers-analysis.json;
   end fork
 }
 
 note right
+  Indépendance vérifiée en code, pas supposée :
+  analyse-har et extracteur-security-headers lisent
+  AUSSI env-data.json, mais en dégradation DOUCE
+  (fichier absent -> classification moins précise /
+  filtre de pages ignoré, jamais un crash).
   Condition de réussite :
-  har-analysis.json et coverage-analysis.json
-  doivent exister avec données valides.
-  Sinon : relancer le dispatch une fois.
+  har-analysis.json ET coverage-analysis.json
+  obligatoires (avertissement bloquant si absents).
+  cwv.json / env-data.json / security-headers-analysis.json
+  best-effort (absence signalée, jamais bloquante).
+end note
+
+partition "**Wave 2 — Extracteurs EOF dépendants d'env-data.json** (2 sous-agents en parallèle)" {
+  fork
+    :Dispatch extracteur-html-css
+    depends_on="collecte-env-data"
+    parse_html_criteria.py <dossier-source>
+    Re-fetch live des pages déjà auditées
+    (le .har ne contient pas les corps HTML/CSS)
+    Archive sous pages-html/ (chantier 27)
+    -> html-css-criteria.json;
+  fork again
+    :Dispatch extracteur-wellknown
+    depends_on="collecte-env-data"
+    scan_wellknown.py <dossier-source>
+    Fetch direct security.txt / robots.txt /
+    sitemap.xml sur le domaine déduit d'env-data.json
+    -> wellknown-scan.json;
+  end fork
+}
+
+note right #FFECB3
+  DÉPENDANCE DURE (pas une dégradation), vérifiée
+  ligne par ligne dans le code :
+  parse_html_criteria.py et scan_wellknown.py font
+  sys.exit(1) si env-data.json est absent ou vide.
+  Ne jamais dispatcher cette vague avant d'avoir
+  confirmé env-data.json sur disque (Wave 1 terminée) —
+  un simple retry ne compense pas cette dépendance dure.
 end note
 
 partition "**Merge + suite** (contexte principal)" {
-  :Lire har-analysis.json + coverage-analysis.json;
+  :Lire har-analysis.json + coverage-analysis.json
+  (obligatoires) + cwv.json / env-data.json /
+  security-headers-analysis.json / html-css-criteria.json /
+  wellknown-scan.json (best-effort, Wave 1/2);
   :Étape 35 — har_metrics.py
   Calcul score/grade A-G par page
   (formule officielle cnumr/ecoindex);
@@ -76,35 +138,23 @@ partition "**Merge + suite** (contexte principal)" {
     DOM=0 si HAR sans corps HTML
     SPA : DOM = état initial seulement
     -> documenté dans le rapport
+    Aucun OUTPUT_FILE réutilisé ailleurs :
+    validation console libre, hors dispatch
   end note
 
-  if (cwv.json présent ?) then (oui)
-    :Étape 37 — collecte CWV skippée;
-  elseif (GOOGLE_API_KEY disponible ?) then (oui, voie prioritaire)
-    :collect_cwv_pagespeed.py
-    PageSpeed Insights API
-    (CrUX terrain + Lighthouse lab, par page)
-    -> cwv.json {lcp, inp, cls, source: "pagespeed/crux"};
-  else (non, repli)
-    fork
-      :run_lighthouse.sh
-      Extraire URLs du HAR
-      Lighthouse CLI par page (mode lab)
-      -> cwv.json {lcp, inp, cls, source: "lighthouse"};
-    fork again
-      note right #FFECB3
-        Si Lighthouse indisponible :
-        warning, rapport sans CWV
-        (onLoad du HAR utilisé comme proxy du LCP)
-      end note
-    end fork
-  endif
+  note right #FFECB3
+    Si cwv.json absent (Wave 1 en échec) :
+    rapport sans CWV, onLoad du HAR utilisé
+    comme proxy du LCP
+  end note
 
-  :Étape 39 — run_eof.py
-  (+ extracteurs annexes : parse_html_criteria.py,
-  analyze_security_headers.py, scan_wellknown.py)
-  Confronte les données déjà collectées à
-  eof-referentiel.json (54 critères + 16 diagnostic rapide)
+  :Étape 39 — run_eof.py <dossier-source>
+  Confronte har-analysis.json / coverage-analysis.json
+  (obligatoires) + cwv.json / env-data.json /
+  security-headers-analysis.json / html-css-criteria.json /
+  wellknown-scan.json (best-effort, déjà produits par
+  Wave 1/2 — plus d'extracteurs annexes à lancer ici)
+  à eof-referentiel.json (54 critères + 16 diagnostic rapide)
   -> eof-audit-results.json, eof-rempli.md,
   eof-radar-<domaine>.svg;
 
@@ -114,7 +164,8 @@ partition "**Merge + suite** (contexte principal)" {
     fusionner_lots.py sont des étapes manuelles assumées
     (décision de mission), jamais déclenchées par ce skill.
     Piège : ne jamais relancer run_eof.py seul après une
-    relecture de questionnaire (écrase les réponses en silence).
+    relecture de questionnaire (écrase les réponses en silence,
+    il ne relit jamais lots/relecture-questionnaire.json).
     Toujours parse_questionnaire.py -> fusionner_lots.py
     -> generate_report_html.py.
   end note
@@ -148,8 +199,10 @@ partition "**Étape optionnelle - e-footprint CO2e** (skill /efootprint)" #C8E6C
 
     note right
       Mode cache :
-      Si env-data.json existe déjà,
-      skip API calls (sauf --refresh)
+      Si env-data.json existe déjà (souvent déjà
+      produit par la Wave 1 de /analyse-parcours,
+      bloc collecte-env-data), skip API calls
+      (sauf --refresh)
     end note
 
     :E2 - AskUserQuestion

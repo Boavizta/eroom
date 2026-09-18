@@ -4202,15 +4202,31 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     lcp_bad, lcp_warn = [], []
     inp_bad, inp_warn = [], []
     cls_bad, cls_warn = [], []
+    cwv_failed = []
 
     for m in deduped:
         # Recos = "pire des deux" par métrique : un problème desktop remonte aussi.
-        c, worst_strat = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
-        if not c:
-            continue
+        by_strat = _cwv_for_page(m, cwv)
+        c, worst_strat = _cwv_worst_per_metric(by_strat)
         num = m.get("page_num", "")
         url = m["title"]
         short = urlparse(url).path.rstrip("/") or "/"
+
+        # Mesure tentée mais échouée (ex. timeout réseau) sur au moins une
+        # stratégie : le dire plutôt que de la faire disparaître silencieusement
+        # (cf. absence != échec) — même quand l'autre stratégie a réussi, sinon
+        # une mesure ratée sur mobile passe pour un "pas de problème" au vu du
+        # seul résultat desktop.
+        failed_strats = [
+            s for s, r in (by_strat or {}).items()
+            if r and r.get("mesure", {}).get("statut") not in (None, "ok")
+        ]
+        if failed_strats:
+            mk = "".join(_cwv_device_marker(s) for s in failed_strats)
+            cwv_failed.append(f'<a href="{url}" target="_blank" rel="noopener">{mk} P{num} {short}</a>')
+
+        if not c:
+            continue
 
         def _label(metric):
             # Annote la page avec l'appareil dont vient la valeur la plus défavorable
@@ -4295,6 +4311,14 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     elif cls_warn:
         prio2.append(_cls_item(cls_warn, "à améliorer"))
 
+    if cwv_failed:
+        n = len(cwv_failed)
+        prio2.append(
+            f"Mesure CWV échouée (timeout réseau) sur {n} page{'s' if n > 1 else ''} : "
+            + ", ".join(cwv_failed)
+            + " - à rejouer avant de conclure sur ces pages."
+        )
+
     # EcoIndex < 40 → priorité 1
     for m in page_metrics:
         if m["ecoindex"] < 40:
@@ -4320,12 +4344,19 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     for page_name, page_data in coverage_by_page.items():
         entries = page_data["entries"] if isinstance(page_data, dict) else page_data
         summ = coverage_summary(entries)
+        # page_name est un chemin brut ("/recrutement") : préfixer "Page" pour
+        # éviter qu'une puce démarre directement par un "/" sans contexte, et
+        # lier vers l'URL complète quand elle est connue.
+        page_label = f"Page {page_name}" if page_name.startswith("/") else page_name
+        page_url = page_data.get("url") if isinstance(page_data, dict) else None
+        if page_url:
+            page_label = f'<a href="{page_url}" target="_blank" rel="noopener">{page_label}</a>'
         if summ["js"]["pct"] > 70:
-            prio1.append(f"<b>{page_name}</b> : {summ['js']['pct']}% du JS non utilisé ({summ['js']['unused_kb']} Ko) - lazy loading + tree shaking")
+            prio1.append(f"<b>{page_label}</b> : {summ['js']['pct']}% du JS non utilisé ({summ['js']['unused_kb']} Ko) - lazy loading + tree shaking")
         elif summ["js"]["pct"] > 50:
-            prio2.append(f"<b>{page_name}</b> : {summ['js']['pct']}% du JS non utilisé - évaluer le découpage par route")
+            prio2.append(f"<b>{page_label}</b> : {summ['js']['pct']}% du JS non utilisé - évaluer le découpage par route")
         if summ["css"]["pct"] > 80:
-            prio2.append(f"<b>{page_name}</b> : {summ['css']['pct']}% du CSS non utilisé ({summ['css']['unused_kb']} Ko) - PurgeCSS recommandé")
+            prio2.append(f"<b>{page_label}</b> : {summ['css']['pct']}% du CSS non utilisé ({summ['css']['unused_kb']} Ko) - PurgeCSS recommandé")
 
     # PRIORITÉ 3 — amélioration continue, croisée avec la stack détectée (documentaire).
     # Les règles lisent les CATÉGORIES détectées, jamais des noms de sites : génériques.

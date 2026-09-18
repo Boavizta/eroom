@@ -84,6 +84,13 @@ de créer manuellement `env-data.json`.
 
 ## Étape 20 - Collecte env-data.json
 
+Si ce dossier a déjà été traité par `/analyse-parcours`, `env-data.json`
+existe probablement déjà (Wave 1 de l'étape 25, bloc `collecte-env-data`,
+cf. `skill-steps/25_dispatch-orchestration.md`) : cette étape se limite
+alors à proposer `--refresh` si les données doivent être rafraîchies. Le
+flux `/efootprint <source_dir>` autonome (sans `/analyse-parcours`
+préalable) reste inchangé ci-dessous.
+
 Vérifier la présence de `<source_dir>/env-data.json` :
 
 - **Absent** : lancer `collect_env_data.py <source_dir>` (sans `--refresh`)

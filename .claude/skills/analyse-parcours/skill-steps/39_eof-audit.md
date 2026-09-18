@@ -13,20 +13,29 @@ partir des données déjà collectées. Elle s'appuie sur :
   de correspondance critère → champ de donnée → règle → confidence
 - `.claude/skills/analyse-parcours/scripts/run_eof.py` : évalue chaque
   critère, calcule les scores par dimension, génère le radar
-- Trois extracteurs Phase 1 (2026-09-03, plan `eof-questionnaire`), à lancer
-  AVANT `run_eof.py` :
-  - `parse_html_criteria.py <source_dir>` — re-fetch live des pages déjà
-    auditées (le `.har` capturé ne contient pas les corps HTML/CSS) : écrit
+- Trois extracteurs Phase 1 (2026-09-03, plan `eof-questionnaire`), désormais
+  produits **automatiquement** par l'orchestration DISPATCH de l'étape 25
+  (`skill-steps/25_dispatch-orchestration.md`) — plus besoin de les lancer
+  manuellement avant `run_eof.py` :
+  - `parse_html_criteria.py <source_dir>` (Wave 2, bloc `extracteur-html-css`,
+    dépend de `env-data.json`) — re-fetch live des pages déjà auditées (le
+    `.har` capturé ne contient pas les corps HTML/CSS) : écrit
     `html-css-criteria.json`
-  - `analyze_security_headers.py <source_dir>` — score sécurité local depuis
-    les en-têtes déjà dans le `.har` : écrit `security-headers-analysis.json`
-  - `scan_wellknown.py <source_dir>` — fetch direct security.txt/robots.txt/
+  - `analyze_security_headers.py <source_dir>` (Wave 1, bloc
+    `extracteur-security-headers`) — score sécurité local depuis les
+    en-têtes déjà dans le `.har` : écrit `security-headers-analysis.json`
+  - `scan_wellknown.py <source_dir>` (Wave 2, bloc `extracteur-wellknown`,
+    dépend de `env-data.json`) — fetch direct security.txt/robots.txt/
     sitemap.xml : écrit `wellknown-scan.json`
+  Pour un relancement manuel isolé, les commandes CLI restent les mêmes
+  (voir `25_dispatch-orchestration.md` pour le détail des dépendances).
 - `collect_cwv_pagespeed.py` étendu (mêmes appels API PageSpeed Insights,
   catégories accessibility + best-practices en plus de performance) :
   ajoute `accessibility_score_pct` / `best_practices_score_pct` dans
-  `cwv.json`. Relancer avec `--strategy both` si `cwv.json` a été généré
-  avant cette extension.
+  `cwv.json`. Le bloc `collecte-cwv` de la Wave 1 appelle désormais
+  directement cette variante étendue (`--strategy both`) dès le premier
+  passage — la note "relancer avec --strategy both" ne concerne plus que les
+  audits **déjà existants**, générés avant cette bascule.
 
 **Cette étape ne lit JAMAIS la Google Sheet ni le Markdown humain du skill
 `eof`** — découplage voulu (cf. `tmp/handoff.md`, plan d'architecture) pour
@@ -59,11 +68,13 @@ dimensions détaillées.
 
 ## Déclenchement
 
-**Automatique**, pas une commande à taper : après l'Étape 37
-(Lighthouse/CWV), avant l'Étape 40 (Rapport HTML) — pour que le premier
-rapport généré contienne déjà cette section. Si `eof-referentiel.json` est
-absent (skill `eof` jamais lancé), sauter silencieusement cette étape et
-continuer vers l'Étape 40 sans section EOF (rapport rétrocompatible).
+**Automatique**, pas une commande à taper : après les Waves 1 + 2 de
+l'Étape 25 (au minimum `har-analysis.json` + `coverage-analysis.json`
+présents, les autres fichiers de Wave 1/2 en best-effort), avant l'Étape 40
+(Rapport HTML) — pour que le premier rapport généré contienne déjà cette
+section. Si `eof-referentiel.json` est absent (skill `eof` jamais lancé),
+sauter silencieusement cette étape et continuer vers l'Étape 40 sans section
+EOF (rapport rétrocompatible).
 
 Relançable à tout moment (ex. après une nouvelle collecte de données) :
 
