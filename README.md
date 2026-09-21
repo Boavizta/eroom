@@ -4,6 +4,8 @@ DISCLAIMER : CECI EST UN TRAVAIL EN COURS ET N’A PAS ÉTÉ VALIDÉ PAR LA COMM
 
 Outils et référentiels pour diagnostiquer l'impact environnemental d'un service numérique, à partir de données réelles plutôt que de moyennes génériques.
 
+**Version actuelle : 1.2.1** — historique complet des versions dans [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Pourquoi ce projet existe
 
 La plupart des estimations d'empreinte numérique reposent sur des hypothèses génériques : un "poids de page moyen", un "temps de visite moyen", un mix d'appareils moyen. Ces moyennes masquent ce qui se passe réellement pour un utilisateur donné, sur un parcours donné.
@@ -138,7 +140,7 @@ Ces outils s'utilisent depuis [Claude Code](https://claude.com/claude-code), sou
 
 ## Statut
 
-Projet actif, développé au fil des audits réels. Les décisions structurantes et les limites connues sont documentées dans `documentation/` ; l'historique détaillé des choix vit dans les messages de commit.
+Projet actif, développé au fil des audits réels. Les décisions structurantes et les limites connues sont documentées dans `documentation/` ; l'historique détaillé des choix vit dans les messages de commit. L'historique des versions est résumé dans [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Licence
 
