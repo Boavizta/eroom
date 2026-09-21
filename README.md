@@ -143,3 +143,29 @@ Projet actif, développé au fil des audits réels. Les décisions structurantes
 ## Licence
 
 Ce dépôt est distribué sous licence [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/). Voir `LICENSE`.
+
+### Projets et services tiers utilisés
+
+Le code de ce dépôt s'appuie sur ses propres scripts pour capturer et analyser les données (HAR, couverture JS/CSS...), mais délègue certains calculs ou certaines données à des projets et services tiers, listés ci-dessous avec leur origine, leurs auteurs et leur licence :
+
+- [e-footprint](https://github.com/Boavizta/e-footprint) (modélisation CO2e du parcours) — Boavizta / Vincent Villet (Publicis Sapient) — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+
+  - [boaviztapi](https://github.com/Boavizta/boaviztapi) (données/calculs d'impact matériel, utilisé par e-footprint) — Boavizta — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+
+  - [EcoLogits](https://github.com/mlco2/ecologits) (calcul d'impact des appels à une IA générative tierce, délégué par e-footprint) — mlco2, Samuel Rincé et Adrien Banse — [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/)
+
+- [PageSpeed Insights](https://developers.google.com/speed/docs/insights/v5/about) (API, données terrain et lab) — Google — service sous [conditions d'utilisation des API Google](https://developers.google.com/terms)
+
+- [Chrome UX Report (CrUX)](https://developer.chrome.com/docs/crux) (données terrain P75, via l'API PageSpeed Insights) — Google — données sous [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
+- [Lighthouse](https://github.com/GoogleChrome/lighthouse) (mesure de repli des Core Web Vitals en laboratoire) — Google (GoogleChrome) — [Apache-2.0](https://github.com/GoogleChrome/lighthouse/blob/main/LICENSE)
+
+- [GreenIT-Analysis](https://github.com/cnumr/GreenIT-Analysis) (méthode de mesure DOM/poids de page dont s'inspire `analyze_har.py`) — © EcoIndex.fr / Frédéric Bordage, auteurs d'EcoMeter, didierfred@gmail.com, maintenu par CNumr — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+
+- [EcoIndex](https://github.com/cnumr/ecoindex_reference) (formule de calcul du score, reprise dans `har_metrics.py`) — CNumr (Collectif Conception Numérique Responsable), valeurs d'analyse de cycle de vie © Frédéric Bordage — [CC BY-NC-ND 3.0](https://creativecommons.org/licenses/by-nc-nd/3.0/)
+
+- [ipinfo.io](https://ipinfo.io) (API de géolocalisation/hébergeur d'IP, via `collect_env_data.py`) — IPinfo LLC — service commercial sous conditions d'utilisation IPinfo
+
+- [SimilarWeb](https://www.similarweb.com) (estimation du trafic annuel, via `similarweb_api.py`) — SimilarWeb Ltd — service commercial sous conditions d'utilisation SimilarWeb
+
+Inspiration méthodologique (aucun code repris) : la pondération de `analyze_security_headers.py` s'inspire de [securityheaders.com](https://securityheaders.com) (Scott Helme).
