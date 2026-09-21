@@ -164,8 +164,8 @@ Le code de ce dépôt s'appuie sur ses propres scripts pour capturer et analyser
 
 - [EcoIndex](https://github.com/cnumr/ecoindex_reference) (formule de calcul du score, reprise dans `har_metrics.py`) — CNumr (Collectif Conception Numérique Responsable), valeurs d'analyse de cycle de vie © Frédéric Bordage — [CC BY-NC-ND 3.0](https://creativecommons.org/licenses/by-nc-nd/3.0/)
 
-- [ipinfo.io](https://ipinfo.io) (API de géolocalisation/hébergeur d'IP, via `collect_env_data.py`) — IPinfo LLC — service commercial sous conditions d'utilisation IPinfo
-
 - [SimilarWeb](https://www.similarweb.com) (estimation du trafic annuel, via `similarweb_api.py`) — SimilarWeb Ltd — service commercial sous conditions d'utilisation SimilarWeb
+
+- [ipinfo.io](https://ipinfo.io) (API de géolocalisation/hébergeur d'IP, via `collect_env_data.py`) — IPinfo LLC — service commercial sous conditions d'utilisation IPinfo
 
 Inspiration méthodologique (aucun code repris) : la pondération de `analyze_security_headers.py` s'inspire de [securityheaders.com](https://securityheaders.com) (Scott Helme).
