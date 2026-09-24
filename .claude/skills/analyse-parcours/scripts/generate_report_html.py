@@ -2012,8 +2012,8 @@ def _confidence_badge(conf):
         "declare":            ("#2a5f99", "#e3f0ff", "📣", "déclaré (public)"),
         "low":                ("#9a4d00", "#fff3e0", "❓", "supposé"),
         "suppose":            ("#9a4d00", "#fff3e0", "❓", "supposé"),
-        "unjustified":        ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
-        "precise":            ("#5a3d34", "#f3e8e4", "✋", "précisé (non justifié)"),
+        "unjustified":        ("#5a3d34", "#f3e8e4", "📝", "précisé"),
+        "precise":            ("#5a3d34", "#f3e8e4", "📝", "précisé"),
         "default":            ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
         "default_efootprint": ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
         "defaut_lib":         ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
@@ -2080,7 +2080,7 @@ def _instance_type_row(hyp):
     - jamais précisé (--instance non fourni) : valeur par défaut du SCRIPT
       (pas d'e-footprint), badge "défaut script".
     - précisé (--instance fourni) mais sans justification (--instance-source
-      absent) : badge "précisé (non justifié)", choix actif mais non vérifié.
+      absent) : badge "précisé", choix actif mais non vérifié.
     - précisé ET justifié (--instance-source fourni) : badge "estimé", avec
       le texte de justification (et lien source si fourni), sur le modèle de
       _traffic_source_label()/_audience_source_label().

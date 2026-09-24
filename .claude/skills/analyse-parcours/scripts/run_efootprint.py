@@ -256,7 +256,7 @@ CONFIDENCE_LABELS = {
     "default":            "défaut lib",
     "default_efootprint": "défaut lib",
     "default_script":     "défaut script",
-    "unjustified":        "précisé (non justifié)",
+    "unjustified":        "précisé",
 }
 
 
