@@ -296,7 +296,8 @@ def parse_coverage_file(cov_path):
         text   = item.get("text", "") or ""
         ranges = item.get("ranges", [])
         total  = len(text)
-        used   = sum(r["end"] - r["start"] for r in ranges if "end" in r and "start" in r)
+        used   = sum(r["end"] - r["start"] for r in ranges
+                      if r.get("end") is not None and r.get("start") is not None)
         unused = total - used
         pct    = round(unused / total * 100, 1) if total > 0 else 0.0
         mime   = item.get("mimeType", "")

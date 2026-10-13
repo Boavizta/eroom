@@ -117,6 +117,13 @@ def _():
     assert res[0]["unused_bytes"] == 90
 
 
+@check("les plages avec start/end valant null sont ignorées sans planter")
+def _():
+    res = measure([{"url": "https://h/a.js", "text": "x" * 100,
+                    "ranges": [{"start": None, "end": None}, {"start": 0, "end": 10}]}])
+    assert res[0]["unused_bytes"] == 90
+
+
 # ── Libellé de page ───────────────────────────────────────────────────────────
 
 @check("le HAR tranche entre deux URLs sans extension")

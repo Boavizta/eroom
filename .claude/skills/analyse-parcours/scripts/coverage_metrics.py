@@ -124,7 +124,7 @@ def measure(entries):
         used = sum(
             r["end"] - r["start"]
             for r in item.get("ranges", [])
-            if "start" in r and "end" in r
+            if r.get("start") is not None and r.get("end") is not None
         )
         resources.append({
             "url": url,
