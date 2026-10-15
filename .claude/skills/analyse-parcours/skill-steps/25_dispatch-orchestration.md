@@ -23,6 +23,39 @@ fenêtre de contexte isolée (Agent tool, subagent API, ou mécanisme équivalen
 
 Quel que soit le mode, les sorties disque sont identiques.
 
+### Palier de complexité par sous-agent (agnostique du modèle)
+
+Chaque bloc `:::dispatch` porte un champ `COMPLEXITE:` (A/B/C/D) : un palier
+abstrait qui ne nomme aucun modèle ni fournisseur LLM, seulement la difficulté
+intrinsèque du wrapper de script Python à exécuter — pas un jugement métier à
+porter, mais une tâche d'orchestration (appeler le bon script, interpréter sa
+sortie JSON, gérer une bascule documentée ou signaler une anomalie détectée).
+Il est pré-calculé à partir de signaux factuels stables déjà présents dans le
+texte de chaque bloc : nombre de sources externes croisées par le script,
+présence d'une bascule vers une méthode alternative documentée, présence
+d'une vigilance de validation au-delà du simple wrapping (anomalie détectée
+et signalée à l'utilisateur).
+
+**Avant dispatch**, résoudre toi-même ce palier en modèle et effort concrets,
+avec ta connaissance actuelle de l'environnement d'exécution (quels modèles
+sont disponibles, lequel est le plus économique/le plus capable). Pour t'aider
+à juger, consulter la grille de niveaux (modèle économique/standard/avancé,
+effort faible/moyen/élevé, avec la justification concrète de chaque palier)
+dans le skill `calibrer-complexite-dispatch-analyse-parcours`, puis choisir
+dans ton harnais ce qui correspond le mieux. Ne jamais écrire de nom de
+modèle dans ce fichier, et ne jamais recalculer `COMPLEXITE` pendant une
+analyse de parcours : ce calcul a un coût en tokens et doit être fait une
+fois, pas à chaque dispatch. Ne pas monter de palier « par prudence » si les
+signaux ne le justifient pas — c'est exactement le gaspillage que cette
+logique vise à éviter (un simple appel API, par exemple, n'est pas en soi un
+motif de palier D : seul le cumul effectif de plusieurs signaux de la formule
+le justifie).
+
+Si la grille de niveaux doit être affinée (seuils à ajuster, nouveaux cas
+rencontrés), invoquer le skill `calibrer-complexite-dispatch-analyse-parcours`
+— qui ne contient lui non plus aucun nom de modèle, uniquement des niveaux
+abstraits et des critères concrets de jugement.
+
 ### Substitution des variables
 
 **Avant tout dispatch**, substituer dans le texte du bloc :
@@ -87,6 +120,7 @@ OUTPUT_FILE: {{AUDIT_DIR}}/har-analysis.json
 AUDIT_DIR: {{AUDIT_DIR}}
 HAR_FILE: {{HAR_FILE}}
 PIPELINE: skill-steps/20_analyse-har.md
+COMPLEXITE: B
 
 Lire et exécuter le pipeline `skill-steps/20_analyse-har.md`.
 
@@ -128,6 +162,7 @@ AUDIT_DIR: {{AUDIT_DIR}}
 SOURCE_DIR: {{SOURCE_DIR}}
 COVERAGE_FILES: {{COVERAGE_FILES}}
 PIPELINE: skill-steps/30_analyse-coverage.md
+COMPLEXITE: B
 
 Lire et exécuter le pipeline `skill-steps/30_analyse-coverage.md`.
 
@@ -176,6 +211,7 @@ OUTPUT_FILE: {{AUDIT_DIR}}/cwv.json
 AUDIT_DIR: {{AUDIT_DIR}}
 SOURCE_DIR: {{SOURCE_DIR}}
 PIPELINE: skill-steps/37_lighthouse.md
+COMPLEXITE: B
 
 Lire et exécuter le pipeline `skill-steps/37_lighthouse.md`, section
 "PageSpeed Insights + CrUX". Appeler directement la variante étendue
@@ -203,6 +239,7 @@ Retourner uniquement : "cwv.json écrit — <N> pages, mobile+desktop, sources :
 OUTPUT_FILE: {{SOURCE_DIR}}/env-data.json
 SOURCE_DIR: {{SOURCE_DIR}}
 PIPELINE: skill-steps/45_efootprint.md (Étape 20)
+COMPLEXITE: C
 
 Lire et exécuter le pipeline `skill-steps/45_efootprint.md`, section
 "Étape 20 - Collecte env-data.json" (collecte HAR + CrUX + ipinfo + mix
@@ -227,6 +264,7 @@ Retourner uniquement : "env-data.json écrit — <N> serveurs détectés, mix pa
 OUTPUT_FILE: {{SOURCE_DIR}}/security-headers-analysis.json
 SOURCE_DIR: {{SOURCE_DIR}}
 PIPELINE: skill-steps/39_eof-audit.md
+COMPLEXITE: A
 
 Lire et exécuter :
 
@@ -272,6 +310,7 @@ Wave 1.
 :::dispatch id="extracteur-html-css" wave="2" depends_on="collecte-env-data" parallel_with="extracteur-wellknown"
 OUTPUT_FILE: {{SOURCE_DIR}}/html-css-criteria.json
 SOURCE_DIR: {{SOURCE_DIR}}
+COMPLEXITE: B
 
 Lire et exécuter :
 
@@ -296,6 +335,7 @@ Retourner uniquement : "html-css-criteria.json écrit — <N> pages, <N> feuille
 :::dispatch id="extracteur-wellknown" wave="2" depends_on="collecte-env-data" parallel_with="extracteur-html-css"
 OUTPUT_FILE: {{SOURCE_DIR}}/wellknown-scan.json
 SOURCE_DIR: {{SOURCE_DIR}}
+COMPLEXITE: A
 
 Lire et exécuter :
 
