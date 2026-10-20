@@ -201,7 +201,7 @@ def rule_3_3(data):
         return None, None, "env-data.json: servers[] absent"
     seuil = 250
     detail = "; ".join(
-        f"{s.get('host', '?')} ({s.get('country_code', '?')}, {s.get('carbon_intensity_g_kwh', '?')} gCO2/kWh)"
+        f"{s.get('host') or '?'} ({s.get('country_code') or '?'}, {s.get('carbon_intensity_g_kwh') or '?'} gCO2/kWh)"
         for s in servers
     )
     over = [s for s in servers if (s.get("carbon_intensity_g_kwh") or 0) > seuil]

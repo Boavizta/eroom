@@ -26,6 +26,8 @@ via `.magnitude`. Comme `ranges.py`, il n'a donc pas besoin d'être exempté du
 contrôle `check_no_efootprint_import()`.
 """
 
+import numpy as np
+
 
 def server_sizing(key, server, server_spec):
     """Dimensionnement d'un seul serveur construit.
@@ -33,9 +35,14 @@ def server_sizing(key, server, server_spec):
     `server_spec` peut être None (défensif) si la clé n'est plus alignée avec
     `built.spec.servers` ; le rapport retombe alors sur la clé technique comme
     étiquette plutôt que d'échouer.
+
+    Un serveur sans aucun octet transféré (ex. host observé seulement sur des
+    requêtes à 0 octet) peut faire dégénérer `.magnitude` en scalaire plutôt
+    qu'en tableau numpy : `np.atleast_1d` uniformise les deux cas sans changer
+    le résultat pour un tableau déjà normal.
     """
-    raw = server.raw_nb_of_instances.magnitude
-    billed = server.nb_of_instances.magnitude
+    raw = np.atleast_1d(server.raw_nb_of_instances.magnitude)
+    billed = np.atleast_1d(server.nb_of_instances.magnitude)
 
     real_instance_hours = float(raw.sum())
     billed_instance_hours = float(billed.sum())

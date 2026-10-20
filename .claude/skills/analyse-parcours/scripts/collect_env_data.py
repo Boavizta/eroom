@@ -1054,7 +1054,7 @@ def country_to_efootprint(country_code):
     mapping = {
         "FR": "FRANCE",
         "DE": "GERMANY",
-        "GB": "GREAT_BRITAIN",
+        "GB": "UNITED_KINGDOM",
         "NL": "NETHERLANDS",
         "BE": "BELGIUM",
         "ES": "SPAIN",
@@ -1062,7 +1062,7 @@ def country_to_efootprint(country_code):
         "PL": "POLAND",
         "SE": "SWEDEN",
         "NO": "NORWAY",
-        "US": "USA",
+        "US": "UNITED_STATES",
         "CA": "CANADA",
         "AU": "AUSTRALIA",
         "JP": "JAPAN",
