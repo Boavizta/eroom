@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-eroom.local/schemas/sortie-lot-eof.json",
+  "title": "Output contract of an EOF audit lot",
+  "description": "Strict format for multi-agent lot output files. Any lot (agent, script, human) producing EOF verdicts must respect this contract. The merge script refuses any non-conforming file instead of merging it.",
+  "type": "object",
+  "required": ["lot_id", "generated_at", "inputs", "criteria"],
+  "additionalProperties": false,
+  "properties": {
+    "lot_id": {
+      "type": "string",
+      "description": "Unique identifier of the lot (ex: 'lot-mesures-har', 'lot-qcm-client', 'lot-osint-accessibilite'). Used to trace the origin of each verdict in the final report.",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the file generation (ex: '2026-09-04T12:34:56+00:00'). Allows detecting stale outputs."
+    },
+    "inputs": {
+      "type": "array",
+      "description": "List of file paths or public URLs actually read by the lot. May be empty for a declarative lot (hand-filled QCM). Traceability: links a verdict to its data sources.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "description": "Optional. Measurement-state convention (cf. documentation/implementation/measurement-state-convention.md): reports a failure of the lot's SOURCE itself (ex. questionnaire file absent or unreadable), distinct from a failure on an individual criterion.",
+      "required": ["status", "target", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "not_found", "network_error", "read_error", "analysis_error"]
+        },
+        "target": {
+          "type": "string",
+          "description": "What was being looked for: file path, URL, field name."
+        },
+        "detail": {
+          "type": ["string", "null"],
+          "description": "Short sentence, or null if status is 'ok' and there is nothing to add."
+        }
+      }
+    },
+    "criteria": {
+      "type": "array",
+      "description": "List of the criteria judged by this lot. A criterion may be partially filled in (context only) or fully settled (answer + coefficient). The merge script consolidates these multiple entries into a single verdict per criterion.",
+      "items": {
+        "type": "object",
+        "required": ["id", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the criterion in the EOF reference (ex: '1.5', '3.3') or in the quick diagnostic (ex: '0.1', '0.16'). Must exist in the reference, otherwise rejected.",
+            "pattern": "^[0-9]+\\.[0-9]+$"
+          },
+          "answer": {
+            "type": ["string", "null"],
+            "description": "Exact label of the ticked option, from the reference vocabulary FOR THIS CRITERION (evaluation_options or screens depending on the type). If null, the criterion stays unsettled (contextual hint only)."
+          },
+          "coefficient": {
+            "type": ["number", "null"],
+            "description": "Numeric coefficient associated with the answer, according to the reference's evaluation_coefficient_options mapping. Must be null if and only if answer is null. If answer is non-null, it must be EXACTLY the coefficient defined by the reference for this label."
+          },
+          "provenance": {
+            "type": ["string", "null"],
+            "description": "Provenance of the verdict or of the hint: 'collected' (measured by our scripts: HAR, HTTP headers, API), 'estimated' (deduced by an LLM from real evidence), 'declared' (publicly declared by the audited organization: accessibility page, legal notices), 'stated' (ticked by the client in the questionnaire, without proof), 'assumed' (deduced from a weak signal, ambiguous). Required if answer or context is non-null. Determines the merge precedence: collected > estimated > stated > declared > assumed (revised 2026-09-11: the client knows their technical reality directly, more reliable than a public declaration that is sometimes generic or dated).",
+            "enum": ["collected", "estimated", "declared", "stated", "assumed", null]
+          },
+          "source": {
+            "type": ["string", "null"],
+            "description": "Origin of the verdict or of the hint: file path (ex: 'audit/har-analysis.json'), public URL (ex: 'https://example.com/accessibilite'), or QCM line reference (ex: 'QCM question 3'). Required if answer or context is non-null. Non-empty string.",
+            "minLength": 1
+          },
+          "context": {
+            "type": ["string", "null"],
+            "description": "Contextual hint sentence, when the criterion is not settled but a signal exists. Displayed in the report appendix to help the human judgment. Never replaces a verdict: if the signal is ambiguous, leave answer null."
+          },
+          "category": {
+            "type": "string",
+            "description": "Type of data used to judge this criterion: 'automatable' (verdict settled by measurement or deterministic rule), 'partial' (weak hint, context only), 'no_data' (no data available for this criterion in this lot). Imposed vocabulary, inherited from the EOF mapping table.",
+            "enum": ["automatable", "partial", "no_data"]
+          },
+          "not_applicable": {
+            "type": ["boolean", "null"],
+            "description": "Indicates whether the criterion is out of scope for this audited service: true removes the criterion from BOTH the numerator AND the denameinator of the optimization-potential calculation. Distinct from the answer '🚫 Not applicable', which leaves the max_potential in the denameinator."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "answer": { "type": "string" }
+              },
+              "required": ["answer"]
+            },
+            "then": {
+              "required": ["provenance", "source"],
+              "properties": {
+                "coefficient": { "type": "number" }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "context": { "type": "string" }
+              },
+              "required": ["context"]
+            },
+            "then": {
+              "required": ["provenance", "source"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "answer": { "type": "null" }
+              }
+            },
+            "then": {
+              "properties": {
+                "coefficient": { "type": "null" }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

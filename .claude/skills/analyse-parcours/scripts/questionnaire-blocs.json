@@ -1,976 +1,976 @@
 {
   "version": 1,
-  "blocs": [
+  "blocks": [
     {
-      "id": "porte-diag-0.1",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Impact d'une panne",
-      "interlocuteur": "le responsable produit",
+      "id": "gate-diag-0.1",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "Impact of an outage",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "0.1",
-      "question": "Si ce service s'arrêtait demain matin, qu'est-ce que cela changerait concrètement pour vous ?",
-      "aide": "Regardez ce qui se bloque vraiment : des clients qui ne peuvent plus commander, une équipe qui ne peut plus travailler, une réputation abîmée."
+      "criterion": "0.1",
+      "question": "If this service stopped tomorrow morning, what would it concretely change for you?",
+      "help": "Look at what actually breaks: customers who can no longer order, a team that can no longer work, a damaged reputation."
     },
     {
-      "id": "porte-diag-0.2",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Doublons avec d'autres services",
-      "interlocuteur": "le responsable produit",
+      "id": "gate-diag-0.2",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "Overlap with other services",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "0.2",
-      "question": "Est-ce que d'autres services ou applications dans votre organisation font la même chose ou quelque chose de similaire ?",
-      "aide": "Cherchez les fonctionnalités qui se recouvrent ou du code qui fait le même travail ailleurs dans votre organisation."
+      "criterion": "0.2",
+      "question": "Do other services or applications in your organization do the same thing or something similar?",
+      "help": "Look for overlapping features or code doing the same job elsewhere in your organization."
     },
     {
-      "id": "porte-compose-haute-dispo-0.3",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Contraintes de disponibilité du service",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
-      "type": "compose",
+      "id": "gate-composite-high-availability-0.3",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Service availability constraints",
+      "interviewee": "the person who operates the infrastructure",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Disponibilité 24 heures sur 24, 7 jours sur 7, avec un engagement à 99,99 % et une couverture internationale",
-          "reponses": {
-            "0.3": "1 - 7 jours sur 7, 24 heures sur 24 - 99,99 % - Couverture internationale",
-            "6.10": "🔴 Difficile à changer"
+          "label": "24/7 availability, with a 99.99% commitment and international coverage",
+          "answers": {
+            "0.3": "1 - 7/7 24/24 - 99.99% - International coverage",
+            "6.10": "🔴 Hard to change"
           }
         },
         {
-          "libelle": "Disponibilité 24 heures sur 24, 7 jours sur 7, avec un engagement à 99 %",
-          "reponses": {
-            "0.3": "2 - 7 jours sur 7, 24 heures sur 24 - 99 %",
-            "6.10": "🔴 Difficile à changer"
+          "label": "24/7 availability, with a 99% commitment",
+          "answers": {
+            "0.3": "2 - 7/7 24/24 - 99%",
+            "6.10": "🔴 Hard to change"
           }
         },
         {
-          "libelle": "Quelques engagements de service, sans exigence de disponibilité permanente",
-          "reponses": {
-            "0.3": "3 - Certains SLA.",
-            "6.10": "🟡 Effort modéré"
+          "label": "Some service commitments, no permanent availability requirement",
+          "answers": {
+            "0.3": "3 - Some SLA.",
+            "6.10": "🟡 Moderate effort"
           }
         },
         {
-          "libelle": "Disponibilité en heures ouvrées seulement, sans engagement de service ni plan de reprise d'activité",
-          "reponses": {
-            "0.3": "4 - 5 jours sur 7, 8 heures sur 24 - Pas de SLA - Pas de Plan de reprise d'activité (DRP)",
-            "6.10": "🟢 Facile à modifier"
+          "label": "Business-hours availability only, no service commitment, no disaster recovery plan",
+          "answers": {
+            "0.3": "4 - 5/7 8/24 - No SLA - No DRP",
+            "6.10": "🟢 Easy to change"
           }
         },
         {
-          "libelle": "Aucun engagement de disponibilité",
-          "reponses": {
-            "0.3": "5 - Pas de SLA/SLO",
-            "6.10": "🟢 Facile à modifier"
+          "label": "No availability commitment",
+          "answers": {
+            "0.3": "5 - No SLA/SLO",
+            "6.10": "🟢 Easy to change"
           }
         }
       ],
-      "question": "Quelles sont les contraintes de disponibilité qui s'appliquent à votre service ?",
-      "aide": "Engagements de temps de disponibilité, plans de reprise d'activité, horaires de fonctionnement garantis. Des contraintes strictes réduisent les occasions de modifier, migrer ou optimiser l'infrastructure."
+      "question": "What availability constraints apply to your service?",
+      "help": "Uptime commitments, disaster recovery plans, guaranteed operating hours. Strict constraints reduce the opportunities to modify, migrate or optimize the infrastructure."
     },
     {
-      "id": "porte-diag-0.4",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Connexions avec d'autres systèmes",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.4",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Connections with other systems",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.4",
-      "question": "À combien d'autres systèmes ce service est-il techniquement relié ?",
-      "aide": "Comptez les connexions actives : API que vous appelez, bases de données partagées, services d'authentification, flux de données entrants ou sortants."
+      "criterion": "0.4",
+      "question": "How many other systems is this service technically connected to?",
+      "help": "Count the active connections: APIs you call, shared databases, authentication services, incoming or outgoing data flows."
     },
     {
-      "id": "porte-diag-0.5",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Disponibilité du code source",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.5",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Source code availability",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.5",
-      "question": "Dans quelle mesure avez-vous accès au code source de ce service ?",
-      "aide": "Code complètement accessible à l'équipe, code ouvert au public, code fermé fourni par un éditeur, ou accès limité à certains modules seulement."
+      "criterion": "0.5",
+      "question": "To what extent do you have access to this service's source code?",
+      "help": "Code fully accessible to the team, code open to the public, closed code provided by a vendor, or limited access to certain modules only."
     },
     {
-      "id": "porte-diag-0.6",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Maîtrise du service par l'équipe",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.6",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Team's command of the service",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.6",
-      "question": "Votre équipe connaît-elle suffisamment ce service pour le modifier en toute confiance ?",
-      "aide": "Regardez si l'équipe maîtrise la conception fonctionnelle et technique, si elle peut travailler sereinement ou avec prudence, ou si la connaissance est trop fragmentée."
+      "criterion": "0.6",
+      "question": "Does your team know this service well enough to modify it with full confidence?",
+      "help": "Look at whether the team masters the functional and technical design, whether it can work calmly or only cautiously, or whether knowledge is too fragmented."
     },
     {
-      "id": "porte-diag-0.7",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Complexité de l'architecture",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.7",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Architecture complexity",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.7",
-      "question": "Comment jugez-vous la complexité de l'architecture de ce service ?",
-      "aide": "Pensez au nombre de composants, à leurs interactions, aux technologies différentes utilisées, à la facilité de comprendre le fonctionnement d'ensemble."
+      "criterion": "0.7",
+      "question": "How would you rate the complexity of this service's architecture?",
+      "help": "Think about the number of components, their interactions, the different technologies used, and how easy it is to understand how the whole thing works."
     },
     {
-      "id": "porte-diag-0.8",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Taille de l'infrastructure",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "id": "gate-diag-0.8",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Infrastructure size",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "0.8",
-      "question": "Quelle est la taille de l'infrastructure de ce service par rapport à vos autres services ?",
-      "aide": "Comparez le nombre et la taille des serveurs, machines virtuelles, conteneurs ou autres composants hébergés à ce que vous avez ailleurs dans l'organisation."
+      "criterion": "0.8",
+      "question": "How large is this service's infrastructure compared to your other services?",
+      "help": "Compare the number and size of servers, virtual machines, containers or other hosted components with what you have elsewhere in the organization."
     },
     {
-      "id": "porte-diag-0.9",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Volume de données stockées",
-      "interlocuteur": "la personne qui gère les données",
+      "id": "gate-diag-0.9",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Stored data volume",
+      "interviewee": "the person who manages the data",
       "type": "direct",
-      "critere": "0.9",
-      "question": "Quel volume de données ce service stocke-t-il par rapport à vos autres services ?",
-      "aide": "Regardez les bases de données, les fichiers, les archives, les sauvegardes. Comparez à ce que vous avez ailleurs dans l'organisation."
+      "criterion": "0.9",
+      "question": "How much data does this service store compared to your other services?",
+      "help": "Look at databases, files, archives, backups. Compare with what you have elsewhere in the organization."
     },
     {
-      "id": "porte-diag-0.10",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Complexité du service",
-      "interlocuteur": "le responsable produit",
+      "id": "gate-diag-0.10",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "Service complexity",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "0.10",
-      "question": "Comment décririez-vous la complexité de ce service ?",
-      "aide": "Pensez au nombre de fonctionnalités, aux règles métier, aux différents cas d'usage que vous gérez."
+      "criterion": "0.10",
+      "question": "How would you describe the complexity of this service?",
+      "help": "Think about the number of features, business rules, and the different use cases you handle."
     },
     {
-      "id": "porte-diag-0.11",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Fluidité de l'expérience utilisateur",
-      "interlocuteur": "le responsable produit",
+      "id": "gate-diag-0.11",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "User experience smoothness",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "0.11",
-      "question": "Comment évaluez-vous la fluidité et l'intuitivité des parcours utilisateurs ?",
-      "aide": "Regardez ce que disent vos utilisateurs, les endroits où ils butent, les améliorations que vous avez en liste d'attente."
+      "criterion": "0.11",
+      "question": "How do you rate the smoothness and intuitiveness of the user journeys?",
+      "help": "Look at what your users say, where they get stuck, and the improvements on your waiting list."
     },
     {
-      "id": "porte-diag-0.12",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Appareils anciens",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.12",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "Legacy devices",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.12",
-      "question": "Ce service fonctionne-t-il bien sur les appareils les plus anciens que vos utilisateurs utilisent encore ?",
-      "aide": "Vérifiez s'il y a des ralentissements, des incompatibilités, ou si l'expérience reste confortable."
+      "criterion": "0.12",
+      "question": "Does this service work well on the oldest devices your users still use?",
+      "help": "Check for slowdowns, incompatibilities, or whether the experience remains comfortable."
     },
     {
-      "id": "porte-diag-0.13",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Problèmes de performance connus",
-      "interlocuteur": "le responsable produit",
+      "id": "gate-diag-0.13",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Known performance issues",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "0.13",
-      "question": "Votre backlog contient-il des problèmes de performance ou des besoins d'optimisation ?",
-      "aide": "Tickets ouverts sur la lenteur du service, discussions récurrentes sur l'efficacité, améliorations techniques identifiées mais non encore traitées."
+      "criterion": "0.13",
+      "question": "Does your backlog contain performance issues or optimization needs?",
+      "help": "Open tickets about service slowness, recurring discussions about efficiency, technical improvements identified but not yet handled."
     },
     {
-      "id": "porte-diag-0.14",
-      "fichier": "produit-usage",
-      "phase": "porte",
-      "titre": "Efficacité des fonctionnalités",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-diag-0.14",
+      "file": "product-usage",
+      "phase": "gate",
+      "title": "Feature effectiveness",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "0.14",
-      "question": "Les fonctionnalités principales de ce service sont-elles bien implémentées et performantes ?",
-      "aide": "Cherchez les fonctionnalités qui font double emploi ou qui pourraient être plus efficaces."
+      "criterion": "0.14",
+      "question": "Are this service's main features well implemented and performant?",
+      "help": "Look for features that duplicate each other or could be more efficient."
     },
     {
-      "id": "porte-diag-0.15",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Suppression et archivage des données",
-      "interlocuteur": "la personne qui gère les données",
+      "id": "gate-diag-0.15",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Data deletion and archiving",
+      "interviewee": "the person who manages the data",
       "type": "direct",
-      "critere": "0.15",
-      "question": "Disposez-vous d'une politique de suppression et d'archivage des données pour ce service ?",
-      "aide": "Regardez s'il existe des règles formalisées, si elles sont appliquées de manière cohérente, si des automatismes sont en place, et si des contrôles réguliers vérifient leur respect."
+      "criterion": "0.15",
+      "question": "Do you have a data deletion and archiving policy for this service?",
+      "help": "Look for formalized rules, whether they are applied consistently, whether automations are in place, and whether regular checks verify their enforcement."
     },
     {
-      "id": "porte-diag-0.16",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Pays d'hébergement du service",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "id": "gate-diag-0.16",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Service hosting country",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "0.16",
-      "question": "Dans quel pays votre service est-il hébergé ?",
-      "aide": "Le pays d'hébergement détermine l'intensité carbone du mix électrique utilisé par vos serveurs. Cette information est normalement collectée automatiquement, mais vous pouvez la renseigner si nécessaire."
+      "criterion": "0.16",
+      "question": "In which country is your service hosted?",
+      "help": "The hosting country determines the carbon intensity of the electricity mix used by your servers. This information is normally collected automatically, but you can fill it in if needed."
     },
     {
-      "id": "porte-dim6-6.1",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité d'observer le comportement",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.1",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of observing behavior",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.1",
-      "question": "Est-il facile de mettre en place et d'exploiter des outils pour suivre le comportement de ce service en production ?",
-      "aide": "Pensez à la possibilité d'ajouter des métriques, des logs, des traces, des alertes, des tableaux de bord. Regardez si des outils sont déjà en place et s'ils sont simples à faire évoluer."
+      "criterion": "6.1",
+      "question": "Is it easy to set up and operate tools to track this service's behavior in production?",
+      "help": "Think about the ability to add metrics, logs, traces, alerts, dashboards. Look at whether tools are already in place and whether they are easy to evolve."
     },
     {
-      "id": "porte-dim6-6.2",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité des revues de code",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.2",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of code reviews",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.2",
-      "question": "Est-il facile d'organiser des revues de code ou de la programmation en binôme sur ce projet ?",
-      "aide": "Regardez si des processus sont déjà en place, si l'équipe a le temps et les habitudes pour cela, si des obstacles organisationnels ou techniques compliquent leur mise en oeuvre."
+      "criterion": "6.2",
+      "question": "Is it easy to organize code reviews or pair programming on this project?",
+      "help": "Look at whether processes are already in place, whether the team has the time and habits for it, and whether organizational or technical obstacles complicate putting them in place."
     },
     {
-      "id": "porte-dim6-6.3",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité de mettre en place un CI/CD",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.3",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of setting up CI/CD",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.3",
-      "question": "Est-il facile de mettre en place ou de faire évoluer un processus de construction et de déploiement automatisé pour ce projet ?",
-      "aide": "Regardez si des automatisations existent déjà, si l'infrastructure le permet, si l'équipe a les compétences et les accès nécessaires pour construire et tester automatiquement le code."
+      "criterion": "6.3",
+      "question": "Is it easy to set up or evolve an automated build and deployment process for this project?",
+      "help": "Look at whether automations already exist, whether the infrastructure allows it, and whether the team has the skills and access needed to build and test the code automatically."
     },
     {
-      "id": "porte-dim6-6.4",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité d'ajouter des tests",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.4",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of adding tests",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.4",
-      "question": "Est-il facile d'ajouter ou de faire évoluer des tests automatisés sur ce projet ?",
-      "aide": "Pensez aux tests unitaires, tests d'intégration, tests de bout en bout. Regardez si une infrastructure de tests existe déjà, si le code se prête à être testé, si l'équipe a les compétences et le temps pour écrire des tests."
+      "criterion": "6.4",
+      "question": "Is it easy to add or evolve automated tests on this project?",
+      "help": "Think unit tests, integration tests, end-to-end tests. Look at whether a test infrastructure already exists, whether the code lends itself to testing, and whether the team has the skills and time to write tests."
     },
     {
-      "id": "porte-dim6-6.5",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité de changer la technique",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.5",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of changing the technical layer",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.5",
-      "question": "Est-il facile de modifier les aspects techniques de ce service sans toucher au code fonctionnel ?",
-      "aide": "Regardez si le code métier est bien séparé de l'intégration technique. Par exemple, pouvez-vous changer de base de données, de service d'authentification ou de framework sans réécrire la logique fonctionnelle ?"
+      "criterion": "6.5",
+      "question": "Is it easy to modify the technical aspects of this service without touching the functional code?",
+      "help": "Look at whether the business code is well separated from the technical integration. For example, can you change database, authentication service or framework without rewriting the functional logic?"
     },
     {
-      "id": "porte-dim6-6.6",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité de suivre la qualité",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.6",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of tracking quality",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.6",
-      "question": "Est-il facile de mettre en place et de suivre des indicateurs de qualité pour ce logiciel ?",
-      "aide": "Pensez à la couverture de code, à la complexité, au nombre de bugs, au délai de modification, à la fréquence de déploiement. Regardez si des outils existent déjà ou s'il est simple d'en ajouter."
+      "criterion": "6.6",
+      "question": "Is it easy to set up and track quality indicators for this software?",
+      "help": "Think code coverage, complexity, number of bugs, time to change, deployment frequency. Look at whether tools already exist or are easy to add."
     },
     {
-      "id": "porte-dim6-6.7",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité de documenter le projet",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.7",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of documenting the project",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.7",
-      "question": "Est-il facile de maintenir une documentation complète et à jour pour ce projet ?",
-      "aide": "Regardez si une documentation existe déjà, si l'équipe a les outils et le temps pour la tenir à jour, si le projet s'y prête. Pensez à l'architecture, aux guides de développement, aux explications des choix techniques."
+      "criterion": "6.7",
+      "question": "Is it easy to maintain complete and up-to-date documentation for this project?",
+      "help": "Look at whether documentation already exists, whether the team has the tools and time to keep it up to date, and whether the project lends itself to it. Think architecture, development guides, explanations of technical choices."
     },
     {
-      "id": "porte-dim6-6.8",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Facilité d'éliminer les duplications",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.8",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Ease of removing duplication",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.8",
-      "question": "Est-il facile de repérer et de supprimer le code dupliqué dans ce projet ?",
-      "aide": "Regardez si du code copié-collé ou des logiques répétées existent, si l'équipe a les outils pour les détecter, et si l'architecture permet de les factoriser sans risque."
+      "criterion": "6.8",
+      "question": "Is it easy to spot and remove duplicated code in this project?",
+      "help": "Look at whether copy-pasted code or repeated logic exists, whether the team has the tools to detect it, and whether the architecture allows factoring it out without risk."
     },
     {
-      "id": "porte-dim6-6.9",
-      "fichier": "technique",
-      "phase": "porte",
-      "titre": "Autonomie pour déployer des outils",
-      "interlocuteur": "l'équipe de développement",
+      "id": "gate-dim6-6.9",
+      "file": "technical",
+      "phase": "gate",
+      "title": "Autonamey to deploy tools",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "6.9",
-      "question": "Est-il facile pour votre équipe de déployer les outils dont elle a besoin pour observer, mesurer et optimiser ce système ?",
-      "aide": "Regardez si l'équipe peut installer des outils personnalisés, accéder aux données de performance, utiliser des outils fournis par la plateforme, sans avoir à demander d'autorisations lourdes."
+      "criterion": "6.9",
+      "question": "Is it easy for your team to deploy the tools it needs to observe, measure and optimize this system?",
+      "help": "Look at whether the team can install custom tools, access performance data, and use platform-provided tools, without having to request heavy authorizations."
     },
     {
-      "id": "detail-compose-parcours-ecrans",
-      "fichier": "produit-usage",
+      "id": "detail-composite-parcours-ecrans",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Parcours et écrans principaux",
-      "interlocuteur": "le responsable produit",
-      "type": "compose",
+      "title": "Main journeys and screens",
+      "interviewee": "the product manager",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Parcours courts avec peu d'étapes ET écrans légers avec informations essentielles uniquement",
-          "reponses": {
-            "1.13": "✅ Point fort confirmé",
-            "1.14": "✅ Point fort confirmé"
+          "label": "Short journeys with few steps AND light screens with essential information only",
+          "answers": {
+            "1.13": "✅ Confirmed strength",
+            "1.14": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Parcours courts avec peu d'étapes MAIS écrans chargés (beaucoup de contenu, médias lourds)",
-          "reponses": {
-            "1.13": "✅ Point fort confirmé",
-            "1.14": "💡 Potentiel d'amélioration identifié"
+          "label": "Short journeys with few steps BUT heavy screens (lots of content, heavy media)",
+          "answers": {
+            "1.13": "✅ Confirmed strength",
+            "1.14": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Parcours longs ou redondants MAIS écrans légers",
-          "reponses": {
-            "1.13": "💡 Potentiel d'amélioration identifié",
-            "1.14": "✅ Point fort confirmé"
+          "label": "Long or redundant journeys BUT light screens",
+          "answers": {
+            "1.13": "💡 Improvement potential identified",
+            "1.14": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Parcours longs ou redondants ET écrans chargés",
-          "reponses": {
-            "1.13": "💡 Potentiel d'amélioration identifié",
-            "1.14": "💡 Potentiel d'amélioration identifié"
+          "label": "Long or redundant journeys AND heavy screens",
+          "answers": {
+            "1.13": "💡 Improvement potential identified",
+            "1.14": "💡 Improvement potential identified"
           }
         }
       ],
-      "question": "Comment sont organisés vos parcours utilisateurs principaux et qu'est-ce qui s'affiche à l'écran ?",
-      "aide": "Comptez les étapes pour réaliser les actions courantes, et regardez combien d'informations et de médias vous affichez sur les écrans les plus visités."
+      "question": "How are your main user journeys organized, and what is displayed on screen?",
+      "help": "Count the steps needed to perform common actions, and look at how much information and media you display on the most visited screens."
     },
     {
-      "id": "detail-compose-environnements-test",
-      "fichier": "technique",
+      "id": "detail-composite-environnements-test",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Environnements de test",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
-      "type": "compose",
+      "title": "Test environments",
+      "interviewee": "the person who operates the infrastructure",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Infrastructure réduite ET bases de données réduites",
-          "reponses": {
-            "3.9": "✅ Point fort confirmé",
-            "4.4": "✅ Point fort confirmé"
+          "label": "Reduced infrastructure AND reduced databases",
+          "answers": {
+            "3.8": "✅ Confirmed strength",
+            "4.4": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Infrastructure réduite MAIS bases de données aussi volumineuses qu'en production",
-          "reponses": {
-            "3.9": "✅ Point fort confirmé",
-            "4.4": "💡 Potentiel d'amélioration identifié"
+          "label": "Reduced infrastructure BUT databases as large as in production",
+          "answers": {
+            "3.8": "✅ Confirmed strength",
+            "4.4": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Infrastructure identique à la production MAIS bases de données réduites",
-          "reponses": {
-            "3.9": "💡 Potentiel d'amélioration identifié",
-            "4.4": "✅ Point fort confirmé"
+          "label": "Infrastructure identical to production BUT reduced databases",
+          "answers": {
+            "3.8": "💡 Improvement potential identified",
+            "4.4": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Infrastructure ET bases de données identiques à la production",
-          "reponses": {
-            "3.9": "💡 Potentiel d'amélioration identifié",
-            "4.4": "💡 Potentiel d'amélioration identifié"
+          "label": "Infrastructure AND databases identical to production",
+          "answers": {
+            "3.8": "💡 Improvement potential identified",
+            "4.4": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Nous n'avons pas d'environnements de test",
-          "reponses": {
-            "3.9": "🚫 Non applicable",
-            "4.4": "🚫 Non applicable"
+          "label": "We have no test environments",
+          "answers": {
+            "3.8": "🚫 Not applicable",
+            "4.4": "🚫 Not applicable"
           }
         }
       ],
-      "question": "Quelle est la taille de vos environnements de test par rapport à la production ?",
-      "aide": "Regardez le nombre et la taille de vos machines virtuelles, conteneurs, et le volume de vos bases de données."
+      "question": "How large are your test environments compared to production?",
+      "help": "Look at the number and size of your virtual machines, containers, and the volume of your databases."
     },
     {
       "id": "detail-dim1-1.1",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Valeur ajoutée du numérique",
-      "interlocuteur": "le responsable produit",
+      "title": "Added value of digital",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.1",
-      "question": "Avez-vous identifié une solution non numérique et démontré que votre version numérique apporte une valeur ajoutée claire ?",
-      "aide": "Cherchez les gains de temps, d'accessibilité ou de réduction d'impact matériel par rapport à ce qui existait avant."
+      "criterion": "1.1",
+      "question": "Have you identified a non-digital solution and shown that your digital version brings clear added value?",
+      "help": "Look for time savings, accessibility gains, or reduced material impact compared to what existed before."
     },
     {
       "id": "detail-dim1-1.2",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Connaissance des utilisateurs",
-      "interlocuteur": "le responsable produit",
+      "title": "Knowledge of users",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.2",
-      "question": "Documentez-vous les besoins, les contextes d'usage et les appareils de vos utilisateurs cibles ?",
-      "aide": "Regardez si vous avez des personas, des entretiens, des analyses d'utilisation, ou une liste des appareils couramment utilisés."
+      "criterion": "1.2",
+      "question": "Do you document the needs, usage contexts and devices of your target users?",
+      "help": "Look for personas, interviews, usage analyses, or a list of commonly used devices."
     },
     {
       "id": "detail-dim1-1.3",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Impact des mises à jour",
-      "interlocuteur": "le responsable produit",
+      "title": "Impact of updates",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.3",
-      "question": "Vous testez que vos nouvelles fonctionnalités restent performantes sur les appareils anciens ou modestes, et vous proposez des modes allégés quand c'est nécessaire.",
-      "aide": "Regardez si vous testez réellement sur ces appareils, et si vous offrez un mode simplifié quand les performances baissent."
+      "criterion": "1.3",
+      "question": "Do you test that your new features remain performant on old or modest devices, and do you offer lightweight modes when needed?",
+      "help": "Look at whether you really test on these devices, and whether you offer a simplified mode when performance drops."
     },
     {
       "id": "detail-dim1-1.4",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Composants natifs ou personnalisés",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Native or custom components",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "1.4",
-      "question": "Vous utilisez les composants natifs du système, ou vous justifiez chaque composant personnalisé par une vraie nécessité.",
-      "aide": "Les boutons, menus et formulaires du système sont plus performants et accessibles que ceux créés sur mesure, sauf exception justifiée."
+      "criterion": "1.4",
+      "question": "Do you use the system's native components, or do you justify each custom component by a real need?",
+      "help": "The system's buttons, menus and forms are more performant and accessible than custom-built ones, except with justification."
     },
     {
       "id": "detail-dim1-1.5",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Lecture automatique de médias",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Automatic media playback",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "1.5",
-      "question": "Vos animations, vidéos, sons ou cartes sont-ils lancés uniquement quand l'utilisateur le demande ?",
-      "aide": "Vérifiez qu'aucun contenu ne démarre tout seul, ou que la lecture automatique est vraiment nécessaire, optimisée et contrôlable."
+      "criterion": "1.5",
+      "question": "Are your animations, videos, sounds or maps only started when the user asks for them?",
+      "help": "Check that no content starts on its own, or that autoplay is truly necessary, optimized and controllable."
     },
     {
       "id": "detail-dim1-1.6",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Adaptation au matériel",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Adaptation to hardware",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "1.6",
-      "question": "Votre application détecte les appareils à configuration limitée et passe automatiquement en mode allégé.",
-      "aide": "Par exemple : qualité d'image réduite, rendu simplifié, ou désactivation automatique des fonctions lourdes."
+      "criterion": "1.6",
+      "question": "Does your application detect low-spec devices and automatically switch to a lightweight mode?",
+      "help": "For example: reduced image quality, simplified rendering, or automatic disabling of heavy features."
     },
     {
       "id": "detail-dim1-1.7",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Utilité des fonctionnalités",
-      "interlocuteur": "le responsable produit",
+      "title": "Usefulness of features",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.7",
-      "question": "Chaque fonctionnalité de votre service est-elle réellement utilisée et apporte-t-elle de la valeur ?",
-      "aide": "Regardez vos analyses d'usage, les commentaires utilisateurs, et vérifiez si vous avez supprimé les fonctionnalités redondantes ou inutilisées."
+      "criterion": "1.7",
+      "question": "Is each feature of your service actually used and does it bring value?",
+      "help": "Look at your usage analytics and user feedback, and check whether you have removed redundant or unused features."
     },
     {
-      "id": "detail-compose-appareils-anciens",
-      "fichier": "technique",
+      "id": "detail-composite-appareils-anciens",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Tests sur les appareils anciens",
-      "interlocuteur": "le responsable produit",
-      "type": "compose",
+      "title": "Testing on legacy devices",
+      "interviewee": "the product manager",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Nous testons sur les appareils les plus anciens de notre cible, et aucun problème de compatibilité n'a été détecté",
-          "reponses": {
-            "1.8": "✅ Point fort confirmé",
-            "5.9": "✅ Point fort confirmé"
+          "label": "We test on the oldest devices in our target range, and no compatibility issue was detected",
+          "answers": {
+            "1.8": "✅ Confirmed strength",
+            "5.9": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Nous avons détecté des problèmes de compatibilité, mais le service reste utilisable sur ces appareils",
-          "reponses": {
-            "1.8": "✅ Point fort confirmé",
-            "5.9": "💡 Potentiel d'amélioration identifié"
+          "label": "We detected compatibility issues, but the service remains usable on these devices",
+          "answers": {
+            "1.8": "✅ Confirmed strength",
+            "5.9": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Nous avons détecté des problèmes de compatibilité qui dégradent réellement l'usage sur ces appareils",
-          "reponses": {
-            "1.8": "💡 Potentiel d'amélioration identifié",
-            "5.9": "💡 Potentiel d'amélioration identifié"
+          "label": "We detected compatibility issues that really degrade the experience on these devices",
+          "answers": {
+            "1.8": "💡 Improvement potential identified",
+            "5.9": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Notre service ne cible aucun appareil ancien : le parc utilisateur est récent et maîtrisé",
-          "reponses": {
-            "1.8": "🚫 Non applicable",
-            "5.9": "🚫 Non applicable"
+          "label": "Our service does not target any old devices: the user base is recent and controlled",
+          "answers": {
+            "1.8": "🚫 Not applicable",
+            "5.9": "🚫 Not applicable"
           }
         }
       ],
-      "question": "Que se passe-t-il quand vous testez votre service sur les appareils les plus anciens que vous vous engagez à supporter ?",
-      "aide": "C'est-à-dire les appareils que vous promettez de supporter, même s'ils ont plusieurs années.",
-      "note": "Le périmètre des appareils ciblés est une décision produit : à valider avec le responsable produit."
+      "question": "What happens when you test your service on the oldest devices you commit to supporting?",
+      "help": "That is, the devices you promise to support, even if they are several years old.",
+      "note": "The scope of targeted devices is a product decision: to be validated with the product manager."
     },
     {
       "id": "detail-dim1-1.9",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Compatibilité basse bande passante",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Low-bandwidth compatibility",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "1.9",
-      "question": "Votre application reste utilisable sur une connexion à faible débit, grâce à des requêtes optimisées, des fichiers allégés et de la mise en cache.",
-      "aide": "Regardez si vous limitez le nombre et la taille des requêtes, si vous réduisez les images et vidéos, et si vous mettez en cache les contenus."
+      "criterion": "1.9",
+      "question": "Does your application remain usable on a low-speed connection, thanks to optimized requests, lightened files and caching?",
+      "help": "Look at whether you limit the number and size of requests, whether you reduce images and videos, and whether you cache content."
     },
     {
       "id": "detail-dim1-1.10",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Pratiques manipulatrices",
-      "interlocuteur": "le responsable produit",
+      "title": "Dark patterns",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.10",
-      "question": "Votre conception évite-t-elle les pratiques qui poussent artificiellement l'utilisateur à consommer plus ?",
-      "aide": "Cherchez le défilement infini, la lecture automatique forcée, les désabonnements cachés, les cases pré-cochées."
+      "criterion": "1.10",
+      "question": "Does your design avoid practices that artificially push the user to consume more?",
+      "help": "Look for infinite scroll, forced autoplay, hidden unsubscribes, pre-checked boxes."
     },
     {
       "id": "detail-dim1-1.11",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Valeurs par défaut sobres",
-      "interlocuteur": "le responsable produit",
+      "title": "Frugal default settings",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.11",
-      "question": "Vos valeurs par défaut sont-elles sobres et les utilisateurs peuvent-ils facilement les ajuster ?",
-      "aide": "Regardez le nombre d'éléments affichés, la qualité des médias, la fréquence de rafraîchissement."
+      "criterion": "1.11",
+      "question": "Are your default settings frugal, and can users easily adjust them?",
+      "help": "Look at the number of items displayed, media quality, and refresh frequency."
     },
     {
       "id": "detail-dim1-1.12",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Limitation des traceurs",
-      "interlocuteur": "le responsable produit",
+      "title": "Limiting trackers",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.12",
-      "question": "Vous limitez le nombre de traceurs au strict nécessaire, et chaque outil de suivi est justifié.",
-      "aide": "Les outils marketing et d'analyse sont souvent responsables d'un tiers du trafic : supprimez ceux qui font doublon.",
-      "note": "La justification de chaque traceur est une décision produit ou marketing : à valider avec le responsable produit."
+      "criterion": "1.12",
+      "question": "Do you limit the number of trackers to the strict minimum, and is each tracking tool justified?",
+      "help": "Marketing and analytics tools are often responsible for a third of the traffic: remove the redundant ones.",
+      "note": "The justification for each tracker is a product or marketing decision: to be validated with the product manager."
     },
     {
       "id": "detail-dim1-1.15",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Fréquence d'utilisation",
-      "interlocuteur": "le responsable produit",
+      "title": "Usage frequency",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "1.15",
-      "question": "Ce service présente-t-il une utilisation régulière et significative ?",
-      "aide": "Vérifiez que la fréquence d'usage est en rapport avec ce que le service coûte en ressources."
+      "criterion": "1.15",
+      "question": "Does this service see regular and significant use?",
+      "help": "Check that the usage frequency is proportionate to what the service costs in resources."
     },
     {
       "id": "detail-dim1-1.16",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Volume d'utilisateurs",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "User volume",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "1.16",
-      "question": "Le volume d'utilisateurs actifs justifie-t-il l'architecture et les ressources allouées ?",
-      "aide": "Regardez si le nombre d'utilisateurs est en rapport avec la taille de votre infrastructure."
+      "criterion": "1.16",
+      "question": "Does the volume of active users justify the architecture and resources allocated?",
+      "help": "Look at whether the number of users is proportionate to the size of your infrastructure."
     },
     {
       "id": "detail-dim2-2.1",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Technologies gourmandes en ressources",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Resource-hungry technologies",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "2.1",
-      "question": "Votre pile technique évite les technologies particulièrement gourmandes en ressources, ou vous les justifiez.",
-      "aide": "Par exemple : intelligence artificielle générative, blockchain à preuve de travail, ou d'autres technologies reconnues pour leur consommation."
+      "criterion": "2.1",
+      "question": "Does your tech stack avoid particularly resource-hungry technologies, or do you justify them?",
+      "help": "For example: generative AI, proof-of-work blockchain, or other technologies known for their consumption."
     },
     {
       "id": "detail-dim2-2.2",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Stratégie de compatibilité",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Compatibility strategy",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "2.2",
-      "question": "Avez-vous défini une stratégie de compatibilité avec les appareils de vos utilisateurs ?",
-      "aide": "Vérifiez si vous avez une liste des appareils ciblés, si vous faites des tests de compatibilité, et si vous supportez les appareils anciens."
+      "criterion": "2.2",
+      "question": "Have you defined a compatibility strategy for your users' devices?",
+      "help": "Check whether you have a list of targeted devices, whether you run compatibility tests, and whether you support legacy devices."
     },
     {
       "id": "detail-dim2-2.3",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Communication entre composants",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Communication between components",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "2.3",
-      "question": "Vos composants sont faiblement couplés, et leur communication ne provoque pas de ralentissements ni de complexité inutile.",
-      "aide": "Regardez si un composant peut changer sans casser les autres, et si la communication entre eux est rapide et fiable."
+      "criterion": "2.3",
+      "question": "Are your components loosely coupled, and does their communication cause no slowdowns or unnecessary complexity?",
+      "help": "Look at whether one component can change without breaking the others, and whether their communication is fast and reliable."
     },
     {
       "id": "detail-dim2-2.4",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Lissage des pics de charge",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Smoothing load peaks",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "2.4",
-      "question": "Vous lissez vos pics de charge en différant les tâches qui n'ont pas besoin d'être exécutées immédiatement.",
-      "aide": "Par exemple : traiter les exports ou les notifications par lots, ou utiliser des files d'attente pour répartir le travail."
+      "criterion": "2.4",
+      "question": "Do you smooth your load peaks by deferring tasks that do not need to run immediately?",
+      "help": "For example: process exports or notifications in batches, or use queues to spread the work."
     },
     {
       "id": "detail-dim2-2.5",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Mise en cache",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Caching",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "2.5",
-      "question": "Vous mettez en cache les résultats de vos calculs et requêtes coûteux quand ils sont réutilisés plusieurs fois.",
-      "aide": "Regardez si vous recalculez les mêmes choses plusieurs fois, ou si vous gardez le résultat en mémoire pour le réutiliser."
+      "criterion": "2.5",
+      "question": "Do you cache the results of your costly computations and queries when they are reused several times?",
+      "help": "Look at whether you recompute the same things several times, or whether you keep the result in memory to reuse it."
     },
     {
       "id": "detail-dim3-3.1",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Optimisation des coûts",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Cost optimization",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "3.1",
-      "question": "Vous avez mis en place une stratégie pour optimiser vos coûts d'infrastructure.",
-      "aide": "Par exemple : repérer les composants sous-utilisés, ajuster leur taille, ou basculer vers des services mieux dimensionnés."
+      "criterion": "3.1",
+      "question": "Have you put in place a strategy to optimize your infrastructure costs?",
+      "help": "For example: spot underused components, right-size them, or switch to better-sized services."
     },
     {
       "id": "detail-dim3-3.2",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Suivi de l'impact environnemental",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Environmental impact monitoring",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "3.2",
-      "question": "Vous suivez l'impact environnemental de votre infrastructure.",
-      "aide": "Par exemple : émissions de carbone de vos serveurs, efficacité énergétique et consommation d'eau de votre centre de données."
+      "criterion": "3.2",
+      "question": "Do you monitor the environmental impact of your infrastructure?",
+      "help": "For example: carbon emissions of your servers, energy efficiency and water consumption of your datacenter."
     },
     {
       "id": "detail-dim3-3.3",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Mix électrique de la région",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Regional electricity mix",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "3.3",
-      "question": "Vous avez choisi une région d'hébergement dont le mix électrique a un faible impact.",
-      "aide": "Les régions où l'électricité est décarbonée, comme la France, la Norvège ou l'Islande, ont un impact bien moindre."
+      "criterion": "3.3",
+      "question": "Have you chosen a hosting region whose electricity mix has a low impact?",
+      "help": "Regions where electricity is decarbonized, such as France, Norway or Iceland, have a much lower impact."
     },
     {
-      "id": "detail-dim3-3.5",
-      "fichier": "technique",
+      "id": "detail-dim3-3.4",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Mutualisation de l'infrastructure",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Shared infrastructure",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "3.5",
-      "question": "Votre infrastructure est mutualisée.",
-      "aide": "Par exemple : machines virtuelles, conteneurs, ou services gérés qui partagent les ressources avec d'autres projets."
+      "criterion": "3.4",
+      "question": "Is your infrastructure shared?",
+      "help": "For example: virtual machines, containers, or managed services that share resources with other projects."
     },
     {
-      "id": "detail-compose-dimensionnement",
-      "fichier": "technique",
+      "id": "detail-composite-dimensionnement",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Dimensionnement et élasticité",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
-      "type": "compose",
+      "title": "Sizing and elasticity",
+      "interviewee": "the person who operates the infrastructure",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Nos composants tournent à au moins 70 % de charge CPU ou RAM, et un auto-scaling borné est en place (ou la charge est constante)",
-          "reponses": {
-            "3.6": "✅ Point fort confirmé",
-            "3.7": "✅ Point fort confirmé"
+          "label": "Our components run at at least 70% CPU or RAM load, and bounded auto-scaling is in place (or load is constant)",
+          "answers": {
+            "3.5": "✅ Confirmed strength",
+            "3.6": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Nos composants tournent à au moins 70 % de charge, mais il n'y a pas d'auto-scaling alors que la charge varie",
-          "reponses": {
-            "3.6": "✅ Point fort confirmé",
-            "3.7": "💡 Potentiel d'amélioration identifié"
+          "label": "Our components run at at least 70% load, but there is no auto-scaling while load varies",
+          "answers": {
+            "3.5": "✅ Confirmed strength",
+            "3.6": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Nos composants tournent en dessous de 70 % de charge, mais un auto-scaling borné est en place (ou la charge est constante)",
-          "reponses": {
-            "3.6": "💡 Potentiel d'amélioration identifié",
-            "3.7": "✅ Point fort confirmé"
+          "label": "Our components run below 70% load, but bounded auto-scaling is in place (or load is constant)",
+          "answers": {
+            "3.5": "💡 Improvement potential identified",
+            "3.6": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Nos composants tournent en dessous de 70 % de charge, et il n'y a pas d'auto-scaling alors que la charge varie",
-          "reponses": {
-            "3.6": "💡 Potentiel d'amélioration identifié",
-            "3.7": "💡 Potentiel d'amélioration identifié"
+          "label": "Our components run below 70% load, and there is no auto-scaling while load varies",
+          "answers": {
+            "3.5": "💡 Improvement potential identified",
+            "3.6": "💡 Improvement potential identified"
           }
         }
       ],
-      "question": "Vos composants tournent-ils à au moins 70 % de charge, et leur nombre s'ajuste-t-il quand la charge varie ?",
-      "aide": "Regardez la charge processeur ou mémoire de vos serveurs et conteneurs. L'ajustement automatique doit avoir une limite haute pour éviter les emballements."
+      "question": "Do your components run at at least 70% load, and does their number adjust when the load varies?",
+      "help": "Look at the CPU or memory load of your servers and containers. Automatic scaling must have an upper bound to avoid runaway costs."
     },
     {
-      "id": "detail-dim3-3.8",
-      "fichier": "technique",
+      "id": "detail-dim3-3.7",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Extinction des environnements",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Shutting down environments",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "3.8",
-      "question": "Vous éteignez vos environnements non productifs quand personne ne les utilise.",
-      "aide": "Par exemple : environnements de développement ou de test éteints la nuit, le week-end, ou entre deux campagnes de tests."
+      "criterion": "3.7",
+      "question": "Do you shut down your non-production environments when nobody is using them?",
+      "help": "For example: development or test environments switched off at night, on weekends, or between test campaigns."
     },
     {
-      "id": "detail-compose-donnees-anciennes",
-      "fichier": "technique",
+      "id": "detail-composite-donnees-anciennes",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Gestion des données anciennes",
-      "interlocuteur": "la personne qui gère les données",
-      "type": "compose",
+      "title": "Handling of old data",
+      "interviewee": "the person who manages the data",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Des mécanismes automatiques de suppression et d'archivage sont appliqués, ET les données rarement consultées ont déjà été basculées vers un stockage à froid",
-          "reponses": {
-            "4.1": "✅ Point fort confirmé",
-            "4.6": "✅ Point fort confirmé"
+          "label": "Automatic deletion and archiving mechanisms are applied, AND rarely accessed data has already been moved to cold storage",
+          "answers": {
+            "4.1": "✅ Confirmed strength",
+            "4.6": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Des mécanismes automatiques de suppression et d'archivage sont appliqués, mais tout reste sur le stockage principal",
-          "reponses": {
-            "4.1": "✅ Point fort confirmé",
-            "4.6": "💡 Potentiel d'amélioration identifié"
+          "label": "Automatic deletion and archiving mechanisms are applied, but everything stays on primary storage",
+          "answers": {
+            "4.1": "✅ Confirmed strength",
+            "4.6": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Aucun mécanisme automatique, mais les données rarement consultées ont déjà été basculées vers un stockage à froid",
-          "reponses": {
-            "4.1": "💡 Potentiel d'amélioration identifié",
-            "4.6": "✅ Point fort confirmé"
+          "label": "No automatic mechanism, but rarely accessed data has already been moved to cold storage",
+          "answers": {
+            "4.1": "💡 Improvement potential identified",
+            "4.6": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Aucun mécanisme automatique, et tout reste sur le stockage principal",
-          "reponses": {
-            "4.1": "💡 Potentiel d'amélioration identifié",
-            "4.6": "💡 Potentiel d'amélioration identifié"
+          "label": "No automatic mechanism, everything stays on primary storage",
+          "answers": {
+            "4.1": "💡 Improvement potential identified",
+            "4.6": "💡 Improvement potential identified"
           }
         }
       ],
-      "question": "Que se passe-t-il quand une donnée devient inutile ou rarement consultée ?",
-      "aide": "Par exemple : une règle qui supprime ou archive automatiquement les anciennes factures, ou un transfert vers un disque plus lent mais moins énergivore pour les données rarement demandées.",
-      "note": "Le caractère acceptable d'un accès plus lent pour l'utilisateur est une décision produit : à valider avec le responsable produit."
+      "question": "What happens when a piece of data becomes useless or rarely accessed?",
+      "help": "For example: a rule that automatically deletes or archives old invoices, or a move to a slower but less energy-intensive disk for rarely requested data.",
+      "note": "Whether slower access is acceptable for the user is a product decision: to be validated with the product manager."
     },
     {
       "id": "detail-dim4-4.2",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Optimisation des bases de données",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Database optimization",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "4.2",
-      "question": "Avez-vous une stratégie pour optimiser les performances de vos bases de données ?",
-      "aide": "Par exemple : choisir les bons index, modéliser les tables pour limiter les requêtes coûteuses, nettoyer régulièrement la base."
+      "criterion": "4.2",
+      "question": "Do you have a strategy to optimize your databases' performance?",
+      "help": "For example: choose the right indexes, model tables to limit costly queries, clean the database regularly."
     },
     {
       "id": "detail-dim4-4.3",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Technologies de stockage adaptées",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Suitable storage technologies",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "4.3",
-      "question": "Vos technologies de stockage correspondent-elles vraiment à ce que vous en faites ?",
-      "aide": "Par exemple : une base relationnelle classique pour les données structurées, une base orientée document pour du contenu flexible, une base en colonnes pour de l'analyse, ou une base spécialisée pour des cas précis."
+      "criterion": "4.3",
+      "question": "Do your storage technologies really match what you do with them?",
+      "help": "For example: a classic relational database for structured data, a document-oriented database for flexible content, a column store for analytics, or a specialized database for specific cases."
     },
     {
       "id": "detail-dim4-4.5",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Duplication de données",
-      "interlocuteur": "la personne qui gère les données",
+      "title": "Data duplication",
+      "interviewee": "the person who manages the data",
       "type": "direct",
-      "critere": "4.5",
-      "question": "Avez-vous repéré les données dupliquées et vérifié si c'est voulu ?",
-      "aide": "Certaines duplications sont utiles : pour garantir que le service reste accessible même en cas de panne, ou pour accélérer certaines requêtes. D'autres sont accidentelles et coûtent de l'espace pour rien."
+      "criterion": "4.5",
+      "question": "Have you spotted duplicated data and checked whether it is intentional?",
+      "help": "Some duplication is useful: to keep the service accessible even in case of an outage, or to speed up certain queries. Other duplication is accidental and wastes space for nothing."
     },
     {
-      "id": "detail-compose-outils-efficacite",
-      "fichier": "technique",
+      "id": "detail-composite-outils-efficacite",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Ce que vos outils ont révélé",
-      "interlocuteur": "l'équipe de développement",
-      "type": "compose",
+      "title": "What your tools revealed",
+      "interviewee": "the development team",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Les deux pratiques sont en place et n'ont révélé aucun problème d'efficacité",
-          "reponses": {
-            "5.1": "✅ Point fort confirmé",
-            "5.2": "✅ Point fort confirmé"
+          "label": "Both practices are in place and revealed no efficiency problem",
+          "answers": {
+            "5.1": "✅ Confirmed strength",
+            "5.2": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "L'analyse statique n'a rien révélé, mais la campagne de charge a révélé des problèmes, ou nous n'en menons pas",
-          "reponses": {
-            "5.1": "✅ Point fort confirmé",
-            "5.2": "💡 Potentiel d'amélioration identifié"
+          "label": "Static analysis revealed nothing, but the load-testing campaign revealed problems, or we don't run one",
+          "answers": {
+            "5.1": "✅ Confirmed strength",
+            "5.2": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "L'analyse statique a révélé des gains possibles, ou nous n'en faisons pas, mais la campagne de charge n'a rien révélé",
-          "reponses": {
-            "5.1": "💡 Potentiel d'amélioration identifié",
-            "5.2": "✅ Point fort confirmé"
+          "label": "Static analysis revealed possible gains, or we don't run it, but the load-testing campaign revealed nothing",
+          "answers": {
+            "5.1": "💡 Improvement potential identified",
+            "5.2": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Les deux ont révélé des problèmes, ou au moins l'une des deux pratiques est absente",
-          "reponses": {
-            "5.1": "💡 Potentiel d'amélioration identifié",
-            "5.2": "💡 Potentiel d'amélioration identifié"
+          "label": "Both revealed problems, or at least one of the two practices is missing",
+          "answers": {
+            "5.1": "💡 Improvement potential identified",
+            "5.2": "💡 Improvement potential identified"
           }
         }
       ],
-      "question": "Vos outils d'analyse du code et vos tests de charge ont-ils révélé des points à améliorer ?",
-      "aide": "Les outils d'analyse automatique du code et les tests sous forte charge permettent de détecter des inefficacités. L'absence de ces pratiques compte aussi comme un potentiel d'amélioration."
+      "question": "Did your code analysis tools and load tests reveal points to improve?",
+      "help": "Automatic code analysis tools and high-load tests help detect inefficiencies. The absence of these practices also counts as improvement potential."
     },
     {
       "id": "detail-dim5-5.3",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Backlog d'optimisations",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Optimization backlog",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "5.3",
-      "question": "Votre backlog contient-il des tâches d'optimisation ?",
-      "aide": "Par exemple : des tickets ou issues qui visent à accélérer une page, réduire la consommation mémoire, ou améliorer le temps de réponse."
+      "criterion": "5.3",
+      "question": "Does your backlog contain optimization tasks?",
+      "help": "For example: tickets or issues aimed at speeding up a page, reducing memory consumption, or improving response time."
     },
     {
       "id": "detail-dim5-5.4",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Indicateurs de performance",
-      "interlocuteur": "le responsable produit",
+      "title": "Performance indicators",
+      "interviewee": "the product manager",
       "type": "direct",
-      "critere": "5.4",
-      "question": "Vos performances actuelles correspondent-elles à ce que vous visez ?",
-      "aide": "Par exemple : le temps de chargement d'une page, le temps de réponse d'une API, le nombre de requêtes traitées par seconde.",
-      "note": "L'ambition de performance du projet est une décision produit : à valider avec le responsable produit."
+      "criterion": "5.4",
+      "question": "Do your current performances match what you aim for?",
+      "help": "For example: page load time, API response time, number of requests processed per second.",
+      "note": "The project's performance ambition is a product decision: to be validated with the product manager."
     },
     {
       "id": "detail-dim5-5.5",
-      "fichier": "produit-usage",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Optimisation des parcours fréquents",
-      "interlocuteur": "l'équipe de développement",
+      "title": "Optimization of frequent journeys",
+      "interviewee": "the development team",
       "type": "direct",
-      "critere": "5.5",
-      "question": "Les parcours utilisateurs les plus fréquents ont-ils fait l'objet d'une étude d'optimisation ?",
-      "aide": "Regardez si vous avez analysé et amélioré les chemins de code les plus empruntés."
+      "criterion": "5.5",
+      "question": "Have the most frequent user journeys been studied for optimization?",
+      "help": "Look at whether you have analyzed and improved the most traveled code paths."
     },
     {
-      "id": "detail-compose-a-jour",
-      "fichier": "technique",
+      "id": "detail-composite-a-jour",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Pile technique et dépendances à jour",
-      "interlocuteur": "l'équipe de développement",
-      "type": "compose",
+      "title": "Up-to-date tech stack and dependencies",
+      "interviewee": "the development team",
+      "type": "composite",
       "options": [
         {
-          "libelle": "Le socle est au moins sur la dernière version LTS ET les principales dépendances sont à jour",
-          "reponses": {
-            "5.6": "✅ Point fort confirmé",
-            "5.8": "✅ Point fort confirmé"
+          "label": "The base is at least on the latest LTS AND the main dependencies are up to date",
+          "answers": {
+            "5.6": "✅ Confirmed strength",
+            "5.8": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Le socle est au moins sur la dernière version LTS, mais des dépendances importantes sont en retard",
-          "reponses": {
-            "5.6": "✅ Point fort confirmé",
-            "5.8": "💡 Potentiel d'amélioration identifié"
+          "label": "The base is at least on the latest LTS, but important dependencies are outdated",
+          "answers": {
+            "5.6": "✅ Confirmed strength",
+            "5.8": "💡 Improvement potential identified"
           }
         },
         {
-          "libelle": "Le socle est en retard sur la dernière version LTS, mais les principales dépendances sont à jour",
-          "reponses": {
-            "5.6": "💡 Potentiel d'amélioration identifié",
-            "5.8": "✅ Point fort confirmé"
+          "label": "The base is behind the latest LTS, but the main dependencies are up to date",
+          "answers": {
+            "5.6": "💡 Improvement potential identified",
+            "5.8": "✅ Confirmed strength"
           }
         },
         {
-          "libelle": "Le socle est en retard ET des dépendances importantes le sont aussi",
-          "reponses": {
-            "5.6": "💡 Potentiel d'amélioration identifié",
-            "5.8": "💡 Potentiel d'amélioration identifié"
+          "label": "The base is outdated AND important dependencies are too",
+          "answers": {
+            "5.6": "💡 Improvement potential identified",
+            "5.8": "💡 Improvement potential identified"
           }
         }
       ],
-      "question": "Votre plateforme et vos bibliothèques principales sont-elles à jour ?",
-      "aide": "La plateforme, c'est par exemple Node, Python, Java, PHP : vérifiez que vous êtes au moins sur la version que l'éditeur s'engage à maintenir longtemps. Les bibliothèques, ce sont les frameworks et modules que vous importez dans votre code."
+      "question": "Are your platform and main libraries up to date?",
+      "help": "The platform is for example Node, Python, Java, PHP: check that you are at least on the version the publisher commits to maintaining long-term. Libraries are the frameworks and modules you import into your code."
     },
     {
       "id": "detail-dim5-5.7",
-      "fichier": "technique",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Configuration des composants",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
+      "title": "Component configuration",
+      "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "critere": "5.7",
-      "question": "Avez-vous vérifié si vos composants pourraient être mieux configurés ?",
-      "aide": "Par exemple : ajuster les paramètres de la machine virtuelle Java, les pools de connexion d'une base de données, ou les limites mémoire d'un serveur."
+      "criterion": "5.7",
+      "question": "Have you checked whether your components could be better configured?",
+      "help": "For example: tuning the Java virtual machine settings, database connection pools, or a server's memory limits."
     },
     {
-      "id": "filtre-interface-utilisateur",
-      "fichier": "produit-usage",
+      "id": "filter-user-interface",
+      "file": "product-usage",
       "phase": "detail",
-      "titre": "Interface utilisateur du service",
-      "interlocuteur": "le responsable produit",
-      "type": "filtre",
-      "criteres": ["1.4", "1.5", "1.8", "1.9", "1.10", "1.11", "1.13", "1.14", "5.9"],
-      "question": "Votre service a-t-il une interface utilisateur avec laquelle des personnes interagissent directement ?",
-      "libelle_ecarte": "Non, c'est un service sans interface (API, batch, worker, service de calcul, etc.)",
-      "libelle_applicable": "Oui, le service a une interface utilisateur (web, mobile, desktop, etc.)",
-      "aide": "Une interface utilisateur comprend des écrans, des boutons, des formulaires, des pages web. Un service qui expose seulement une API pour d'autres programmes n'a pas d'interface utilisateur."
+      "title": "Service user interface",
+      "interviewee": "the product manager",
+      "type": "filter",
+      "criteria": ["1.4", "1.5", "1.8", "1.9", "1.10", "1.11", "1.13", "1.14", "5.9"],
+      "question": "Does your service have a user interface that people interact with directly?",
+      "discarded_label": "No, this is a service without an interface (API, batch, worker, compute service, etc.)",
+      "applicable_label": "Yes, the service has a user interface (web, mobile, desktop, etc.)",
+      "help": "A user interface includes screens, buttons, forms, web pages. A service that only exposes an API to other programs has no user interface."
     },
     {
-      "id": "filtre-donnees-persistantes",
-      "fichier": "technique",
+      "id": "filter-persistent-data",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Stockage de données du service",
-      "interlocuteur": "la personne qui gère les données",
-      "type": "filtre",
-      "criteres": ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6"],
-      "question": "Votre service conserve-t-il des données dans une base de données ou un stockage qui lui est propre ?",
-      "libelle_ecarte": "Non, le service ne conserve aucune donnée (ou seulement en cache temporaire)",
-      "libelle_applicable": "Oui, le service conserve des données persistantes (base de données, fichiers, etc.)",
-      "aide": "Des données persistantes sont conservées même après un redémarrage du service. Un cache temporaire en mémoire n'est pas du stockage persistant."
+      "title": "Service data storage",
+      "interviewee": "the person who manages the data",
+      "type": "filter",
+      "criteria": ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6"],
+      "question": "Does your service keep data in a database or storage of its own?",
+      "discarded_label": "No, the service retains no data (or only in temporary cache)",
+      "applicable_label": "Yes, the service retains persistent data (database, files, etc.)",
+      "help": "Persistent data is kept even after the service restarts. A temporary in-memory cache is not persistent storage."
     },
     {
-      "id": "filtre-environnement-test",
-      "fichier": "technique",
+      "id": "filter-test-environment",
+      "file": "technical",
       "phase": "detail",
-      "titre": "Environnements de test",
-      "interlocuteur": "la personne qui exploite l'infrastructure",
-      "type": "filtre",
-      "criteres": ["3.8", "3.9"],
-      "question": "Disposez-vous d'environnements de test ou de développement distincts de la production ?",
-      "libelle_ecarte": "Non, nous n'avons pas d'environnement de test distinct",
-      "libelle_applicable": "Oui, nous avons des environnements de test ou de développement",
-      "aide": "Un environnement de test est une infrastructure séparée où vous pouvez tester vos modifications avant de les déployer en production."
+      "title": "Test environments",
+      "interviewee": "the person who operates the infrastructure",
+      "type": "filter",
+      "criteria": ["3.7", "3.8"],
+      "question": "Do you have test or development environments separate from production?",
+      "discarded_label": "No, we do not have a separate test environment",
+      "applicable_label": "Yes, we have test or development environments",
+      "help": "A test environment is a separate infrastructure where you can test your changes before deploying them to production."
     }
   ]
 }

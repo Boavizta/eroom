@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Construit le template Markdown vierge du référentiel EOF-V.1.1 (EROOM
-Optimization Framework) à partir des données brutes récupérées via gviz
-(un fichier JSON par onglet, cf. fetch_gviz.py).
+"""Builds the blank Markdown template of the EOF-V.1.1 reference framework (EROOM
+Optimization Framework) from the raw data fetched via gviz
+(one JSON file per tab, cf. fetch_gviz.py).
 
-Ce script ne fait AUCUN calcul de potentiel d'optimisation : le template produit est vierge
-(toutes les listes à cocher sont décochées). Seule la méthode de calcul est
-documentée en texte, pour que le fichier reste auto-suffisant et
-recalculable à la main plus tard (cf. section "Comment ce référentiel se
-lit" en tête du document).
+This script does NO optimization-potential calculation: the template it produces is
+blank (all checkboxes unchecked). Only the calculation method is documented in
+text, so that the file remains self-sufficient and can be recalculated by hand
+later (cf. the "How to read this framework" section at the top of the document).
 
-Usage :
-    python3 build_template.py <dossier_json> <fichier_markdown_sortie>
+Usage:
+    python3 build_template.py <json_dir> <output_markdown_file>
 """
 import json
 import re
@@ -18,65 +17,65 @@ import sys
 import os
 
 PILLAR_TABS = [
-    ("produit", "🛖 1 — Produit"),
+    ("product", "🛖 1 — Product"),
     ("architecture", "🗺️ 2 — Architecture"),
     ("infrastructure", "🏢 3 — Infrastructure"),
-    ("stockage", "💾 4 — Stockage et données"),
-    ("algo-code", "👨‍💻 5 — Algo & Code"),
-    ("facilite", "🛠 6 — Facilité de changement"),
+    ("storage", "💾 4 — Storage and data"),
+    ("algo-code", "👨‍💻 5 — Algorithms & code"),
+    ("ease", "🛠 6 — Ease of change"),
 ]
 
-# Ordre de LECTURE du template vierge (sommaire + corps), distinct de
-# PILLAR_TABS ci-dessus : 0 - Diagnostic rapide (avant, hors liste) → 6 -
-# Facilité de changement en premier (préalable pratique : est-il seulement
-# possible d'agir ?) → puis 1,2,3,4,5 dans l'ordre du référentiel. Ne
-# s'applique qu'à ce fichier de sortie humain : PILLAR_TABS et
-# build_referentiel_json() gardent l'ordre canonique 1..6 (consommé par
-# run_eof.py côté eof-audit/analyse-parcours, hors scope de ce changement).
+# READ order of the blank template (table of contents + body), distinct from
+# PILLAR_TABS above: 0 - Quick diagnostic (first, outside the list) → 6 -
+# Ease of change first (practical prerequisite: is it even possible to act?)
+# → then 1,2,3,4,5 in the framework's order. Applies only to this human-facing
+# output file: PILLAR_TABS and build_referentiel_json() keep the canonical
+# 1..6 order (consumed by run_eof.py on the eof-audit/analyse-parcours side,
+# outside the scope of this change).
 PILLAR_TABS_TEMPLATE_ORDER = [PILLAR_TABS[5]] + PILLAR_TABS[0:5]
 
-# Dropdown observé sur les onglets dimensions (5 valeurs, cf. relevé empirique
-# sur les 6 onglets). Correspondance numérique observée (coefficient avant
-# pondération par le maximum de potentiel) :
-#   ✅ Point fort confirmé              -> 0  (rien à optimiser)
-#   💡 Potentiel d'amélioration identifié -> 1  (levier identifié)
-#   🚫 Non applicable                    -> 0  (exclu, compte quand même dans le maximum de potentiel total)
-#   🤔 À évaluer                         -> 0  (pas encore regardé)
-#   ⌛️ Évaluation en cours               -> 0,5 (UNE seule occurrence observée dans
-#                                              tout le classeur au moment de la
-#                                              génération, à confirmer si le
-#                                              cas se représente, pas encore
-#                                              une règle certaine)
+# Dropdown observed on the dimension tabs (5 values, cf. empirical survey
+# over the 6 tabs). Observed numeric mapping (coefficient before weighting by
+# the potential maximum):
+#   ✅ Confirmed strength              -> 0  (nothing to optimize)
+#   💡 Improvement potential identified -> 1  (lever identified)
+#   🚫 Not applicable                   -> 0  (excluded, still counts in the total potential maximum)
+#   🤔 To be assessed                   -> 0  (not looked at yet)
+#   ⌛️ Assessment in progress           -> 0.5 (ONE single occurrence observed in
+#                                              the whole workbook at generation
+#                                              time, to be confirmed if the case
+#                                              comes up again, not yet a certain
+#                                              rule)
 PILLAR_EVAL_OPTIONS = [
-    ("✅ Point fort confirmé", 0),
-    ("💡 Potentiel d'amélioration identifié", 1),
-    ("🚫 Non applicable", 0),
-    ("🤔 À évaluer", 0),
-    ("⌛️ Évaluation en cours", 0.5),
+    ("✅ Confirmed strength", 0),
+    ("💡 Improvement potential identified", 1),
+    ("🚫 Not applicable", 0),
+    ("🤔 To be assessed", 0),
+    ("⌛️ Assessment in progress", 0.5),
 ]
 
-# Onglet 6 (Facilité de changement) seul : dropdown DIFFÉRENT des 5 autres
-# dimensions, confirmé par le texte de l'onglet "À LIRE" (Étape 6). Mapping
-# numérique non observé dans des cellules réelles (onglet encore vide au
-# moment de la génération), à confirmer le jour où des réponses existeront.
+# Tab 6 (Ease of change) only: a DIFFERENT dropdown from the 5 other
+# dimensions, confirmed by the "Read me" tab text (Step 6). Numeric mapping
+# not observed in real cells (tab still empty at generation time), to be
+# confirmed the day answers exist.
 FACILITE_EVAL_OPTIONS = [
-    ("🟢 Facile à modifier", 0),
-    ("🟡 Effort modéré", 0.5),
-    ("🔴 Difficile à changer", 1),
+    ("🟢 Easy to change", 0),
+    ("🟡 Moderate effort", 0.5),
+    ("🔴 Hard to change", 1),
 ]
 
-DIAG_RAPIDE_NIVEAUX = ["Modéré", "Significatif", "Déterminant"]
+QUICK_DIAG_LEVELS = ["Moderate", "Significant", "Decisive"]
 
-# 3 liens hypertexte du Sheet source (récupérés depuis les relations du
-# fichier Excel fourni, car l'API gviz ne renvoie que le texte affiché, pas
-# la cible du lien). Les coordonnées de cellule exactes ont bougé depuis
-# (des critères ont été ajoutés) — on relie donc la PREMIÈRE occurrence du
-# mot dans l'onglet concerné, ce qui atteint le même but (rendre le terme
-# navigable) sans dépendre d'une référence de cellule devenue obsolète.
+# 3 hyperlinks of the source Sheet (retrieved from the relations of the
+# provided Excel file, because the gviz API only returns the displayed text,
+# not the link target). The exact cell coordinates have moved since then
+# (criteria were added) — so we link the FIRST occurrence of the word in the
+# relevant tab, which achieves the same goal (making the term navigable)
+# without depending on a cell reference that has become obsolete.
 TAB_HYPERLINKS = {
-    "diag-rapide": ("SLA", "https://fr.wikipedia.org/wiki/Service-level_agreement"),
+    "quick-diag": ("SLA", "https://fr.wikipedia.org/wiki/Service-level_agreement"),
     "algo-code": ("Core Web Vitals", "https://developers.google.com/search/docs/appearance/core-web-vitals?hl=fr"),
-    "facilite": ("CI/CD", "https://fr.wikipedia.org/wiki/CI/CD"),
+    "ease": ("CI/CD", "https://fr.wikipedia.org/wiki/CI/CD"),
 }
 
 
@@ -117,37 +116,37 @@ def checklist(options, checked=None):
 
 
 def build_diag_rapide(json_dir):
-    rows = load_tab(json_dir, "diag-rapide")
-    out = ["## 🏦 0 — Diagnostic rapide\n"]
+    rows = load_tab(json_dir, "quick-diag")
+    out = ["## 🏦 0 — Quick diagnostic\n"]
     out.append(
-        "*Identifiez les meilleures opportunités d'optimisation. Un score plus "
-        "élevé reflète un potentiel d'optimisation plus important.*\n"
+        "*Identify the best optimization opportunities. A higher score reflects "
+        "greater optimization potential.*\n"
     )
     for r in rows:
         crit_id = cell(r, 1)
         if not is_id(crit_id):
             continue
-        critere = cell(r, 2)
-        methode = cell(r, 4)  # texte des 5 crans, enumeré "1 - ... \n2 - ..."
-        niveau = cell(r, 5)
-        out.append(f"### {crit_id} — {critere}\n")
-        out.append("**Évaluation**")
-        if methode:
-            crans = [c.strip() for c in methode.split("\n") if c.strip()]
-            for c in crans:
+        criterion = cell(r, 2)
+        method = cell(r, 4)  # text of the 5 levels, enumerated "1 - ... \n2 - ..."
+        level = cell(r, 5)
+        out.append(f"### {crit_id} — {criterion}\n")
+        out.append("**Evaluation**")
+        if method:
+            screens = [c.strip() for c in method.split("\n") if c.strip()]
+            for c in screens:
                 out.append(f"- [ ] {c}")
         out.append("")
-        out.append("**Niveau d'impact**")
-        out.append(checklist(DIAG_RAPIDE_NIVEAUX, checked=niveau))
+        out.append("**Impact level**")
+        out.append(checklist(QUICK_DIAG_LEVELS, checked=level))
         out.append("")
     return "\n".join(out)
 
 
 def build_pillar(json_dir, tab_name, title):
     rows = load_tab(json_dir, tab_name)
-    eval_options = FACILITE_EVAL_OPTIONS if tab_name == "facilite" else PILLAR_EVAL_OPTIONS
+    eval_options = FACILITE_EVAL_OPTIONS if tab_name == "ease" else PILLAR_EVAL_OPTIONS
     out = [f"## {title}\n"]
-    # ligne 1 (index 1 dans les rows) porte la description courte de la dimension
+    # row 1 (index 1 in the rows) carries the short description of the dimension
     if len(rows) > 1:
         desc = cell(rows[1], 2)
         if desc:
@@ -156,182 +155,181 @@ def build_pillar(json_dir, tab_name, title):
         crit_id = cell(r, 1)
         if not is_id(crit_id):
             continue
-        critere = cell(r, 2)
-        explication = cell(r, 3)
-        niveau = cell(r, 6)
-        out.append(f"### {crit_id} — {critere}\n")
-        if explication:
-            out.append(f"**Explication supplémentaire** : {explication}\n")
-        out.append("**Évaluation**")
+        criterion = cell(r, 2)
+        explanation = cell(r, 3)
+        level = cell(r, 6)
+        out.append(f"### {crit_id} — {criterion}\n")
+        if explanation:
+            out.append(f"**Additional explanation**: {explanation}\n")
+        out.append("**Evaluation**")
         out.append(checklist([o for o, _ in eval_options]))
         out.append("")
-        out.append("**Niveau d'impact**")
-        out.append(checklist(DIAG_RAPIDE_NIVEAUX, checked=niveau))
+        out.append("**Impact level**")
+        out.append(checklist(QUICK_DIAG_LEVELS, checked=level))
         out.append("")
     return "\n".join(out)
 
 
-def parse_potentiel_max(v):
+def parse_potential_max(v):
     if v is None:
         return None
     return float(str(v).replace(",", "."))
 
 
 def build_diag_rapide_json(json_dir):
-    """Liste structurée des 16 questions de l'onglet 0-Diagnostic rapide,
-    pour affichage en aperçu (topo) uniquement — échelle 1-5 différente des
-    6 dimensions détaillées, jamais remplie automatiquement par `eof-audit`,
-    jamais mêlée à la liste `criteres` (54) ni à son radar."""
-    rows = load_tab(json_dir, "diag-rapide")
+    """Structured list of the 16 questions of the 0-Quick diagnostic tab,
+    for preview display (topo) only — a 1-5 scale different from the
+    6 detailed dimensions, never filled automatically by `eof-audit`,
+    never mixed into the `criteria` list (54) nor into its radar."""
+    rows = load_tab(json_dir, "quick-diag")
     out = []
     for r in rows:
         crit_id = cell(r, 1)
         if not is_id(crit_id):
             continue
-        methode = cell(r, 4)
-        crans = [c.strip() for c in methode.split("\n") if c.strip()] if methode else []
+        method = cell(r, 4)
+        screens = [c.strip() for c in method.split("\n") if c.strip()] if method else []
         out.append({
             "id": crit_id,
-            "critere": cell(r, 2),
-            "crans": crans,
-            "niveau_impact": cell(r, 5),
+            "criterion": cell(r, 2),
+            "screens": screens,
+            "impact_level": cell(r, 5),
         })
     return out
 
 
 def build_referentiel_json(json_dir):
-    """Construit la table structurée du référentiel :
-    - `criteres` : les 54 critères détaillés (6 dimensions), ceux que lit
-      `eof-audit` pour remplir automatiquement et calculer le radar.
-    - `diagnostic_rapide` : les 16 questions de l'onglet 0, pour un aperçu
-      seulement (échelle différente, jamais remplies automatiquement — cf.
-      section "Comment ce référentiel se lit").
-    C'est ce fichier, et lui seul, que le futur processus `eof-audit` doit
-    lire : jamais la Google Sheet, jamais le Markdown humain.
+    """Builds the structured table of the reference framework:
+    - `criteria`: the 54 detailed criteria (6 dimensions), the ones
+      `eof-audit` reads to fill in automatically and compute the radar.
+    - `quick_diagnostic`: the 16 questions of tab 0, for an overview
+      only (different scale, never filled automatically — cf.
+      the "How to read this framework" section).
+    This file, and only this file, is what the future `eof-audit` process
+    must read: never the Google Sheet, never the human-readable Markdown.
     """
-    criteres = []
+    criteria = []
     for key, title in PILLAR_TABS:
         rows = load_tab(json_dir, key)
-        eval_options = FACILITE_EVAL_OPTIONS if key == "facilite" else PILLAR_EVAL_OPTIONS
+        eval_options = FACILITE_EVAL_OPTIONS if key == "ease" else PILLAR_EVAL_OPTIONS
         for r in rows:
             crit_id = cell(r, 1)
             if not is_id(crit_id):
                 continue
-            criteres.append({
+            criteria.append({
                 "id": crit_id,
-                "pilier": title,
-                "critere": cell(r, 2),
-                "explication": cell(r, 3),
-                "methode": cell(r, 5),
-                "niveau_impact": cell(r, 6),
-                "potentiel_max": parse_potentiel_max(cell(r, 9)),
-                "options_evaluation": [o for o, _ in eval_options],
-                "options_evaluation_coefficient": {o: s for o, s in eval_options},
+                "pillar": title,
+                "criterion": cell(r, 2),
+                "explanation": cell(r, 3),
+                "method": cell(r, 5),
+                "impact_level": cell(r, 6),
+                "max_potential": parse_potential_max(cell(r, 9)),
+                "evaluation_options": [o for o, _ in eval_options],
+                "evaluation_coefficient_options": {o: s for o, s in eval_options},
             })
-    return {"criteres": criteres, "diagnostic_rapide": build_diag_rapide_json(json_dir)}
+    return {"criteria": criteria, "quick_diagnostic": build_diag_rapide_json(json_dir)}
 
 
 def build_a_lire(json_dir):
-    rows = load_tab(json_dir, "a-lire")
-    out = ["## 📖 À lire\n"]
+    rows = load_tab(json_dir, "read-me")
+    out = ["## 📖 Read me\n"]
     out.append("![Logo Boavizta](logo1.png) ![Licence CC BY-SA](logo2.png)\n")
     out.append(
-        "> ⚠️ Le logo Boavizta (`logo1.png`) est en blanc sur fond transparent : "
-        "il ne s'affiche pas sur un rendu Markdown à fond blanc (GitHub, VS Code, "
-        "la plupart des visionneuses). Visible seulement sur fond sombre, ou en "
-        "ouvrant le fichier directement. Non corrigé ici (retouche graphique hors "
-        "périmètre) — signalé pour ne pas laisser croire à une image manquante.\n"
+        "> ⚠️ The Boavizta logo (`logo1.png`) is white on a transparent background: "
+        "it does not show on a white-background Markdown render (GitHub, VS Code, "
+        "most viewers). Only visible on a dark background, or when opening the file "
+        "directly. Not fixed here (graphic retouching out of scope) — flagged so it "
+        "is not mistaken for a missing image.\n"
     )
     for r in rows:
-        txt = cell(r, 1)
-        if txt:
-            if txt.startswith(("🎯", "📊", "🧮", "💡")) and len(txt) < 60:
-                out.append(f"### {txt}\n")
+        text = cell(r, 1)
+        if text:
+            if text.startswith(("🎯", "📊", "🧮", "💡")) and len(text) < 60:
+                out.append(f"### {text}\n")
             else:
-                out.append(f"{txt}\n")
+                out.append(f"{text}\n")
     return "\n".join(out)
 
 
 def build_synthese(json_dir, criteria_counts):
     categories = [
-        "🛖 Produit", "🗺️ Architecture", "🏢 Infrastructure",
-        "💾 Stockage & Données", "👨‍💻 Algo & Code", "🛠 Facilité de changement",
+        "🛖 Product", "🗺️ Architecture", "🏢 Infrastructure",
+        "💾 Storage & Data", "👨‍💻 Algo & Code", "🛠 Ease of change",
     ]
     total = sum(criteria_counts.values())
-    out = ["## 🕸️ 7 — Synthèse\n"]
+    out = ["## 🕸️ 7 — Synthesis\n"]
     out.append(
-        "Ce référentiel compte **{} critères détaillés** au total, répartis sur "
-        "les 6 dimensions ci-dessous (hors Diagnostic rapide, qui les recouvre en "
-        "version condensée mais n'entre pas dans cette synthèse).\n".format(total)
+        "This framework counts **{} detailed criteria** in total, spread over "
+        "the 6 dimensions below (excluding the Quick diagnostic, which covers them in "
+        "condensed form but is not part of this synthesis).\n".format(total)
     )
-    out.append("| Catégorie | Nombre de critères | Renvoi |")
+    out.append("| Category | Number of criteria | Link |")
     out.append("|---|---|---|")
-    keys = ["produit", "architecture", "infrastructure", "stockage", "algo-code", "facilite"]
+    keys = ["product", "architecture", "infrastructure", "storage", "algo-code", "ease"]
     for cat, key in zip(categories, keys):
         anchor = cat.split(" ", 1)[1].lower().replace(" ", "-").replace("&", "")
-        out.append(f"| {cat} | {criteria_counts[key]} | [Voir la section](#{anchor}) |")
+        out.append(f"| {cat} | {criteria_counts[key]} | [See the section](#{anchor}) |")
     out.append("")
     out.append(
-        "**Note sur le total du Sheet source.** La formule Google Sheets qui "
-        "compte le nombre total de critères référence des onglets qui n'existent "
-        "plus (`#REF!` + anciens noms d'onglets) — sa valeur affichée est figée et "
-        "fausse. Le total ci-dessus ({}) est recompté directement depuis les "
-        "données actuelles, un par un.\n".format(total)
+        "**Note on the source Sheet's total.** The Google Sheets formula that "
+        "counts the total number of criteria references tabs that no longer "
+        "exist (`#REF!` + old tab names) — its displayed value is frozen and "
+        "wrong. The total above ({}) is recomputed directly from the current "
+        "data, one by one.\n".format(total)
     )
     out.append(
-        "**Radar.** Le Sheet source affiche un radar à 6 axes qui, à l'examen, "
-        "n'en trace que 5 : la catégorie *Facilité de changement* est absente du "
-        "graphique (bug constaté, pas une exclusion volontaire). Tant que ce "
-        "template est vierge, aucun radar réel n'a de sens ici, un exemple de "
-        "rendu (potentiels d'optimisation fictifs, 6 axes) est disponible via "
+        "**Radar.** The source Sheet displays a 6-axis radar which, on inspection, "
+        "only draws 5 of them: the *Ease of change* category is missing from the "
+        "chart (bug observed, not a deliberate exclusion). As long as this template "
+        "is blank, no real radar makes sense here; a rendering example (fictitious "
+        "optimization potentials, 6 axes) is available via "
         "`.claude/skills/eof/scripts/generate_radar_svg.py`.\n"
     )
-    out.append("### Comment ce référentiel se lit\n")
+    out.append("### How to read this framework\n")
     out.append(
-        "- **Dimensions 1 à 5 (Produit, Architecture, Infrastructure, Stockage, "
-        "Algo & Code)** : chaque critère se répond par un choix unique parmi 5 "
-        "(`✅ Point fort confirmé`, `💡 Potentiel d'amélioration identifié`, "
-        "`🚫 Non applicable`, `🤔 À évaluer`, `⌛️ Évaluation en cours`), en "
-        "cochant la case correspondante. Coefficient observé sur le Sheet "
-        "source : `✅`/`🚫`/`🤔`/vide = 0, `💡` = 1, `⌛️` = 0,5 (cette dernière "
-        "valeur n'a été observée qu'une seule fois dans tout le classeur au "
-        "moment de la génération, à confirmer si elle se reproduit ailleurs, "
-        "ce n'est pas encore une règle certaine).\n"
-        "- **Dimension 6 (Facilité de changement)** : dropdown **différent** des 5 "
-        "autres dimensions (confirmé par l'onglet \"À lire\" du Sheet source) : "
-        "`🟢 Facile à modifier`, `🟡 Effort modéré`, `🔴 Difficile à changer`. "
-        "Aucune réponse réelle n'existait sur cet onglet au moment de la "
-        "génération, le mapping numérique (0 / 0,5 / 1 retenu ici) est une "
-        "supposition par analogie avec les autres dimensions, **non vérifiée** sur "
-        "une donnée réelle.\n"
-        "- **Potentiel d'optimisation d'une dimension** = "
-        "`Σ (coefficient de la réponse × maximum de potentiel du critère)` "
-        "÷ `Σ (maximum de potentiel de TOUS les critères de la dimension, répondus ou non)`. "
-        "**Un critère non répondu compte 0 au numérateur mais son maximum reste "
-        "au dénominateur**, il ne pénalise donc jamais le potentiel d'optimisation, et une dimension "
-        "vierge affiche 0 % de potentiel d'optimisation, pas \"inconnu\". "
-        "C'est un biais méthodologique du Sheet source, pas une correction "
-        "faite ici.\n"
-        "- **Maximum de potentiel \"Sans objet\"** : l'onglet \"À lire\" indique qu'on peut "
-        "exclure complètement un critère en réglant son maximum de potentiel sur \"Sans "
-        "objet\" (pas juste répondre \"Non applicable\" à l'évaluation, qui "
-        "elle laisse le maximum compter au dénominateur). Aucun exemple réel de "
-        "ce réglage n'a été observé dans les données récupérées, mécanisme "
-        "documenté ici tel que décrit par le Sheet, non vérifié sur un cas "
-        "concret.\n"
-        "- **Onglet 0 (Diagnostic rapide)** : logique différente, une échelle "
-        "1 à 5 par critère (`(5 − réponse) ÷ 4 × maximum de potentiel`), ne contribue pas à ce "
-        "tableau de synthèse.\n"
-        "- **Maximum de potentiel** : chaque critère porte son propre maximum de potentiel "
-        "(visible dans le Sheet source, colonne correspondante), différent d'un critère à l'autre, "
-        "ce n'est jamais 1 partout.\n"
+        "- **Dimensions 1 to 5 (Product, Architecture, Infrastructure, Storage, "
+        "Algo & Code)**: each criterion is answered by a single choice among 5 "
+        "(`✅ Confirmed strength`, `💡 Improvement potential identified`, "
+        "`🚫 Not applicable`, `🤔 To be assessed`, `⌛️ Assessment in progress`), by "
+        "checking the corresponding box. Coefficient observed on the source "
+        "Sheet: `✅`/`🚫`/`🤔`/empty = 0, `💡` = 1, `⌛️` = 0.5 (this last "
+        "value was observed only once in the whole workbook at generation "
+        "time, to be confirmed if it occurs elsewhere, it is not yet a certain "
+        "rule).\n"
+        "- **Dimension 6 (Ease of change)**: a **different** dropdown from the 5 "
+        "other dimensions (confirmed by the source Sheet's \"Read me\" tab): "
+        "`🟢 Easy to change`, `🟡 Moderate effort`, `🔴 Hard to change`. "
+        "No real answer existed on this tab at generation time, so the numeric "
+        "mapping (0 / 0.5 / 1 used here) is an assumption by analogy with the "
+        "other dimensions, **not verified** on real data.\n"
+        "- **Optimization potential of a dimension** = "
+        "`Σ (coefficient of the answer × potential maximum of the criterion)` "
+        "÷ `Σ (potential maximum of ALL the criteria of the dimension, answered or not)`. "
+        "**An unanswered criterion counts 0 in the numerator but its maximum stays "
+        "in the denameinator**, so it never penalizes the optimization potential, and a blank "
+        "dimension shows 0% optimization potential, not \"unknown\". "
+        "This is a methodological bias of the source Sheet, not a correction "
+        "made here.\n"
+        "- **\"Not applicable\" potential maximum**: the \"Read me\" tab says a criterion can be "
+        "excluded entirely by setting its potential maximum to \"Not "
+        "applicable\" (not just answering \"Not applicable\" to the evaluation, which "
+        "still counts the maximum in the denameinator). No real example of "
+        "this setting was observed in the fetched data; the mechanism is "
+        "documented here as described by the Sheet, not verified on a concrete "
+        "case.\n"
+        "- **Tab 0 (Quick diagnostic)**: different logic, a 1-to-5 scale "
+        "per criterion (`(5 − answer) ÷ 4 × potential maximum`), does not contribute to this "
+        "synthesis table.\n"
+        "- **Potential maximum**: each criterion carries its own potential maximum "
+        "(visible in the source Sheet, corresponding column), different from one criterion to another, "
+        "it is never 1 everywhere.\n"
     )
     return "\n".join(out)
 
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python3 build_template.py <dossier_json> <fichier_sortie.md>")
+        print("Usage: python3 build_template.py <json_dir> <output_file.md>")
         sys.exit(1)
     json_dir, out_path = sys.argv[1], sys.argv[2]
 
@@ -341,34 +339,34 @@ def main():
         criteria_counts[key] = sum(1 for r in rows if is_id(cell(r, 1)))
 
     parts = []
-    parts.append("# EOF-V.1.1 (EROOM Optimization Framework) — Référentiel complet\n")
+    parts.append("# EOF-V.1.1 (EROOM Optimization Framework) — Full reference\n")
     parts.append(
-        "> Généré depuis la Google Sheet source : "
-        "https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/edit\n"
+        "> Generated from the source Google Sheet: "
+        "https://docs.google.com/spreadsheets/d/1_fymJEyXxKjqy3jFlyO8MHhfmLZduUsLyloMeU2kSRM/edit\n"
         ">\n"
-        "> **Template vierge** — aucune réponse n'est pré-remplie. Le fichier Excel "
-        "fourni en complément n'a servi qu'à deux choses que l'API de données du "
-        "Sheet ne fournit pas : les 2 logos de la section \"À lire\" et 3 URLs de "
-        "liens hypertexte (voir aux endroits concernés).\n"
+        "> **Blank template** — no answer is pre-filled. The Excel file provided "
+        "as a complement was only used for two things that the Sheet's data "
+        "API does not provide: the 2 logos of the \"Read me\" section and 3 hyperlink URLs "
+        "(see where relevant).\n"
     )
     toc_items = [
-        ("À lire", "à-lire"),
-        ("0 — Diagnostic rapide", "0--diagnostic-rapide"),
+        ("Read me", "read-me"),
+        ("0 — Quick diagnostic", "0--quick-diagnostic"),
     ]
     for key, title in PILLAR_TABS_TEMPLATE_ORDER:
         anchor = title.lower()
         anchor = re.sub(r"[^\w\s-]", "", anchor).strip().replace(" ", "-")
         toc_items.append((title, anchor))
-    toc_items.append(("Synthèse", "🕸️-7--synthèse".lower()))
+    toc_items.append(("Synthesis", "🕸️-7--synthesis".lower()))
 
-    parts.append("## Sommaire\n")
+    parts.append("## Contents\n")
     for label, anchor in toc_items:
         parts.append(f"- [{label}](#{anchor})")
     parts.append("")
 
     parts.append(build_a_lire(json_dir))
     parts.append("\n-----\n")
-    parts.append(apply_hyperlink(build_diag_rapide(json_dir), "diag-rapide"))
+    parts.append(apply_hyperlink(build_diag_rapide(json_dir), "quick-diag"))
     parts.append("\n-----\n")
     for key, title in PILLAR_TABS_TEMPLATE_ORDER:
         parts.append(apply_hyperlink(build_pillar(json_dir, key, title), key))
@@ -378,18 +376,18 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(parts))
 
-    referentiel = build_referentiel_json(json_dir)
-    referentiel_path = os.path.join(os.path.dirname(out_path) or ".", "eof-referentiel.json")
+    reference = build_referentiel_json(json_dir)
+    referentiel_path = os.path.join(os.path.dirname(out_path) or ".", "eof-reference.json")
     with open(referentiel_path, "w", encoding="utf-8") as f:
-        json.dump(referentiel, f, ensure_ascii=False, indent=2)
+        json.dump(reference, f, ensure_ascii=False, indent=2)
 
-    print(f"Template écrit : {out_path}")
+    print(f"Template written: {out_path}")
     print(
-        f"Référentiel structuré écrit : {referentiel_path} "
-        f"({len(referentiel['criteres'])} critères détaillés + "
-        f"{len(referentiel['diagnostic_rapide'])} questions Diagnostic rapide)"
+        f"Structured reference written: {referentiel_path} "
+        f"({len(reference['criteria'])} detailed criteria + "
+        f"{len(reference['quick_diagnostic'])} quick-diagnostic questions)"
     )
-    print("Critères par dimension :", criteria_counts, "total =", sum(criteria_counts.values()))
+    print("Criteria per dimension:", criteria_counts, "total =", sum(criteria_counts.values()))
 
 
 if __name__ == "__main__":

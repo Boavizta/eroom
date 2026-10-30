@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p1
-title Workflow Analyse de parcours web — Page 1/5 : Étape 10 Localisation
+title Web journey analysis workflow — Page 1/5 : Step 10 File location
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,49 +22,49 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 10 — Localisation des fichiers ==
+== Step 10 — File location ==
 
-U -> C : /analyse-parcours <dossier> ou <fichier.har> [coverage.json ...]
-C -> C : Extraire chemin(s) du prompt
+U -> C : /analyse-parcours <dir> or <file.har> [coverage.json ...]
+C -> C : Extract path(s) from the prompt
 
-alt Dossier fourni
-  C -> FS : Lister contenu
-  FS -> C : Fichiers trouvés
-  C -> C : Identifier .har + Coverage-*.json + cwv.json (optionnel)
-  alt Plusieurs .har trouvés
-    C -> U : Lequel utiliser ?
-    U -> C : Choix
+alt Directory provided
+  C -> FS : List contents
+  FS -> C : Files found
+  C -> C : Identify .har + Coverage-*.json + cwv.json (optional)
+  alt Several .har found
+    C -> U : Which one to use?
+    U -> C : Choice
   end
-else Fichiers directs fournis
-  C -> FS : Vérifier existence de chaque fichier
-  FS -> C : OK / erreur
-else Aucun argument
-  C -> U : Quel dossier ou fichiers HAR/Coverage analyser ?
-  U -> C : Chemin(s)
+else Direct files provided
+  C -> FS : Check existence of each file
+  FS -> C : OK / error
+else No argument
+  C -> U : Which directory or HAR/Coverage files to analyze?
+  U -> C : Path(s)
 end
 
-C -> U : Synthèse fichiers identifiés :\n- HAR : <nom> ([N] Ko)\n- Coverage : [N] fichier(s)\n- cwv.json : présent / absent
+C -> U : Summary of identified files:\n- HAR: <name> ([N] KB)\n- Coverage: [N] file(s)\n- cwv.json: present / absent
 
 note over C, FS
-  Sécurité HAR :
-  Ne jamais afficher credentials ni tokens en clair.
-  Masquer : {"password":"***"}, token=****...abc
-  Tronquer les UIDs : uid=8116...92
+  HAR security:
+  Never display credentials or tokens in clear.
+  Mask: {"password":"***"}, token=****...abc
+  Truncate UIDs: uid=8116...92
 end note
 
-== Étape 15 — Capture sessionId (silencieux) ==
+== Step 15 — sessionId capture (silent) ==
 
 C -> FS : mkdir -p <HAR_DIR>/analyse-interne-agent
 C -> FS : cp ~/.claude/.current_session_id\nanalyse-interne-agent/.session_id
 
 note over C, FS
-  Utilisé par patch-audit-cost.sh (Étape 40)
-  pour calculer le coût exact de la session
-  au lieu d'une estimation par fenêtre temporelle.
+  Used by patch-audit-cost.sh (Step 40)
+  to compute the exact cost of the session
+  instead of an estimate per time window.
 end note
 
 @enduml

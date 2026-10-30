@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """
-Génération de questionnaires EOF depuis un audit existant.
+Generation of EOF questionnaires from an existing audit.
 
-Lit eof-audit-results.json, eof-referentiel.json et questionnaire-blocs.json
-pour produire un fichier Markdown unique contenant les questions encore à
-répondre, triées par rendement décroissant.
+Reads eof-audit-results.json, eof-reference.json and questionnaire-blocs.json
+to produce a single Markdown file containing the questions still to be
+answered, sorted by decreasing yield.
 
-Le résidu : un critère fait partie du résidu s'il n'a pas de verdict utile.
-ATTENTION : "🤔 À évaluer" et "⌛️ Évaluation en cours" comptent comme des
-réponses dans le reste du code (coefficient 0) mais NE TRANCHENT RIEN. Ces
-réponses doivent être reposées. Raison : éviter qu'un critère ne soit jamais
-posé et reste un faux zéro.
+The residual: a criterion is part of the residual if it has no useful verdict.
+WARNING: "🤔 To be assessed" and "⌛️ Assessment in progress" count as
+answers in the rest of the code (coefficient 0) but DECIDE NOTHING. These
+answers must be re-asked. Reason: avoid a criterion never being
+asked and remaining a false zero.
 
-Usage :
-    python3 generate_questionnaire.py <repertoire-audit> --output-dir <autre-dir>
+Usage:
+    python3 generate_questionnaire.py <audit-dir> --output-dir <other-dir>
     python3 generate_questionnaire.py --autotest
 
-Écrit questionnaire-eof.md dans le répertoire spécifié par --output-dir.
+Writes questionnaire-eof.md into the directory specified by --output-dir.
 
-Par défaut, REFUSE d'écrire dans un chemin contenant "audits" (un questionnaire
-vierge ne doit jamais se trouver dans audits/ pour éviter l'envoi accidentel
-d'un fichier non rempli). Passer --dans-le-dossier-audit pour forcer.
+By default, REFUSES to write into a path containing "audits" (a blank
+questionnaire must never be found in audits/ to avoid the accidental sending
+of an unfilled file). Pass --in-audit-dir to force.
 
-NE modifie JAMAIS questionnaire-blocs.json ni son validateur.
+NEVER modifies questionnaire-blocs.json nor its validator.
 """
 
 import argparse
@@ -31,591 +31,591 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Séparateur de section, jamais "-----" (lu lettre par lettre par TTS macOS)
+# Section separator, never "-----" (read letter by letter by macOS TTS)
 SEPARATOR = "-----"
 
-# Réponses qui ne tranchent rien et doivent être reposées
-REPONSES_NON_TRANCHANTES = {
-    "🤔 À évaluer",
-    "⌛️ Évaluation en cours",
+# Answers that decide nothing and must be re-asked
+NON_DECISIVE_ANSWERS = {
+    "🤔 To be assessed",
+    "⌛️ Assessment in progress",
 }
 
 
-def nettoyer_mention_jnsp(libelle):
+def strip_dnk_mention(label):
     """
-    Nettoie la mention "je ne sais pas" d'un libellé de cran du diagnostic rapide.
+    Cleans the "I don't know" mention from a quick diagnostic screen label.
 
-    Raison de fond : certains crans du référentiel contiennent "je ne sais pas"
-    collé au pire cas (ex: "1 - Très complexe / Je ne sais pas"). Ce nettoyage
-    évite qu'un répondant qui ne sait pas se voie attribuer le pire cas en cochant
-    cette option - nous ajoutons une case "Je ne sais pas" séparée qui ne pose
-    aucune réponse.
+    Underlying reason: some screens of the reference contain "I don't know"
+    glued to the worst case (e.g. "1 - Very complex / I don't know"). This cleaning
+    avoids a respondent who does not know being assigned the worst case by ticking
+    this option - we add a separate "I don't know" checkbox that records no
+    answer.
 
-    Ce nettoyage est PUREMENT cosmétique et ne change RIEN à la réponse versée :
-    le parseur retrouve le cran d'origine par l'indice <!-- opt:N --> et va le
-    relire dans le référentiel.
+    This cleaning is PURELY cosmetic and changes NOTHING about the recorded answer:
+    the parser finds the original screen again via the <!-- opt:N --> index and goes
+    to re-read it in the reference.
 
-    Exemples de mentions à retirer (variantes de casse et séparateurs) :
-    - "/ Je ne sais pas"
-    - "/ je ne sais pas"
-    - "ou je ne sais pas"
-    - "Je ne sais pas" (en fin de libellé)
+    Examples of mentions to remove (case variants and separators):
+    - "/ I don't know"
+    - "/ i don't know"
+    - "or I don't know"
+    - "I don't know" (at the end of the label)
 
-    Retourne le libellé nettoyé, ou le libellé d'origine si le nettoyage le
-    viderait complètement.
+    Returns the cleaned label, or the original label if cleaning would
+    empty it completely.
     """
-    if not isinstance(libelle, str):
-        return libelle
+    if not isinstance(label, str):
+        return label
 
     import re
 
-    # Motif pour détecter "je ne sais pas" avec variantes
-    # Capture les séparateurs courants avant la mention
-    pattern = r'\s*[/]?\s*(ou\s+)?je\s+ne\s+sais\s+pas\.?'
+    # Pattern to detect "I don't know" with variants (and the old French form)
+    # Capture common separators before the mention
+    pattern = r"\s*[/]?\s*(or\s+|ou\s+)?(?:i\s+don'?t\s+know|je\s+ne\s+sais\s+pas)\.?"
 
-    # Nettoyer (insensible à la casse)
-    nettoye = re.sub(pattern, '', libelle, flags=re.IGNORECASE).strip()
+    # Clean (case-insensitive)
+    cleaned = re.sub(pattern, '', label, flags=re.IGNORECASE).strip()
 
-    # Si le nettoyage vide le libellé ou ne laisse que le numéro de cran,
-    # retourner l'original intact
-    if not nettoye or re.match(r'^\d+\s*-?\s*$', nettoye):
-        return libelle
+    # If cleaning empties the label or leaves only the screen number,
+    # return the original intact
+    if not cleaned or re.match(r'^\d+\s*-?\s*$', cleaned):
+        return label
 
-    return nettoye
+    return cleaned
 
 
-def find_referentiel():
-    """Trouve le référentiel EOF dans l'arborescence."""
-    # Chercher depuis le répertoire du script vers le haut
+def find_reference():
+    """Finds the EOF reference in the tree."""
+    # Search from the script's directory upwards
     current = Path(__file__).resolve().parent
-    for _ in range(5):  # Remonter jusqu'à 5 niveaux
-        matches = list(current.glob("**/eof-referentiel.json"))
+    for _ in range(5):  # Climb up to 5 levels
+        matches = list(current.glob("**/eof-reference.json"))
         matches = [m for m in matches if ".venv" not in str(m)]
         if matches:
             return matches[0]
         current = current.parent
-    raise FileNotFoundError("eof-referentiel.json introuvable")
+    raise FileNotFoundError("eof-reference.json not found")
 
 
-def load_referentiel(path):
-    """Charge le référentiel et retourne un dict {id: critère} et {id: question}."""
+def load_reference(path):
+    """Loads the reference and returns a dict {id: criterion} and {id: question}."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
-    criteres = {c["id"]: c for c in data["criteres"]}
-    diag_rapide = {q["id"]: q for q in data["diagnostic_rapide"]}
+    criteria = {c["id"]: c for c in data["criteria"]}
+    quick_diag = {q["id"]: q for q in data["quick_diagnostic"]}
 
-    return criteres, diag_rapide
+    return criteria, quick_diag
 
 
 def load_audit_results(audit_dir):
-    """Charge les résultats d'audit existants et extrait les contextes."""
+    """Loads the existing audit results and extracts the contexts."""
     path = audit_dir / "eof-audit-results.json"
     if not path.exists():
-        raise FileNotFoundError(f"eof-audit-results.json introuvable dans {audit_dir}")
+        raise FileNotFoundError(f"eof-audit-results.json not found in {audit_dir}")
 
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
-    # Extraire les contextes pour l'emprunt 1
-    # Clé = id du critère ou de la question, valeur = texte du contexte
-    contextes = {}
+    # Extract the contexts for fact recall
+    # Key = criterion or question id, value = context text
+    contexts = {}
 
-    # Critères détaillés (1.x à 6.x)
-    for c in data.get("criteres", []):
+    # Detailed criteria (1.x to 6.x)
+    for c in data.get("criteria", []):
         cid = c["id"]
-        ctx = c.get("contexte")
-        # Piège 1 : une clé peut exister et valoir null
+        ctx = c.get("context")
+        # Pitfall 1: a key can exist and be null
         if ctx is not None and isinstance(ctx, str) and ctx.strip():
-            contextes[cid] = ctx.strip()
+            contexts[cid] = ctx.strip()
 
-    # Questions diagnostic rapide (0.x)
-    diag_apercu = data.get("diagnostic_rapide_apercu", {})
-    for q in diag_apercu.get("questions", []):
+    # Quick diagnostic questions (0.x)
+    diag_overview = data.get("quick_diag_overview", {})
+    for q in diag_overview.get("questions", []):
         qid = q["id"]
-        indice = q.get("indice_contextuel")
-        # Piège 1 : une clé peut exister et valoir null
+        indice = q.get("context_index")
+        # Pitfall 1: a key can exist and be null
         if indice is not None and isinstance(indice, str) and indice.strip():
-            contextes[qid] = indice.strip()
+            contexts[qid] = indice.strip()
 
-    return data, contextes
+    return data, contexts
 
 
-def load_blocs(scripts_dir):
-    """Charge la bibliothèque de blocs."""
+def load_blocks(scripts_dir):
+    """Loads the block library."""
     path = scripts_dir / "questionnaire-blocs.json"
     if not path.exists():
-        raise FileNotFoundError(f"questionnaire-blocs.json introuvable dans {scripts_dir}")
+        raise FileNotFoundError(f"questionnaire-blocs.json not found in {scripts_dir}")
 
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def compute_residu(audit_results, criteres_ref, diag_rapide_ref):
+def compute_residual(audit_results, criteria_ref, quick_diag_ref):
     """
-    Calcule l'ensemble des critères encore dans le résidu.
+    Computes the set of criteria still in the residual.
 
-    Un critère est dans le résidu si :
-    - il n'a pas de réponse
-    - ou sa réponse est "🤔 À évaluer" ou "⌛️ Évaluation en cours"
+    A criterion is in the residual if:
+    - it has no answer
+    - or its answer is "🤔 To be assessed" or "⌛️ Assessment in progress"
 
-    Une question diagnostic rapide est dans le résidu si elle n'a pas de réponse.
+    A quick diagnostic question is in the residual if it has no answer.
     """
-    residu = set()
+    residual = set()
 
-    # Critères détaillés (1.x à 6.x)
-    for c in audit_results.get("criteres", []):
+    # Detailed criteria (1.x to 6.x)
+    for c in audit_results.get("criteria", []):
         cid = c["id"]
-        reponse = c.get("reponse")
+        answer = c.get("answer")
 
-        if reponse is None or reponse in REPONSES_NON_TRANCHANTES:
-            residu.add(cid)
+        if answer is None or answer in NON_DECISIVE_ANSWERS:
+            residual.add(cid)
 
-    # Questions diagnostic rapide (0.x)
-    diag_apercu = audit_results.get("diagnostic_rapide_apercu", {})
-    for q in diag_apercu.get("questions", []):
+    # Quick diagnostic questions (0.x)
+    diag_overview = audit_results.get("quick_diag_overview", {})
+    for q in diag_overview.get("questions", []):
         qid = q["id"]
-        reponse = q.get("reponse")
+        answer = q.get("answer")
 
-        if reponse is None or reponse in REPONSES_NON_TRANCHANTES:
-            residu.add(qid)
+        if answer is None or answer in NON_DECISIVE_ANSWERS:
+            residual.add(qid)
 
-    return residu
+    return residual
 
 
-def get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref):
-    """Retourne la liste des critères couverts par un bloc."""
-    if bloc["type"] == "direct":
-        # Bloc direct : un seul critère
-        return [bloc["critere"]]
-    elif bloc["type"] == "filtre":
-        # Bloc filtre : liste de critères écartés
-        return bloc.get("criteres", [])
+def get_criteria_from_block(block, criteria_ref, quick_diag_ref):
+    """Returns the list of criteria covered by a block."""
+    if block["type"] == "direct":
+        # Direct block: a single criterion
+        return [block["criterion"]]
+    elif block["type"] == "filter":
+        # Filter block: list of discarded criteria
+        return block.get("criteria", [])
     else:
-        # Bloc composé : extraire tous les critères des options. Ordre trié pour
-        # que la sortie soit déterministe (list(set(...)) dépend du hash-seed du
-        # process Python, donc changeait d'un rejeu à l'autre sans raison).
-        criteres = set()
-        for option in bloc.get("options", []):
-            for cid in option.get("reponses", {}).keys():
-                criteres.add(cid)
-        return sorted(criteres)
+        # Composite block: extract all criteria from the options. Sorted order so
+        # that the output is deterministic (list(set(...)) depends on the hash-seed of
+        # the Python process, so it changed from one replay to the next for no reason).
+        criteria = set()
+        for option in block.get("options", []):
+            for cid in option.get("answers", {}).keys():
+                criteria.add(cid)
+        return sorted(criteria)
 
 
-def compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref):
+def compute_block_potential(block, residual, criteria_ref, quick_diag_ref):
     """
-    Calcule le potentiel total d'un bloc (somme des potentiel_max des critères
-    encore dans le résidu).
+    Computes the total potential of a block (sum of the max_potential of the criteria
+    still in the residual).
 
-    Les questions diagnostic rapide n'ont pas de potentiel_max : comptent comme 0.
+    Quick diagnostic questions have no max_potential: count as 0.
     """
-    criteres = get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref)
-    potentiel = 0.0
+    criteria = get_criteria_from_block(block, criteria_ref, quick_diag_ref)
+    potential = 0.0
 
-    for cid in criteres:
-        if cid not in residu:
+    for cid in criteria:
+        if cid not in residual:
             continue
 
-        # Questions diagnostic rapide : pas de potentiel_max
+        # Quick diagnostic questions: no max_potential
         if cid.startswith("0."):
             continue
 
-        # Critère détaillé
-        if cid in criteres_ref:
-            potentiel += criteres_ref[cid]["potentiel_max"]
+        # Detailed criterion
+        if cid in criteria_ref:
+            potential += criteria_ref[cid]["max_potential"]
 
-    return potentiel
+    return potential
 
 
-def bloc_filtre_doit_etre_supprime(bloc, audit_results):
+def filter_block_must_be_removed(block, audit_results):
     """
-    Vérifie si un bloc filtre doit être supprimé selon la règle 4.2.
+    Checks whether a filter block must be removed according to rule 4.2.
 
-    Un filtre n'est imprimé que si AUCUN de ses critères ne porte déjà une
-    réponse tranchante (c'est-à-dire une réponse absente de REPONSES_NON_TRANCHANTES).
+    A filter is printed only if NONE of its criteria already carries a
+    decisive answer (i.e. an answer absent from NON_DECISIVE_ANSWERS).
 
-    Retourne True si le filtre doit être supprimé, False sinon.
+    Returns True if the filter must be removed, False otherwise.
     """
-    if bloc.get("type") != "filtre":
+    if block.get("type") != "filter":
         return False
 
-    criteres_filtre = bloc.get("criteres", [])
+    filter_criteria = block.get("criteria", [])
 
-    # Construire un index {id_critere: reponse} depuis audit_results
-    reponses = {}
+    # Build an index {criterion_id: answer} from audit_results
+    answers = {}
 
-    # Critères détaillés
-    for c in audit_results.get("criteres", []):
-        reponses[c["id"]] = c.get("reponse")
+    # Detailed criteria
+    for c in audit_results.get("criteria", []):
+        answers[c["id"]] = c.get("answer")
 
-    # Questions diagnostic rapide
-    diag_apercu = audit_results.get("diagnostic_rapide_apercu", {})
-    for q in diag_apercu.get("questions", []):
-        reponses[q["id"]] = q.get("reponse")
+    # Quick diagnostic questions
+    diag_overview = audit_results.get("quick_diag_overview", {})
+    for q in diag_overview.get("questions", []):
+        answers[q["id"]] = q.get("answer")
 
-    # Vérifier si au moins un critère du filtre a une réponse tranchante
-    for cid in criteres_filtre:
-        reponse = reponses.get(cid)
-        if reponse is not None and reponse not in REPONSES_NON_TRANCHANTES:
-            # Une réponse tranchante existe : supprimer le filtre
+    # Check whether at least one criterion of the filter has a decisive answer
+    for cid in filter_criteria:
+        answer = answers.get(cid)
+        if answer is not None and answer not in NON_DECISIVE_ANSWERS:
+            # A decisive answer exists: remove the filter
             return True
 
     return False
 
 
-def select_and_sort_blocs(blocs_data, residu, criteres_ref, diag_rapide_ref, audit_results=None):
+def select_and_sort_blocks(blocks_data, residual, criteria_ref, quick_diag_ref, audit_results=None):
     """
-    Sélectionne et trie les blocs à afficher dans le questionnaire unique.
+    Selects and sorts the blocks to display in the single questionnaire.
 
-    Un bloc est retenu si au moins un de ses critères est dans le résidu.
-    Un bloc filtre est supprimé si l'un de ses critères a déjà une réponse tranchante.
+    A block is kept if at least one of its criteria is in the residual.
+    A filter block is removed if one of its criteria already has a decisive answer.
 
-    Tri : rendement décroissant (nombre de critères), puis phase "porte" avant
-    "detail", puis ordre du référentiel (0.x, puis 1.x à 6.x).
+    Sort: decreasing yield (number of criteria), then phase "gate" before
+    "detail", then reference order (0.x, then 1.x to 6.x).
     """
-    blocs_retenus = []
+    selected_blocks = []
 
-    for bloc in blocs_data["blocs"]:
-        # Règle 4.2 : supprimer un filtre si l'un de ses critères est déjà tranché
-        if audit_results and bloc_filtre_doit_etre_supprime(bloc, audit_results):
+    for block in blocks_data["blocks"]:
+        # Rule 4.2: remove a filter if one of its criteria is already decided
+        if audit_results and filter_block_must_be_removed(block, audit_results):
             continue
 
-        criteres = get_criteres_from_bloc(bloc, criteres_ref, diag_rapide_ref)
+        criteria = get_criteria_from_block(block, criteria_ref, quick_diag_ref)
 
-        # Retenir si au moins un critère est dans le résidu
-        criteres_residu = [c for c in criteres if c in residu]
-        if criteres_residu:
-            potentiel = compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref)
-            rendement = len(criteres_residu)
-            blocs_retenus.append((bloc, potentiel, criteres, rendement))
+        # Keep if at least one criterion is in the residual
+        residual_criteria = [c for c in criteria if c in residual]
+        if residual_criteria:
+            potential = compute_block_potential(block, residual, criteria_ref, quick_diag_ref)
+            yield_count = len(residual_criteria)
+            selected_blocks.append((block, potential, criteria, yield_count))
 
-    # Tri spécial : les filtres en tête de la partie detail, triés entre eux par rendement,
-    # puis tous les autres blocs (porte puis detail) triés par rendement/ordre référentiel
-    def parse_critere_id(critere_id):
+    # Special sort: filters at the head of the detail part, sorted among themselves by yield,
+    # then all other blocks (gate then detail) sorted by yield/reference order
+    def parse_criterion_id(criterion_id):
         """
-        Extrait les composants numériques d'un id de critère pour tri numérique.
-        Ex: "0.10" -> (0, 10), "1.5" -> (1, 5)
+        Extracts the numeric components of a criterion id for numeric sorting.
+        E.g. "0.10" -> (0, 10), "1.5" -> (1, 5)
         """
         import re
-        match = re.search(r'(\d+)\.(\d+)', critere_id)
+        match = re.search(r'(\d+)\.(\d+)', criterion_id)
         if match:
             return (int(match.group(1)), int(match.group(2)))
         return (999, 999)
 
     def sort_key(item):
-        bloc, potentiel, criteres, rendement = item
+        block, potential, criteria, yield_count = item
 
-        # Tri : porte d'abord, puis filtres detail, puis autres detail
-        # Ordre de tri : (1) phase_order, (2) rendement décroissant, (3) ordre ref
-        is_filtre = bloc.get("type") == "filtre"
+        # Sort: gate first, then detail filters, then other detail
+        # Sort order: (1) phase_order, (2) decreasing yield, (3) ref order
+        is_filter = block.get("type") == "filter"
 
-        if bloc["phase"] == "porte":
-            # Blocs porte : (0, rendement décroissant, ordre ref)
+        if block["phase"] == "gate":
+            # Gate blocks: (0, decreasing yield, ref order)
             phase_order = 0
-        elif is_filtre:
-            # Filtres detail : (1, rendement décroissant, ordre ref)
+        elif is_filter:
+            # Detail filters: (1, decreasing yield, ref order)
             phase_order = 1
         else:
-            # Autres blocs detail : (2, rendement décroissant, ordre ref)
+            # Other detail blocks: (2, decreasing yield, ref order)
             phase_order = 2
 
-        min_critere = min(criteres, key=parse_critere_id) if criteres else "999.999"
-        ordre_ref = parse_critere_id(min_critere)
+        min_criterion = min(criteria, key=parse_criterion_id) if criteria else "999.999"
+        ref_order = parse_criterion_id(min_criterion)
 
-        return (phase_order, -rendement, ordre_ref)
+        return (phase_order, -yield_count, ref_order)
 
-    blocs_retenus.sort(key=sort_key)
+    selected_blocks.sort(key=sort_key)
 
-    return blocs_retenus
+    return selected_blocks
 
 
-def get_deja_tranches(bloc, criteres, audit_results, residu):
+def get_already_decided(block, criteria, audit_results, residual):
     """
-    Pour un bloc composé, retourne la liste des critères déjà tranchés.
+    For a composite block, returns the list of already-decided criteria.
 
-    Un critère est déjà tranché s'il n'est PAS dans le résidu.
+    A criterion is already decided if it is NOT in the residual.
     """
-    return [c for c in criteres if c not in residu]
+    return [c for c in criteria if c not in residual]
 
 
-def get_options_for_direct_bloc(bloc, criteres_ref, diag_rapide_ref):
+def get_options_for_direct_block(block, criteria_ref, quick_diag_ref):
     """
-    Pour un bloc direct, retourne les options depuis le référentiel.
+    For a direct block, returns the options from the reference.
 
-    - Critère détaillé : options_evaluation
-    - Question diagnostic rapide : crans
+    - Detailed criterion: evaluation_options
+    - Quick diagnostic question: screens
     """
-    cid = bloc["critere"]
+    cid = block["criterion"]
 
     if cid.startswith("0."):
-        # Question diagnostic rapide
-        if cid in diag_rapide_ref:
-            return diag_rapide_ref[cid]["crans"]
+        # Quick diagnostic question
+        if cid in quick_diag_ref:
+            return quick_diag_ref[cid]["screens"]
         else:
-            raise ValueError(f"Question diagnostic rapide {cid} introuvable dans le référentiel")
+            raise ValueError(f"Quick diagnostic question {cid} not found in the reference")
     else:
-        # Critère détaillé
-        if cid in criteres_ref:
-            return criteres_ref[cid]["options_evaluation"]
+        # Detailed criterion
+        if cid in criteria_ref:
+            return criteria_ref[cid]["evaluation_options"]
         else:
-            raise ValueError(f"Critère {cid} introuvable dans le référentiel")
+            raise ValueError(f"Criterion {cid} not found in the reference")
 
 
-def build_filtres_index(blocs_tries):
+def build_filters_index(sorted_blocks):
     """
-    Construit un index {critere_id: [(filtre_id, num_question, titre, libelle_ecarte), ...]}
-    pour tous les critères gouvernés par des filtres.
+    Builds an index {criterion_id: [(filter_id, question_num, title, discarded_label), ...]}
+    for all criteria governed by filters.
 
-    blocs_tries est la liste triée des blocs retenus (avec leurs métadonnées).
+    sorted_blocks is the sorted list of kept blocks (with their metadata).
     """
     index = {}
     num = 1
 
-    for bloc, potentiel, criteres, rendement in blocs_tries:
-        if bloc.get("type") == "filtre":
-            filtre_id = bloc["id"]
-            titre = bloc["titre"]
-            libelle_ecarte = bloc["libelle_ecarte"]
+    for block, potential, criteria, yield_count in sorted_blocks:
+        if block.get("type") == "filter":
+            filter_id = block["id"]
+            title = block["title"]
+            discarded_label = block["discarded_label"]
 
-            for critere_id in bloc.get("criteres", []):
-                if critere_id not in index:
-                    index[critere_id] = []
-                index[critere_id].append((filtre_id, num, titre, libelle_ecarte))
+            for criterion_id in block.get("criteria", []):
+                if criterion_id not in index:
+                    index[criterion_id] = []
+                index[criterion_id].append((filter_id, num, title, discarded_label))
 
         num += 1
 
     return index
 
 
-def format_bloc_markdown(bloc, criteres, num, total, criteres_ref, diag_rapide_ref,
-                         audit_results, residu, contextes, filtres_index):
+def format_block_markdown(block, criteria, num, total, criteria_ref, quick_diag_ref,
+                         audit_results, residual, contexts, filters_index):
     """
-    Formate un bloc en Markdown.
+    Formats a block as Markdown.
 
-    Respecte les consignes de style : séparateurs en "-----", guillemets droits,
-    pas de tiret long.
+    Follows the style rules: separators as "-----", straight quotes,
+    no em dash.
 
-    Paramètre contextes : dict {id_critere: texte_contexte} pour l'emprunt 1.
-    Paramètre filtres_index : dict {critere_id: [(filtre_id, num_question, titre, libelle_ecarte), ...]}
+    Parameter contexts: dict {criterion_id: context_text} for fact recall.
+    Parameter filters_index: dict {criterion_id: [(filter_id, question_num, title, discarded_label), ...]}
     """
     lines = []
 
-    # Titre du bloc : le sujet de la question, plus la personne a qui la passer.
-    # "Bloc 3 sur 41" seul ne disait rien du sujet, donc le lecteur devait lire la
-    # question entiere pour savoir si elle etait pour lui, et un questionnaire qui
-    # circule mal revient sans reponse.
-    titre_ligne = f"## {num} sur {total} - {bloc['titre']}"
-    if bloc.get("interlocuteur"):
-        titre_ligne += f" (à voir avec {bloc['interlocuteur']})"
-    lines.append(titre_ligne)
+    # Block title: the subject of the question, plus the person to ask it to.
+    # "Block 3 of 41" alone said nothing about the subject, so the reader had to read the
+    # whole question to know whether it was for them, and a questionnaire that
+    # circulates badly comes back unanswered.
+    title_line = f"## {num} of {total} - {block['title']}"
+    if block.get("interviewee"):
+        title_line += f" (to check with {block['interviewee']})"
+    lines.append(title_line)
     lines.append("")
 
-    # Mention "À IGNORER" si tous les critères du bloc sont gouvernés par des filtres
-    # Section 4.2ter de la convention
-    if bloc.get("type") != "filtre":
-        criteres_residu = [c for c in criteres if c in residu]
+    # "DO NOT ANSWER" mention if all the block's criteria are governed by filters
+    # Section 4.2ter of the convention
+    if block.get("type") != "filter":
+        residual_criteria = [c for c in criteria if c in residual]
 
-        # Vérifier si tous les critères sont gouvernés
-        filtres_gouvernants = {}  # {filtre_id: (num, titre, libelle_ecarte)}
-        tous_gouvernes = True
+        # Check whether all criteria are governed
+        governing_filters = {}  # {filter_id: (num, title, discarded_label)}
+        all_governed = True
 
-        for cid in criteres_residu:
-            if cid not in filtres_index or not filtres_index[cid]:
-                tous_gouvernes = False
+        for cid in residual_criteria:
+            if cid not in filters_index or not filters_index[cid]:
+                all_governed = False
                 break
-            # Collecter tous les filtres qui gouvernent ce critère
-            for filtre_id, num_q, titre_f, libelle_e in filtres_index[cid]:
-                if filtre_id not in filtres_gouvernants:
-                    filtres_gouvernants[filtre_id] = (num_q, titre_f, libelle_e)
+            # Collect all filters that govern this criterion
+            for filter_id, q_num, f_title, f_label in filters_index[cid]:
+                if filter_id not in governing_filters:
+                    governing_filters[filter_id] = (q_num, f_title, f_label)
 
-        if tous_gouvernes and filtres_gouvernants:
-            # Construire la mention avec conjonction si plusieurs filtres
-            # Trier par numéro de question pour avoir l'ordre d'apparition dans le questionnaire
-            filtres_tries = sorted(filtres_gouvernants.items(), key=lambda item: item[1][0])
+        if all_governed and governing_filters:
+            # Build the mention with a conjunction if several filters
+            # Sort by question number to get the order of appearance in the questionnaire
+            sorted_filters = sorted(governing_filters.items(), key=lambda item: item[1][0])
 
-            if len(filtres_tries) == 1:
-                # Un seul filtre : extraire son libellé et construire la mention
-                filtre_id, (num_q, titre_f, libelle_e) = filtres_tries[0]
-                debut_libelle = libelle_e.split('(')[0].strip()
-                condition = f"si vous avez repondu \"{debut_libelle}\" a la question {num_q} ({titre_f})"
+            if len(sorted_filters) == 1:
+                # A single filter: extract its label and build the mention
+                filter_id, (q_num, f_title, f_label) = sorted_filters[0]
+                label_start = f_label.split('(')[0].strip()
+                condition = f"if you answered \"{label_start}\" to question {q_num} ({f_title})"
             else:
-                # Plusieurs filtres : chaque terme porte son propre libellé
-                termes = []
-                for filtre_id, (num_q, titre_f, libelle_e) in filtres_tries:
-                    debut_libelle = libelle_e.split('(')[0].strip()
-                    termes.append(f"\"{debut_libelle}\" a la question {num_q} ({titre_f})")
-                condition = f"si vous avez repondu {' ET '.join(termes)}"
+                # Several filters: each term carries its own label
+                terms = []
+                for filter_id, (q_num, f_title, f_label) in sorted_filters:
+                    label_start = f_label.split('(')[0].strip()
+                    terms.append(f"\"{label_start}\" to question {q_num} ({f_title})")
+                condition = f"if you answered {' AND '.join(terms)}"
 
-            lines.append(f"**A IGNORER** {condition}.")
+            lines.append(f"**DO NOT ANSWER** {condition}.")
             lines.append("")
 
-    # Marqueur machine
-    lines.append(f"<!-- bloc:{bloc['id']} -->")
+    # Machine marker
+    lines.append(f"<!-- block:{block['id']} -->")
     lines.append("")
 
-    # Question en gras
-    lines.append(f"**{bloc['question']}**")
+    # Question in bold
+    lines.append(f"**{block['question']}**")
     lines.append("")
 
-    # Aide en italique si présente
-    if bloc.get("aide"):
-        lines.append(f"*{bloc['aide']}*")
+    # Help in italics if present
+    if block.get("help"):
+        lines.append(f"*{block['help']}*")
         lines.append("")
 
-    # Emprunt 1 : Rappel des faits mesurés
-    # Inséré après la question et l'aide, avant la note et les cases à cocher
-    # Piège 3 (bloc composé) : afficher TOUS les faits mesurés non vides,
-    # en fusionnant les doublons strictement identiques
-    faits_mesures = []
-    for cid in criteres:
-        if cid in contextes:
-            fait = contextes[cid]
-            # Fusionner les doublons : n'ajouter que si pas déjà présent
-            if fait not in faits_mesures:
-                faits_mesures.append(fait)
+    # Fact recall: reminder of measured facts
+    # Inserted after the question and the help, before the note and the checkboxes
+    # Pitfall 3 (composite block): display ALL non-empty measured facts,
+    # merging strictly identical duplicates
+    measured_facts = []
+    for cid in criteria:
+        if cid in contexts:
+            fact = contexts[cid]
+            # Merge duplicates: only add if not already present
+            if fact not in measured_facts:
+                measured_facts.append(fact)
 
-    if faits_mesures:
-        # Piège 5 : l'absence doit être silencieuse, mais ici on a au moins un fait
-        lines.append("> **Ce que nous avons mesuré :**")
-        if len(faits_mesures) == 1:
-            # Un seul fait : pas de puce
-            lines.append(f"> {faits_mesures[0]}")
+    if measured_facts:
+        # Pitfall 5: absence must be silent, but here we have at least one fact
+        lines.append("> **What we measured:**")
+        if len(measured_facts) == 1:
+            # A single fact: no bullet
+            lines.append(f"> {measured_facts[0]}")
         else:
-            # Plusieurs faits : en puces
-            for fait in faits_mesures:
-                lines.append(f"> - {fait}")
+            # Several facts: as bullets
+            for fact in measured_facts:
+                lines.append(f"> - {fact}")
         lines.append(">")
-        lines.append("> Confirmez, ou corrigez si notre mesure est incomplète.")
+        lines.append("> Confirm, or correct if our measurement is incomplete.")
         lines.append("")
 
-    # Note en blockquote gras si présente
-    if bloc.get("note"):
-        lines.append(f"> **Note :** {bloc['note']}")
+    # Note in bold blockquote if present
+    if block.get("note"):
+        lines.append(f"> **Note:** {block['note']}")
         lines.append("")
 
-    # Critères couverts et potentiel : plomberie interne, en commentaires HTML.
-    # Ces deux informations servent à nous, jamais au service audité : un identifiant
-    # de critère et un nombre de points ne l'aident pas à répondre et lui donnent à
-    # lire le fonctionnement de notre outil. Elles restent dans le fichier, invisibles
-    # à la lecture, pour rester traçables.
-    criteres_residu = [c for c in criteres if c in residu]
-    potentiel = compute_potentiel_bloc(bloc, residu, criteres_ref, diag_rapide_ref)
+    # Covered criteria and potential: internal plumbing, in HTML comments.
+    # These two pieces of information are for us, never for the audited service: a
+    # criterion identifier and a point count do not help them answer and give them
+    # a read on how our tool works. They stay in the file, invisible when
+    # reading, to remain traceable.
+    residual_criteria = [c for c in criteria if c in residual]
+    potential = compute_block_potential(block, residual, criteria_ref, quick_diag_ref)
 
-    lines.append(f"<!-- criteres:{','.join(criteres_residu)} -->")
-    if potentiel > 0:
-        lines.append(f"<!-- potentiel:{potentiel:.1f} -->")
+    lines.append(f"<!-- criteria:{','.join(residual_criteria)} -->")
+    if potential > 0:
+        lines.append(f"<!-- potential:{potential:.1f} -->")
     lines.append("")
 
     # Options
-    if bloc["type"] == "direct":
-        options = get_options_for_direct_bloc(bloc, criteres_ref, diag_rapide_ref)
-        # Pour les blocs directs sur diagnostic rapide, nettoyer les mentions "je ne sais pas"
-        cid = bloc["critere"]
+    if block["type"] == "direct":
+        options = get_options_for_direct_block(block, criteria_ref, quick_diag_ref)
+        # For direct blocks on the quick diagnostic, clean the "I don't know" mentions
+        cid = block["criterion"]
         if cid.startswith("0."):
-            options = [nettoyer_mention_jnsp(opt) for opt in options]
+            options = [strip_dnk_mention(opt) for opt in options]
 
-        for i, opt_libelle in enumerate(options):
-            lines.append(f"- [ ] {opt_libelle}  <!-- opt:{i} -->")
+        for i, opt_label in enumerate(options):
+            lines.append(f"- [ ] {opt_label}  <!-- opt:{i} -->")
 
-    elif bloc["type"] == "filtre":
-        # Bloc filtre : deux options (ecarte et applicable)
-        lines.append(f"- [ ] {bloc['libelle_ecarte']}  <!-- opt:ecarte -->")
-        lines.append(f"- [ ] {bloc['libelle_applicable']}  <!-- opt:applicable -->")
+    elif block["type"] == "filter":
+        # Filter block: two options (discarded and applicable)
+        lines.append(f"- [ ] {block['discarded_label']}  <!-- opt:discarded -->")
+        lines.append(f"- [ ] {block['applicable_label']}  <!-- opt:applicable -->")
 
     else:
-        # Bloc composé
-        options = [opt["libelle"] for opt in bloc["options"]]
-        for i, opt_libelle in enumerate(options):
-            lines.append(f"- [ ] {opt_libelle}  <!-- opt:{i} -->")
+        # Composite block
+        options = [opt["label"] for opt in block["options"]]
+        for i, opt_label in enumerate(options):
+            lines.append(f"- [ ] {opt_label}  <!-- opt:{i} -->")
 
-    # Case "Je ne sais pas"
-    lines.append(f"- [ ] Je ne sais pas  <!-- opt:jnsp -->")
+    # "I don't know" checkbox
+    lines.append(f"- [ ] I don't know  <!-- opt:dnk -->")
     lines.append("")
 
-    # Critères déjà tranchés (pour blocs composés)
-    if bloc["type"] == "compose":
-        deja_tranches = get_deja_tranches(bloc, criteres, audit_results, residu)
-        if deja_tranches:
-            lines.append(f"<!-- deja-tranche:{','.join(deja_tranches)} -->")
+    # Already-decided criteria (for composite blocks)
+    if block["type"] == "composite":
+        already_decided = get_already_decided(block, criteria, audit_results, residual)
+        if already_decided:
+            lines.append(f"<!-- already-decided:{','.join(already_decided)} -->")
             lines.append("")
 
     return "\n".join(lines)
 
 
-def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
-                                   diag_rapide_ref, output_dir, contextes):
-    """Génère le questionnaire unique trié par rendement décroissant."""
-    residu = compute_residu(audit_results, criteres_ref, diag_rapide_ref)
-    blocs_tries = select_and_sort_blocs(blocs_data, residu, criteres_ref,
-                                        diag_rapide_ref, audit_results)
+def generate_questionnaire_unique(blocks_data, audit_results, criteria_ref,
+                                   quick_diag_ref, output_dir, contexts):
+    """Generates the single questionnaire sorted by decreasing yield."""
+    residual = compute_residual(audit_results, criteria_ref, quick_diag_ref)
+    sorted_blocks = select_and_sort_blocks(blocks_data, residual, criteria_ref,
+                                        quick_diag_ref, audit_results)
 
-    if not blocs_tries:
-        # Aucun bloc à afficher : ne pas créer le fichier
+    if not sorted_blocks:
+        # No block to display: do not create the file
         return None
 
     lines = []
 
-    # En-tête du fichier
+    # File header
     lines.append(SEPARATOR)
     lines.append("Questionnaire EOF")
     lines.append(SEPARATOR)
     lines.append("")
 
     # Instructions
-    lines.append("**Comment remplir ce questionnaire :**")
+    lines.append("**How to fill in this questionnaire:**")
     lines.append("")
-    lines.append("- Cochez UNE SEULE case par bloc en utilisant la syntaxe `- [x]`.")
-    lines.append("- Une case laissée vide reste vide et ne sera jamais devinée.")
-    lines.append("- Chaque question indique dans son titre à qui la poser.")
-    lines.append("- Les questions sont classées pour que les premières rapportent le plus de critères.")
-    lines.append("- Vous pouvez vous arrêter en cours de route : l'effort fourni aura couvert le maximum de critères.")
-    lines.append("- Si vous ne savez pas, cochez la case \"Je ne sais pas\".")
+    lines.append("- Tick EXACTLY ONE box per block using the `- [x]` syntax.")
+    lines.append("- A box left empty stays empty and will never be guessed.")
+    lines.append("- Each question states in its title who to ask.")
+    lines.append("- Questions are ordered so that the first ones cover the most criteria.")
+    lines.append("- You can stop halfway: the effort spent will have covered the maximum of criteria.")
+    lines.append("- If you don't know, tick the \"I don't know\" box.")
     lines.append("")
 
-    # Marqueurs machine
+    # Machine markers
     lines.append(f"<!-- questionnaire: eof -->")
-    lines.append(f"<!-- version-blocs: {blocs_data['version']} -->")
+    lines.append(f"<!-- version-blocks: {blocks_data['version']} -->")
     lines.append("")
 
-    # Construire l'index des filtres pour la mention "À IGNORER"
-    filtres_index = build_filtres_index(blocs_tries)
+    # Build the filters index for the "DO NOT ANSWER" mention
+    filters_index = build_filters_index(sorted_blocks)
 
-    # Séparer porte et détail
-    blocs_porte = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "porte"]
-    blocs_detail = [(b, p, c, r) for b, p, c, r in blocs_tries if b["phase"] == "detail"]
+    # Separate gate and detail
+    gate_blocks = [(b, p, c, r) for b, p, c, r in sorted_blocks if b["phase"] == "gate"]
+    detail_blocks = [(b, p, c, r) for b, p, c, r in sorted_blocks if b["phase"] == "detail"]
 
-    total_blocs = len(blocs_tries)
+    total_blocks = len(sorted_blocks)
     num = 1
 
-    if blocs_porte:
+    if gate_blocks:
         lines.append(SEPARATOR)
-        # "Porte" est notre étiquette interne pour cette phase, elle ne dit rien à
-        # un lecteur client : le titre imprimé emploie des mots ordinaires.
-        lines.append("Partie 1 : Premier tri")
+        # "Gate" is our internal label for this phase, it means nothing to a
+        # client reader: the printed title uses ordinary words.
+        lines.append("Part 1: Initial screening")
         lines.append(SEPARATOR)
         lines.append("")
-        lines.append("Ce premier tri permet de décider rapidement si un diagnostic approfondi est pertinent.")
+        lines.append("This initial screening quickly decides whether an in-depth diagnostic is relevant.")
         lines.append("")
 
-        for bloc, potentiel, criteres, rendement in blocs_porte:
-            lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
-                                             criteres_ref, diag_rapide_ref,
-                                             audit_results, residu, contextes, filtres_index))
+        for block, potential, criteria, yield_count in gate_blocks:
+            lines.append(format_block_markdown(block, criteria, num, total_blocks,
+                                             criteria_ref, quick_diag_ref,
+                                             audit_results, residual, contexts, filters_index))
             num += 1
 
-    if blocs_detail:
+    if detail_blocks:
         lines.append(SEPARATOR)
-        lines.append("Partie 2 : Questions détaillées")
+        lines.append("Part 2: Detailed questions")
         lines.append(SEPARATOR)
         lines.append("")
 
-        for bloc, potentiel, criteres, rendement in blocs_detail:
-            lines.append(format_bloc_markdown(bloc, criteres, num, total_blocs,
-                                             criteres_ref, diag_rapide_ref,
-                                             audit_results, residu, contextes, filtres_index))
+        for block, potential, criteria, yield_count in detail_blocks:
+            lines.append(format_block_markdown(block, criteria, num, total_blocks,
+                                             criteria_ref, quick_diag_ref,
+                                             audit_results, residual, contexts, filters_index))
             num += 1
 
-    # Écrire le fichier
+    # Write the file
     output_path = output_dir / "questionnaire-eof.md"
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -624,34 +624,34 @@ def generate_questionnaire_unique(blocs_data, audit_results, criteres_ref,
 
 
 def autotest():
-    """Rejoue les cas de test embarqués."""
+    """Replays the embedded test cases."""
     import tempfile
     import subprocess
 
-    echecs = []
+    failures = []
     total = 0
 
-    # Les cas 24 à 26 sont groupés ici parce qu'ils sont les seuls à relancer le
-    # script par subprocess : ils exercent main() et son garde-fou, pas une
-    # fonction interne. Ils travaillent donc avec le VRAI référentiel et la VRAIE
-    # bibliothèque de blocs, que le script retrouve depuis son propre répertoire
-    # (find_referentiel) et non depuis le dossier d'audit qu'on lui passe.
+    # Cases 24 to 26 are grouped here because they are the only ones to re-run the
+    # script via subprocess: they exercise main() and its guard, not an
+    # internal function. They therefore work with the REAL reference and the REAL
+    # block library, which the script finds from its own directory
+    # (find_reference) and not from the audit directory passed to it.
 
-    # Cas 24 : Refus d'écrire dans audits/ sans drapeau
+    # Case 24: Refusal to write into audits/ without the flag
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Créer une arborescence avec audits/
+            # Create a tree with audits/
             audit_dir = tmpdir / "audits" / "test.com"
             audit_dir.mkdir(parents=True)
 
-            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_data = {"criteria": [{"id": "1.1", "answer": None}], "quick_diag_overview": {"questions": []}}
             audit_path = audit_dir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            # Appeler le script sans drapeau
+            # Call the script without the flag
             result = subprocess.run(
                 [sys.executable, __file__, str(audit_dir)],
                 capture_output=True,
@@ -659,13 +659,13 @@ def autotest():
             )
 
             if result.returncode != 2:
-                echecs.append(("Refus ecriture dans audits sans drapeau", f"Code sortie attendu 2, obtenu {result.returncode}"))
+                failures.append(("Refusal to write into audits without flag", f"Expected exit code 2, got {result.returncode}"))
             elif "audits" not in result.stderr:
-                echecs.append(("Refus ecriture dans audits sans drapeau", "Message d'erreur ne mentionne pas 'audits'"))
+                failures.append(("Refusal to write into audits without flag", "Error message does not mention 'audits'"))
     except Exception as exc:
-        echecs.append(("Refus ecriture dans audits sans drapeau", f"Exception : {exc}"))
+        failures.append(("Refusal to write into audits without flag", f"Exception: {exc}"))
 
-    # Cas 25 : Acceptation avec --dans-le-dossier-audit
+    # Case 25: Acceptance with --in-audit-dir
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -674,25 +674,25 @@ def autotest():
             audit_dir = tmpdir / "audits" / "test.com"
             audit_dir.mkdir(parents=True)
 
-            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_data = {"criteria": [{"id": "1.1", "answer": None}], "quick_diag_overview": {"questions": []}}
             audit_path = audit_dir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            # Appeler le script avec drapeau
+            # Call the script with the flag
             result = subprocess.run(
-                [sys.executable, __file__, str(audit_dir), "--dans-le-dossier-audit"],
+                [sys.executable, __file__, str(audit_dir), "--in-audit-dir"],
                 capture_output=True,
                 text=True
             )
 
             if result.returncode != 0:
-                echecs.append(("Acceptation avec drapeau explicite", f"Code sortie attendu 0, obtenu {result.returncode}. stderr: {result.stderr}"))
+                failures.append(("Acceptance with explicit flag", f"Expected exit code 0, got {result.returncode}. stderr: {result.stderr}"))
             elif not (audit_dir / "questionnaire-eof.md").exists():
-                echecs.append(("Acceptation avec drapeau explicite", "Fichier questionnaire-eof.md non cree"))
+                failures.append(("Acceptance with explicit flag", "File questionnaire-eof.md not created"))
     except Exception as exc:
-        echecs.append(("Acceptation avec drapeau explicite", f"Exception : {exc}"))
+        failures.append(("Acceptance with explicit flag", f"Exception: {exc}"))
 
-    # Cas 26 : Acceptation sans drapeau hors de audits/
+    # Case 26: Acceptance without flag outside audits/
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -703,11 +703,11 @@ def autotest():
             output_dir = tmpdir / "output"
             output_dir.mkdir()
 
-            audit_data = {"criteres": [{"id": "1.1", "reponse": None}], "diagnostic_rapide_apercu": {"questions": []}}
+            audit_data = {"criteria": [{"id": "1.1", "answer": None}], "quick_diag_overview": {"questions": []}}
             audit_path = audit_dir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            # Appeler le script sans drapeau mais avec output-dir hors audits/
+            # Call the script without the flag but with output-dir outside audits/
             result = subprocess.run(
                 [sys.executable, __file__, str(audit_dir), "--output-dir", str(output_dir)],
                 capture_output=True,
@@ -715,1758 +715,1758 @@ def autotest():
             )
 
             if result.returncode != 0:
-                echecs.append(("Acceptation sans drapeau hors audits", f"Code sortie attendu 0, obtenu {result.returncode}. stderr: {result.stderr}"))
+                failures.append(("Acceptance without flag outside audits", f"Expected exit code 0, got {result.returncode}. stderr: {result.stderr}"))
             elif not (output_dir / "questionnaire-eof.md").exists():
-                echecs.append(("Acceptation sans drapeau hors audits", "Fichier questionnaire-eof.md non cree"))
+                failures.append(("Acceptance without flag outside audits", "File questionnaire-eof.md not created"))
     except Exception as exc:
-        echecs.append(("Acceptation sans drapeau hors audits", f"Exception : {exc}"))
+        failures.append(("Acceptance without flag outside audits", f"Exception: {exc}"))
 
-    # Cas 1 : Bloc direct sur critère détaillé
+    # Case 1: Direct block on a detailed criterion
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Créer un référentiel minimal
+            # Create a minimal reference
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "1.1",
-                        "pilier": "🛖 1 — Produit",
-                        "critere": "Test critère",
-                        "potentiel_max": 2.0,
-                        "options_evaluation": ["✅ Point fort confirmé", "💡 Potentiel d'amélioration identifié"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "💡 Potentiel d'amélioration identifié": 1}
+                        "pillar": "🛖 1 — Product",
+                        "criterion": "Test criterion",
+                        "max_potential": 2.0,
+                        "evaluation_options": ["✅ Confirmed strength", "💡 Improvement potential identified"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "💡 Improvement potential identified": 1}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            # Créer une bibliothèque de blocs
-            blocs_data = {
+            # Create a block library
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-direct-11",
-                        "fichier": "produit-usage",
+                        "file": "product-usage",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "1.1",
-                        "question": "Question test ?",
-                        "aide": "Aide test"
+                        "criterion": "1.1",
+                        "question": "Test question?",
+                        "help": "Test help"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Créer un audit results avec 1.1 dans le résidu
+            # Create audit results with 1.1 in the residual
             audit_data = {
-                "criteres": [{"id": "1.1", "reponse": None}],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "criteria": [{"id": "1.1", "answer": None}],
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            # Générer
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            # Generate
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                   criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc direct critère détaillé", "Aucun fichier généré"))
+                failures.append(("Direct block detailed criterion", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "Question test ?" not in content:
-                    echecs.append(("Bloc direct critère détaillé", "Question absente"))
-                if "<!-- bloc:test-direct-11 -->" not in content:
-                    echecs.append(("Bloc direct critère détaillé", "Marqueur bloc absent"))
+                if "Test question?" not in content:
+                    failures.append(("Direct block detailed criterion", "Question missing"))
+                if "<!-- block:test-direct-11 -->" not in content:
+                    failures.append(("Direct block detailed criterion", "block marker missing"))
                 if "<!-- opt:0 -->" not in content:
-                    echecs.append(("Bloc direct critère détaillé", "Marqueur option absent"))
-                if "<!-- opt:jnsp -->" not in content:
-                    echecs.append(("Bloc direct critère détaillé", "Case 'Je ne sais pas' absente"))
+                    failures.append(("Direct block detailed criterion", "option marker missing"))
+                if "<!-- opt:dnk -->" not in content:
+                    failures.append(("Direct block detailed criterion", "'I don't know' box missing"))
     except Exception as exc:
-        echecs.append(("Bloc direct critère détaillé", f"Exception : {exc}"))
+        failures.append(("Direct block detailed criterion", f"Exception: {exc}"))
 
-    # Cas 2 : Bloc direct sur question diagnostic rapide (vérifier absence de coefficient)
+    # Case 2: Direct block on a quick diagnostic question (check absence of coefficient)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [],
-                "diagnostic_rapide": [
+                "criteria": [],
+                "quick_diagnostic": [
                     {
                         "id": "0.1",
-                        "critere": "Question diagnostic",
-                        "crans": ["Cran 1", "Cran 2"],
-                        "niveau_impact": "Déterminant"
+                        "criterion": "Diagnostic question",
+                        "screens": ["Screen 1", "Screen 2"],
+                        "impact_level": "Decisive"
                     }
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-direct-01",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "titre": "Test",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "0.1",
-                        "question": "Question 0.1 ?"
+                        "criterion": "0.1",
+                        "question": "Question 0.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [],
-                "diagnostic_rapide_apercu": {"questions": [{"id": "0.1", "reponse": None}]}
+                "criteria": [],
+                "quick_diag_overview": {"questions": [{"id": "0.1", "answer": None}]}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc direct diagnostic rapide", "Aucun fichier généré"))
+                failures.append(("Bloc direct diagnostic rapide", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "Cran 1" not in content:
-                    echecs.append(("Bloc direct diagnostic rapide", "Options du référentiel absentes"))
+                if "Screen 1" not in content:
+                    failures.append(("Direct block quick diagnostic", "Reference options missing"))
     except Exception as exc:
-        echecs.append(("Bloc direct diagnostic rapide", f"Exception : {exc}"))
+        failures.append(("Direct block quick diagnostic", f"Exception: {exc}"))
 
-    # Cas 3 : Critère avec "🤔 À évaluer" doit être dans le résidu
+    # Case 3: Criterion with "🤔 To be assessed" must be in the residual
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "2.1",
-                        "pilier": "🗺️ 2 — Architecture",
-                        "critere": "Test",
-                        "potentiel_max": 1.5,
-                        "options_evaluation": ["✅ Point fort confirmé", "💡 Potentiel d'amélioration identifié"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "💡 Potentiel d'amélioration identifié": 1}
+                        "pillar": "🗺️ 2 — Architecture",
+                        "criterion": "Test",
+                        "max_potential": 1.5,
+                        "evaluation_options": ["✅ Confirmed strength", "💡 Improvement potential identified"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "💡 Improvement potential identified": 1}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-a-evaluer",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "2.1",
-                        "question": "Question 2.1 ?"
+                        "criterion": "2.1",
+                        "question": "Question 2.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Critère avec réponse "🤔 À évaluer" : doit être reposé
+            # Criterion with answer "🤔 To be assessed": must be re-asked
             audit_data = {
-                "criteres": [{"id": "2.1", "reponse": "🤔 À évaluer", "coefficient": 0}],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "criteria": [{"id": "2.1", "answer": "🤔 To be assessed", "coefficient": 0}],
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
-            # Le critère doit être dans le résidu et le bloc doit être généré
+            # The criterion must be in the residual and the block must be generated
             if result is None:
-                echecs.append(("Critère 'À évaluer' dans résidu", "Aucun fichier généré (bloc devait être retenu)"))
+                failures.append(("Criterion '🤔 To be assessed' in residual", "No file generated (block should have been kept)"))
     except Exception as exc:
-        echecs.append(("Critère 'À évaluer' dans résidu", f"Exception : {exc}"))
+        failures.append(("Criterion '🤔 To be assessed' in residual", f"Exception: {exc}"))
 
-    # Cas 4 : Bloc composé avec critères déjà tranchés
+    # Case 4: Composite block with already-decided criteria
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "3.1",
-                        "pilier": "🏢 3 — Infrastructure",
-                        "critere": "Test 3.1",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🏢 3 — Infrastructure",
+                        "criterion": "Test 3.1",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     },
                     {
                         "id": "3.2",
-                        "pilier": "🏢 3 — Infrastructure",
-                        "critere": "Test 3.2",
-                        "potentiel_max": 1.5,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🏢 3 — Infrastructure",
+                        "criterion": "Test 3.2",
+                        "max_potential": 1.5,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-compose",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test composé",
-                        "type": "compose",
-                        "question": "Question composée ?",
+                        "title": "Test composite",
+                        "type": "composite",
+                        "question": "Composite question?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"3.1": "✅ Point fort confirmé", "3.2": "✅ Point fort confirmé"}},
-                            {"libelle": "Option B", "reponses": {"3.1": "💡 Potentiel d'amélioration identifié"}}
+                            {"label": "Option A", "answers": {"3.1": "✅ Confirmed strength", "3.2": "✅ Confirmed strength"}},
+                            {"label": "Option B", "answers": {"3.1": "💡 Improvement potential identified"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # 3.1 déjà tranché, 3.2 dans le résidu
+            # 3.1 already decided, 3.2 in the residual
             audit_data = {
-                "criteres": [
-                    {"id": "3.1", "reponse": "✅ Point fort confirmé", "coefficient": 0},
-                    {"id": "3.2", "reponse": None}
+                "criteria": [
+                    {"id": "3.1", "answer": "✅ Confirmed strength", "coefficient": 0},
+                    {"id": "3.2", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc composé avec déjà tranché", "Aucun fichier généré"))
+                failures.append(("Composite block with already decided", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "<!-- deja-tranche:3.1 -->" not in content:
-                    echecs.append(("Bloc composé avec déjà tranché", "Marqueur deja-tranche absent ou incorrect"))
+                if "<!-- already-decided:3.1 -->" not in content:
+                    failures.append(("Composite block with already decided", "already-decided marker missing or incorrect"))
     except Exception as exc:
-        echecs.append(("Bloc composé avec déjà tranché", f"Exception : {exc}"))
+        failures.append(("Composite block with already decided", f"Exception: {exc}"))
 
-    # Cas 5 : Nettoyage "je ne sais pas" dans les crans du diagnostic rapide
+    # Case 5: Cleaning "I don't know" in the quick diagnostic screens
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [],
-                "diagnostic_rapide": [
+                "criteria": [],
+                "quick_diagnostic": [
                     {
                         "id": "0.10",
-                        "critere": "Complexité fonctionnelle",
-                        "crans": [
-                            "5 - Très simple",
-                            "1 - Très complexe / Je ne sais pas"
+                        "criterion": "Functional complexity",
+                        "screens": [
+                            "5 - Very simple",
+                            "1 - Very complex / I don't know"
                         ],
-                        "niveau_impact": "Déterminant"
+                        "impact_level": "Decisive"
                     }
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-jnsp-nettoyage",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "titre": "Test",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "0.10",
+                        "criterion": "0.10",
                         "question": "Question test ?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [],
-                "diagnostic_rapide_apercu": {"questions": [{"id": "0.10", "reponse": None}]}
+                "criteria": [],
+                "quick_diag_overview": {"questions": [{"id": "0.10", "answer": None}]}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Nettoyage je ne sais pas", "Aucun fichier généré"))
+                failures.append(("I don't know cleaning", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Vérifier que "Je ne sais pas" a été retiré du cran 1
-                if "1 - Très complexe / Je ne sais pas" in content:
-                    echecs.append(("Nettoyage je ne sais pas", "Mention 'Je ne sais pas' non nettoyée dans le cran"))
-                # Vérifier que le cran nettoyé apparaît
-                if "1 - Très complexe" not in content:
-                    echecs.append(("Nettoyage je ne sais pas", "Cran nettoyé absent du questionnaire"))
-                # Vérifier que l'indice opt:1 est présent pour le parseur
+                # Check that "I don't know" was removed from screen 1
+                if "1 - Very complex / I don't know" in content:
+                    failures.append(("I don't know cleaning", "Mention 'I don't know' not cleaned in the screen"))
+                # Check that the cleaned screen appears
+                if "- [ ] 1 - Very complex  <!-- opt:1 -->" not in content:
+                    failures.append(("I don't know cleaning", "Cleaned screen missing from the questionnaire"))
+                # Check that the opt:1 index is present for the parser
                 if "<!-- opt:1 -->" not in content:
-                    echecs.append(("Nettoyage je ne sais pas", "Marqueur opt:1 absent"))
+                    failures.append(("I don't know cleaning", "opt:1 marker missing"))
     except Exception as exc:
-        echecs.append(("Nettoyage je ne sais pas", f"Exception : {exc}"))
+        failures.append(("I don't know cleaning", f"Exception: {exc}"))
 
-    # Cas 6 : Ordonnancement porte avant detail
+    # Case 6: Gate-before-detail ordering
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "1.1", "potentiel_max": 2.0, "options_evaluation": [], "options_evaluation_coefficient": {}},
+                "criteria": [
+                    {"id": "1.1", "max_potential": 2.0, "evaluation_options": [], "evaluation_coefficient_options": {}},
                     {"id": "0.1"}
                 ],
-                "diagnostic_rapide": [
-                    {"id": "0.1", "critere": "Test", "crans": ["Cran 1"], "niveau_impact": "Déterminant"}
+                "quick_diagnostic": [
+                    {"id": "0.1", "criterion": "Test", "screens": ["Screen 1"], "impact_level": "Decisive"}
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
-                    {"id": "bloc-detail", "fichier": "produit-usage", "phase": "detail", "titre": "Test", "interlocuteur": "le responsable produit", "type": "direct", "critere": "1.1", "question": "Detail ?"},
-                    {"id": "bloc-porte", "fichier": "produit-usage", "phase": "porte", "titre": "Test", "interlocuteur": "le responsable produit", "type": "direct", "critere": "0.1", "question": "Porte ?"}
+                "blocks": [
+                    {"id": "block-detail", "file": "product-usage", "phase": "detail", "title": "Test", "interviewee": "the product manager", "type": "direct", "criterion": "1.1", "question": "Detail?"},
+                    {"id": "block-porte", "file": "product-usage", "phase": "gate", "title": "Test", "interviewee": "the product manager", "type": "direct", "criterion": "0.1", "question": "Gate?"}
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [{"id": "1.1", "reponse": None}],
-                "diagnostic_rapide_apercu": {"questions": [{"id": "0.1", "reponse": None}]}
+                "criteria": [{"id": "1.1", "answer": None}],
+                "quick_diag_overview": {"questions": [{"id": "0.1", "answer": None}]}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result:
                 content = result.read_text(encoding="utf-8")
-                # La porte doit apparaître avant le detail
-                pos_porte = content.find("bloc-porte")
-                pos_detail = content.find("bloc-detail")
+                # The gate must appear before the detail
+                pos_porte = content.find("block-porte")
+                pos_detail = content.find("block-detail")
                 if pos_porte == -1 or pos_detail == -1:
-                    echecs.append(("Ordonnancement porte avant detail", "Blocs absents"))
+                    failures.append(("Gate-before-detail ordering", "Blocks missing"))
                 elif pos_porte > pos_detail:
-                    echecs.append(("Ordonnancement porte avant detail", "Porte après detail (attendu : porte avant)"))
+                    failures.append(("Gate-before-detail ordering", "Gate after detail (expected: gate first)"))
     except Exception as exc:
-        echecs.append(("Ordonnancement porte avant detail", f"Exception : {exc}"))
+        failures.append(("Ordonnancement porte avant detail", f"Exception: {exc}"))
 
-    # Cas 7 : Tri numérique des identifiants de critères (0.2 avant 0.10)
+    # Case 7: Numeric sort of criterion ids (0.2 before 0.10)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [],
-                "diagnostic_rapide": [
-                    {"id": "0.2", "critere": "Test 0.2", "crans": ["Cran"], "niveau_impact": "Déterminant"},
-                    {"id": "0.10", "critere": "Test 0.10", "crans": ["Cran"], "niveau_impact": "Déterminant"}
+                "criteria": [],
+                "quick_diagnostic": [
+                    {"id": "0.2", "criterion": "Test 0.2", "screens": ["Screen"], "impact_level": "Decisive"},
+                    {"id": "0.10", "criterion": "Test 0.10", "screens": ["Screen"], "impact_level": "Decisive"}
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
-                    {"id": "porte-diag-0.10", "fichier": "produit-usage", "phase": "porte", "titre": "Test", "type": "direct", "critere": "0.10", "question": "Question 0.10 ?"},
-                    {"id": "porte-diag-0.2", "fichier": "produit-usage", "phase": "porte", "titre": "Test", "type": "direct", "critere": "0.2", "question": "Question 0.2 ?"}
+                "blocks": [
+                    {"id": "gate-diag-0.10", "file": "product-usage", "phase": "gate", "title": "Test", "type": "direct", "criterion": "0.10", "question": "Question 0.10?"},
+                    {"id": "gate-diag-0.2", "file": "product-usage", "phase": "gate", "title": "Test", "type": "direct", "criterion": "0.2", "question": "Question 0.2?"}
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [],
-                "diagnostic_rapide_apercu": {"questions": [{"id": "0.2", "reponse": None}, {"id": "0.10", "reponse": None}]}
+                "criteria": [],
+                "quick_diag_overview": {"questions": [{"id": "0.2", "answer": None}, {"id": "0.10", "answer": None}]}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result:
                 content = result.read_text(encoding="utf-8")
-                # 0.2 doit apparaître avant 0.10
-                pos_02 = content.find("porte-diag-0.2")
-                pos_010 = content.find("porte-diag-0.10")
+                # 0.2 must appear before 0.10
+                pos_02 = content.find("gate-diag-0.2")
+                pos_010 = content.find("gate-diag-0.10")
                 if pos_02 == -1 or pos_010 == -1:
-                    echecs.append(("Tri numérique 0.2 avant 0.10", "Blocs absents"))
+                    failures.append(("Numeric sort 0.2 before 0.10", "Blocks missing"))
                 elif pos_02 > pos_010:
-                    echecs.append(("Tri numérique 0.2 avant 0.10", f"0.2 après 0.10 (positions : {pos_02} > {pos_010})"))
+                    failures.append(("Numeric sort 0.2 before 0.10", f"0.2 after 0.10 (positions: {pos_02} > {pos_010})"))
     except Exception as exc:
-        echecs.append(("Tri numérique 0.2 avant 0.10", f"Exception : {exc}"))
+        failures.append(("Numeric sort 0.2 before 0.10", f"Exception: {exc}"))
 
-    # Cas 8 : Rendu de la clé `note`
+    # Case 8: Rendering of the `note` key
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "4.1",
-                        "pilier": "🔍 4 — Observabilité",
-                        "critere": "Test 4.1",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🔍 4 — Observability",
+                        "criterion": "Test 4.1",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     },
                     {
                         "id": "4.2",
-                        "pilier": "🔍 4 — Observabilité",
-                        "critere": "Test 4.2",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🔍 4 — Observability",
+                        "criterion": "Test 4.2",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-avec-note",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test avec note",
+                        "title": "Test with note",
                         "type": "direct",
-                        "critere": "4.1",
-                        "question": "Question avec note ?",
-                        "aide": "Aide test",
-                        "note": "À valider avec le responsable produit"
+                        "criterion": "4.1",
+                        "question": "Question with note?",
+                        "help": "Test help",
+                        "note": "To validate with the product manager"
                     },
                     {
                         "id": "test-sans-note",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test sans note",
+                        "title": "Test without note",
                         "type": "direct",
-                        "critere": "4.2",
-                        "question": "Question sans note ?"
+                        "criterion": "4.2",
+                        "question": "Question without note?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "4.1", "reponse": None},
-                    {"id": "4.2", "reponse": None}
+                "criteria": [
+                    {"id": "4.1", "answer": None},
+                    {"id": "4.2", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Rendu clé note", "Aucun fichier généré"))
+                failures.append(("note key rendering", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Vérifier que la note apparaît pour le bloc test-avec-note
-                if "> **Note :** À valider avec le responsable produit" not in content:
-                    echecs.append(("Rendu clé note", "Note absente pour bloc avec note"))
-                # Vérifier qu'aucune note n'apparaît pour le bloc test-sans-note
-                # On cherche entre le marqueur du bloc et la ligne des critères
-                pos_sans_note = content.find("<!-- bloc:test-sans-note -->")
-                if pos_sans_note != -1:
-                    section_sans_note = content[pos_sans_note:pos_sans_note + 500]
-                    if "> **Note :**" in section_sans_note:
-                        echecs.append(("Rendu clé note", "Note présente pour bloc sans note (ne devrait pas)"))
+                # Check that the note appears for block test-avec-note
+                if "> **Note:** To validate with the product manager" not in content:
+                    failures.append(("note key rendering", "Note missing for block with note"))
+                # Check that no note appears for block test-sans-note
+                # We look between the block marker and the criteria line
+                pos_no_note = content.find("<!-- block:test-sans-note -->")
+                if pos_no_note != -1:
+                    section_no_note = content[pos_no_note:pos_no_note + 500]
+                    if "> **Note:**" in section_no_note:
+                        failures.append(("note key rendering", "Note present for block without note (should not)"))
     except Exception as exc:
-        echecs.append(("Rendu clé note", f"Exception : {exc}"))
+        failures.append(("note key rendering", f"Exception: {exc}"))
 
-    # Cas 9 : Emprunt 1 - Critère avec contexte null
+    # Case 9: Fact recall - criterion with null context
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "5.1",
-                        "pilier": "👨‍💻 5 — Algo & Code",
-                        "critere": "Test 5.1",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "👨‍💻 5 — Algorithms & code",
+                        "criterion": "Test 5.1",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-contexte-null",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "5.1",
-                        "question": "Question 5.1 ?"
+                        "criterion": "5.1",
+                        "question": "Question 5.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Critère avec contexte = null
+            # Criterion with context = null
             audit_data = {
-                "criteres": [{"id": "5.1", "reponse": None, "contexte": None}],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "criteria": [{"id": "5.1", "answer": None, "context": None}],
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - contexte null", "Aucun fichier généré"))
+                failures.append(("Emprunt 1 - contexte null", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Aucun rappel ne doit être affiché
-                if "> **Ce que nous avons mesuré :**" in content:
-                    echecs.append(("Emprunt 1 - contexte null", "Rappel affiché alors que contexte est null"))
+                # No reminder must be displayed
+                if "> **What we measured:**" in content:
+                    failures.append(("Fact recall - null context", "Reminder displayed although context is null"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - contexte null", f"Exception : {exc}"))
+        failures.append(("Emprunt 1 - contexte null", f"Exception: {exc}"))
 
-    # Cas 10 : Emprunt 1 - Critère avec contexte vide
+    # Case 10: Fact recall - criterion with empty context
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "5.2",
-                        "pilier": "👨‍💻 5 — Algo & Code",
-                        "critere": "Test 5.2",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "👨‍💻 5 — Algorithms & code",
+                        "criterion": "Test 5.2",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-contexte-vide",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "5.2",
-                        "question": "Question 5.2 ?"
+                        "criterion": "5.2",
+                        "question": "Question 5.2?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Critère avec contexte = "   " (espaces uniquement)
+            # Criterion with context = "   " (spaces only)
             audit_data = {
-                "criteres": [{"id": "5.2", "reponse": None, "contexte": "   "}],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "criteria": [{"id": "5.2", "answer": None, "context": "   "}],
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - contexte vide", "Aucun fichier généré"))
+                failures.append(("Emprunt 1 - contexte vide", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Aucun rappel ne doit être affiché
-                if "> **Ce que nous avons mesuré :**" in content:
-                    echecs.append(("Emprunt 1 - contexte vide", "Rappel affiché alors que contexte est vide"))
+                # No reminder must be displayed
+                if "> **What we measured:**" in content:
+                    failures.append(("Fact recall - empty context", "Reminder displayed although context is empty"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - contexte vide", f"Exception : {exc}"))
+        failures.append(("Emprunt 1 - contexte vide", f"Exception: {exc}"))
 
-    # Cas 11 : Emprunt 1 - Bloc composé avec un seul contexte
+    # Case 11: Fact recall - composite block with a single context
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "2.1",
-                        "pilier": "🗺️ 2 — Architecture",
-                        "critere": "Test 2.1",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🗺️ 2 — Architecture",
+                        "criterion": "Test 2.1",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     },
                     {
                         "id": "2.2",
-                        "pilier": "🗺️ 2 — Architecture",
-                        "critere": "Test 2.2",
-                        "potentiel_max": 1.5,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🗺️ 2 — Architecture",
+                        "criterion": "Test 2.2",
+                        "max_potential": 1.5,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "test-compose-un-contexte",
-                        "fichier": "technique",
+                        "id": "test-composite-un-contexte",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test composé",
-                        "type": "compose",
-                        "question": "Question composée ?",
+                        "title": "Test composite",
+                        "type": "composite",
+                        "question": "Composite question?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"2.1": "✅ Point fort confirmé", "2.2": "✅ Point fort confirmé"}},
-                            {"libelle": "Option B", "reponses": {"2.1": "💡 Potentiel d'amélioration identifié"}}
+                            {"label": "Option A", "answers": {"2.1": "✅ Confirmed strength", "2.2": "✅ Confirmed strength"}},
+                            {"label": "Option B", "answers": {"2.1": "💡 Improvement potential identified"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # 2.1 avec contexte, 2.2 sans contexte
+            # 2.1 with context, 2.2 without context
             audit_data = {
-                "criteres": [
-                    {"id": "2.1", "reponse": None, "contexte": "Fait mesuré pour 2.1"},
-                    {"id": "2.2", "reponse": None, "contexte": None}
+                "criteria": [
+                    {"id": "2.1", "answer": None, "context": "Measured fact for 2.1"},
+                    {"id": "2.2", "answer": None, "context": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - bloc composé un contexte", "Aucun fichier généré"))
+                failures.append(("Fact recall - composite block single context", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Un rappel avec le seul fait doit être affiché (sans puce car un seul)
-                if "> **Ce que nous avons mesuré :**" not in content:
-                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Aucun rappel affiché"))
-                elif "> Fait mesuré pour 2.1" not in content:
-                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Fait 2.1 absent du rappel"))
-                # Vérifier qu'il n'y a pas de puce (un seul fait)
-                elif "> - Fait mesuré pour 2.1" in content:
-                    echecs.append(("Emprunt 1 - bloc composé un contexte", "Puce présente alors qu'un seul fait (attendu : sans puce)"))
+                # A reminder with the single fact must be displayed (no bullet since there is only one)
+                if "> **What we measured:**" not in content:
+                    failures.append(("Fact recall - composite block single context", "No reminder displayed"))
+                elif "> Measured fact for 2.1" not in content:
+                    failures.append(("Fact recall - composite block single context", "Fact 2.1 missing from the reminder"))
+                # Check there is no bullet (a single fact)
+                elif "> - Measured fact for 2.1" in content:
+                    failures.append(("Fact recall - composite block single context", "Bullet present although a single fact (expected: no bullet)"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - bloc composé un contexte", f"Exception : {exc}"))
+        failures.append(("Fact recall - composite block single context", f"Exception: {exc}"))
 
-    # Cas 12 : Emprunt 1 - Bloc composé avec deux contextes identiques (fusion)
+    # Case 12: Fact recall - composite block with two identical contexts (merge)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "3.1",
-                        "pilier": "🏢 3 — Infrastructure",
-                        "critere": "Test 3.1",
-                        "potentiel_max": 1.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🏢 3 — Infrastructure",
+                        "criterion": "Test 3.1",
+                        "max_potential": 1.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     },
                     {
                         "id": "3.2",
-                        "pilier": "🏢 3 — Infrastructure",
-                        "critere": "Test 3.2",
-                        "potentiel_max": 1.5,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🏢 3 — Infrastructure",
+                        "criterion": "Test 3.2",
+                        "max_potential": 1.5,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "test-compose-fusion",
-                        "fichier": "technique",
+                        "id": "test-composite-merge",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Test composé fusion",
-                        "type": "compose",
-                        "question": "Question composée ?",
+                        "title": "Test composite merge",
+                        "type": "composite",
+                        "question": "Composite question?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"3.1": "✅ Point fort confirmé", "3.2": "✅ Point fort confirmé"}},
-                            {"libelle": "Option B", "reponses": {"3.1": "💡 Potentiel d'amélioration identifié"}}
+                            {"label": "Option A", "answers": {"3.1": "✅ Confirmed strength", "3.2": "✅ Confirmed strength"}},
+                            {"label": "Option B", "answers": {"3.1": "💡 Improvement potential identified"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # 3.1 et 3.2 avec le MÊME contexte
+            # 3.1 and 3.2 with the SAME context
             audit_data = {
-                "criteres": [
-                    {"id": "3.1", "reponse": None, "contexte": "Fait identique pour les deux"},
-                    {"id": "3.2", "reponse": None, "contexte": "Fait identique pour les deux"}
+                "criteria": [
+                    {"id": "3.1", "answer": None, "context": "Identical fact for both"},
+                    {"id": "3.2", "answer": None, "context": "Identical fact for both"}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - bloc composé fusion", "Aucun fichier généré"))
+                failures.append(("Fact recall - composite block merge", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Le fait doit apparaître une seule fois (fusion des doublons)
-                if "> **Ce que nous avons mesuré :**" not in content:
-                    echecs.append(("Emprunt 1 - bloc composé fusion", "Aucun rappel affiché"))
-                elif content.count("Fait identique pour les deux") > 1:
-                    echecs.append(("Emprunt 1 - bloc composé fusion", f"Doublon non fusionné (apparaît {content.count('Fait identique pour les deux')} fois)"))
-                # Vérifier qu'il n'y a pas de puce (un seul fait après fusion)
-                elif "> - Fait identique pour les deux" in content:
-                    echecs.append(("Emprunt 1 - bloc composé fusion", "Puce présente alors qu'un seul fait après fusion (attendu : sans puce)"))
+                # The fact must appear only once (duplicate merge)
+                if "> **What we measured:**" not in content:
+                    failures.append(("Fact recall - composite block merge", "No reminder displayed"))
+                elif content.count("Identical fact for both") > 1:
+                    failures.append(("Fact recall - composite block merge", f"Duplicate not merged (appears {content.count('Identical fact for both')} times)"))
+                # Check there is no bullet (a single fact after merge)
+                elif "> - Identical fact for both" in content:
+                    failures.append(("Fact recall - composite block merge", "Bullet present although a single fact after merge (expected: no bullet)"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - bloc composé fusion", f"Exception : {exc}"))
+        failures.append(("Fact recall - composite block merge", f"Exception: {exc}"))
 
-    # Cas 13 : Emprunt 1 - Question 0.x avec indice_contextuel
+    # Case 13: Fact recall - 0.x question with context_index
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [],
-                "diagnostic_rapide": [
+                "criteria": [],
+                "quick_diagnostic": [
                     {
                         "id": "0.5",
-                        "critere": "Test diagnostic",
-                        "crans": ["Cran 1", "Cran 2"],
-                        "niveau_impact": "Déterminant"
+                        "criterion": "Test diagnostic",
+                        "screens": ["Screen 1", "Screen 2"],
+                        "impact_level": "Decisive"
                     }
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-diag-indice",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "titre": "Test",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "0.5",
-                        "question": "Question 0.5 ?"
+                        "criterion": "0.5",
+                        "question": "Question 0.5?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Question 0.5 avec indice_contextuel
+            # Question 0.5 with context_index
             audit_data = {
-                "criteres": [],
-                "diagnostic_rapide_apercu": {
+                "criteria": [],
+                "quick_diag_overview": {
                     "questions": [
-                        {"id": "0.5", "reponse": None, "indice_contextuel": "Indice de contexte pour 0.5"}
+                        {"id": "0.5", "answer": None, "context_index": "Context hint for 0.5"}
                     ]
                 }
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - question 0.x avec indice", "Aucun fichier généré"))
+                failures.append(("Fact recall - 0.x question with hint", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Le rappel doit être affiché
-                if "> **Ce que nous avons mesuré :**" not in content:
-                    echecs.append(("Emprunt 1 - question 0.x avec indice", "Aucun rappel affiché"))
-                elif "Indice de contexte pour 0.5" not in content:
-                    echecs.append(("Emprunt 1 - question 0.x avec indice", "Indice contextuel absent du rappel"))
+                # The reminder must be displayed
+                if "> **What we measured:**" not in content:
+                    failures.append(("Fact recall - 0.x question with hint", "No reminder displayed"))
+                elif "Context hint for 0.5" not in content:
+                    failures.append(("Fact recall - 0.x question with hint", "Context hint missing from the reminder"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - question 0.x avec indice", f"Exception : {exc}"))
+        failures.append(("Fact recall - 0.x question with hint", f"Exception: {exc}"))
 
-    # Cas 14 : Emprunt 1 - Audit avec tous les contextes vides
+    # Case 14: Fact recall - audit with all contexts empty
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "1.1",
-                        "pilier": "🛖 1 — Produit",
-                        "critere": "Test 1.1",
-                        "potentiel_max": 2.0,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🛖 1 — Product",
+                        "criterion": "Test 1.1",
+                        "max_potential": 2.0,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     },
                     {
                         "id": "1.2",
-                        "pilier": "🛖 1 — Produit",
-                        "critere": "Test 1.2",
-                        "potentiel_max": 1.5,
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "pillar": "🛖 1 — Product",
+                        "criterion": "Test 1.2",
+                        "max_potential": 1.5,
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": [
+                "quick_diagnostic": [
                     {
                         "id": "0.1",
-                        "critere": "Test 0.1",
-                        "crans": ["Cran 1"],
-                        "niveau_impact": "Déterminant"
+                        "criterion": "Test 0.1",
+                        "screens": ["Screen 1"],
+                        "impact_level": "Decisive"
                     }
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-vide-1",
-                        "fichier": "produit-usage",
+                        "file": "product-usage",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "1.1",
-                        "question": "Question 1.1 ?"
+                        "criterion": "1.1",
+                        "question": "Question 1.1?"
                     },
                     {
                         "id": "test-vide-2",
-                        "fichier": "produit-usage",
+                        "file": "product-usage",
                         "phase": "detail",
-                        "titre": "Test",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "1.2",
-                        "question": "Question 1.2 ?"
+                        "criterion": "1.2",
+                        "question": "Question 1.2?"
                     },
                     {
                         "id": "test-vide-3",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "titre": "Test",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "title": "Test",
                         "type": "direct",
-                        "critere": "0.1",
-                        "question": "Question 0.1 ?"
+                        "criterion": "0.1",
+                        "question": "Question 0.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Tous les contextes sont null ou vides
+            # All contexts are null or empty
             audit_data = {
-                "criteres": [
-                    {"id": "1.1", "reponse": None, "contexte": None},
-                    {"id": "1.2", "reponse": None, "contexte": ""}
+                "criteria": [
+                    {"id": "1.1", "answer": None, "context": None},
+                    {"id": "1.2", "answer": None, "context": ""}
                 ],
-                "diagnostic_rapide_apercu": {
+                "quick_diag_overview": {
                     "questions": [
-                        {"id": "0.1", "reponse": None, "indice_contextuel": None}
+                        {"id": "0.1", "answer": None, "context_index": None}
                     ]
                 }
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Emprunt 1 - audit vide", "Aucun fichier généré"))
+                failures.append(("Emprunt 1 - audit vide", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Aucun rappel ne doit être affiché nulle part
-                if "> **Ce que nous avons mesuré :**" in content:
-                    echecs.append(("Emprunt 1 - audit vide", "Rappel affiché alors que tous les contextes sont vides"))
+                # No reminder must be displayed anywhere
+                if "> **What we measured:**" in content:
+                    failures.append(("Fact recall - empty audit", "Reminder displayed although all contexts are empty"))
     except Exception as exc:
-        echecs.append(("Emprunt 1 - audit vide", f"Exception : {exc}"))
+        failures.append(("Emprunt 1 - audit vide", f"Exception: {exc}"))
 
-    # Cas 15 : Emprunt 3 - le titre du bloc porte le sujet et l'interlocuteur
+    # Case 15: The block title carries the subject and the interviewee
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "1.1", "pilier": "🛖 1 — Produit", "critere": "C", "potentiel_max": 2.0,
-                     "options_evaluation": ["✅ Point fort confirmé", "💡 Potentiel d'amélioration identifié"],
-                     "options_evaluation_coefficient": {"✅ Point fort confirmé": 0,
-                                                        "💡 Potentiel d'amélioration identifié": 1}}
+                "criteria": [
+                    {"id": "1.1", "pillar": "🛖 1 — Product", "criterion": "C", "max_potential": 2.0,
+                     "evaluation_options": ["✅ Confirmed strength", "💡 Improvement potential identified"],
+                     "evaluation_coefficient_options": {"✅ Confirmed strength": 0,
+                                                        "💡 Improvement potential identified": 1}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            (tmpdir / "eof-referentiel.json").write_text(
+            (tmpdir / "eof-reference.json").write_text(
                 json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {"version": 1, "blocs": [
-                {"id": "b-titre", "fichier": "produit-usage", "phase": "detail",
-                 "titre": "Appareils anciens",
-                 "interlocuteur": "le responsable produit",
-                 "type": "direct", "critere": "1.1", "question": "Q ?"}
+            blocks_data = {"version": 1, "blocks": [
+                {"id": "b-titre", "file": "product-usage", "phase": "detail",
+                 "title": "Legacy devices",
+                 "interviewee": "the product manager",
+                 "type": "direct", "criterion": "1.1", "question": "Q?"}
             ]}
             (tmpdir / "questionnaire-blocs.json").write_text(
-                json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+                json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             (tmpdir / "eof-audit-results.json").write_text(
-                json.dumps({"criteres": [{"id": "1.1", "reponse": None, "contexte": None}],
-                            "diagnostic_rapide_apercu": {"questions": []}},
+                json.dumps({"criteria": [{"id": "1.1", "answer": None, "context": None}],
+                            "quick_diag_overview": {"questions": []}},
                            ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(tmpdir / "eof-referentiel.json")
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(tmpdir / "eof-reference.json")
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
             if result is None:
-                echecs.append(("Emprunt 3 - titre de bloc", "Aucun fichier généré"))
+                failures.append(("Block title", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                attendu = "## 1 sur 1 - Appareils anciens (à voir avec le responsable produit)"
-                if attendu not in content:
-                    echecs.append(("Emprunt 3 - titre de bloc",
-                                   f"Ligne de titre absente : {attendu}"))
-                # La plomberie interne ne doit pas revenir sous les yeux du lecteur
-                if "**Critères EOF couverts" in content or "**Potentiel débloqué" in content:
-                    echecs.append(("Emprunt 3 - titre de bloc",
-                                   "Plomberie interne affichée au lecteur"))
+                expected = "## 1 of 1 - Legacy devices (to check with the product manager)"
+                if expected not in content:
+                    failures.append(("Block title",
+                                   f"Title line missing: {expected}"))
+                # The internal plumbing must not come back in front of the reader
+                if "**Covered EOF criteria" in content or "**Unlocked potential" in content:
+                    failures.append(("Block title",
+                                   "Internal plumbing shown to the reader"))
     except Exception as exc:
-        echecs.append(("Emprunt 3 - titre de bloc", f"Exception : {exc}"))
+        failures.append(("Block title", f"Exception: {exc}"))
 
-    # Cas 16 : Bloc filtre imprimé (aucun critère tranché)
+    # Case 16: Filter block printed (no criterion decided)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
-                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                "criteria": [
+                    {"id": "4.1", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
+                    {"id": "4.2", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-test",
-                        "fichier": "technique",
-                        "phase": "porte",
-                        "titre": "Test filtre",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.1", "4.2"],
-                        "question": "Question filtre ?",
-                        "libelle_ecarte": "Non applicable",
-                        "libelle_applicable": "Cela s'applique"
+                        "id": "filter-test",
+                        "file": "technical",
+                        "phase": "gate",
+                        "title": "Test filter",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.1", "4.2"],
+                        "question": "Question filter?",
+                        "discarded_label": "Not applicable",
+                        "applicable_label": "It applies"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Aucun critère tranché : le filtre doit être imprimé
+            # No criterion decided: the filter must be printed
             audit_data = {
-                "criteres": [
-                    {"id": "4.1", "reponse": None},
-                    {"id": "4.2", "reponse": None}
+                "criteria": [
+                    {"id": "4.1", "answer": None},
+                    {"id": "4.2", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc filtre imprimé", "Aucun fichier généré"))
+                failures.append(("Filter block printed", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "<!-- bloc:filtre-test -->" not in content:
-                    echecs.append(("Bloc filtre imprimé", "Marqueur bloc filtre absent"))
-                if "<!-- opt:ecarte -->" not in content:
-                    echecs.append(("Bloc filtre imprimé", "Marqueur opt:ecarte absent"))
+                if "<!-- block:filter-test -->" not in content:
+                    failures.append(("Filter block printed", "filter block marker missing"))
+                if "<!-- opt:discarded -->" not in content:
+                    failures.append(("Filter block printed", "opt:discarded marker missing"))
                 if "<!-- opt:applicable -->" not in content:
-                    echecs.append(("Bloc filtre imprimé", "Marqueur opt:applicable absent"))
-                if "Non applicable" not in content:
-                    echecs.append(("Bloc filtre imprimé", "Libellé écarte absent"))
+                    failures.append(("Filter block printed", "opt:applicable marker missing"))
+                if "Not applicable" not in content:
+                    failures.append(("Filter block printed", "Discarded label missing"))
     except Exception as exc:
-        echecs.append(("Bloc filtre imprimé", f"Exception : {exc}"))
+        failures.append(("Filter block printed", f"Exception: {exc}"))
 
-    # Cas 17 : Bloc filtre supprimé par la règle 4.2 (un critère déjà tranché)
+    # Case 17: Filter block removed by rule 4.2 (a criterion already decided)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "1.5", "potentiel_max": 1.0, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
-                    {"id": "1.13", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
-                    {"id": "2.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                "criteria": [
+                    {"id": "1.5", "max_potential": 1.0, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
+                    {"id": "1.13", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
+                    {"id": "2.1", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-interface",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "titre": "Interface utilisateur",
-                        "interlocuteur": "le responsable produit",
-                        "type": "filtre",
-                        "criteres": ["1.5", "1.13"],
-                        "question": "Le service a-t-il une interface ?",
-                        "libelle_ecarte": "Non, pas d'interface",
-                        "libelle_applicable": "Oui, il y a une interface"
+                        "id": "filter-interface",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "title": "User interface",
+                        "interviewee": "the product manager",
+                        "type": "filter",
+                        "criteria": ["1.5", "1.13"],
+                        "question": "Does the service have an interface?",
+                        "discarded_label": "No, no interface",
+                        "applicable_label": "Yes, there is an interface"
                     },
                     {
-                        "id": "bloc-autre",
-                        "fichier": "technique",
+                        "id": "block-autre",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Autre bloc",
-                        "interlocuteur": "l'équipe de développement",
+                        "title": "Other block",
+                        "interviewee": "the development team",
                         "type": "direct",
-                        "critere": "2.1",
-                        "question": "Question autre ?"
+                        "criterion": "2.1",
+                        "question": "Question other?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # 1.5 est tranché : le filtre doit être supprimé, mais le bloc autre reste
+            # 1.5 is decided: the filter must be removed, but the other block remains
             audit_data = {
-                "criteres": [
-                    {"id": "1.5", "reponse": "✅ Point fort confirmé", "coefficient": 0},
-                    {"id": "1.13", "reponse": None},
-                    {"id": "2.1", "reponse": None}
+                "criteria": [
+                    {"id": "1.5", "answer": "✅ Confirmed strength", "coefficient": 0},
+                    {"id": "1.13", "answer": None},
+                    {"id": "2.1", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc filtre supprimé règle 4.2", "Aucun fichier généré"))
+                failures.append(("Filter block removed rule 4.2", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "<!-- bloc:filtre-interface -->" in content:
-                    echecs.append(("Bloc filtre supprimé règle 4.2", "Filtre présent alors qu'il devrait être supprimé"))
-                if "<!-- bloc:bloc-autre -->" not in content:
-                    echecs.append(("Bloc filtre supprimé règle 4.2", "Bloc autre absent"))
+                if "<!-- block:filter-interface -->" in content:
+                    failures.append(("Filter block removed rule 4.2", "Filter present although it should be removed"))
+                if "<!-- block:block-autre -->" not in content:
+                    failures.append(("Filter block removed rule 4.2", "Other block missing"))
     except Exception as exc:
-        echecs.append(("Bloc filtre supprimé règle 4.2", f"Exception : {exc}"))
+        failures.append(("Filter block removed rule 4.2", f"Exception: {exc}"))
 
-    # Cas 18 : Bloc filtre avec réponse "🤔 À évaluer" (ne supprime pas le filtre)
+    # Case 18: Filter block with answer "🤔 To be assessed" (does not remove the filter)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "3.8", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}},
-                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                "criteria": [
+                    {"id": "3.7", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
+                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-env-test",
-                        "fichier": "technique",
-                        "phase": "porte",
-                        "titre": "Environnement de test",
-                        "interlocuteur": "la personne qui exploite l'infrastructure",
-                        "type": "filtre",
-                        "criteres": ["3.8", "3.9"],
-                        "question": "Avez-vous des environnements de test ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "id": "filter-env-test",
+                        "file": "technical",
+                        "phase": "gate",
+                        "title": "Test environment",
+                        "interviewee": "the person who operates the infrastructure",
+                        "type": "filter",
+                        "criteria": ["3.7", "3.8"],
+                        "question": "Do you have test environments?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # 3.8 a une réponse non tranchante : le filtre doit être imprimé
+            # 3.8 has a non-decisive answer: the filter must be printed
             audit_data = {
-                "criteres": [
-                    {"id": "3.8", "reponse": "🤔 À évaluer", "coefficient": 0},
-                    {"id": "3.9", "reponse": None}
+                "criteria": [
+                    {"id": "3.7", "answer": "🤔 To be assessed", "coefficient": 0},
+                    {"id": "3.8", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc filtre avec À évaluer", "Aucun fichier généré"))
+                failures.append(("Filter block with 🤔 To be assessed", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "<!-- bloc:filtre-env-test -->" not in content:
-                    echecs.append(("Bloc filtre avec À évaluer", "Filtre absent alors qu'il devrait être imprimé (réponse non tranchante)"))
+                if "<!-- block:filter-env-test -->" not in content:
+                    failures.append(("Filter block with 🤔 To be assessed", "Filter missing although it should be printed (non-decisive answer)"))
     except Exception as exc:
-        echecs.append(("Bloc filtre avec À évaluer", f"Exception : {exc}"))
+        failures.append(("Filter block with 🤔 To be assessed", f"Exception: {exc}"))
 
-    # Cas 19 : Bloc totalement gouverné qui reçoit la mention "À IGNORER"
+    # Case 19: Fully governed block that gets the "DO NOT ANSWER" mention
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                "criteria": [
+                    {"id": "4.1", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.2", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
+                        "id": "filter-donnees",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Stockage de donnees du service",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.1", "4.2"],
-                        "question": "Avez-vous des donnees ?",
-                        "libelle_ecarte": "Non, le service ne conserve aucune donnee",
-                        "libelle_applicable": "Oui"
+                        "title": "Service data storage",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.1", "4.2"],
+                        "question": "Do you have data?",
+                        "discarded_label": "No, the service retains no data",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "bloc-4.1",
-                        "fichier": "technique",
+                        "id": "block-4.1",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Critere 4.1",
-                        "interlocuteur": "la personne qui gère les données",
+                        "title": "Criterion 4.1",
+                        "interviewee": "the person who manages the data",
                         "type": "direct",
-                        "critere": "4.1",
-                        "question": "Question 4.1 ?"
+                        "criterion": "4.1",
+                        "question": "Question 4.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "4.1", "reponse": None},
-                    {"id": "4.2", "reponse": None}
+                "criteria": [
+                    {"id": "4.1", "answer": None},
+                    {"id": "4.2", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc totalement gouverne avec mention", "Aucun fichier genere"))
+                failures.append(("Fully governed block with mention", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if "**A IGNORER**" not in content:
-                    echecs.append(("Bloc totalement gouverne avec mention", "Mention 'A IGNORER' absente"))
-                elif "la question 1 (Stockage de donnees du service)" not in content:
-                    echecs.append(("Bloc totalement gouverne avec mention", "Reference au filtre absente ou incorrecte"))
+                if "**DO NOT ANSWER**" not in content:
+                    failures.append(("Fully governed block with mention", "Mention 'DO NOT ANSWER' missing"))
+                elif "question 1 (Service data storage)" not in content:
+                    failures.append(("Fully governed block with mention", "Reference to the filter missing or incorrect"))
     except Exception as exc:
-        echecs.append(("Bloc totalement gouverne avec mention", f"Exception : {exc}"))
+        failures.append(("Fully governed block with mention", f"Exception: {exc}"))
 
-    # Cas 20 : Bloc partiellement gouverné qui ne reçoit pas la mention
+    # Case 20: Partially governed block that does not get the mention
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "5.1", "potentiel_max": 1.0, "options_evaluation": ["✅ Point fort confirmé"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}}
+                "criteria": [
+                    {"id": "4.1", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "5.1", "max_potential": 1.0, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
+                        "id": "filter-donnees",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Stockage",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.1"],
-                        "question": "Avez-vous des donnees ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "title": "Storage",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.1"],
+                        "question": "Do you have data?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "bloc-compose",
-                        "fichier": "technique",
+                        "id": "block-compose",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Bloc compose",
-                        "interlocuteur": "l'équipe de développement",
-                        "type": "compose",
-                        "question": "Question ?",
+                        "title": "Composite block",
+                        "interviewee": "the development team",
+                        "type": "composite",
+                        "question": "Question?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"4.1": "✅ Point fort confirmé", "5.1": "✅ Point fort confirmé"}}
+                            {"label": "Option A", "answers": {"4.1": "✅ Confirmed strength", "5.1": "✅ Confirmed strength"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "4.1", "reponse": None},
-                    {"id": "5.1", "reponse": None}
+                "criteria": [
+                    {"id": "4.1", "answer": None},
+                    {"id": "5.1", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc partiellement gouverne sans mention", "Aucun fichier genere"))
+                failures.append(("Bloc partiellement gouverne sans mention", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Trouver le bloc compose dans le contenu
-                if "bloc-compose" in content:
-                    # Extraire la section du bloc compose
-                    bloc_debut = content.find("<!-- bloc:bloc-compose -->")
-                    bloc_fin = content.find("##", bloc_debut + 1) if bloc_debut >= 0 else -1
-                    bloc_section = content[bloc_debut:bloc_fin] if bloc_fin > bloc_debut else content[bloc_debut:]
+                # Find the composite block in the content
+                if "block-compose" in content:
+                    # Extract the composite block section
+                    block_start = content.find("<!-- block:block-compose -->")
+                    block_end = content.find("##", block_start + 1) if block_start >= 0 else -1
+                    bloc_section = content[block_start:block_end] if block_end > block_start else content[block_start:]
 
-                    if "**A IGNORER**" in bloc_section:
-                        echecs.append(("Bloc partiellement gouverne sans mention", "Mention presente alors qu'elle ne devrait pas (bloc partiellement gouverne)"))
+                    if "**DO NOT ANSWER**" in bloc_section:
+                        failures.append(("Partially governed block without mention", "Mention present although it should not (partially governed block)"))
     except Exception as exc:
-        echecs.append(("Bloc partiellement gouverne sans mention", f"Exception : {exc}"))
+        failures.append(("Bloc partiellement gouverne sans mention", f"Exception: {exc}"))
 
-    # Cas 21 : Bloc gouverné par deux filtres avec conjonction ET
+    # Case 21: Block governed by two filters with AND conjunction
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "3.8", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.4", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                "criteria": [
+                    {"id": "3.7", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.4", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-env",
-                        "fichier": "technique",
+                        "id": "filter-env",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Environnements de test",
-                        "interlocuteur": "la personne qui exploite l'infrastructure",
-                        "type": "filtre",
-                        "criteres": ["3.8", "3.9"],
-                        "question": "Question env ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "title": "Test environments",
+                        "interviewee": "the person who operates the infrastructure",
+                        "type": "filter",
+                        "criteria": ["3.7", "3.8"],
+                        "question": "Question env?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
+                        "id": "filter-donnees",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Donnees persistantes",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.4"],
-                        "question": "Question donnees ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "title": "Persistent data",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.4"],
+                        "question": "Question data?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "bloc-compose",
-                        "fichier": "technique",
+                        "id": "block-compose",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Environnements de test",
-                        "interlocuteur": "la personne qui exploite l'infrastructure",
-                        "type": "compose",
-                        "question": "Question compose ?",
+                        "title": "Test environments",
+                        "interviewee": "the person who operates the infrastructure",
+                        "type": "composite",
+                        "question": "Question composite?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"3.9": "✅ Point fort confirmé", "4.4": "✅ Point fort confirmé"}}
+                            {"label": "Option A", "answers": {"3.8": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "3.8", "reponse": None},
-                    {"id": "3.9", "reponse": None},
-                    {"id": "4.4", "reponse": None}
+                "criteria": [
+                    {"id": "3.7", "answer": None},
+                    {"id": "3.8", "answer": None},
+                    {"id": "4.4", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Bloc gouverne par deux filtres avec ET", "Aucun fichier genere"))
+                failures.append(("Block governed by two filters with AND", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                if " ET " not in content:
-                    echecs.append(("Bloc gouverne par deux filtres avec ET", "Conjonction 'ET' absente de la mention"))
+                if " AND " not in content:
+                    failures.append(("Block governed by two filters with AND", "Conjunction 'AND' missing from the mention"))
     except Exception as exc:
-        echecs.append(("Bloc gouverne par deux filtres avec ET", f"Exception : {exc}"))
+        failures.append(("Block governed by two filters with AND", f"Exception: {exc}"))
 
-    # Cas 22 : Filtre toujours placé avant les blocs qu'il gouverne
+    # Case 22: Filter always placed before the blocks it governs
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "4.1", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.2", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                "criteria": [
+                    {"id": "4.1", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.2", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
+                        "id": "filter-donnees",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Stockage",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.1", "4.2"],
-                        "question": "Avez-vous des donnees ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "title": "Storage",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.1", "4.2"],
+                        "question": "Do you have data?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "bloc-4.1",
-                        "fichier": "technique",
+                        "id": "block-4.1",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Critere 4.1",
-                        "interlocuteur": "la personne qui gère les données",
+                        "title": "Criterion 4.1",
+                        "interviewee": "the person who manages the data",
                         "type": "direct",
-                        "critere": "4.1",
-                        "question": "Question 4.1 ?"
+                        "criterion": "4.1",
+                        "question": "Question 4.1?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "4.1", "reponse": None},
-                    {"id": "4.2", "reponse": None}
+                "criteria": [
+                    {"id": "4.1", "answer": None},
+                    {"id": "4.2", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Filtre avant les blocs gouvernes", "Aucun fichier genere"))
+                failures.append(("Filter before governed blocks", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                pos_filtre = content.find("<!-- bloc:filtre-donnees -->")
-                pos_bloc = content.find("<!-- bloc:bloc-4.1 -->")
-                if pos_filtre == -1 or pos_bloc == -1:
-                    echecs.append(("Filtre avant les blocs gouvernes", "Blocs absents"))
-                elif pos_filtre > pos_bloc:
-                    echecs.append(("Filtre avant les blocs gouvernes", f"Filtre apres le bloc gouverne (positions : {pos_filtre} > {pos_bloc})"))
+                pos_filter = content.find("<!-- block:filter-donnees -->")
+                pos_bloc = content.find("<!-- block:block-4.1 -->")
+                if pos_filter == -1 or pos_bloc == -1:
+                    failures.append(("Filter before governed blocks", "Blocks missing"))
+                elif pos_filter > pos_bloc:
+                    failures.append(("Filter before governed blocks", f"Filter after the governed block (positions: {pos_filter} > {pos_block})"))
     except Exception as exc:
-        echecs.append(("Filtre avant les blocs gouvernes", f"Exception : {exc}"))
+        failures.append(("Filter before governed blocks", f"Exception: {exc}"))
 
-    # Cas 23 : Mention "À IGNORER" avec deux filtres porte les deux libellés distincts
+    # Case 23: "DO NOT ANSWER" mention with two filters carries the two distinct labels
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "3.9", "potentiel_max": 1.5, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.4", "potentiel_max": 2.0, "options_evaluation": ["✅ Point fort confirmé", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "🚫 Non applicable": 0}}
+                "criteria": [
+                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.4", "max_potential": 2.0, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
+                        "id": "filter-donnees",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Stockage de donnees du service",
-                        "interlocuteur": "la personne qui gère les données",
-                        "type": "filtre",
-                        "criteres": ["4.4"],
-                        "question": "Question donnees ?",
-                        "libelle_ecarte": "Non, le service ne conserve aucune donnee (ni base de donnees, ni stockage objet)",
-                        "libelle_applicable": "Oui"
+                        "title": "Service data storage",
+                        "interviewee": "the person who manages the data",
+                        "type": "filter",
+                        "criteria": ["4.4"],
+                        "question": "Question data?",
+                        "discarded_label": "No, the service retains no data (neither database nor object storage)",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "filtre-env",
-                        "fichier": "technique",
+                        "id": "filter-env",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Environnements de test",
-                        "interlocuteur": "la personne qui exploite l'infrastructure",
-                        "type": "filtre",
-                        "criteres": ["3.9"],
-                        "question": "Question env ?",
-                        "libelle_ecarte": "Non, pas d'environnement de pre-production distinct (tous les tests en local ou en production)",
-                        "libelle_applicable": "Oui"
+                        "title": "Test environments",
+                        "interviewee": "the person who operates the infrastructure",
+                        "type": "filter",
+                        "criteria": ["3.8"],
+                        "question": "Question env?",
+                        "discarded_label": "No, no distinct pre-production environment (all tests run locally or in production)",
+                        "applicable_label": "Yes"
                     },
                     {
-                        "id": "bloc-compose",
-                        "fichier": "technique",
+                        "id": "block-compose",
+                        "file": "technical",
                         "phase": "detail",
-                        "titre": "Gestion des environnements de test",
-                        "interlocuteur": "la personne qui exploite l'infrastructure",
-                        "type": "compose",
-                        "question": "Question compose ?",
+                        "title": "Test environment management",
+                        "interviewee": "the person who operates the infrastructure",
+                        "type": "composite",
+                        "question": "Question composite?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"3.9": "✅ Point fort confirmé", "4.4": "✅ Point fort confirmé"}}
+                            {"label": "Option A", "answers": {"3.8": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             audit_data = {
-                "criteres": [
-                    {"id": "3.9", "reponse": None},
-                    {"id": "4.4", "reponse": None}
+                "criteria": [
+                    {"id": "3.8", "answer": None},
+                    {"id": "4.4", "answer": None}
                 ],
-                "diagnostic_rapide_apercu": {"questions": []}
+                "quick_diag_overview": {"questions": []}
             }
             audit_path = tmpdir / "eof-audit-results.json"
             audit_path.write_text(json.dumps(audit_data, ensure_ascii=False), encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            audit, contextes = load_audit_results(tmpdir)
-            blocs = load_blocs(tmpdir)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            audit, contexts = load_audit_results(tmpdir)
+            blocks = load_blocks(tmpdir)
 
-            result = generate_questionnaire_unique(blocs, audit,
-                                                criteres_ref, diag_ref, tmpdir, contextes)
+            result = generate_questionnaire_unique(blocks, audit,
+                                                criteria_ref, diag_ref, tmpdir, contexts)
 
             if result is None:
-                echecs.append(("Mention deux filtres avec deux libelles", "Aucun fichier genere"))
+                failures.append(("Mention two filters two labels", "No file generated"))
             else:
                 content = result.read_text(encoding="utf-8")
-                # Vérifier que les deux libellés apparaissent dans la mention
-                libelle_donnees = "Non, le service ne conserve aucune donnee"
-                libelle_env = "Non, pas d'environnement de pre-production distinct"
+                # Check that both labels appear in the mention
+                data_label = "No, the service retains no data"
+                env_label = "No, no distinct pre-production environment"
 
-                if libelle_donnees not in content:
-                    echecs.append(("Mention deux filtres avec deux libelles", f"Libelle du filtre donnees absent : {libelle_donnees}"))
-                if libelle_env not in content:
-                    echecs.append(("Mention deux filtres avec deux libelles", f"Libelle du filtre env absent : {libelle_env}"))
-                # Vérifier que la conjonction ET est présente
-                if " ET " not in content:
-                    echecs.append(("Mention deux filtres avec deux libelles", "Conjonction 'ET' absente"))
+                if data_label not in content:
+                    failures.append(("Mention two filters two labels", f"Data filter label missing: {data_label}"))
+                if env_label not in content:
+                    failures.append(("Mention two filters two labels", f"Env filter label missing: {env_label}"))
+                # Check that the AND conjunction is present
+                if " AND " not in content:
+                    failures.append(("Mention two filters two labels", "Conjunction 'AND' missing"))
     except Exception as exc:
-        echecs.append(("Mention deux filtres avec deux libelles", f"Exception : {exc}"))
+        failures.append(("Mention two filters two labels", f"Exception: {exc}"))
 
-    if echecs:
-        print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
-        for libelle, erreur in echecs:
-            print(f"  - {libelle}")
-            print(f"      {erreur}")
+    if failures:
+        print(f"AUTOTEST FAILED: {len(failures)} case(s) out of {total}")
+        for label, error in failures:
+            print(f"  - {label}")
+            print(f"      {error}")
         return 1
 
-    print(f"Autotest : {total} cas passés.")
+    print(f"Autotest: {total} cases passed.")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Génère un questionnaire EOF depuis un audit existant")
-    parser.add_argument("repertoire_audit", nargs="?",
-                        help="dossier d'audit contenant eof-audit-results.json")
+        description="Generates an EOF questionnaire from an existing audit")
+    parser.add_argument("audit_dir", nargs="?",
+                        help="audit directory containing eof-audit-results.json")
     parser.add_argument("--output-dir",
-                        help="répertoire de sortie (par défaut : repertoire_audit)")
-    parser.add_argument("--dans-le-dossier-audit", action="store_true",
-                        help="autorise l'écriture dans un chemin contenant 'audits'")
+                        help="output directory (default: audit_dir)")
+    parser.add_argument("--in-audit-dir", action="store_true",
+                        help="allows writing into a path containing 'audits'")
     parser.add_argument("--autotest", action="store_true",
-                        help="rejoue les cas de test embarqués et sort 1 si un cas échoue")
+                        help="replays the embedded test cases and exits 1 if a case fails")
     args = parser.parse_args()
 
     if args.autotest:
         sys.exit(autotest())
 
-    if not args.repertoire_audit:
-        parser.error("repertoire_audit est requis (ou utiliser --autotest)")
+    if not args.audit_dir:
+        parser.error("audit_dir is required (or use --autotest)")
 
-    audit_dir = Path(args.repertoire_audit).resolve()
+    audit_dir = Path(args.audit_dir).resolve()
     output_dir = Path(args.output_dir).resolve() if args.output_dir else audit_dir
 
-    # Garde-fou : refuser d'écrire dans audits/ sans drapeau explicite
-    if "audits" in output_dir.parts and not args.dans_le_dossier_audit:
+    # Guard: refuse to write into audits/ without an explicit flag
+    if "audits" in output_dir.parts and not args.in_audit_dir:
         print(
-            "ERREUR : Ce script refuse d'écrire dans un chemin contenant 'audits'.\n"
+            "ERROR: This script refuses to write into a path containing 'audits'.\n"
             "\n"
-            "RAISON : Un questionnaire généré est VIERGE, toutes ses cases restent à cocher.\n"
-            "Seul un questionnaire revenu REMPLI du client a le droit d'exister dans\n"
-            "audits/<domaine>/. Un questionnaire vierge dans ce dossier peut être envoyé\n"
-            "au client comme s'il était à jour, alors qu'il ne contient aucune réponse.\n"
+            "REASON: A generated questionnaire is BLANK, all its boxes remain to be ticked.\n"
+            "Only a questionnaire returned FILLED-IN by the client may exist in\n"
+            "audits/<domain>/. A blank questionnaire in this directory can be sent\n"
+            "to the client as if it were up to date, when it contains no answer.\n"
             "\n"
-            "SOLUTION :\n"
-            "  - Pour générer sans risque : --output-dir /tmp/questionnaire-<domaine>\n"
-            "  - Pour forcer (si vous savez ce que vous faites) : --dans-le-dossier-audit\n",
+            "SOLUTION:\n"
+            "  - To generate safely: --output-dir /tmp/questionnaire-<domain>\n"
+            "  - To force (if you know what you are doing): --in-audit-dir\n",
             file=sys.stderr
         )
         sys.exit(2)
 
-    # Charger les données
-    ref_path = find_referentiel()
-    criteres_ref, diag_rapide_ref = load_referentiel(ref_path)
-    audit_results, contextes = load_audit_results(audit_dir)
+    # Load the data
+    ref_path = find_reference()
+    criteria_ref, quick_diag_ref = load_reference(ref_path)
+    audit_results, contexts = load_audit_results(audit_dir)
 
-    # Trouver la bibliothèque de blocs
+    # Find the block library
     scripts_dir = Path(__file__).resolve().parent
-    blocs_data = load_blocs(scripts_dir)
+    blocks_data = load_blocks(scripts_dir)
 
-    # Générer le questionnaire unique
-    result = generate_questionnaire_unique(blocs_data, audit_results,
-                                          criteres_ref, diag_rapide_ref, output_dir, contextes)
+    # Generate the single questionnaire
+    result = generate_questionnaire_unique(blocks_data, audit_results,
+                                          criteria_ref, quick_diag_ref, output_dir, contexts)
     if result:
-        print(f"Généré : {result}")
+        print(f"Generated: {result}")
     else:
-        print("Aucun bloc à afficher (résidu vide)")
+        print("No block to display (empty residual)")
 
     return 0
 

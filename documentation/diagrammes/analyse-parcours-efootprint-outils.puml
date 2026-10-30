@@ -1,5 +1,5 @@
 @startuml analyse-parcours-efootprint-outils
-title Pipeline outils e-footprint (CO2e) — outils, données, calcul, restitution
+title e-footprint tool pipeline (CO2e) — tools, data, calculation, reporting
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -17,100 +17,100 @@ skinparam PartitionBackgroundColor #ECECF2
 skinparam PartitionBorderColor #5BA1BC
 
 start
-:Chrome DevTools — capture manuelle du parcours;
+:Chrome DevTools — manual journey capture;
 note right
-  Sortie : .har (requêtes, tailles, timings, IP serveur)
-  + Coverage-*.json (code JS/CSS exécuté,
-  parsing effectué plus tard, hors périmètre CO2e)
+  Output: .har (requests, sizes, timings, server IP)
+  + Coverage-*.json (executed JS/CSS code,
+  parsing done later, out of CO2e scope)
 end note
 
-partition "**Bloc 1 — Outils de collecte** (collect_env_data.py, séquentiel)" {
+partition "**Block 1 — Collection tools** (collect_env_data.py, sequential)" {
   note right #FFF3CD
-    Contrairement au DISPATCH HAR/Coverage,
-    ces outils s'exécutent l'un après l'autre,
-    pas en parallèle
+    Unlike the HAR/Coverage DISPATCH,
+    these tools run one after the other,
+    not in parallel
   end note
 
-  :1. extract_har_data — parsing du HAR;
-  :2. CrUX (API Google) — mix device;
-  :3. ipinfo.io — pays/provider hébergeur;
-  :4. detect_tech.py — stack techno (~35 règles);
-  :5. similarweb_api.py (optionnel) — audience/trafic;
+  :1. extract_har_data — HAR parsing;
+  :2. CrUX (Google API) — device mix;
+  :3. ipinfo.io — hosting country/provider;
+  :4. detect_tech.py — tech stack (~35 rules);
+  :5. similarweb_api.py (optional) — audience/traffic;
 }
 
-partition "**Bloc 2 — Données récoltées** -> env-data.json" {
-  :Poids page, mix device,
-  pays/provider/intensité carbone,
-  tech_stack, audience, trafic;
+partition "**Block 2 — Collected data** -> env-data.json" {
+  :Page weight, device mix,
+  country/provider/carbon intensity,
+  tech_stack, audience, traffic;
   note right
-    Paramètres : audience, ios-mobile-share, sw-domain,
+    Parameters: audience, ios-mobile-share, sw-domain,
     refresh, check, no-similarweb
   end note
 }
 
-partition "**Bloc 3 — run_efootprint.py** (calcul e-footprint/Boavizta, scénario de référence)" {
+partition "**Block 3 — run_efootprint.py** (e-footprint/Boavizta calculation, reference scenario)" {
   note right #FFF3CD
-    Cas optionnel : IA générative tierce détectée
-    -> e-footprint délègue ce calcul précis à
-    EcoLogits (bibliothèque tierce genai-impact),
-    jamais ajouté au total sans confirmation
+    Optional case: third-party generative AI detected
+    -> e-footprint delegates this precise calculation to
+    EcoLogits (third-party genai-impact library),
+    never added to the total without confirmation
   end note
-  :Modèle (mobile + desktop) ->
-  impacts fabrication + énergie
-  par poste (devices, réseau, serveur, stockage);
+  :Model (mobile + desktop) ->
+  manufacturing + energy impacts
+  per item (devices, network, server, storage);
   note right
-    Paramètres : visits, instance,
+    Parameters: visits, instance,
     instance-source, refresh-data
   end note
-  :Écrire efootprint-boavizta-model.json
-  + efootprint-synthese-python.json;
+  :Write efootprint-boavizta-model.json
+  + efootprint-python-summary.json;
 }
 
-partition "**Bloc 3bis — Scénarios de recommandations** (recommendations.py, dans run_efootprint.py)" {
+partition "**Block 3bis — Recommendation scenarios** (recommendations.py, inside run_efootprint.py)" {
   :dead_code_reductions, duplicate_reductions,
-  brotli_reductions -> une Reduction par
-  (Job, recommandation) avec octets transférés,
-  octets décompressés, requêtes retirées;
+  brotli_reductions -> one Reduction per
+  (Job, recommendation) with bytes transferred,
+  bytes decompressed, requests removed;
   note right #FFF3CD
-    Poids décompressé DIRECT (Coverage mesure déjà
-    le code mort sur le décompressé) - sauf doublons
-    HTTP 304 (revalidation cache), exclus du poids
-    décompressé retirable, comptés seulement en
-    requêtes et en octets transférés (déjà minimes)
+    DIRECT decompressed weight (Coverage already
+    measures the dead code on the decompressed) - except
+    HTTP 304 duplicates (cache revalidation), excluded from
+    the removable decompressed weight, counted only in
+    requests and bytes transferred (already tiny)
   end note
-  :apply_recommendations -> 3 SiteSpec cumulées
-  (prio1, prio1+2, prio1+2+3), recalcul RÉEL
-  du modèle Boavizta pour chacune;
-  :Écrire efootprint-scenario-{palier}.e-f.json
-  (4 fichiers : référence + 3 paliers,
-  rechargeables sur e-footprint.boavizta.org)
+  :apply_recommendations -> 3 cumulative SiteSpec
+  (prio1, prio1+2, prio1+2+3), REAL recalculation
+  of the Boavizta model for each;
+  :Write efootprint-scenario-{tier}.e-f.json
+  (4 files: reference + 3 tiers,
+  reloadable on e-footprint.boavizta.org)
   + efootprint-recommendations-gains.json
-  (gain CO2e par palier, reductions_detail
-  par page, recommandations exclues,
-  hypothèses générales);
+  (CO2e gain per tier, reductions_detail
+  per page, excluded recommendations,
+  general hypotheses);
 }
 
-partition "**Bloc 4 — generate_report_html.py** (restitution)" {
-  :Lire les résultats du calcul CO2e
-  (efootprint-synthese-python.json)
-  et la stack technique détectée (tech_stack);
-  :parsing des fichiers Coverage-*.json
-  pour la section Code mort JS/CSS;
-  :Lire efootprint-recommendations-gains.json
-  (si absent ou schéma antérieur : sections
-  omises ou "non disponible", pas d'exception);
-  :Générer section CO2e (KPIs,
-  fabrication/énergie, hypothèses,
-  stack technique, recommandations);
-  :Recommandations -> bloc "Gain CO2e estimé"
-  + bloc "Gain EcoIndex & LCP estimé"
-  (recalcul par page via har_metrics.py
+partition "**Block 4 — generate_report_html.py** (reporting)" {
+  :Read the CO2e calculation results
+  (efootprint-python-summary.json)
+  and the detected tech stack (tech_stack);
+  :parsing of the Coverage-*.json files
+  for the Dead JS/CSS code section;
+  :Read efootprint-recommendations-gains.json
+  (if absent or older schema: sections
+  omitted or "not available", no exception);
+  :Generate the CO2e section (KPIs,
+  manufacturing/energy, hypotheses,
+  tech stack, recommendations);
+  :Recommendations -> block "Estimated CO2e gain"
+  + block "Estimated EcoIndex & LCP gain"
+  (per-page recalculation via har_metrics.py
   ecoindex_score/ecoindex_grade/lcp_delta_s,
-  LCP = estimation grossière, surestimation
-  possible, dit explicitement);
-  :Annexe Méthodologie -> F. Recommandations
-  & gain CO2e, G. Gain EcoIndex & LCP par page
-  (3 tableaux, un par palier, delta par page);
+  LCP = rough estimate, overestimation
+  possible, stated explicitly);
+  :Methodology appendix -> F. Recommendations
+  & CO2e gain, G. EcoIndex & LCP gain per page
+  (3 tables, one per tier, delta per page);
 }
 
 stop

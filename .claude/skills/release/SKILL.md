@@ -1,117 +1,114 @@
 ---
 name: release
 description: >
-  Fait évoluer de manière cohérente le numéro de version du projet Agent EROOM
-  et les 3 fichiers qui doivent rester synchronisés : `.claude/skills/analyse-parcours/SKILL.md`
-  (champ `version:`, source de vérité, affichée dans le footer des rapports générés),
-  `CHANGELOG.md` (historique) et `README.md` (ligne "Version actuelle : X" en tête
-  de fichier). S'active sur "/release", "bump la version", "nouvelle version",
-  "sors une release", ou toute demande de faire évoluer le numéro de version du projet.
+  Evolves, consistently, the version number of the Agent EROOM project
+  and the 3 files that must stay in sync: `.claude/skills/analyse-parcours/SKILL.md`
+  (the `version:` field, source of truth, displayed in the footer of generated reports),
+  `CHANGELOG.md` (history) and `README.md` (the "Current version: X" line at the top
+  of the file). Activates on "/release", "bump the version", "new version",
+  "cut a release", or any request to evolve the project version number.
 version: 1.0.0
 ---
 
-# Skill : release (Agent EROOM)
+# Skill: release (Agent EROOM)
 
-## Vue d'ensemble
+## Overview
 
-Le projet Agent EROOM a un seul numéro de version, dont la source de vérité
-est le champ `version:` du frontmatter de `.claude/skills/analyse-parcours/SKILL.md`
-(lu dynamiquement par `generate_report_html.py` pour le H1 et le footer des
-rapports générés). Deux autres fichiers doivent refléter la même valeur :
+The Agent EROOM project has a single version number, whose source of truth
+is the `version:` field of the frontmatter of `.claude/skills/analyse-parcours/SKILL.md`
+(read dynamically by `generate_report_html.py` for the H1 and the footer of
+generated reports). Two other files must reflect the same value:
 
-1. `CHANGELOG.md` (racine du dépôt) : une entrée par version, la plus récente en tête.
-2. `README.md` (racine du dépôt) : la ligne `**Version actuelle : X.Y.Z**` juste après
-   la description en une ligne du projet, avant la section "Pourquoi ce projet existe".
+1. `CHANGELOG.md` (repo root): one entry per version, the most recent on top.
+2. `README.md` (repo root): the line `**Current version: X.Y.Z**` right after
+   the one-line project description, before the "Why this project exists" section.
 
-**Ne jamais modifier un seul de ces 3 fichiers sans les deux autres.** C'est
-exactement le problème que ce skill résout : sans lui, il est facile de bumper
-`SKILL.md` en oubliant `CHANGELOG.md` ou `README.md`, et les 3 sources dérivent.
+**Never modify only one of these 3 files without the other two.** That is
+exactly the problem this skill solves: without it, it is easy to bump
+`SKILL.md` while forgetting `CHANGELOG.md` or `README.md`, and the 3 sources drift.
 
-## Étapes
+## Steps
 
-### 1. Lire l'état actuel
+### 1. Read the current state
 
-- Version actuelle : champ `version:` de `.claude/skills/analyse-parcours/SKILL.md`.
-- Dernier commit de bump : `git log --oneline -- .claude/skills/analyse-parcours/SKILL.md`
-  puis `git show <hash>` sur le plus récent pour retrouver sa date et son message.
-- Vérifier que `CHANGELOG.md` et le `README.md` sont bien alignés sur cette version
-  actuelle (avant de commencer). Si l'un des deux est déjà décalé, le signaler
-  explicitement à l'utilisateur avant de continuer — c'est un signal qu'une
-  évolution précédente a été faite sans passer par ce skill.
+- Current version: the `version:` field of `.claude/skills/analyse-parcours/SKILL.md`.
+- Last bump commit: `git log --oneline -- .claude/skills/analyse-parcours/SKILL.md`
+  then `git show <hash>` on the most recent one to find its date and message.
+- Check that `CHANGELOG.md` and `README.md` are indeed aligned on this current
+  version (before starting). If one of the two is already out of sync, signal it
+  explicitly to the user before continuing — it is a sign that a previous
+  evolution was done without going through this skill.
 
-### 2. Recenser ce qui a changé depuis le dernier bump
+### 2. Inventory what changed since the last bump
 
 ```bash
-git log --oneline <hash-du-dernier-bump>..HEAD
+git log --oneline <last-bump-hash>..HEAD
 ```
 
-Regrouper les commits par thème (pas un bullet par commit : ce serait illisible
-pour une session avec beaucoup de petits fixes). S'inspirer du regroupement déjà
-fait dans les entrées existantes de `CHANGELOG.md` pour le ton et le niveau de
-détail attendu.
+Group the commits by theme (not one bullet per commit: that would be unreadable
+for a session with many small fixes). Draw inspiration from the grouping already
+done in the existing `CHANGELOG.md` entries for the tone and level of detail
+expected.
 
-### 3. Demander le type de release à l'utilisateur
+### 3. Ask the user for the release type
 
-Poser la question avec `AskUserQuestion` (jamais trancher seul un numéro de
-version, c'est une décision produit) :
-- **Patch** (X.Y.Z+1) : correctifs, stabilisation, pas de nouvelle capacité.
-- **Minor** (X.Y+1.0) : nouvelle fonctionnalité, sondes ou critères ajoutés,
-  rétrocompatible.
-- **Major** (X+1.0.0) : rupture (référentiel migré, format de sortie changé,
-  incompatible avec les audits précédents).
+Ask the question with `AskUserQuestion` (never decide a version number alone,
+it is a product decision):
+- **Patch** (X.Y.Z+1): fixes, stabilization, no new capability.
+- **Minor** (X.Y+1.0): new feature, probes or criteria added, backward compatible.
+- **Major** (X+1.0.0): breaking change (migrated reference, changed output format,
+  incompatible with previous audits).
 
-Demander aussi un thème court (1 à 3 mots) pour l'entête de l'entrée changelog,
-comme "Stabilisation" pour la 1.2.1 — reprendre ce même mot-clé si l'utilisateur
-le redemande explicitement, sinon proposer un thème cohérent avec le contenu
-recensé à l'étape 2 et le faire valider.
+Also ask for a short theme (1 to 3 words) for the changelog entry header,
+like "Stabilization" for 1.2.1 — reuse the same keyword if the user explicitly
+asks for it again, otherwise propose a theme consistent with the content
+inventoried at step 2 and have it validated.
 
-### 4. Rédiger l'entrée CHANGELOG.md et la faire valider avant d'écrire
+### 4. Draft the CHANGELOG.md entry and have it validated before writing
 
-Format d'une entrée (voir les entrées existantes) :
+Entry format (see existing entries):
 
 ```markdown
-## [X.Y.Z] - AAAA-MM-JJ — Thème
+## [X.Y.Z] - YYYY-MM-DD — Theme
 
-Phrase d'intro optionnelle si le contexte le justifie (ex : "pas de nouvelle
-fonctionnalité majeure : ...").
+Optional intro sentence if the context justifies it (ex: "no major new
+feature: ...").
 
-- Bullet thématique 1
-- Bullet thématique 2
+- Thematic bullet 1
+- Thematic bullet 2
 ```
 
-Afficher le brouillon de l'entrée à l'utilisateur avant de toucher aux fichiers.
+Show the draft entry to the user before touching any file.
 
-### 5. Écrire les 3 fichiers en une seule fois
+### 5. Write the 3 files in one go
 
-Dans cet ordre, sans s'arrêter entre les trois (pour ne jamais laisser un état
-incohérent visible en git status) :
+In this order, without stopping between the three (so as never to leave an
+inconsistent state visible in git status):
 
-1. `.claude/skills/analyse-parcours/SKILL.md` : `version: X.Y.Z`
-2. `CHANGELOG.md` : nouvelle entrée en tête (juste après le chapeau, avant la
-   première entrée existante)
-3. `README.md` : `**Version actuelle : X.Y.Z**`
+1. `.claude/skills/analyse-parcours/SKILL.md`: `version: X.Y.Z`
+2. `CHANGELOG.md`: new entry on top (right after the header, before the
+   first existing entry)
+3. `README.md`: `**Current version: X.Y.Z**`
 
-### 6. Vérifier la cohérence après coup
+### 6. Check consistency afterwards
 
 ```bash
 grep -n "version:" .claude/skills/analyse-parcours/SKILL.md
 grep -n "^## \[" CHANGELOG.md | head -1
-grep -n "Version actuelle" README.md
+grep -n "Current version" README.md
 ```
 
-Confirmer à l'utilisateur que les 3 valeurs affichent bien le même numéro.
+Confirm to the user that the 3 values do display the same number.
 
 ### 7. Commit
 
-Ne committer que si l'utilisateur le demande explicitement (règle générale du
-projet, non levée par ce skill). Un commit de release regroupe typiquement les
-3 fichiers en un seul commit, message du type
-`chore(release): passe en X.Y.Z (thème)`.
+Only commit if the user explicitly asks for it (general project rule, not lifted
+by this skill). A release commit typically groups the 3 files in a single commit,
+message of the type `chore(release): bump to X.Y.Z (theme)`.
 
-## Ce que ce skill ne fait pas
+## What this skill does not do
 
-- Pas de tag git automatique (le dépôt n'utilise pas de tags à ce jour).
-- Pas de publication/déploiement : uniquement la cohérence des 3 fichiers de
-  version et l'historique.
-- Ne décide jamais seul du numéro de version ou du contenu de l'entrée
-  changelog : toujours validé avec l'utilisateur avant écriture.
+- No automatic git tag (the repo does not use tags to date).
+- No publication/deployment: only the consistency of the 3 version files and the history.
+- Never decides alone the version number or the content of the changelog entry:
+  always validated with the user before writing.

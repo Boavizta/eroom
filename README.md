@@ -1,173 +1,173 @@
-DISCLAIMER : CECI EST UN TRAVAIL EN COURS ET N’A PAS ÉTÉ VALIDÉ PAR LA COMMUNAUTÉ BOAVIZTA. 
+DISCLAIMER: THIS IS A WORK IN PROGRESS AND HAS NOT BEEN VALIDATED BY THE BOAVIZTA COMMUNITY.
 
 # Agent EROOM
 
-Outils et référentiels pour diagnostiquer l'impact environnemental d'un service numérique, à partir de données réelles plutôt que de moyennes génériques.
+Tools and frameworks to diagnose the environmental impact of a digital service, from real data rather than generic averages.
 
-**Version actuelle : 1.2.1** — historique complet des versions dans [`CHANGELOG.md`](CHANGELOG.md).
+**Current version: 1.2.1** — full version history in [`CHANGELOG.md`](CHANGELOG.md).
 
-## Pourquoi ce projet existe
+## Why this project exists
 
-La plupart des estimations d'empreinte numérique reposent sur des hypothèses génériques : un "poids de page moyen", un "temps de visite moyen", un mix d'appareils moyen. Ces moyennes masquent ce qui se passe réellement pour un utilisateur donné, sur un parcours donné.
+Most digital footprint estimates rely on generic assumptions: an "average page weight", an "average visit duration", an "average device mix". These averages hide what actually happens for a given user, on a given journey.
 
-EROOM part d'un principe simple : mesurer d'abord ce qui se passe vraiment (le trafic réseau réellement capturé, le code réellement exécuté, les hôtes tiers réellement contactés), puis construire l'estimation par-dessus cette mesure, jamais à sa place. Quand une hypothèse générique est malgré tout nécessaire (durée de vie du matériel, intensité carbone électrique, longueur de réponse d'une IA générative...), elle est explicitée : sa valeur, sa source, son niveau de confiance sont tracés et affichés, jamais noyés dans un chiffre final présenté comme certain.
+EROOM starts from a simple principle: measure first what really happens (the network traffic actually captured, the code actually executed, the third-party hosts actually contacted), then build the estimate on top of that measurement, never in its place. When a generic assumption is nevertheless necessary (hardware lifespan, electricity carbon intensity, length of a generative AI response...), it is made explicit: its value, its source, its confidence level are tracked and displayed, never drowned in a final figure presented as certain.
 
-Deux autres principes guident les choix du projet :
+Two other principles guide the project's choices:
 
-- **Multi-critère plutôt que mono-critère.** Un parcours web se regarde sous plusieurs angles à la fois : trafic réseau, code mort, performance perçue (Core Web Vitals), empreinte carbone. Aucun de ces angles ne remplace les autres.
-- **Un humain garde la main.** Les estimations produites nourrissent une décision humaine (prioriser, arbitrer, alerter), elles ne l'automatisent pas. Aucune boucle n'agit seule sur la base d'un résultat.
+- **Multi-criteria rather than single-criteria.** A web journey is looked at from several angles at once: network traffic, dead code, perceived performance (Core Web Vitals), carbon footprint. None of these angles replaces the others.
+- **A human stays in the loop.** The estimates produced feed a human decision (prioritize, arbitrate, alert); they do not automate it. No loop acts on its own based on a result.
 
-## Ce que contient le dépôt
+## What the repository contains
 
-Le projet regroupe trois familles d'outils, complémentaires mais indépendantes :
+The project brings together three families of tools, complementary but independent:
 
-### `analyse-parcours` : diagnostic technique d'un parcours web
+### `analyse-parcours`: technical diagnosis of a web journey
 
-À partir d'une capture HAR (trafic réseau, export Chrome DevTools) et de fichiers de couverture JS/CSS, ce skill produit un rapport HTML avec :
+From a HAR capture (network traffic, Chrome DevTools export) and JS/CSS coverage files, this skill produces an HTML report with:
 
-- le détail du trafic réseau (requêtes, domaines, volumes, codes HTTP) ;
-- le score EcoIndex (0 à 100, grade A à G) et le code mort JS/CSS ;
-- les Core Web Vitals (données terrain via PageSpeed Insights/Chrome UX Report, à défaut mesurés en laboratoire via Lighthouse) ;
-- des recommandations croisées avec la stack technique détectée.
+- the network traffic detail (requests, domains, volumes, HTTP codes);
+- the EcoIndex score (0 to 100, grade A to G) and JS/CSS dead code;
+- Core Web Vitals (field data via PageSpeed Insights/Chrome UX Report, failing that measured in the lab via Lighthouse);
+- recommendations cross-referenced with the detected technical stack.
 
 → `.claude/skills/analyse-parcours/`
 
-### `efootprint` : estimation CO2e du parcours
+### `efootprint`: CO2e estimation of the journey
 
-Étape optionnelle du même skill, qui réutilise les données déjà capturées (HAR, mix d'appareils CrUX, pays et hébergeur du serveur via ipinfo.io, trafic annuel SimilarWeb) pour construire un modèle avec la bibliothèque [e-footprint](https://github.com/Boavizta/e-footprint) de Boavizta, et insère une section "Impact environnemental" dans le rapport. Quand le parcours appelle une IA générative tierce, e-footprint délègue ce calcul précis à une bibliothèque tierce, EcoLogits.
+Optional step of the same skill, which reuses the data already captured (HAR, CrUX device mix, server country and host via ipinfo.io, annual traffic SimilarWeb) to build a model with the [e-footprint](https://github.com/Boavizta/e-footprint) library from Boavizta, and inserts an "Environmental impact" section into the report. When the journey calls a third-party generative AI, e-footprint delegates that specific calculation to a third-party library, EcoLogits.
 
-Ce que la bibliothèque e-footprint mesure, sur quoi elle repose et où sont ses limites est documenté sans détour dans `documentation/implementation/methodologie_efootprint.md`.
+What the e-footprint library measures, what it relies on and where its limits are is documented in plain terms in `documentation/implementation/efootprint-methodology.md`.
 
 → `.claude/skills/analyse-parcours/scripts/efootprint_model/`
 
-### Référentiel EROOM : diagnostic rapide d'éco-conception
+### EROOM framework: quick eco-design diagnosis
 
-Une grille de qualification à 16 critères / 6 piliers, dérivée du référentiel EOF, revue pour que chaque critère soit une vraie question de degré et que chaque évaluation soit reproductible d'une personne (ou d'un agent) à l'autre.
+A qualification grid of 16 criteria / 6 pillars, derived from the EOF framework, reviewed so that each criterion is a real question of degree and each evaluation is reproducible from one person (or agent) to another.
 
 → `.claude/skills/analyse-parcours/docs/Référenciel EROOM/`
 
 -----
 
-## Diagrammes
+## Diagrams
 
-Vue générale du workflow (par thématique), du recueil manuel du parcours jusqu'à la régénération du rapport après questionnaire :
+Overview of the workflow (by theme), from manual journey capture to report regeneration after the questionnaire:
 
-![Vue générale du workflow](documentation/diagrammes/analyse-parcours-vue-generale.jpg)
+![Workflow overview](documentation/diagrammes/analyse-parcours-vue-generale.jpg)
 
-Zoom sur l'étape DISPATCH (répartition de l'analyse HAR/Coverage en 2 sous-agents parallèles) :
+Zoom on the DISPATCH step (splitting the HAR/Coverage analysis into 2 parallel sub-agents):
 
-![DISPATCH — flux des vagues](documentation/diagrammes/analyse-parcours-dispatch-activite.jpg)
+![DISPATCH — wave flow](documentation/diagrammes/analyse-parcours-dispatch-activite.jpg)
 
-Workflow principal en diagramme de séquence (5 pages : localisation, DISPATCH, rapport, puis collecte et calcul e-footprint) :
+Main workflow as a sequence diagram (5 pages: localization, DISPATCH, report, then e-footprint collection and calculation):
 
-![Séquence — page 1/5](documentation/diagrammes/analyse-parcours-p1.jpg)
+![Sequence — page 1/5](documentation/diagrammes/analyse-parcours-p1.jpg)
 
-![Séquence — page 2/5](documentation/diagrammes/analyse-parcours-p2.jpg)
+![Sequence — page 2/5](documentation/diagrammes/analyse-parcours-p2.jpg)
 
-![Séquence — page 3/5](documentation/diagrammes/analyse-parcours-p3.jpg)
+![Sequence — page 3/5](documentation/diagrammes/analyse-parcours-p3.jpg)
 
-![Séquence — page 4/5](documentation/diagrammes/analyse-parcours-p4.jpg)
+![Sequence — page 4/5](documentation/diagrammes/analyse-parcours-p4.jpg)
 
-![Séquence — page 5/5](documentation/diagrammes/analyse-parcours-p5.jpg)
+![Sequence — page 5/5](documentation/diagrammes/analyse-parcours-p5.jpg)
 
-Pipeline outils de l'estimation e-footprint (collecte → calcul Boavizta → scénarios de recommandations → restitution) :
+Tool pipeline of the e-footprint estimation (collection → Boavizta calculation → recommendation scenarios → delivery):
 
-![e-footprint — pipeline outils](documentation/diagrammes/analyse-parcours-efootprint-outils.jpg)
+![e-footprint — tool pipeline](documentation/diagrammes/analyse-parcours-efootprint-outils.jpg)
 
-Versions imprimables (PDF) : [vue générale](documentation/diagrammes/analyse-parcours-vue-generale.pdf) · [DISPATCH](documentation/diagrammes/analyse-parcours-dispatch-activite.pdf) · [workflow (séquence, 5 pages)](documentation/diagrammes/analyse-parcours-workflow.pdf) · [e-footprint (pipeline outils)](documentation/diagrammes/analyse-parcours-efootprint-outils.pdf).
+Printable versions (PDF): [overview](documentation/diagrammes/analyse-parcours-vue-generale.pdf) · [DISPATCH](documentation/diagrammes/analyse-parcours-dispatch-activite.pdf) · [workflow (sequence, 5 pages)](documentation/diagrammes/analyse-parcours-workflow.pdf) · [e-footprint (tool pipeline)](documentation/diagrammes/analyse-parcours-efootprint-outils.pdf).
 
-Les sources `.puml`/`.svg` et la procédure de régénération (registre complet de tous les diagrammes du projet) sont documentées dans le skill `.claude/skills/diagrammes-analyse-parcours/SKILL.md`.
+The `.puml`/`.svg` sources and the regeneration procedure (complete registry of all the project's diagrams) are documented in the skill `.claude/skills/diagrammes-analyse-parcours/SKILL.md`.
 
 -----
 
-## Structure du dépôt
+## Repository structure
 
 ```
 .
 ├── .claude/skills/
-│   ├── analyse-parcours/                      # Le skill principal (diagnostic + e-footprint)
-│   │   ├── SKILL.md                           # Workflow complet (référence technique)
-│   │   ├── docs/                              # Guides (capture HAR/Coverage, clés API...)
-│   │   ├── skill-steps/                       # Étapes détaillées du workflow
+│   ├── analyse-parcours/                      # The main skill (diagnosis + e-footprint)
+│   │   ├── SKILL.md                           # Complete workflow (technical reference)
+│   │   ├── docs/                              # Guides (HAR/Coverage capture, API keys...)
+│   │   ├── skill-steps/                       # Detailed workflow steps
 │   │   └── scripts/                           # analyze_har.py, run_efootprint.py, efootprint_model/...
-│   ├── diagrammes-analyse-parcours/           # Skill de génération/maintenance des diagrammes
-│   └── eof/                                   # Skill de fabrication du template EOF (référentiel source)
-├── audits/<nom-du-site-audité>/                # Résultats d'audits réels (rapports HTML, e-footprint, EOF, topologie)
+│   ├── diagrammes-analyse-parcours/           # Diagram generation/maintenance skill
+│   └── eof/                                   # EOF template generation skill (source framework)
+├── audits/<audited-site-name>/                # Real audit results (HTML reports, e-footprint, EOF, topology)
 ├── documentation/
-│   ├── diagrammes/                            # Diagrammes PlantUML (.puml, .svg, .pdf, .jpg, .pptx)
-│   └── implementation/                        # Méthodologie e-footprint, setup clés API
-├── EOF_study_Quick_and_fast_first_questionary/  # Étude du référentiel EOF -> questionnaire
-├── exemples fictifs radar EOF/                 # Démonstration du rendu radar SVG (données fictives)
-├── processus/                                  # Fusion multi-agents des lots d'analyse EOF
+│   ├── diagrammes/                            # PlantUML diagrams (.puml, .svg, .pdf, .jpg, .pptx)
+│   └── implementation/                        # e-footprint methodology, API key setup
+├── EOF_study_Quick_and_fast_first_questionnaire/  # EOF framework study -> questionnaire
+├── example-radar-eof/                 # SVG radar rendering demo (fictional data)
+├── process/                                  # Multi-agent merge of EOF analysis lots
 ├── LICENSE
 └── README.md
 ```
 
-Sous `audits/`, les données brutes potentiellement sensibles (`donnees-brutes-potentiellement-sensibles/`, `pages-html/`, `PERIMETRE-CAPTURE.md`) sont exclues du dépôt à n'importe quelle profondeur.
+Under `audits/`, raw potentially sensitive data (`raw-data-potentially-sensitive/`, `html-pages/`, `SCOPE-CAPTURE.md`) is excluded from the repository at any depth.
 
 -----
 
-## Prérequis
+## Prerequisites
 
 - [Claude Code](https://claude.com/claude-code)
-- **Google Chrome** — capture manuelle du HAR et des données de couverture JS/CSS via DevTools (voir `.claude/skills/analyse-parcours/docs/capturer-har-et-coverage.md`)
-- **Python 3**, avec la bibliothèque [`e-footprint`](https://github.com/Boavizta/e-footprint) (estimation CO2e)
-- **Node.js** — pour Lighthouse (mesure Core Web Vitals en repli si les données terrain CrUX/PageSpeed ne sont pas disponibles), installé une seule fois via `npm install --prefix .claude/skills/analyse-parcours/scripts/`
-- **Clés API personnelles** : PageSpeed Insights/Chrome UX Report et ipinfo.io (voir `documentation/implementation/setup_Google_api_keys.md`)
-- Pour régénérer les diagrammes : `plantuml`, `rsvg-convert`, `magick` (ImageMagick) et `soffice` (LibreOffice, pour l'export `.pptx`)
+- **Google Chrome** — manual capture of the HAR and JS/CSS coverage data via DevTools (see `.claude/skills/analyse-parcours/docs/capture-har-and-coverage.md`)
+- **Python 3**, with the [`e-footprint`](https://github.com/Boavizta/e-footprint) library (CO2e estimation)
+- **Node.js** — for Lighthouse (Core Web Vitals lab measurement as a fallback when CrUX/PageSpeed field data is not available), installed once via `npm install --prefix .claude/skills/analyse-parcours/scripts/`
+- **Personal API keys**: PageSpeed Insights/Chrome UX Report and ipinfo.io (see `documentation/implementation/setup_Google_api_keys.md`)
+- To regenerate the diagrams: `plantuml`, `rsvg-convert`, `magick` (ImageMagick) and `soffice` (LibreOffice, for the `.pptx` export)
 
 -----
 
 ## Installation
 
 ```bash
-git clone <URL_du_dépôt_distant>/eroom.git
+git clone <remote-repo-URL>/eroom.git
 cd eroom
 ```
 
-Ouvrir le dossier avec Claude Code : les skills (`analyse-parcours`, `diagrammes-analyse-parcours`, `eof`) sont détectés automatiquement (`.claude/skills/`).
+Open the folder with Claude Code: the skills (`analyse-parcours`, `diagrammes-analyse-parcours`, `eof`) are detected automatically (`.claude/skills/`).
 
 -----
 
-## Démarrage rapide
+## Quick start
 
-Ces outils s'utilisent depuis [Claude Code](https://claude.com/claude-code), sous forme de skills invoqués en langage naturel ou par commande explicite :
+These tools are used from [Claude Code](https://claude.com/claude-code), as skills invoked in natural language or by explicit command:
 
 ```
-/analyse-parcours <dossier-contenant-le-har-et-les-fichiers-de-couverture>
-/efootprint <même-dossier>          # estimation CO2e seule
+/analyse-parcours <folder-containing-the-HAR-and-coverage-files>
+/efootprint <same-folder>          # CO2e estimation only
 ```
 
-## Statut
+## Status
 
-Projet actif, développé au fil des audits réels. Les décisions structurantes et les limites connues sont documentées dans `documentation/` ; l'historique détaillé des choix vit dans les messages de commit. L'historique des versions est résumé dans [`CHANGELOG.md`](CHANGELOG.md).
+Active project, developed through real audits. Structuring decisions and known limits are documented in `documentation/`; the detailed history of choices lives in the commit messages. The version history is summarized in [`CHANGELOG.md`](CHANGELOG.md).
 
-## Licence
+## License
 
-Ce dépôt est distribué sous licence [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/). Voir `LICENSE`.
+This repository is distributed under the [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/) license. See `LICENSE`.
 
-### Projets et services tiers utilisés
+### Third-party projects and services used
 
-Le code de ce dépôt s'appuie sur ses propres scripts pour capturer et analyser les données (HAR, couverture JS/CSS...), mais délègue certains calculs ou certaines données à des projets et services tiers, listés ci-dessous avec leur origine, leurs auteurs et leur licence :
+The code in this repository relies on its own scripts to capture and analyze data (HAR, JS/CSS coverage...), but delegates some calculations or some data to third-party projects and services, listed below with their origin, authors and license:
 
-- [e-footprint](https://github.com/Boavizta/e-footprint) (modélisation CO2e du parcours) — Boavizta / Vincent Villet (Publicis Sapient) — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+- [e-footprint](https://github.com/Boavizta/e-footprint) (journey CO2e modeling) — Boavizta / Vincent Villet (Publicis Sapient) — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
 
-  - [boaviztapi](https://github.com/Boavizta/boaviztapi) (données/calculs d'impact matériel, utilisé par e-footprint) — Boavizta — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+  - [boaviztapi](https://github.com/Boavizta/boaviztapi) (hardware impact data/calculations, used by e-footprint) — Boavizta — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
 
-  - [EcoLogits](https://github.com/mlco2/ecologits) (calcul d'impact des appels à une IA générative tierce, délégué par e-footprint) — mlco2, Samuel Rincé et Adrien Banse — [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/)
+  - [EcoLogits](https://github.com/mlco2/ecologits) (impact calculation for calls to a third-party generative AI, delegated by e-footprint) — mlco2, Samuel Rincé and Adrien Banse — [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/)
 
-- [PageSpeed Insights](https://developers.google.com/speed/docs/insights/v5/about) (API, données terrain et lab) — Google — service sous [conditions d'utilisation des API Google](https://developers.google.com/terms)
+- [PageSpeed Insights](https://developers.google.com/speed/docs/insights/v5/about) (API, field and lab data) — Google — service under [Google API Terms of Service](https://developers.google.com/terms)
 
-- [Chrome UX Report (CrUX)](https://developer.chrome.com/docs/crux) (données terrain P75, via l'API PageSpeed Insights) — Google — données sous [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- [Chrome UX Report (CrUX)](https://developer.chrome.com/docs/crux) (P75 field data, via the PageSpeed Insights API) — Google — data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-- [Lighthouse](https://github.com/GoogleChrome/lighthouse) (mesure de repli des Core Web Vitals en laboratoire) — Google (GoogleChrome) — [Apache-2.0](https://github.com/GoogleChrome/lighthouse/blob/main/LICENSE)
+- [Lighthouse](https://github.com/GoogleChrome/lighthouse) (fallback lab measurement of Core Web Vitals) — Google (GoogleChrome) — [Apache-2.0](https://github.com/GoogleChrome/lighthouse/blob/main/LICENSE)
 
-- [GreenIT-Analysis](https://github.com/cnumr/GreenIT-Analysis) (méthode de mesure DOM/poids de page dont s'inspire `analyze_har.py`) — © EcoIndex.fr / Frédéric Bordage, auteurs d'EcoMeter, didierfred@gmail.com, maintenu par CNumr — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+- [GreenIT-Analysis](https://github.com/cnumr/GreenIT-Analysis) (DOM/page-weight measurement method that `analyze_har.py` draws on) — © EcoIndex.fr / Frédéric Bordage, authors of EcoMeter, didierfred@gmail.com, maintained by CNumr — [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)
 
-- [EcoIndex](https://github.com/cnumr/ecoindex_reference) (formule de calcul du score, reprise dans `har_metrics.py`) — CNumr (Collectif Conception Numérique Responsable), valeurs d'analyse de cycle de vie © Frédéric Bordage — [CC BY-NC-ND 3.0](https://creativecommons.org/licenses/by-nc-nd/3.0/)
+- [EcoIndex](https://github.com/cnumr/ecoindex_reference) (score calculation formula, reused in `har_metrics.py`) — CNumr (Collectif Conception Numérique Responsable), life-cycle analysis values © Frédéric Bordage — [CC BY-NC-ND 3.0](https://creativecommons.org/licenses/by-nc-nd/3.0/)
 
-- [SimilarWeb](https://www.similarweb.com) (estimation du trafic annuel, via `similarweb_api.py`) — SimilarWeb Ltd — service commercial sous conditions d'utilisation SimilarWeb
+- [SimilarWeb](https://www.similarweb.com) (annual traffic estimation, via `similarweb_api.py`) — SimilarWeb Ltd — commercial service under SimilarWeb terms of use
 
-- [ipinfo.io](https://ipinfo.io) (API de géolocalisation/hébergeur d'IP, via `collect_env_data.py`) — IPinfo LLC — service commercial sous conditions d'utilisation IPinfo
+- [ipinfo.io](https://ipinfo.io) (IP geolocation/hosting API, via `collect_env_data.py`) — IPinfo LLC — commercial service under IPinfo terms of use
 
-Inspiration méthodologique (aucun code repris) : la pondération de `analyze_security_headers.py` s'inspire de [securityheaders.com](https://securityheaders.com) (Scott Helme).
+Methodological inspiration (no code reused): the weighting of `analyze_security_headers.py` draws on [securityheaders.com](https://securityheaders.com) (Scott Helme).

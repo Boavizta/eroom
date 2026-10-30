@@ -1,100 +1,102 @@
 -----
 -----
-# Photocopie de la Google Sheet source du référentiel EOF
+# Snapshot of the source Google Sheet of the EOF reference framework
 -----
 -----
 
-Ces 9 fichiers sont **l'export brut de la Google Sheet EOF-V.1.1 d'EROOM**, un fichier
-par onglet. Ce n'est pas de la documentation : c'est la **source de vérité** à partir de
-laquelle `eof-referentiel.json` est fabriqué.
+These 9 files are the **raw export of EROOM's EOF-V.1.1 Google Sheet**, one file
+per tab. This is not documentation: it is the **source of truth** from which
+`eof-reference.json` is built.
 
-**Date de la photocopie : 2026-09-02.** Vérifiée encore identique à la Sheet vivante le
+**Snapshot date: 2026-09-02.** Verified still identical to the live Sheet on
 2026-09-07.
 
-## Pourquoi ces fichiers sont versionnés
+## Why these files are versioned
 
-Ils étaient auparavant dans `tmp/eof-gviz/`, un dossier ignoré par git, donc sauvegardés
-nulle part. Le lien vers la Sheet, lui, a toujours été versionné dans `../../SKILL.md`.
-La distinction compte :
+They used to be in `tmp/eof-gviz/`, a git-ignored directory, so saved
+nowhere. The link to the Sheet, however, has always been versioned in `../../SKILL.md`.
+The distinction matters:
 
-| | Où | Perdable |
+| | Where | Losable |
 |---|---|---|
-| L'adresse de la Sheet et la recette de téléchargement | `../../SKILL.md` | non |
-| **La photocopie, c'est-à-dire le point de comparaison** | **ici** | **plus maintenant** |
+| The Sheet address and the download recipe | `../../SKILL.md` | no |
+| **The snapshot, i.e. the point of comparison** | **here** | **not anymore** |
 
-Sans point de comparaison, retélécharger la Sheet n'apprend rien : on obtient son état
-du jour, sans pouvoir dire ce qui a changé. Le seul intérêt de garder cette photocopie
-est donc de **détecter une évolution du référentiel chez EROOM**.
+Without a point of comparison, re-downloading the Sheet learns nothing: you get its
+state of the day, without being able to say what changed. The only interest of keeping this snapshot
+is therefore to **detect an evolution of the framework at EROOM**.
 
-Ce n'est pas théorique : la Sheet a déjà été enrichie de **43 à 54 critères détaillés**
-depuis l'export Excel initialement fourni par EROOM, découverte faite le 2026-09-02.
-Elle bougera encore.
+It is not theoretical: the Sheet has already been enriched from **43 to 54 detailed
+criteria** since the Excel export initially provided by EROOM, a discovery made on 2026-09-02.
+It will move again.
 
-C'est aussi en relisant cette source qu'on a établi que le code appliquait la **mauvaise
-formule** du potentiel d'optimisation : le dénominateur porte sur **tous** les critères
-d'une dimension, répondus ou non. Ces fichiers sont la pièce à conviction de cette
+It is also by re-reading this source that we established that the code applied the **wrong
+formula** for the optimization potential: the denameinator covers **all** the criteria
+of a dimension, answered or not. These files are the evidence for this
 correction.
 
-## Vérifier si EROOM a modifié le référentiel
+## Check whether EROOM modified the reference framework
 
 ```bash
-.claude/skills/eof/scripts/verifier_source_sheet.sh
+.claude/skills/eof/scripts/verify_source_sheet.sh
 ```
 
-Aucun effet de bord, ne touche à rien, code de sortie 0 si rien n'a bougé, 1 sinon.
-Détecte aussi une Sheet devenue privée ou un onglet supprimé, qui renvoient du HTML avec
-un code 200 et se compareraient sinon en silence.
+No side effect, touches nothing, exit code 0 if nothing changed, 1 otherwise.
+Also detects a Sheet that became private or a deleted tab, which return HTML with
+a 200 code and would otherwise be compared silently.
 
-Pour adopter une évolution :
+To adopt an evolution:
 
 ```bash
-.claude/skills/eof/scripts/verifier_source_sheet.sh --rafraichir
-git diff .claude/skills/eof/docs/source-sheet/   # voir exactement ce qu'EROOM a changé
+.claude/skills/eof/scripts/verify_source_sheet.sh --refresh
+git diff .claude/skills/eof/docs/source-sheet/   # see exactly what EROOM changed
 ```
 
-Puis régénérer le référentiel, cf. étape 2 de `../../SKILL.md`, et rejouer
-`processus/valider_coherence_cles.py`.
+Then regenerate the reference framework, cf. step 2 of `../../SKILL.md`, and re-run
+`process/validate_key_consistency.py`.
 
-## Format des fichiers
+## File format
 
-Ce sont des réponses de l'interface `gviz` de Google, pas du JSON pur : chaque fichier
-commence par `/*O_o*/` puis `google.visualization.Query.setResponse({...})`. Il faut
-retirer cette enveloppe avant de parser, ce que fait déjà
-`../../scripts/build_template.py`. Les exports CSV et XLSX classiques ne sont pas
-utilisables ici : ils passent par une redirection à jeton à usage unique.
+These are responses of Google's `gviz` interface, not pure JSON: each file
+starts with `/*O_o*/` then `google.visualization.Query.setResponse({...})`. This envelope must be
+stripped before parsing, which is what
+`../../scripts/build_template.py` already does. The classic CSV and XLSX exports are not
+usable here: they go through a one-time-token redirect.
 
-## Correspondance des fichiers et des onglets
+## File-to-tab correspondence
 
-| Fichier | Onglet | Contenu | Critères |
+| File | Tab | Content | Criteria |
 |---|---|---|---|
-| `a-lire.json` | À lire | mode d'emploi du référentiel | - |
-| `diag-rapide.json` | Diagnostic rapide | échelle 1 à 5, logique propre | 16 questions |
-| `produit.json` | dimension 1, Produit | | 16 |
+| `read-me.json` | Read me | how to use the framework | - |
+| `quick-diag.json` | Quick diagnostic | 1-to-5 scale, its own logic | 16 questions |
+| `product.json` | dimension 1, Product | | 16 |
 | `architecture.json` | dimension 2, Architecture | | 5 |
 | `infrastructure.json` | dimension 3, Infrastructure | | 8 |
-| `stockage.json` | dimension 4, Stockage et données | | 6 |
-| `algo-code.json` | dimension 5, Algorithme et code | | 9 |
-| `facilite.json` | dimension 6, Facilité de changement | vocabulaire 🟢 / 🟡 / 🔴 | 10 |
-| `synthese.json` | Synthèse | | - |
+| `storage.json` | dimension 4, Storage and data | | 6 |
+| `algo-code.json` | dimension 5, Algorithms and code | | 9 |
+| `ease.json` | dimension 6, Ease of change | vocabulary 🟢 / 🟡 / 🔴 | 10 |
+| `synthesis.json` | Synthesis | | - |
 
-Total **54 critères** détaillés, sommes de `potentiel_max` par dimension
-**23,5 / 8,0 / 12,0 / 8,0 / 13,0 / 15,5**, total **80,0**.
+Total **54 criteria** detailed, sums of `max_potential` per dimension
+**23.5 / 8.0 / 12.0 / 8.0 / 13.0 / 15.5**, total **80.0**.
 
-Deux pièges du référentiel, lisibles dans ces fichiers :
+Two pitfalls of the framework, visible in these files:
 
-- Le critère **`3.4` n'existe pas**, la numérotation saute de 3.3 à 3.5. C'est normal.
-- **Deux vocabulaires de réponse** : 44 critères en `✅ / 💡 / 🚫 / 🤔 / ⌛️`, et les 10
-  critères de la dimension 6 en `🟢 / 🟡 / 🔴`, **sans option "À évaluer"**. Toujours lire
-  `options_evaluation` du critère, ne jamais coder ces libellés en dur.
+- Dimension 3 numbering is continuous (`3.1` to `3.8`, 8 criteria, no gap) in the current
+  English sheet. Older French-sheet audits used 3.1–3.3 then 3.5–3.9: subtract one from any
+  id in 3.5–3.9 to get the current id.
+- **Two answer vocabularies**: 44 criteria in `✅ / 💡 / 🚫 / 🤔 / ⌛️`, and the 10
+  criteria of dimension 6 in `🟢 / 🟡 / 🔴`, **without a "To be assessed" option**. Always read
+  the criterion's `evaluation_options`, never hardcode these labels.
 
-⚠️ **Ces deux pièges ne sont que les plus visibles. Le recensement complet est dans
-[`PIEGES-REFERENTIEL.md`](PIEGES-REFERENTIEL.md)**, à lire **avant** de rédiger une question ou
-d'écrire un extracteur. Il documente verbatim, entre autres : les 8 crans du diagnostic rapide qui
-attribuent un cran extrême à qui répond ne pas savoir ; le fait que l'échelle de 1 à 5 **n'a pas
-d'orientation constante** d'une question à l'autre ; les critères dont le libellé et la `methode`
-ne posent pas la même question ; ceux qui sont validés par l'absence de découverte, donc qui
-récompensent l'inaction ; et tous les recoupements entre le diagnostic rapide et les critères
-détaillés, avec le motif de chaque refus.
+⚠️ **These two pitfalls are only the most visible ones. The complete inventory is in
+[`REFERENCE-PITFALLS.md`](REFERENCE-PITFALLS.md)**, to be read **before** writing a question or
+an extractor. It documents verbatim, among others: the 8 quick-diagnostic levels that
+assign an extreme level to whoever answers they don't know; the fact that the 1-to-5 scale **has no
+constant direction** from one question to the next; the criteria whose label and `method`
+do not ask the same question; those validated by the absence of a discovery, thus
+rewarding inaction; and all the overlaps between the quick diagnostic and the
+detailed criteria, with the reason for each refusal.
 
-**La règle qui résume tout** : c'est la `methode` qui définit ce que le critère mesure, jamais le
-libellé ni l'`explication`.
+**The rule that sums it all up**: it is the `method` that defines what the criterion measures, never the
+label nor the `explanation`.

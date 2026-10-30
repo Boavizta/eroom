@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Génère un rapport HTML d'audit de parcours web.
-Structure calquée sur le rapport PDF ANTS (generate_pdf.py).
-Palette OCTO.
+Generates an HTML audit report of a web journey.
+Structure modeled on the ANTS PDF report (generate_pdf.py).
+OCTO palette.
 
-Usage :
-  python3 generate_report_html.py <dossier-audit> [--output rapport.html]
+Usage:
+  python3 generate_report_html.py <audit-dir> [--output report.html]
 
-Le dossier doit contenir :
-  - 1 fichier .har
-  - 1+ fichiers Coverage-*.json
-  - cwv.json (optionnel)
+The directory must contain:
+  - 1 .har file
+  - 1+ Coverage-*.json files
+  - cwv.json (optional)
 """
 
 import base64
@@ -32,9 +32,9 @@ OCTO_PALE      = "#E0F0F4"
 OCTO_GREY      = "#ECECF2"
 OCTO_WHITE     = "#FFFFFF"
 
-# Couleurs par type de ressource
-# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+# Colors by resource type
+# Optional subdirectory for raw captures (HAR, Coverage), in .gitignore.
+RAW_DATA_DIR = "raw-data-potentially-sensitive"
 
 TYPE_COLORS = {
     "javascript": "#f0ad4e",
@@ -48,33 +48,33 @@ TYPE_COLORS = {
     "other":      "#95a5a6",
 }
 
-# Palette de statut (bon/moyen/mauvais/neutre), utilisée pour les badges de
-# conformité GreenIT, les niveaux de confiance et les Core Web Vitals. Couleurs
-# choisies pour un contraste >= 4.5:1 (WCAG AA) sur fond blanc (texte coloré) ET
-# sur fond coloré (texte blanc) — les teintes plus claires historiques (ex.
-# #0cce6b, #ffa400, #5bc0de) étaient sous ce seuil. Un emoji accompagne toujours
-# le statut : la couleur seule ne doit jamais porter l'information (accessibilité
-# daltonisme/lecteur d'écran/impression N&B).
-STATUS_GOOD    = "#1e7e34"   # vert foncé — ✅
-STATUS_WARN    = "#9a4d00"   # orange foncé — ⚠️
-STATUS_BAD     = "#c0392b"   # rouge foncé — 🔴
-STATUS_NEUTRAL = "#5a5a5a"   # gris moyen foncé — ➖ (non mesuré / non applicable)
+# Status palette (good/medium/bad/neutral), used for GreenIT compliance badges,
+# confidence levels and Core Web Vitals. Colors chosen for a contrast >= 4.5:1
+# (WCAG AA) on white background (colored text) AND on colored background (white
+# text) — the historical lighter shades (e.g.
+# #0cce6b, #ffa400, #5bc0de) were below this threshold. An emoji always
+# accompanies the status: color alone must never carry the information
+# (accessibility: color blindness/screen reader/B&W printing).
+STATUS_GOOD    = "#1e7e34"   # dark green — ✅
+STATUS_WARN    = "#9a4d00"   # dark orange — ⚠️
+STATUS_BAD     = "#c0392b"   # dark red — 🔴
+STATUS_NEUTRAL = "#5a5a5a"   # darkish grey — ➖ (not measured / not applicable)
 STATUS_EMOJI = {"good": "✅", "warn": "⚠️", "bad": "🔴", "neutral": "➖"}
 
-# Fonds clairs assortis (style "chip" : fond clair + bordure + texte/emoji coloré),
-# utilisés à la place des anciens badges fond saturé + texte blanc. Un emoji coloré
-# (ex. ✅ vert Unicode, 🔴 rouge Unicode) devient quasi invisible sur un fond saturé
-# de la MÊME couleur (peu de contraste emoji/fond) ; sur fond clair, l'emoji garde
-# sa couleur Unicode propre et reste toujours lisible.
+# Matching light backgrounds ("chip" style: light background + border + colored
+# text/emoji), used instead of the old saturated-background + white-text badges.
+# A colored emoji (e.g. ✅ green Unicode, 🔴 red Unicode) becomes almost invisible
+# on a saturated background of the SAME color (little emoji/background contrast);
+# on a light background, the emoji keeps its own Unicode color and stays readable.
 STATUS_BG = {
     "good": "#e8f5e9", "warn": "#fff3e0", "bad": "#fdecea", "neutral": "#eeeeee",
 }
 
 
 def _status_chip(status, text, extra_style=""):
-    """Badge style "chip" (fond clair + bordure + texte/emoji coloré) pour un
-    statut good/warn/bad/neutral. Contraste vérifié >= 4.5:1 (texte sur fond clair)
-    ET emoji toujours visible (jamais posé sur un fond de sa propre couleur)."""
+    """Badge style "chip" (light background + border + colored text/emoji) for a
+    good/warn/bad/neutral status. Contrast checked >= 4.5:1 (text on light background)
+    AND emoji always visible (never placed on a background of its own color)."""
     color = {"good": STATUS_GOOD, "warn": STATUS_WARN, "bad": STATUS_BAD,
              "neutral": STATUS_NEUTRAL}[status]
     bg = STATUS_BG[status]
@@ -83,10 +83,10 @@ def _status_chip(status, text, extra_style=""):
             f'font-weight:bold;padding:1px 8px;border-radius:4px;font-size:13px;'
             f'white-space:nowrap;{extra_style}">{emoji} {text}</span>')
 
-# Domaines de trackers/analytics tiers connus (fusion avec les catégories
-# "Analytics"/"Balise / Tag manager" de detect_tech.py — les deux listes
-# visent le même périmètre mais sont maintenues séparément selon leur usage :
-# ici pour compter/chiffrer, dans detect_tech.py pour qualifier la stack).
+# Known third-party tracker/analytics domains (merged with the
+# "Analytics"/"Tag manager" categories of detect_tech.py — the two lists
+# target the same scope but are maintained separately according to their use:
+# here to count/quantify, in detect_tech.py to qualify the stack).
 TRACKER_DOMAINS = {
     "google-analytics.com", "analytics.google.com", "googletagmanager.com",
     "hotjar.com", "segment.io", "mixpanel.com", "amplitude.com", "heap.io",
@@ -97,7 +97,7 @@ TRACKER_PATHS = {"/log/", "/log/hb", "/hb", "/ping", "/beacon", "/collect", "/tr
 
 
 def _is_tracker(host, url):
-    """True si l'hôte/chemin correspond à un tracker/analytics tiers connu."""
+    """True if the host/path matches a known third-party tracker/analytics."""
     if host in TRACKER_DOMAINS or any(t in host for t in
             ("analytics", "swetrix", "gtm", "hotjar", "segment", "mixpanel", "clarity")):
         return True
@@ -105,7 +105,7 @@ def _is_tracker(host, url):
     return any(p in path for p in TRACKER_PATHS)
 
 
-# ── Version Agent EROOM (source de vérité : SKILL.md) ────────────────────────
+# ── Agent EROOM version (source of truth: SKILL.md) ────────────────────────
 _skill_md = Path(__file__).parent.parent / "SKILL.md"
 AGENT_VERSION = "?.?.?"
 if _skill_md.exists():
@@ -117,43 +117,43 @@ if _skill_md.exists():
 # ── Imports EcoIndex ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from har_metrics import extract_page_metrics, load_cwv, ecoindex_score, ecoindex_grade, lcp_delta_s
-from efootprint_model.temps_utilisateur import nielsen_raw_seconds as _nielsen_raw_seconds
+from efootprint_model.user_time import nielsen_raw_seconds as _nielsen_raw_seconds
 
 
-# ── Noms de pays (affichage) ────────────────────────────────────────────────
-# Correspondance code ISO-2 -> nom français, pour les 30 pays des tables
-# iOS/macOS de collect_env_data.py. Purement cosmétique (le calcul utilise les
-# codes). Un pays absent retombe sur son code brut.
+# ── Country names (display) ────────────────────────────────────────────────
+# ISO-2 code -> English name, for the 30 countries of the
+# iOS/macOS tables of collect_env_data.py. Purely cosmetic (the calculation uses
+# the codes). An unknown country falls back to its raw code.
 _COUNTRY_NAMES = {
-    "FR": "France", "DE": "Allemagne", "GB": "Royaume-Uni", "IE": "Irlande",
-    "NL": "Pays-Bas", "BE": "Belgique", "CH": "Suisse", "AT": "Autriche",
-    "ES": "Espagne", "IT": "Italie", "PT": "Portugal", "PL": "Pologne",
-    "SE": "Suède", "NO": "Norvège", "DK": "Danemark", "FI": "Finlande",
-    "RU": "Russie", "US": "États-Unis", "CA": "Canada", "MX": "Mexique",
-    "BR": "Brésil", "JP": "Japon", "KR": "Corée du Sud", "CN": "Chine",
-    "IN": "Inde", "AU": "Australie", "ZA": "Afrique du Sud", "SN": "Sénégal",
-    "TN": "Tunisie", "MA": "Maroc",
+    "FR": "France", "DE": "Germany", "GB": "United Kingdom", "IE": "Ireland",
+    "NL": "Netherlands", "BE": "Belgium", "CH": "Switzerland", "AT": "Austria",
+    "ES": "Spain", "IT": "Italy", "PT": "Portugal", "PL": "Poland",
+    "SE": "Sweden", "NO": "Norway", "DK": "Denmark", "FI": "Finland",
+    "RU": "Russia", "US": "United States", "CA": "Canada", "MX": "Mexico",
+    "BR": "Brazil", "JP": "Japan", "KR": "South Korea", "CN": "China",
+    "IN": "India", "AU": "Australia", "ZA": "South Africa", "SN": "Senegal",
+    "TN": "Tunisia", "MA": "Morocco",
 }
 
 
 def _country_label(code):
-    """'BR' -> 'Brésil (BR)'. Code inconnu -> le code seul."""
+    """'BR' -> 'Brazil (BR)'. Unknown code -> the code alone."""
     cc = (code or "").upper()
     name = _COUNTRY_NAMES.get(cc)
     return f"{name} ({cc})" if name else (cc or "?")
 
 
-# ── Parsing HAR ───────────────────────────────────────────────────────────────
+# ── HAR parsing ───────────────────────────────────────────────────────────────
 
 def _classify_type(mime, url):
     mime = (mime or "").lower()
     url  = (url  or "").lower()
-    # L'extension se lit sur le CHEMIN seul : une URL versionnée
-    # (style.css?v=2026-6-10) ou fragmentée (app.js#x) garde son extension mais
-    # ne se termine plus par elle. Sans ce nettoyage, ces fichiers tombent en
-    # "other" et disparaissent des agrégats JS/CSS du rapport de code mort.
-    # Les entrées Coverage sont les seules concernées en pratique : les entrées
-    # HAR portent un mimeType, testé avant l'extension.
+    # The extension is read on the PATH only: a versioned URL
+    # (style.css?v=2026-6-10) or fragmented (app.js#x) keeps its extension but
+    # no longer ends with it. Without this cleanup, those files fall into
+    # "other" and disappear from the JS/CSS aggregates of the dead-code report.
+    # Coverage entries are the only ones concerned in practice: HAR entries
+    # carry a mimeType, tested before the extension.
     path = url.split("#", 1)[0].split("?", 1)[0]
     if "javascript" in mime or path.endswith(".js") or path.endswith(".mjs"):
         return "javascript"
@@ -181,14 +181,14 @@ def parse_har(har_path):
 
 
 def har_traffic_analysis(har_data):
-    """Analyse du trafic : domaines, codes HTTP, top ressources, doublons."""
+    """Traffic analysis: domains, HTTP codes, top resources, duplicates."""
     entries = har_data.get("log", {}).get("entries", [])
 
     domains = defaultdict(int)
     http_codes = defaultdict(int)
     resources = []
     url_counts = defaultdict(int)
-    # Stocker les headers de réponse par URL pour analyser le cache
+    # Store response headers per URL to analyze caching
     url_resp_headers = {}
 
     _FONT_DOMAINS  = {"fonts.googleapis.com", "fonts.gstatic.com", "use.typekit.net", "use.fontawesome.com"}
@@ -198,11 +198,11 @@ def har_traffic_analysis(har_data):
         path = _up(url).path.lower()
         # Tracker / analytics
         if _is_tracker(host, url):
-            return "tracker", "Requête analytics/tracker — comportement normal, envoi répété intentionnel"
-        # Police externe
+            return "tracker", "Analytics/tracker request — normal behavior, intentional repeated sending"
+        # External font
         if host in _FONT_DOMAINS or "font" in host:
-            return "font", "Police externe — absence de cache navigateur entre les pages"
-        # Ressource statique : vérifier cache-control
+            return "font", "External font — no browser cache between pages"
+        # Static resource: check cache-control
         cc = hdrs_resp.get("cache-control", "")
         has_long_cache = "max-age" in cc and any(
             int(v) >= 3600 for v in re.findall(r"max-age=(\d+)", cc)
@@ -210,10 +210,10 @@ def har_traffic_analysis(har_data):
         rtype = _classify_type("", url)
         if rtype in ("javascript", "css", "image", "font"):
             if has_long_cache:
-                return "static_cached", "Ressource statique avec cache long — rechargement dû au parcours multi-pages (normal)"
+                return "static_cached", "Static resource with long cache — reload due to multi-page journey (normal)"
             else:
-                return "static_no_cache", "Ressource statique SANS cache long — retéléchargée à chaque page, ajouter Cache-Control: max-age"
-        return "other", "URL appelée plusieurs fois — vérifier si intentionnel"
+                return "static_no_cache", "Static resource WITHOUT long cache — re-downloaded on every page, add Cache-Control: max-age"
+        return "other", "URL called several times — check whether intentional"
 
     for e in entries:
         req  = e.get("request", {})
@@ -237,7 +237,7 @@ def har_traffic_analysis(har_data):
         if url not in url_resp_headers:
             url_resp_headers[url] = hdrs_resp
 
-    # Dédupliquer par URL avant le classement (garder la taille max observée)
+    # Deduplicate by URL before ranking (keep the max observed size)
     seen_urls = {}
     for r in resources:
         url_key = r["url"].split("?")[0]
@@ -245,7 +245,7 @@ def har_traffic_analysis(har_data):
             seen_urls[url_key] = r
     top10 = sorted(seen_urls.values(), key=lambda x: x["size"], reverse=True)[:10]
 
-    # Doublons enrichis avec catégorie et cause
+    # Duplicates enriched with category and cause
     duplicates = []
     for u, c in url_counts.items():
         if c <= 1:
@@ -258,9 +258,9 @@ def har_traffic_analysis(har_data):
         cat, cause = _dup_category(u, host, hdrs)
         duplicates.append({"url": u, "count": c, "category": cat, "cause": cause})
 
-    # Trackers/scripts tiers (Lot 2) : nombre de requêtes + poids cumulé,
-    # calculés sur les requêtes brutes (pas dédupliquées par URL, pour refléter
-    # le trafic réseau réel généré, doublons de tracking inclus).
+    # Third-party trackers/scripts (Lot 2): request count + cumulative weight,
+    # computed on the raw requests (not deduplicated by URL, to reflect the
+    # real network traffic generated, tracking duplicates included).
     tracker_entries = [r for r in resources if _is_tracker(r["host"], r["url"])]
     total_size = sum(r["size"] for r in resources) or 1
     trackers = {
@@ -282,7 +282,7 @@ def har_traffic_analysis(har_data):
     }
 
 
-# ── Parsing Coverage ──────────────────────────────────────────────────────────
+# ── Coverage parsing ──────────────────────────────────────────────────────────
 
 def parse_coverage_file(cov_path):
     with open(cov_path, encoding="utf-8") as f:
@@ -329,22 +329,22 @@ def coverage_summary(entries):
     return {"js": _agg(js), "css": _agg(css), "all": _agg(entries)}
 
 
-# ── Images : compression AVIF + intégration base64 ───────────────────────────
+# ── Images: AVIF compression + base64 embedding ───────────────────────────
 
 def embed_image(source, alt="", max_dim=500):
     """
-    Compresse une image (URL ou chemin local) en AVIF 500×500 max et retourne
-    le bloc HTML <figure> avec le base64 inline.
+    Compresses an image (URL or local path) to AVIF 500×500 max and returns
+    the HTML <figure> block with the inline base64.
 
-    Retourne une chaîne HTML vide si vipsthumbnail n'est pas disponible ou si
-    la source est inaccessible.
+    Returns an empty HTML string if vipsthumbnail is not available or if
+    the source is unreachable.
     """
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             orig = Path(tmpdir) / "orig"
             avif = Path(tmpdir) / "out.avif"
 
-            # Téléchargement ou copie
+            # Download or copy
             src = str(source)
             if src.startswith("http://") or src.startswith("https://"):
                 urllib.request.urlretrieve(src, orig)
@@ -353,7 +353,7 @@ def embed_image(source, alt="", max_dim=500):
                 if not orig.exists():
                     return ""
 
-            # Dimensions originales
+            # Original dimensions
             r = subprocess.run(
                 ["vipsheader", "-f", "width", str(orig), "-f", "height", str(orig)],
                 capture_output=True, text=True
@@ -363,7 +363,7 @@ def embed_image(source, alt="", max_dim=500):
             dims = r.stdout.strip().split()
             orig_w, orig_h = (int(dims[0]), int(dims[1])) if len(dims) == 2 else (0, 0)
 
-            # Compression AVIF
+            # AVIF compression
             size_arg = f"{max_dim}x{max_dim}>"
             r2 = subprocess.run(
                 ["vipsthumbnail", str(orig), "--size", size_arg,
@@ -373,7 +373,7 @@ def embed_image(source, alt="", max_dim=500):
             if r2.returncode != 0 or not avif.exists():
                 return ""
 
-            # Dimensions compressées
+            # Compressed dimensions
             r3 = subprocess.run(
                 ["vipsheader", "-f", "width", str(avif), "-f", "height", str(avif)],
                 capture_output=True, text=True
@@ -385,9 +385,9 @@ def embed_image(source, alt="", max_dim=500):
 
         resized = (orig_w != comp_w or orig_h != comp_h) and orig_w > 0
         caption = (
-            f"(Pour ce rapport image redimensionnée : {orig_w}×{orig_h} → {comp_w}×{comp_h} px et version allègement du fichier au format AVIF)"
+            f"(For this report, image resized: {orig_w}×{orig_h} → {comp_w}×{comp_h} px and file lightened to AVIF format)"
             if resized else
-            "(Pour ce rapport : version allègement du fichier au format AVIF)"
+            "(For this report: file lightened to AVIF format)"
         )
         return (
             f'<figure style="margin:0.75rem 0; text-align:center;">'
@@ -404,7 +404,7 @@ def embed_image(source, alt="", max_dim=500):
 
 def _html_head(title):
     return f"""<!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -437,10 +437,10 @@ def _html_head(title):
   h3 {{ font-size: 18px; color: var(--octo-dark); margin: 16px 0 8px; font-weight: bold; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 17px; margin-bottom: 12px; }}
   th {{ background: var(--octo-dark); color: white; padding: 7px 10px; text-align: left; font-size: 16px; }}
-  /* RGAA/WCAG : un lien dans un en-tête sombre ne doit jamais garder le bleu/violet
-     par défaut du navigateur (contraste insuffisant sur --octo-dark) ; blanc = ~14:1
-     de contraste (largement > 4.5:1 exigé), souligné pour rester distinguable sans
-     dépendre de la seule couleur. */
+  /* RGAA/WCAG: a link in a dark header must never keep the browser default blue/purple
+     default (insufficient contrast on --octo-dark); white = ~14:1
+     contrast (well above the required 4.5:1), underlined to stay distinguishable without
+     depending on color alone. */
   th a {{ color: white; text-decoration: underline; }}
   th a:visited {{ color: white; }}
   td {{ padding: 6px 10px; border-bottom: 1px solid #ddd; }}
@@ -485,16 +485,16 @@ def _bar(used_pct):
 
 
 def _normalize_page_url(url):
-    """Normalisation partagée d'une URL de page : sans query string, sans slash
-    final. Utilisée pour dédupliquer `page_metrics` (repli 1st-party/dédup HAR)
-    et pour apparier `page_url` (venant de `reductions_detail`, brut) aux
-    entrées `page_metrics` correspondantes."""
+    """Shared normalization of a page URL: no query string, no trailing slash.
+    Used to deduplicate `page_metrics` (1st-party fallback/HAR dedup)
+    and to match `page_url` (from `reductions_detail`, raw) to the
+    corresponding `page_metrics` entries."""
     return url.split("?")[0].rstrip("/") or url
 
 
 def _dedup_page_metrics(page_metrics):
-    """Déduplique par URL canonique : garde la ligne avec mesure réussie (statut ok), sinon la plus lourde.
-    Ajoute un champ page_num (1-indexé) dans l'ordre de première apparition."""
+    """Deduplicates by canonical URL: keeps the row with a successful measurement (status ok), else the heaviest.
+    Adds a page_num field (1-indexed) in order of first appearance."""
     seen = {}
     order = []
     for m in page_metrics:
@@ -504,9 +504,9 @@ def _dedup_page_metrics(page_metrics):
             seen[url] = m
             order.append(url)
         else:
-            # Préférer la mesure réussie (statut ok) à une mesure échouée
-            m_ok = m.get("mesure", {}).get("statut") == "ok"
-            prev_ok = prev.get("mesure", {}).get("statut") == "ok"
+            # Prefer the successful measurement (status ok) over a failed one
+            m_ok = m.get("measurement", {}).get("status") == "ok"
+            prev_ok = prev.get("measurement", {}).get("status") == "ok"
             if m_ok and not prev_ok:
                 seen[url] = m
             elif m_ok and prev_ok and m["req"] > prev["req"]:
@@ -522,32 +522,32 @@ def _dedup_page_metrics(page_metrics):
 
 
 def _cwv_for_page(m, cwv):
-    """Cherche les données CWV d'une page (dict groupé par stratégie).
+    """Looks up the CWV data of a page (dict grouped by strategy).
 
-    Retourne {"mobile": row, "desktop": row} (clés éventuellement absentes),
-    d'abord par URL (normalisée) puis par page_id."""
+    Returns {"mobile": row, "desktop": row} (keys possibly absent),
+    by URL (normalized) first, then by page_id."""
     url = m.get("title", "").rstrip("/")
     return cwv.get(url) or cwv.get(m["page_id"], {})
 
 
 def _cwv_device_marker(strat):
-    """Pictogramme d'appareil pour annoter d'où provient une valeur retenue."""
+    """Device pictogram to annotate which device a retained value comes from."""
     return "📱" if strat == "mobile" else "🖥"
 
 
 def _cwv_worst_per_metric(by_strategy):
-    """Compose un row synthétique en prenant, pour CHAQUE métrique (lcp/inp/cls),
-    la valeur la PIRE parmi les stratégies disponibles (mobile / desktop).
+    """Composes a synthetic row taking, for EACH metric (lcp/inp/cls),
+    the WORST value among the available strategies (mobile / desktop).
 
-    Pour les trois CWV, "pire" = valeur la plus élevée (LCP/INP/CLS : plus haut =
-    plus mauvais). À valeur égale, le mobile est préféré (trafic dominant + conditions
-    les plus contraignantes).
+    For the three CWVs, "worst" = highest value (LCP/INP/CLS: higher =
+    worse). On a tie, mobile wins (dominant traffic + most
+    constraining conditions).
 
-    Retourne (row, strat_by_metric) où :
-      - row = {"lcp": .., "inp": .., "cls": ..} (clés présentes seulement si mesurées) ;
-      - strat_by_metric = {"lcp": "mobile"|"desktop", ...} indiquant l'appareil retenu
-        pour chaque métrique.
-    Retourne (None, {}) si aucune donnée exploitable."""
+    Returns (row, strat_by_metric) where:
+      - row = {"lcp": .., "inp": .., "cls": ..} (keys present only if measured) ;
+      - strat_by_metric = {"lcp": "mobile"|"desktop", ...} indicating the device
+        retained for each metric.
+    Returns (None, {}) if no usable data."""
     if not by_strategy:
         return None, {}
     row = {}
@@ -555,7 +555,7 @@ def _cwv_worst_per_metric(by_strategy):
     for metric in ("lcp", "inp", "cls"):
         best_strat = None
         best_val = None
-        for strat in ("mobile", "desktop"):  # mobile d'abord => gagne à égalité
+        for strat in ("mobile", "desktop"):  # mobile first => wins on a tie
             r = by_strategy.get(strat)
             if not r:
                 continue
@@ -573,11 +573,11 @@ def _cwv_worst_per_metric(by_strategy):
     return row, strat_by_metric
 
 
-# Libellés lisibles des sources CWV (distingue terrain / lab API / lab local).
+# Readable labels of CWV sources (distinguishes field / lab API / local lab).
 _CWV_SOURCE_LABELS = {
-    "crux": ("terrain", STATUS_GOOD, "CrUX terrain (utilisateurs Chrome réels, via PageSpeed)"),
-    "pagespeed_lab": ("lab", STATUS_WARN, "Lab PageSpeed (simulation via l'API PSI)"),
-    "lighthouse": ("lab local", STATUS_WARN, "Lab Lighthouse (simulation en local)"),
+    "crux": ("field", STATUS_GOOD, "CrUX field (real Chrome users, via PageSpeed)"),
+    "pagespeed_lab": ("lab", STATUS_WARN, "Lab PageSpeed (simulation via the PSI API)"),
+    "lighthouse": ("local lab", STATUS_WARN, "Lab Lighthouse (local simulation)"),
 }
 
 
@@ -585,8 +585,8 @@ _STATUS_BY_COLOR = {STATUS_GOOD: "good", STATUS_WARN: "warn", STATUS_NEUTRAL: "n
 
 
 def _cwv_source_badge(source):
-    """Petit badge indiquant la source réelle d'une mesure CWV (style "chip")."""
-    label, color, _ = _CWV_SOURCE_LABELS.get(source, ("?", STATUS_NEUTRAL, "Source inconnue"))
+    """Small badge indicating the real source of a CWV measurement ("chip" style)."""
+    label, color, _ = _CWV_SOURCE_LABELS.get(source, ("?", STATUS_NEUTRAL, "Unknown source"))
     bg = STATUS_BG[_STATUS_BY_COLOR.get(color, "neutral")]
     return (f'<span style="display:inline-block;font-size:13px;padding:1px 7px;'
             f'border-radius:10px;background:{bg};border:1.5px solid {color};'
@@ -604,7 +604,7 @@ def _section_dashboard(page_metrics, cwv):
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
         page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
-        # Dashboard = "pire des deux" par métrique (mobile ou desktop, le plus mauvais).
+        # Dashboard = "worst of both" per metric (mobile or desktop, the worst).
         cwv_data, worst_strat = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
 
         def _cwv_cell(val, unit, thresholds, strat=None):
@@ -617,9 +617,9 @@ def _section_dashboard(page_metrics, cwv):
                 color, emoji = STATUS_WARN, STATUS_EMOJI["warn"]
             else:
                 color, emoji = STATUS_BAD, STATUS_EMOJI["bad"]
-            # Pictogramme indiquant l'appareil dont vient la valeur retenue (pire des deux)
+            # Pictogram indicating the device the retained value comes from (worst of the two)
             marker = (f'<span style="color:#999;font-size:12px;margin-right:3px" '
-                      f'title="valeur la plus défavorable : {strat}">{_cwv_device_marker(strat)}</span>'
+                      f'title="most unfavorable value: {strat}">{_cwv_device_marker(strat)}</span>'
                       if strat else "")
             return (f'<td style="text-align:right;color:{color};font-weight:bold">'
                     f'{emoji} {marker}{val} {unit}</td>')
@@ -636,40 +636,40 @@ def _section_dashboard(page_metrics, cwv):
             inp_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
             cls_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
 
-        # Affichage EcoIndex et DOM : "non mesuré" si la mesure a échoué
-        mesure_ok = m.get("mesure", {}).get("statut") == "ok"
-        if mesure_ok:
+        # EcoIndex and DOM display: "not measured" if the measurement failed
+        measured_ok = m.get("measurement", {}).get("status") == "ok"
+        if measured_ok:
             ecoindex_cell = f'<td style="text-align:center">{badge} {m["ecoindex"]}/100</td>'
             dom_cell = f'<td style="text-align:right">{m["dom"]}</td>'
         else:
-            ecoindex_cell = f'<td style="text-align:center;color:{STATUS_NEUTRAL}">non mesuré</td>'
-            dom_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">non mesuré</td>'
+            ecoindex_cell = f'<td style="text-align:center;color:{STATUS_NEUTRAL}">not measured</td>'
+            dom_cell = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">not measured</td>'
 
         rows += f"""<tr>
       <td>{page_cell}</td>
       {ecoindex_cell}
       <td style="text-align:right">{m['req']}</td>
-      <td style="text-align:right">{m['size_ko']:.0f} Ko</td>
+      <td style="text-align:right">{m['size_ko']:.0f} KB</td>
       {dom_cell}
       {lcp_cell}{inp_cell}{cls_cell}
     </tr>"""
 
     cwv_legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-    <span style="font-weight:bold;color:#555">Légende CWV :</span>
-    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
-    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
-    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
-    <span style="color:#999">📱/🖥 appareil de la valeur la plus défavorable (pire des deux par métrique)</span>
-    <span style="color:{STATUS_NEUTRAL};font-style:italic">{STATUS_EMOJI['neutral']} Données terrain non disponibles (fournir cwv.json)</span>
+    <span style="font-weight:bold;color:#555">CWV legend:</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Good</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} Needs improvement</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Poor</span>
+    <span style="color:#999">📱/🖥 device of the most unfavorable value (worst of both per metric)</span>
+    <span style="color:{STATUS_NEUTRAL};font-style:italic">{STATUS_EMOJI['neutral']} Field data unavailable (provide cwv.json)</span>
   </div>"""
-    cwv_note = "" if cwv else '<p style="font-size:15px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP et CLS nécessitent des données terrain (API PageSpeed ou cwv.json).</p>'
+    cwv_note = "" if cwv else '<p style="font-size:15px;color:#888;margin-top:6px">* LCP = onLoad HAR (proxy). INP and CLS need field data (PageSpeed API or cwv.json).</p>'
 
     return f"""<section id="dashboard">
-  <h2>Tableau de bord EcoIndex et CWV (Core Web Vitals)</h2>
+  <h2>EcoIndex and CWV dashboard (Core Web Vitals)</h2>
   <table>
     <thead><tr>
-      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requêtes</th>
-      <th>Poids</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th>
+      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requests</th>
+      <th>Weight</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>
@@ -685,19 +685,19 @@ def _section_traffic(traffic):
     )
 
     CODE_LABELS = {
-        200: ("Succès", "Ressource chargée normalement"),
-        201: ("Créé", "Requête API acceptée (POST)"),
-        204: ("Vide OK", "Réponse sans contenu, souvent des pings analytics"),
-        206: ("Partiel", "Contenu partiel (streaming, range request)"),
-        301: ("Redirection permanente", "URL déplacée définitivement"),
-        302: ("Redirection temporaire", "URL redirigée (ex: /recrutement → /recrutement/)"),
-        304: ("Non modifié (cache)", "Ressource en cache navigateur, non retéléchargée"),
-        400: ("Requête invalide", "Erreur côté client"),
-        401: ("Non authentifié", "Accès refusé, authentification requise"),
-        403: ("Accès refusé", "Serveur bloque la requête"),
-        404: ("Introuvable", "Ressource absente sur le serveur"),
-        500: ("Erreur serveur", "Problème côté serveur"),
-        503: ("Service indisponible", "Serveur temporairement hors service"),
+        200: ("Success", "Resource loaded normally"),
+        201: ("Created", "API request accepted (POST)"),
+        204: ("No content", "Empty response, often analytics pings"),
+        206: ("Partial", "Partial content (streaming, range request)"),
+        301: ("Permanent redirect", "URL moved permanently"),
+        302: ("Temporary redirect", "URL redirected (e.g. /jobs → /jobs/)"),
+        304: ("Not modified (cache)", "Resource in browser cache, not re-downloaded"),
+        400: ("Bad request", "Client-side error"),
+        401: ("Unauthorized", "Access denied, authentication required"),
+        403: ("Forbidden", "Server blocks the request"),
+        404: ("Not found", "Resource missing on the server"),
+        500: ("Server error", "Server-side problem"),
+        503: ("Service unavailable", "Server temporarily out of service"),
     }
     codes_rows = ""
     for k, v in sorted(traffic["http_codes"].items()):
@@ -714,9 +714,9 @@ def _section_traffic(traffic):
     codes_html = f"""<table style="border-collapse:collapse;width:100%">
   <thead><tr>
     <th style="text-align:left;width:60px">Code</th>
-    <th style="text-align:right;width:50px">Nb</th>
-    <th style="text-align:left;width:160px">Statut</th>
-    <th style="text-align:left">Signification</th>
+    <th style="text-align:right;width:50px">Count</th>
+    <th style="text-align:left;width:160px">Status</th>
+    <th style="text-align:left">Meaning</th>
   </tr></thead>
   <tbody>{codes_rows}</tbody>
 </table>"""
@@ -728,48 +728,48 @@ def _section_traffic(traffic):
         top_rows += f"""<tr>
       <td><a href="{r['url']}" target="_blank" rel="noopener" title="{r['url']}">{fname}</a></td>
       <td><span style="color:{color}">{_classify_type(r['mime'], r['url'])}</span></td>
-      <td style="text-align:right">{round(r['size']/1024, 1)} Ko</td>
+      <td style="text-align:right">{round(r['size']/1024, 1)} KB</td>
       <td style="color:#555;font-size:15px">{r['host']}</td>
     </tr>"""
 
-    # Catégories de doublons : couleur + libellé court
+    # Duplicate categories: color + short label
     _CAT_META = {
         "tracker":        ("#5a3494", "#f0e9fa", "🔗 Tracker / analytics"),
-        "font":           ("#a83232", "#fbe9e9", "🔤 Police externe"),
-        "static_no_cache":("#a72834", "#fbe9e9", "🔴 Statique sans cache"),
-        "static_cached":  (STATUS_GOOD, STATUS_BG["good"], "✅ Statique avec cache"),
-        "other":          (STATUS_NEUTRAL, STATUS_BG["neutral"], "➖ Autre"),
+        "font":           ("#a83232", "#fbe9e9", "🔤 External font"),
+        "static_no_cache":("#a72834", "#fbe9e9", "🔴 Static without cache"),
+        "static_cached":  (STATUS_GOOD, STATUS_BG["good"], "✅ Static with cache"),
+        "other":          (STATUS_NEUTRAL, STATUS_BG["neutral"], "➖ Other"),
     }
 
     dup_section = ""
     dups = traffic["duplicates"]
     if dups:
-        # Grouper par catégorie
+        # Group by category
         from collections import OrderedDict
         groups = OrderedDict()
         for cat in _CAT_META:
             groups[cat] = [d for d in dups if d.get("category") == cat]
 
-        # KPIs doublons
+        # Duplicate KPIs
         nb_problematic = sum(1 for d in dups if d.get("category") in ("static_no_cache", "other"))
         nb_tracker     = sum(1 for d in dups if d.get("category") == "tracker")
         nb_font        = sum(1 for d in dups if d.get("category") == "font")
 
         dup_kpis = (
             f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:16px">'
-            f'<span style="background:#fbe9e9;border:1.5px solid #a72834;color:#a72834;font-weight:bold;padding:2px 8px;border-radius:4px">🔴 <b>{nb_problematic}</b> à corriger (sans cache)</span>'
+            f'<span style="background:#fbe9e9;border:1.5px solid #a72834;color:#a72834;font-weight:bold;padding:2px 8px;border-radius:4px">🔴 <b>{nb_problematic}</b> to fix (no cache)</span>'
             f'<span style="background:#f0e9fa;border:1.5px solid #5a3494;color:#5a3494;font-weight:bold;padding:2px 8px;border-radius:4px">🔗 <b>{nb_tracker}</b> trackers (normal)</span>'
-            f'<span style="background:#fbe9e9;border:1.5px solid #a83232;color:#a83232;font-weight:bold;padding:2px 8px;border-radius:4px">🔤 <b>{nb_font}</b> polices externes</span>'
+            f'<span style="background:#fbe9e9;border:1.5px solid #a83232;color:#a83232;font-weight:bold;padding:2px 8px;border-radius:4px">🔤 <b>{nb_font}</b> external fonts</span>'
             f'</div>'
         )
 
-        # Tableau par groupe
+        # Table per group
         dup_tables = ""
         for cat, items in groups.items():
             if not items:
                 continue
             cat_color, cat_bg, cat_label = _CAT_META[cat]
-            # Cause (identique pour tout le groupe)
+            # Cause (identical for the whole group)
             cause = items[0].get("cause", "")
             rows_html = ""
             for d in sorted(items, key=lambda x: -x["count"]):
@@ -787,42 +787,42 @@ def _section_traffic(traffic):
                 f'{len(items)} URL(s) — <span style="font-weight:normal;color:#555;font-size:16px">{cause}</span>'
                 f'</summary>'
                 f'<table style="margin-top:6px">'
-                f'<thead><tr><th>Fichier</th><th style="width:50px">Nb</th></tr></thead>'
+                f'<thead><tr><th>File</th><th style="width:50px">Count</th></tr></thead>'
                 f'<tbody>{rows_html}</tbody>'
                 f'</table>'
                 f'</details>'
             )
 
-        dup_section = f'<h3 id="trafic-doublons">Requêtes dupliquées ({len(dups)} URL(s))</h3>{dup_kpis}{dup_tables}'
+        dup_section = f'<h3 id="trafic-doublons">Duplicate requests ({len(dups)} URL(s))</h3>{dup_kpis}{dup_tables}'
 
     tr = traffic.get("trackers") or {}
     trackers_section = ""
     if tr.get("count", 0) > 0:
         tr_domains_html = "".join(f'<span class="domain-tag">{d}</span>' for d in tr.get("domains", [])[:10])
-        trackers_section = f"""<h3 id="trafic-trackers">Trackers et scripts tiers</h3>
+        trackers_section = f"""<h3 id="trafic-trackers">Trackers and third-party scripts</h3>
   <div class="kpi-grid" style="margin-bottom:8px">
-    <div class="kpi"><div class="val">{tr['count']}</div><div class="lbl">Requêtes trackers ({tr['pct_requests']}% du total)</div></div>
-    <div class="kpi"><div class="val">{tr['size_ko']:.0f} Ko</div><div class="lbl">Poids trackers ({tr['pct_size']}% du total)</div></div>
+    <div class="kpi"><div class="val">{tr['count']}</div><div class="lbl">Tracker requests ({tr['pct_requests']}% of total)</div></div>
+    <div class="kpi"><div class="val">{tr['size_ko']:.0f} KB</div><div class="lbl">Tracker weight ({tr['pct_size']}% of total)</div></div>
   </div>
   <div style="margin-bottom:8px">{tr_domains_html}</div>
-  <p style="font-size:15px;color:#888">Pour référence, les pisteurs tiers ajoutent typiquement 20 à 100 requêtes HTTP par page (source : études sur le pistage web) — chiffre à comparer à la mesure ci-dessus.</p>
+  <p style="font-size:15px;color:#888">For reference, third-party trackers typically add 20 to 100 HTTP requests per page (source: web tracking studies) — a figure to compare with the measurement above.</p>
 """
 
-    return f"""<section id="trafic">
-  <h2>Trafic réseau</h2>
+    return f"""<section id="traffic">
+  <h2>Network traffic</h2>
   <div class="kpi-grid">
-    <div class="kpi"><div class="val">{traffic['total_req']}</div><div class="lbl">Requêtes totales</div></div>
-    <div class="kpi"><div class="val">{traffic['total_ko']:.0f} Ko</div><div class="lbl">Volume transféré</div></div>
-    <div class="kpi"><div class="val">{len(traffic['domains'])}</div><div class="lbl">Domaines</div></div>
+    <div class="kpi"><div class="val">{traffic['total_req']}</div><div class="lbl">Total requests</div></div>
+    <div class="kpi"><div class="val">{traffic['total_ko']:.0f} KB</div><div class="lbl">Transferred volume</div></div>
+    <div class="kpi"><div class="val">{len(traffic['domains'])}</div><div class="lbl">Domains</div></div>
   </div>
   {trackers_section}
-  <h3>Domaines contactés</h3>
+  <h3>Contacted domains</h3>
   <div style="margin-bottom:12px">{domains_html}</div>
-  <h3>Codes HTTP</h3>
+  <h3>HTTP codes</h3>
   <div style="margin-bottom:16px">{codes_html}</div>
-  <h3>Top 10 ressources les plus lourdes</h3>
+  <h3>Top 10 heaviest resources</h3>
   <table>
-    <thead><tr><th>Fichier</th><th>Type</th><th>Poids</th><th>Domaine</th></tr></thead>
+    <thead><tr><th>File</th><th>Type</th><th>Weight</th><th>Domain</th></tr></thead>
     <tbody>{top_rows}</tbody>
   </table>
   {dup_section}
@@ -830,7 +830,7 @@ def _section_traffic(traffic):
 
 
 def _section_coverage(coverage_by_page):
-    html = '<section id="coverage">\n  <h2>Code mort (Coverage JS/CSS)</h2>\n'
+    html = '<section id="coverage">\n  <h2>Dead code (Coverage JS/CSS)</h2>\n'
 
     for page_name, page_data in coverage_by_page.items():
         entries = page_data["entries"] if isinstance(page_data, dict) else page_data
@@ -842,15 +842,15 @@ def _section_coverage(coverage_by_page):
                     if page_url else page_name)
         html += f'  <h3>{h3_label}</h3>\n'
 
-        # Jauges
+        # Gauges
         js_used = 100 - summ["js"]["pct"] if summ["js"]["total_kb"] else 0
         css_used = 100 - summ["css"]["pct"] if summ["css"]["total_kb"] else 0
         html += f"""  <div style="display:flex;gap:24px;margin-bottom:10px;align-items:center">
-    <div>JS {_bar(js_used)} <span style="font-size:16px">{summ['js']['unused_kb']} Ko non utilisés ({summ['js']['pct']}%)</span></div>
-    <div>CSS {_bar(css_used)} <span style="font-size:16px">{summ['css']['unused_kb']} Ko non utilisés ({summ['css']['pct']}%)</span></div>
+    <div>JS {_bar(js_used)} <span style="font-size:16px">{summ['js']['unused_kb']} KB unused ({summ['js']['pct']}%)</span></div>
+    <div>CSS {_bar(css_used)} <span style="font-size:16px">{summ['css']['unused_kb']} KB unused ({summ['css']['pct']}%)</span></div>
   </div>\n"""
 
-        # Top fichiers
+        # Top files
         top = sorted(entries, key=lambda e: e["unused_kb"], reverse=True)[:8]
         rows = ""
         for e in top:
@@ -858,13 +858,13 @@ def _section_coverage(coverage_by_page):
             rows += f"""<tr>
       <td><a href="{e['url']}" target="_blank" rel="noopener" title="{e['url']}">{e['filename']}</a></td>
       <td style="color:{color}">{e['type']}</td>
-      <td style="text-align:right">{e['total_kb']} Ko</td>
-      <td style="text-align:right;color:#dc5050">{e['unused_kb']} Ko</td>
+      <td style="text-align:right">{e['total_kb']} KB</td>
+      <td style="text-align:right;color:#dc5050">{e['unused_kb']} KB</td>
       <td style="text-align:right">{e['unused_pct']}%</td>
       <td>{_bar(100 - e['unused_pct'])}</td>
     </tr>"""
         html += f"""  <table>
-    <thead><tr><th>Fichier</th><th>Type</th><th>Total</th><th>Non utilisé</th><th>%</th><th></th></tr></thead>
+    <thead><tr><th>File</th><th>Type</th><th>Total</th><th>Unused</th><th>%</th><th></th></tr></thead>
     <tbody>{rows}</tbody>
   </table>\n"""
 
@@ -899,7 +899,7 @@ def _section_cwv(page_metrics, cwv):
         num = m.get("page_num", "")
         page_cell = f'<a href="{url}" target="_blank" rel="noopener" title="{url}"><span style="color:#888;font-size:15px;margin-right:4px">P{num}</span>{short}</a>'
 
-        # Une sous-ligne par appareil disponible (mobile puis desktop)
+        # One sub-row per available device (mobile then desktop)
         strats = [s for s in ("mobile", "desktop") if by_strat.get(s)]
         if not strats:
             na = f'<td style="text-align:right;color:{STATUS_NEUTRAL}">—</td>'
@@ -916,7 +916,7 @@ def _section_cwv(page_metrics, cwv):
             lcp_cell = _cwv_colored(c.get("lcp"), "s", (1.8, 2.5))
             inp_cell = _cwv_colored(c.get("inp"), "ms", (200, 500))
             cls_cell = _cwv_colored(c.get("cls"), "", (0.1, 0.25))
-            # La cellule "Page" n'est affichée que sur la 1re sous-ligne (rowspan)
+            # The "Page" cell is only displayed on the 1st sub-row (rowspan)
             first_cell = f'<td rowspan="{len(strats)}">{page_cell}</td>' if i == 0 else ""
             rows += f"""<tr>
       {first_cell}
@@ -925,31 +925,31 @@ def _section_cwv(page_metrics, cwv):
     </tr>"""
 
     legend = f"""<div style="font-size:15px;margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-    <span style="font-weight:bold;color:#555">Légende :</span>
-    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
-    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
-    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
-    <span style="color:#888">Définitions et seuils : voir le <a href="#glossaire">Glossaire</a> (Annexes)</span>
+    <span style="font-weight:bold;color:#555">Legend:</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Good</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} Needs improvement</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Poor</span>
+    <span style="color:#888">Definitions and thresholds: see the <a href="#glossaire">Glossary</a> (Appendices)</span>
   </div>"""
 
-    methodo_note = _cwv_methodo_note(cwv)
+    methodology_note = _cwv_methodology_note(cwv)
 
     return f"""<section id="cwv">
   <h2>Core Web Vitals</h2>
-  {methodo_note}
+  {methodology_note}
   <table>
-    <thead><tr><th>Page</th><th>Appareil</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th></tr></thead>
+    <thead><tr><th>Page</th><th>Device</th><th>{_glossary_link("LCP")}</th><th>{_glossary_link("INP")}</th><th>{_glossary_link("CLS")}</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
   {legend}
 </section>"""
 
 
-def _cwv_methodo_note(cwv):
-    """Note méthodologique CWV, adaptée aux sources RÉELLEMENT présentes.
+def _cwv_methodology_note(cwv):
+    """CWV methodology note, adapted to the sources ACTUALLY present.
 
-    Distingue les 3 sources (crux terrain / pagespeed_lab / lighthouse local) au
-    lieu de confondre crux et pagespeed_lab sous 'terrain manuel'."""
+    Distinguishes the 3 sources (crux field / pagespeed_lab / local lighthouse)
+    instead of confusing crux and pagespeed_lab under 'manual field'."""
     sources = {row.get("source")
                for by_strat in cwv.values() if isinstance(by_strat, dict)
                for row in by_strat.values() if row}
@@ -957,7 +957,7 @@ def _cwv_methodo_note(cwv):
     src_lines = "".join(
         f'<li><strong>{_CWV_SOURCE_LABELS[s][0]}</strong> : {_CWV_SOURCE_LABELS[s][2]}</li>'
         for s in present
-    ) or '<li>Source non renseignée</li>'
+    ) or '<li>Source not provided</li>'
 
     has_lab = bool(sources & {"pagespeed_lab", "lighthouse"})
     has_field = "crux" in sources
@@ -967,41 +967,41 @@ def _cwv_methodo_note(cwv):
     lab_caveat = ""
     if has_lab:
         lab_caveat = ('<span style="color:#888;margin-top:6px;display:block">'
-                      'Les mesures lab sont des simulations (réseau/CPU bridés). Les valeurs terrain '
-                      'réelles sont souvent meilleures, surtout sur desktop et connexion rapide. '
-                      'Les pages nécessitant une authentification sont analysées sans session : les '
-                      'métriques reflètent alors la page de login, pas la page cible.</span>')
+                      'Lab measurements are simulations (throttled network/CPU). Real field values '
+                      'are often better, especially on desktop and fast connections. '
+                      'Pages requiring authentication are analyzed without a session: the '
+                      'metrics then reflect the login page, not the target page.</span>')
     field_caveat = ""
     if has_field:
         field_caveat = ('<span style="color:#888;margin-top:6px;display:block">'
-                        'Le terrain CrUX ne couvre que les utilisateurs Chrome : iOS/Safari ne sont '
-                        'pas mesurés (voir annexe méthodologique).</span>')
+                        'CrUX field data only covers Chrome users: iOS/Safari are '
+                        'not measured (see methodology appendix).</span>')
 
     return (f'<div style="background:{bg};border-left:3px solid {color};padding:10px 14px;'
             f'margin-bottom:14px;font-size:16px;color:#555;border-radius:0 4px 4px 0">'
-            f'<strong>Note méthodologique - sources des mesures</strong>'
+            f'<strong>Methodology note - measurement sources</strong>'
             f'<ul style="margin:6px 0 0 16px;padding:0">{src_lines}</ul>'
             f'{field_caveat}{lab_caveat}</div>')
 
 
 CWV_ACTIONS = {
-    "lcp_warn": "L'élément principal de la page (souvent l'image ou le bloc héro) met un "
-                "peu trop de temps à s'afficher. À vérifier : cette image/bloc est-il chargé "
-                "en priorité, ou un script/une autre ressource le retarde-t-il ?",
-    "lcp_bad":  "L'élément principal de la page (image ou bloc héro) met trop de temps à "
-                "s'afficher. Causes probables : image non préchargée, formats non optimisés, "
-                "lazy loading activé par erreur sur le hero, ou script bloquant le rendu.",
-    "inp_warn": "Le thread principal met un peu de temps à répondre après un clic ou un tap. "
-                "Cause probable : gestionnaires d'événements ou traitements JS qui retardent "
-                "la réponse.",
-    "inp_bad":  "Le thread principal met trop de temps à répondre après une interaction "
-                "(clic, tap). Cause probable : tâches JS longues ou gestionnaires "
-                "d'événements lourds qui saturent le thread principal.",
-    "cls_warn": "Des éléments de la page se décalent légèrement après l'affichage initial. "
-                "Cause probable : images, iframes ou polices sans dimensions réservées.",
-    "cls_bad":  "Des éléments de la page se décalent nettement après l'affichage initial, "
-                "perturbant la lecture. Cause probable : images/iframes sans dimensions "
-                "réservées, ou contenus injectés tardivement dans la page.",
+    "lcp_warn": "The page's main element (often the hero image or block) takes a "
+                "little too long to appear. Check: is this image/block loaded "
+                "with priority, or does a script/another resource delay it?",
+    "lcp_bad":  "The page's main element (hero image or block) takes too long to "
+                "appear. Likely causes: image not preloaded, unoptimized formats, "
+                "lazy loading wrongly enabled on the hero, or a render-blocking script.",
+    "inp_warn": "The main thread takes a little time to respond after a click or tap. "
+                "Likely cause: event handlers or JS processing that delay "
+                "the response.",
+    "inp_bad":  "The main thread takes too long to respond after an interaction "
+                "(click, tap). Likely cause: long JS tasks or heavy event "
+                "handlers saturating the main thread.",
+    "cls_warn": "Page elements shift slightly after the initial display. "
+                "Likely cause: images, iframes or fonts without reserved dimensions.",
+    "cls_bad":  "Page elements shift noticeably after the initial display, "
+                "disrupting reading. Likely cause: images/iframes without reserved "
+                "dimensions, or content injected late into the page.",
 }
 
 _CWV_THRESHOLDS = {"lcp": (1.8, 2.5), "inp": (200, 500), "cls": (0.1, 0.25)}
@@ -1010,7 +1010,7 @@ _CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩"
 
 
 def _cwv_status(metric, val):
-    """Retourne (statut, couleur) pour une valeur de métrique CWV donnée."""
+    """Returns (status, color) for a given CWV metric value."""
     lo, hi = _CWV_THRESHOLDS[metric]
     if val > hi:
         return "bad", STATUS_BAD
@@ -1028,11 +1028,11 @@ def _cwv_fmt_value(metric, val):
 
 
 def _cwv_diagnostic_signal(action_key, traffic, greenit, coverage_by_page):
-    """Lot 5 : croise le problème CWV détecté avec des données déjà collectées
-    (trackers, polices externes, ressource la plus lourde, JS non utilisé) pour
-    nommer une cause probable plutôt qu'un message générique. Retourne une
-    phrase additionnelle (vocabulaire prudent : "signal indicatif", pas de
-    certitude) ou une chaîne vide si aucun signal exploitable n'est disponible.
+    """Lot 5: cross-references the detected CWV problem with already collected
+    data (trackers, external fonts, heaviest resource, unused JS) to
+    name a likely cause rather than a generic message. Returns an
+    additional sentence (cautious wording: "indicative signal", no
+    certainty) or an empty string if no usable signal is available.
     """
     metric = action_key.split("_")[0]
     agg = (greenit or {}).get("aggregated", {}) or {}
@@ -1041,14 +1041,14 @@ def _cwv_diagnostic_signal(action_key, traffic, greenit, coverage_by_page):
         signals = []
         trackers = (traffic or {}).get("trackers") or {}
         if trackers.get("count"):
-            signals.append(f"{trackers['count']} requête(s) de trackers/scripts tiers détectée(s)")
+            signals.append(f"{trackers['count']} third-party tracker/script request(s) detected")
         fonts = agg.get("UseStandardTypefaces", {}).get("evidence") or []
         if fonts:
-            signals.append(f"police(s) web externe(s) détectée(s) ({', '.join(fonts[:2])})")
+            signals.append(f"external web font(s) detected ({', '.join(fonts[:2])})"),
         if signals:
-            return (f"Signal indicatif : {' et '.join(signals)}, susceptibles d'injecter du "
-                    f"contenu tardivement dans la page (widgets, fallback de police) — à vérifier "
-                    f"comme cause possible du décalage.")
+            return (f"Indicative signal: {' and '.join(signals)}, likely to inject "
+                    f"content late into the page (widgets, font fallback) — to check "
+                    f"as a possible cause of the shift.")
         return ""
 
     if metric == "lcp":
@@ -1057,9 +1057,9 @@ def _cwv_diagnostic_signal(action_key, traffic, greenit, coverage_by_page):
             rtype = _classify_type(r.get("mime", ""), r.get("url", ""))
             if rtype in ("image", "font"):
                 ko = round(r["size"] / 1024, 1)
-                return (f"Signal indicatif : la ressource la plus lourde du parcours est "
-                        f"un(e) {rtype} de {ko} Ko ({r.get('host', '')}) — à vérifier si elle "
-                        f"correspond à l'élément LCP de la page concernée.")
+                return (f"Indicative signal: the heaviest resource of the journey is "
+                        f"a {rtype} of {ko} KB ({r.get('host', '')}) — check whether it "
+                        f"matches the LCP element of the page concerned.")
         return ""
 
     if metric == "inp":
@@ -1069,10 +1069,10 @@ def _cwv_diagnostic_signal(action_key, traffic, greenit, coverage_by_page):
                 if coverage_summary(pd["entries"] if isinstance(pd, dict) else pd)["js"]["pct"] > 60
             ]
             if heavy_pages:
-                return (f"Signal indicatif : taux de JS non utilisé &gt; 60 % relevé sur "
-                        f"{len(heavy_pages)} page(s) (voir Coverage en annexe) — cause possible "
-                        f"de surcharge du thread principal, sans certitude sur le JS exécuté "
-                        f"réellement au runtime.")
+                return (f"Indicative signal: unused JS rate &gt; 60 % found on "
+                        f"{len(heavy_pages)} page(s) (see Coverage in appendix) — possible "
+                        f"cause of main-thread overload, without certainty about the JS "
+                        f"actually executed at runtime.")
         return ""
 
     return ""
@@ -1086,20 +1086,20 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
 
     deduped = _dedup_page_metrics(page_metrics)
 
-    methodo_note = _cwv_methodo_note(cwv)
+    methodology_note = _cwv_methodology_note(cwv)
 
     legend = f"""<div style="font-size:15px;margin-top:16px;display:flex;gap:16px;align-items:center">
-    <span style="font-weight:bold;color:#555">Légende :</span>
-    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Bon</span>
-    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} A améliorer</span>
-    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Mauvais</span>
-    <span style="color:{STATUS_NEUTRAL}">{STATUS_EMOJI['neutral']} Non mesuré</span>
+    <span style="font-weight:bold;color:#555">Legend:</span>
+    <span style="color:{STATUS_GOOD}">{STATUS_EMOJI['good']} Good</span>
+    <span style="color:{STATUS_WARN}">{STATUS_EMOJI['warn']} Needs improvement</span>
+    <span style="color:{STATUS_BAD}">{STATUS_EMOJI['bad']} Poor</span>
+    <span style="color:{STATUS_NEUTRAL}">{STATUS_EMOJI['neutral']} Not measured</span>
   </div>"""
 
-    # Numérotation des types de problèmes (①②③...), attribuée dans l'ordre de
-    # première apparition en parcourant le tableau page par page, métrique par
-    # métrique — un même type de problème (ex. "lcp_warn") garde le même numéro
-    # partout, même s'il touche plusieurs pages/appareils.
+    # Numbering of problem types (①②③...), assigned in order of
+    # first appearance while scanning the table page by page, metric by
+    # metric — the same problem type (e.g. "lcp_warn") keeps the same number
+    # everywhere, even when it affects several pages/devices.
     problem_order = []
     problem_number = {}
 
@@ -1110,8 +1110,8 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         return problem_number[action_key]
 
     def _render_value(metric, strat, val):
-        """Rend une ligne de valeur (émoji statut + émoji appareil + valeur +
-        repère numéroté si dégradée). Retourne (html, status)."""
+        """Renders a value line (status emoji + device emoji + value +
+        numbered marker if degraded). Returns (html, status)."""
         status, color = _cwv_status(metric, val)
         status_emoji = STATUS_EMOJI.get(status, "")
         marker = f'{status_emoji} {_cwv_device_marker(strat)}'
@@ -1126,7 +1126,7 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         row_worst, strat_by_metric = _cwv_worst_per_metric(by_strat)
         worst_strat = strat_by_metric.get(metric) if strat_by_metric else None
         if worst_strat is None:
-            return f'<span style="color:{STATUS_NEUTRAL}" title="Non mesuré">{STATUS_EMOJI["neutral"]}</span>'
+            return f'<span style="color:{STATUS_NEUTRAL}" title="Not measured">{STATUS_EMOJI["neutral"]}</span>'
 
         marker_w, txt_w, sup_w, status_w, color_w = _render_value(metric, worst_strat, row_worst[metric])
         line1 = f'<div><b style="color:{color_w}">{marker_w} {txt_w}</b>{sup_w}</div>'
@@ -1138,14 +1138,14 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
             marker_o, txt_o, sup_o, status_o, color_o = _render_value(metric, other_strat, other_row[metric])
             style_o = f"color:{color_o};font-weight:bold"
             line2 = f'<div style="font-size:14px;{style_o}">{marker_o} {txt_o}{sup_o}</div>'
-        elif other_row and (mesure := other_row.get("mesure", {})).get("statut") not in (None, "ok"):
-            # Mesure tentée mais échouée (ex. timeout réseau) : le dire plutôt
-            # que de la faire disparaître silencieusement (cf. absence != échec).
-            detail = mesure.get("detail", "")
+        elif other_row and (measurement := other_row.get("measurement", {})).get("status") not in (None, "ok"):
+            # Measurement attempted but failed (e.g. network timeout): say it
+            # rather than let it disappear silently (cf. absence != failure).
+            detail = measurement.get("detail", "")
             title_attr = f' title="{detail}"' if detail else ""
             marker_fail = _cwv_device_marker(other_strat)
             line2 = (f'<div style="font-size:14px;color:{STATUS_NEUTRAL}"{title_attr}>'
-                      f'{marker_fail} mesure échouée</div>')
+                      f'{marker_fail} measurement failed</div>')
         return line1 + line2
 
     rows = ""
@@ -1156,9 +1156,9 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         short = parsed.path.rstrip("/") or "/"
         num = m.get("page_num", "")
 
-        # Ignorer les stratégies dont la mesure a échoué (pas de "source") :
-        # sinon un échec réseau sur une seule stratégie (ex. mobile) efface le
-        # badge de la source réellement utilisée par l'autre stratégie.
+        # Ignore strategies whose measurement failed (no "source"):
+        # otherwise a network failure on a single strategy (e.g. mobile) wipes
+        # the source badge of the strategy actually used by the other.
         sources = {s for r in by_strat.values() if r and (s := r.get("source"))}
         page_badge = _cwv_source_badge(next(iter(sources))) if len(sources) == 1 else ""
 
@@ -1167,7 +1167,7 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
             inp_cell = _render_cell("inp", by_strat)
             cls_cell = _render_cell("cls", by_strat)
         else:
-            not_measured = f'<span style="color:{STATUS_NEUTRAL}" title="Non mesuré">{STATUS_EMOJI["neutral"]}</span>'
+            not_measured = f'<span style="color:{STATUS_NEUTRAL}" title="Not measured">{STATUS_EMOJI["neutral"]}</span>'
             lcp_cell = inp_cell = cls_cell = not_measured
 
         rows += (
@@ -1209,8 +1209,8 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
         )
 
     return f"""<section id="cwv-analyse">
-  <h2>Analyse Core Web Vitals</h2>
-  {methodo_note}
+  <h2>Core Web Vitals analysis</h2>
+  {methodology_note}
   {table}
   {legend}
   {legend_notes}
@@ -1219,112 +1219,112 @@ def _section_cwv_analyse(page_metrics, cwv, traffic=None, greenit=None, coverage
 
 GREENIT_RULES = {
     "AddExpiresOrCacheControlHeaders": {
-        "name": "Ajouter des expires ou cache-control headers (>= 95%)",
-        "description": "Configurez les headers pour que CSS, JS et images soient mis en cache le plus longtemps possible.",
+        "name": "Add expires or cache-control headers (>= 95%)",
+        "description": "Configure headers so CSS, JS and images are cached as long as possible.",
     },
     "CompressHttp": {
-        "name": "Compresser les ressources (>= 95%)",
-        "description": "Activez gzip/Deflate. Pré-compressez les ressources statiques ; la compression à la volée convient pour le HTML dynamique.",
+        "name": "Compress resources (>= 95%)",
+        "description": "Enable gzip/Deflate. Pre-compress static resources; on-the-fly compression suits dynamic HTML.",
     },
     "DomainsNumber": {
-        "name": "Limiter le nombre de domaines (< 3)",
-        "description": "Moins de domaines = moins de connexions HTTP. Exception : un domaine séparé sans cookie pour les ressources statiques.",
+        "name": "Limit the number of domains (< 3)",
+        "description": "Fewer domains = fewer HTTP connections. Exception: a separate cookie-less domain for static resources.",
     },
     "DontResizeImageInBrowser": {
-        "name": "Ne pas retailler les images dans le navigateur",
-        "description": "Redimensionner via HTML gaspille la bande passante : un PNG 350×300 px pèse 41 Ko même affiché en 70×60 px.",
+        "name": "Do not resize images in the browser",
+        "description": "Resizing via HTML wastes bandwidth: a 350×300 px PNG weighs 41 KB even when displayed at 70×60 px.",
     },
     "EmptySrcTag": {
-        "name": "Eviter les tags SRC vides",
-        "description": "Un attribut src vide déclenche des requêtes HTTP inutiles vers le répertoire de la page.",
+        "name": "Avoid empty SRC tags",
+        "description": "An empty src attribute triggers useless HTTP requests to the page's directory.",
     },
     "ExternalizeCss": {
-        "name": "Externaliser les css",
-        "description": "Le CSS inline est renvoyé à chaque requête de page ; les fichiers externes peuvent être mis en cache.",
+        "name": "Externalize CSS",
+        "description": "Inline CSS is sent on every page request; external files can be cached.",
     },
     "ExternalizeJs": {
-        "name": "Externaliser les js",
-        "description": "Même principe que le CSS : les fichiers JS séparés permettent la mise en cache navigateur.",
+        "name": "Externalize JS",
+        "description": "Same principle as CSS: separate JS files allow browser caching.",
     },
     "HttpError": {
-        "name": "Eviter les requêtes en erreur",
-        "description": "Les réponses en erreur consomment des ressources inutilement.",
+        "name": "Avoid error requests",
+        "description": "Error responses consume resources for nothing.",
     },
     "HttpRequests": {
-        "name": "Limiter le nombre de requêtes HTTP (< 27)",
-        "description": "Moins de requêtes par page allègent la charge serveur et réduisent l'impact environnemental.",
+        "name": "Limit the number of HTTP requests (< 27)",
+        "description": "Fewer requests per page lighten the server load and reduce the environmental impact.",
     },
     "ImageDownloadedNotDisplayed": {
-        "name": "Ne pas télécharger des images inutilement",
-        "description": "Les images chargées mais affichées seulement après interaction utilisateur gaspillent des ressources.",
+        "name": "Do not download images unnecessarily",
+        "description": "Images loaded but displayed only after user interaction waste resources.",
     },
     "JsValidate": {
-        "name": "Valider le javascript",
-        "description": "JSLint garantit la conformité syntaxique cross-navigateur et permet une exécution plus rapide de l'interpréteur.",
+        "name": "Validate JavaScript",
+        "description": "JSLint guarantees cross-browser syntactic compliance and allows faster interpreter execution.",
     },
     "MaxCookiesLength": {
-        "name": "Taille maximum des cookies par domaine (< 512 octets)",
-        "description": "Les cookies sont envoyés à chaque requête : les garder courts économise de la bande passante.",
+        "name": "Maximum cookie size per domain (< 512 bytes)",
+        "description": "Cookies are sent with every request: keeping them short saves bandwidth.",
     },
     "MinifiedCss": {
-        "name": "Minifier les css (>= 95%)",
-        "description": "Utilisez YUI Compressor ou mod_pagespeed pour supprimer espaces et sauts de ligne.",
+        "name": "Minify CSS (>= 95%)",
+        "description": "Use YUI Compressor or mod_pagespeed to strip spaces and line breaks.",
     },
     "MinifiedJs": {
-        "name": "Minifier les js (>= 95%)",
-        "description": "Supprimez les espaces, sauts de ligne, points-virgules inutiles et raccourcissez les noms de variables locales.",
+        "name": "Minify JS (>= 95%)",
+        "description": "Strip spaces, line breaks, useless semicolons and shorten local variable names.",
     },
     "NoCookieForStaticRessources": {
-        "name": "Pas de cookie pour les ressources statiques",
-        "description": "Les cookies sur les ressources statiques gaspillent de la bande passante. Utilisez un domaine séparé ou limitez la portée des cookies.",
+        "name": "No cookies for static resources",
+        "description": "Cookies on static resources waste bandwidth. Use a separate domain or limit cookie scope.",
     },
     "NoRedirect": {
-        "name": "Eviter les redirections",
-        "description": "Les redirections ralentissent les temps de réponse et consomment des ressources inutilement.",
+        "name": "Avoid redirects",
+        "description": "Redirects slow down response times and consume resources for nothing.",
     },
     "OptimizeBitmapImages": {
-        "name": "Optimiser les images bitmap",
-        "description": "Les bitmaps représentent généralement la majorité des octets téléchargés : leur optimisation a un fort impact.",
+        "name": "Optimize bitmap images",
+        "description": "Bitmaps usually make up the bulk of downloaded bytes: optimizing them has a strong impact.",
     },
     "OptimizeSvg": {
-        "name": "Optimiser les images svg",
-        "description": "Bien que plus légères que les bitmaps, les SVG peuvent être minifiés avec des outils comme svgo.",
+        "name": "Optimize SVG images",
+        "description": "Although lighter than bitmaps, SVGs can be minified with tools like svgo.",
     },
     "Plugins": {
-        "name": "Ne pas utiliser de plugins",
-        "description": "Flash, Java, Silverlight imposent une charge CPU/RAM importante. Préférez HTML5 et ECMAScript.",
+        "name": "Do not use plugins",
+        "description": "Flash, Java, Silverlight impose a heavy CPU/RAM load. Prefer HTML5 and ECMAScript.",
     },
     "PrintStyleSheet": {
-        "name": "Fournir une print css",
-        "description": "Une feuille de style d'impression réduit le nombre de pages imprimées ; masquez menus, en-têtes et images non essentielles.",
+        "name": "Provide a print CSS",
+        "description": "A print stylesheet reduces the number of printed pages; hide menus, headers and non-essential images.",
     },
     "SocialNetworkButton": {
-        "name": "N'utilisez pas les boutons standards des réseaux sociaux",
-        "description": "Les plugins officiels (Facebook, Twitter…) chargent des ressources inutiles ; utilisez des liens directs.",
+        "name": "Do not use standard social network buttons",
+        "description": "Official plugins (Facebook, Twitter…) load useless resources; use direct links.",
     },
     "StyleSheets": {
-        "name": "Limiter le nombre de fichiers css (< 3)",
-        "description": "Concaténez les feuilles de style en un seul fichier pour réduire les requêtes HTTP.",
+        "name": "Limit the number of CSS files (< 3)",
+        "description": "Concatenate stylesheets into a single file to reduce HTTP requests.",
     },
     "UseETags": {
-        "name": "Utiliser des ETags (>= 95%)",
-        "description": "Les ETags permettent la réutilisation des ressources en cache quand la signature serveur correspond.",
+        "name": "Use ETags (>= 95%)",
+        "description": "ETags allow cache reuse of resources when the server signature matches.",
     },
     "UseStandardTypefaces": {
-        "name": "Utiliser des polices de caractères standards",
-        "description": "Les polices standard sont déjà présentes sur l'appareil de l'utilisateur : aucun téléchargement nécessaire.",
+        "name": "Use standard typefaces",
+        "description": "Standard fonts are already present on the user's device: no download needed.",
     },
     "PreferHttp2": {
-        "name": "Privilégier HTTP/2 à HTTP/1",
+        "name": "Prefer HTTP/2 over HTTP/1",
         "description": (
-            "HTTP/2 permet le multiplexage des requêtes sur une seule connexion TCP "
-            "(fin du plafond de 6 connexions/domaine d'HTTP/1.1) et compresse les en-têtes "
-            "(HPACK), réduisant la latence et le nombre de handshakes TCP/TLS. "
-            "Activation selon le serveur : Apache -> mod_http2 (nécessite le MPM event ou "
-            "worker ; incompatible avec mpm_prefork) ; Nginx -> directive 'listen 443 ssl "
-            "http2;' (>= 1.25 pour HTTP/3 QUIC) ; derrière un CDN/reverse-proxy -> HTTP/2 "
-            "est généralement activé par défaut côté edge, vérifier la configuration entre "
-            "le CDN et l'origine."
+            "HTTP/2 allows multiplexing requests over a single TCP connection "
+            "(end of the 6-connections-per-domain cap of HTTP/1.1) and compresses headers "
+            "(HPACK), reducing latency and the number of TCP/TLS handshakes. "
+            "Activation depends on the server: Apache -> mod_http2 (requires the event or "
+            "worker MPM ; incompatible with mpm_prefork) ; Nginx -> 'listen 443 ssl "
+            "http2;' directive (>= 1.25 for HTTP/3 QUIC) ; behind a CDN/reverse-proxy -> HTTP/2 "
+            "is usually enabled by default at the edge, check the configuration between "
+            "the CDN and the origin."
         ),
     },
 }
@@ -1334,9 +1334,9 @@ COMPLIANCE_ORDER  = {"C": 0, "B": 1, "A": 2, "NA": 3}
 
 
 def _compliance_badge_html(level, count=None, min_width="28px"):
-    """Badge de conformité GreenIT (A/B/C/N.A), style "chip" (fond clair + bordure
-    + emoji coloré) : la couleur seule ne doit jamais porter l'information, et
-    l'emoji doit rester visible même sur son propre statut (accessibilité)."""
+    """GreenIT compliance badge (A/B/C/N.A), "chip" style (light background + border
+    + colored emoji): color alone must never carry the information, and
+    the emoji must stay visible even on its own status (accessibility)."""
     status = COMPLIANCE_STATUS.get(level, "neutral")
     display = "N.A" if level == "NA" else level
     label = f"<b>{count}</b> {display}" if count is not None else display
@@ -1345,11 +1345,11 @@ def _compliance_badge_html(level, count=None, min_width="28px"):
 
 def load_greenit(audit_dir):
     """
-    Charge le fichier greenit.json si présent.
-    Formats acceptés :
-      - CLI GreenIT-Analysis-cli : liste de pages {"url":..., "bestPractices":{...}}
+    Loads greenit.json if present.
+    Accepted formats:
+      - GreenIT-Analysis-cli CLI: list of pages {"url":..., "bestPractices":{...}}
       - EcoSonar export          : {"ecodesign": {"RuleName": {"compliance":..., "auditedMetric":..., "averageScore":..., "description":...}}}
-    Retourne un dict {"pages": [...], "aggregated": {"RuleName": {...}}} ou None.
+    Returns a dict {"pages": [...], "aggregated": {"RuleName": {...}}} or None.
     """
     path = Path(audit_dir) / "greenit.json"
     if not path.exists():
@@ -1357,7 +1357,7 @@ def load_greenit(audit_dir):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
-    # Format EcoSonar
+    # EcoSonar format
     if isinstance(data, dict) and "ecodesign" in data:
         aggregated = {}
         for key, val in data["ecodesign"].items():
@@ -1368,7 +1368,7 @@ def load_greenit(audit_dir):
             }
         return {"pages": [], "aggregated": aggregated}
 
-    # Format CLI : liste de pages
+    # CLI format: list of pages
     pages = data if isinstance(data, list) else [data]
     aggregated = {}
     for page in pages:
@@ -1378,7 +1378,7 @@ def load_greenit(audit_dir):
                 aggregated[key] = {"complianceLevel": level, "comment": bp.get("comment", ""), "detailComment": bp.get("detailComment", ""), "_levels": []}
             aggregated[key]["_levels"].append(level)
 
-    # Compliance globale = pire niveau parmi les pages
+    # Overall compliance = worst level among pages
     for key, val in aggregated.items():
         levels = val.pop("_levels", [])
         worst = sorted(levels, key=lambda x: COMPLIANCE_ORDER.get(x, 3))[-1] if levels else "NA"
@@ -1389,9 +1389,9 @@ def load_greenit(audit_dir):
 
 def compute_greenit_from_har(har_data):
     """
-    Calcule les bonnes pratiques GreenIT-Analysis depuis un HAR.
-    Logique basée sur cnumr/GreenIT-Analysis (open source).
-    Retourne un dict compatible avec load_greenit() : {"pages":[], "aggregated":{...}}
+    Computes GreenIT-Analysis best practices from a HAR.
+    Logic based on cnumr/GreenIT-Analysis (open source).
+    Returns a dict compatible with load_greenit(): {"pages":[], "aggregated":{...}}
     """
     from urllib.parse import urlparse
 
@@ -1406,12 +1406,12 @@ def compute_greenit_from_har(har_data):
         hdrs = {h["name"].lower(): h["value"] for h in resp.get("headers", [])}
         return bool(hdrs.get("cache-control") or hdrs.get("expires") or hdrs.get("etag") or resp.get("status") == 304)
 
-    # ── Collecte des métriques brutes ─────────────────────────────────────────
+    # ── Raw metrics collection ─────────────────────────────────────────
     total = len(entries)
     nb_errors = 0;         urls_errors = []
     nb_redirects = 0;      urls_redirects = []
     nb_no_cache = 0;       urls_no_cache = []
-    static_cacheable_bytes = 0;  cacheable_ok_bytes = 0  # Lot 3 : gain estimé "visite de retour"
+    static_cacheable_bytes = 0;  cacheable_ok_bytes = 0  # Lot 3: estimated "return visit" gain
     nb_no_compress = 0;    urls_no_compress = []
     nb_no_etag = 0;        urls_no_etag = []
     nb_cookie_static = 0;  urls_cookie_static = [];  cookie_static_bytes = 0
@@ -1425,14 +1425,14 @@ def compute_greenit_from_har(har_data):
     nb_bitmap = 0;         urls_bitmap_heavy = []
     nb_bitmap_heavy = 0
     nb_svg_heavy = 0
-    urls_svg_fake = []     # Lot 4 : SVG anormalement lourd (> 30 Ko), probable bitmap encodé
+    urls_svg_fake = []     # Lot 4: abnormally heavy SVG (> 30 KB), probable encoded bitmap
     nb_video = 0;          video_bytes = 0;  urls_video = []
     nb_pdf = 0;            pdf_bytes = 0;    urls_pdf = []
     has_print_css = False
     social_domains = {"facebook.com", "twitter.com", "x.com", "linkedin.com", "instagram.com",
                       "platform.twitter.com", "connect.facebook.net", "platform.linkedin.com"}
     nb_social = 0;         urls_social = []
-    http_versions = defaultdict(int)  # pour HTTP/2
+    http_versions = defaultdict(int)  # for HTTP/2
 
     def _short(u, n=80):
         return u if len(u) <= n else u[:n] + "…"
@@ -1460,13 +1460,13 @@ def compute_greenit_from_har(har_data):
         if http_ver:
             http_versions[http_ver] += 1
 
-        # Erreurs
+        # Errors
         if 400 <= status < 600:
             nb_errors += 1
             if len(urls_errors) < 20:
                 urls_errors.append((url, status))
 
-        # Redirections
+        # Redirects
         if 300 <= status < 400 and status != 304:
             nb_redirects += 1
             if len(urls_redirects) < 20:
@@ -1496,7 +1496,7 @@ def compute_greenit_from_har(har_data):
                 if len(urls_no_compress) < 20:
                     urls_no_compress.append(url)
 
-        # Cookies sur statiques
+        # Cookies on static resources
         if _is_static(mime, url) and hdrs_req.get("cookie"):
             nb_cookie_static += 1
             cookie_static_bytes += len(hdrs_req["cookie"].encode())
@@ -1516,13 +1516,13 @@ def compute_greenit_from_har(har_data):
             else:
                 inline_css += 1
 
-        # JS inline
+        # Inline JS
         if rtype == "html":
             body = resp.get("content", {}).get("text", "") or ""
             if "<script" in body and "src=" not in body.split("<script")[1][:100] if "<script" in body else False:
                 inline_js += 1
 
-        # Polices externes
+        # External fonts
         if "googleapis.com" in netloc or "gstatic.com" in netloc or "typekit" in netloc or rtype == "font":
             if netloc:
                 font_external = 1
@@ -1538,8 +1538,8 @@ def compute_greenit_from_har(har_data):
                     nb_svg_heavy += 1
                     if len(urls_svg_heavy) < 20:
                         urls_svg_heavy.append((url, round(size/1024, 1)))
-                # Lot 4 : au-delà de 30 Ko, un SVG (vectoriel, normalement léger)
-                # cache le plus souvent un bitmap encodé en base64 (signal, pas certitude)
+                # Lot 4: beyond 30 KB, an SVG (vectorial, normally light)
+                # most often hides a base64-encoded bitmap (signal, not certainty)
                 if size > 30 * 1024 and len(urls_svg_fake) < 20:
                     urls_svg_fake.append((url, round(size/1024, 1)))
             else:
@@ -1549,7 +1549,7 @@ def compute_greenit_from_har(har_data):
                     if len(urls_bitmap_heavy) < 20:
                         urls_bitmap_heavy.append((url, round(size/1024, 1)))
 
-        # Vidéos et PDF (Lot 4) : signalement factuel, pas de jugement A/B/C
+        # Videos and PDFs (Lot 4): factual reporting, no A/B/C judgment
         if rtype == "video":
             nb_video += 1
             video_bytes += size
@@ -1561,20 +1561,20 @@ def compute_greenit_from_har(har_data):
             if len(urls_pdf) < 20:
                 urls_pdf.append((url, round(size/1024, 1)))
 
-        # Réseaux sociaux
+        # Social networks
         if netloc in social_domains or any(s in netloc for s in ("facebook", "twitter", "linkedin", "instagram")):
             nb_social += 1
             if len(urls_social) < 10:
                 urls_social.append(url)
 
-    # print CSS : chercher dans les corps HTML
+    # print CSS: search in HTML bodies
     for e in entries:
         body = e.get("response", {}).get("content", {}).get("text", "") or ""
         if "media" in body and "print" in body:
             has_print_css = True
             break
 
-    # ── Évaluation des règles ─────────────────────────────────────────────────
+    # ── Rule evaluation ─────────────────────────────────────────────────
     static_total = sum(
         1 for e in entries
         if _is_static(
@@ -1585,29 +1585,29 @@ def compute_greenit_from_har(har_data):
 
     def _pct_ok(nb_bad, total_concerned):
         if total_concerned == 0:
-            return "A", "100% conformes"
+            return "A", "100% compliant"
         pct_bad = nb_bad / total_concerned * 100
         if pct_bad == 0:
-            return "A", "100% conformes"
+            return "A", "100% compliant"
         elif pct_bad <= 5:
-            return "B", f"{nb_bad}/{total_concerned} ressource(s) non conforme(s)"
+            return "B", f"{nb_bad}/{total_concerned} non-compliant resource(s)"
         else:
-            return "C", f"{nb_bad}/{total_concerned} ressource(s) non conforme(s)"
+            return "C", f"{nb_bad}/{total_concerned} non-compliant resource(s)"
 
     def _ev(urls, label="URL"):
-        """Formate la liste d'evidence pour stockage."""
+        """Formats the evidence list for storage."""
         return urls
 
     agg = {}
 
     # AddExpiresOrCacheControlHeaders
     lvl, cmt = _pct_ok(nb_no_cache, static_total)
-    # Gain "visite de retour" (Lot 3) : poids déjà évité par le cache en place
-    # + poids additionnel qui serait évité si les ressources sans cache étaient corrigées.
+    # "Return visit" gain (Lot 3): weight already saved by the cache in place
+    # + additional weight that would be saved if the uncached resources were fixed.
     _no_cache_bytes = static_cacheable_bytes - cacheable_ok_bytes
     if static_cacheable_bytes > 0:
-        cmt += (f" — gain revisite actuel : {cacheable_ok_bytes/1024:.0f} Ko évités/visite de retour"
-                f"{f', {_no_cache_bytes/1024:.0f} Ko additionnels possibles si corrigé' if _no_cache_bytes > 0 else ''}")
+        cmt += (f" — current return-visit gain: {cacheable_ok_bytes/1024:.0f} KB saved/return visit"
+                f"{f', {_no_cache_bytes/1024:.0f} KB additional possible if fixed' if _no_cache_bytes > 0 else ''}")
     agg["AddExpiresOrCacheControlHeaders"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_no_cache}
 
     # CompressHttp
@@ -1630,11 +1630,11 @@ def compute_greenit_from_har(har_data):
         lvl = "B"
     else:
         lvl = "C"
-    agg["DomainsNumber"] = {"complianceLevel": lvl, "comment": f"{nd} domaine(s)", "evidence": sorted(domains)}
+    agg["DomainsNumber"] = {"complianceLevel": lvl, "comment": f"{nd} domain(s)", "evidence": sorted(domains)}
 
     # HttpError
     lvl = "A" if nb_errors == 0 else "C"
-    cmt = "Aucune erreur HTTP" if nb_errors == 0 else f"{nb_errors} requête(s) en erreur"
+    cmt = "No HTTP error" if nb_errors == 0 else f"{nb_errors} error request(s)"
     agg["HttpError"] = {"complianceLevel": lvl, "comment": cmt, "evidence": [f"{u} ({s})" for u, s in urls_errors]}
 
     # HttpRequests
@@ -1644,22 +1644,22 @@ def compute_greenit_from_har(har_data):
     if avg_req < 27:   lvl = "A"
     elif avg_req < 40: lvl = "B"
     else:              lvl = "C"
-    agg["HttpRequests"] = {"complianceLevel": lvl, "comment": f"{avg_req:.0f} req/page en moyenne ({total} total, {nb_pages_har} pages)", "evidence": []}
+    agg["HttpRequests"] = {"complianceLevel": lvl, "comment": f"{avg_req:.0f} req/page on average ({total} total, {nb_pages_har} pages)", "evidence": []}
 
     # NoRedirect
-    if nb_redirects == 0:     lvl, cmt = "A", "Aucune redirection"
-    elif nb_redirects <= 2:   lvl, cmt = "B", f"{nb_redirects} redirection(s)"
-    else:                     lvl, cmt = "C", f"{nb_redirects} redirection(s)"
+    if nb_redirects == 0:     lvl, cmt = "A", "No redirect"
+    elif nb_redirects <= 2:   lvl, cmt = "B", f"{nb_redirects} redirect(s)"
+    else:                     lvl, cmt = "C", f"{nb_redirects} redirect(s)"
     agg["NoRedirect"] = {"complianceLevel": lvl, "comment": cmt, "evidence": [f"{u} ({s})" for u, s in urls_redirects]}
 
     # NoCookieForStaticRessources
     lvl = "A" if nb_cookie_static == 0 else "C"
     if nb_cookie_static == 0:
-        cmt = "Aucun cookie sur ressource statique"
+        cmt = "No cookie on static resource"
     else:
-        cmt = (f"{nb_cookie_static} ressource(s) statique(s) avec cookie — "
-               f"{cookie_static_bytes} octets de cookie transmis inutilement sur ce parcours "
-               f"(mesuré depuis les en-têtes HAR, pas une estimation)")
+        cmt = (f"{nb_cookie_static} static resource(s) with cookie — "
+               f"{cookie_static_bytes} bytes of cookie sent uselessly on this journey "
+               f"(measured from HAR headers, not an estimate)")
     agg["NoCookieForStaticRessources"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_cookie_static}
 
     # UseETags
@@ -1668,12 +1668,12 @@ def compute_greenit_from_har(har_data):
 
     # ExternalizeCss
     lvl = "A" if inline_css == 0 else "C"
-    cmt = "Pas de CSS inline détecté" if inline_css == 0 else f"{inline_css} CSS inline détecté(s)"
+    cmt = "No inline CSS detected" if inline_css == 0 else f"{inline_css} inline CSS detected"
     agg["ExternalizeCss"] = {"complianceLevel": lvl, "comment": cmt, "evidence": []}
 
     # ExternalizeJs
     lvl = "A" if inline_js == 0 else "C"
-    cmt = "Pas de JS inline détecté" if inline_js == 0 else f"{inline_js} JS inline détecté(s)"
+    cmt = "No inline JS detected" if inline_js == 0 else f"{inline_js} inline JS detected"
     agg["ExternalizeJs"] = {"complianceLevel": lvl, "comment": cmt, "evidence": []}
 
     # StyleSheets
@@ -1681,14 +1681,14 @@ def compute_greenit_from_har(har_data):
     if nb_css <= 2:   lvl = "A"
     elif nb_css <= 5: lvl = "B"
     else:             lvl = "C"
-    agg["StyleSheets"] = {"complianceLevel": lvl, "comment": f"{nb_css} fichier(s) CSS distincts", "evidence": sorted(set(u.split("?")[0] for u in css_files))}
+    agg["StyleSheets"] = {"complianceLevel": lvl, "comment": f"{nb_css} distinct CSS file(s)", "evidence": sorted(set(u.split("?")[0] for u in css_files))}
 
     # UseStandardTypefaces
     lvl = "C" if font_external else "A"
-    cmt = "Polices externes détectées" if font_external else "Pas de police externe détectée"
+    cmt = "External fonts detected" if font_external else "No external font detected"
     agg["UseStandardTypefaces"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_fonts}
 
-    # MinifiedCss / MinifiedJs — heuristique whitespace ratio
+    # MinifiedCss / MinifiedJs — whitespace ratio heuristic
     def _count_unminified(rtype_filter):
         nb = 0; tot = 0; urls_bad = []
         for e in entries:
@@ -1709,17 +1709,17 @@ def compute_greenit_from_har(har_data):
 
     nb_unmin_css, tot_css, urls_unmin_css = _count_unminified("css")
     lvl, cmt = _pct_ok(nb_unmin_css, tot_css)
-    agg["MinifiedCss"] = {"complianceLevel": lvl, "comment": cmt if cmt else f"{tot_css} fichier(s) CSS", "evidence": urls_unmin_css}
+    agg["MinifiedCss"] = {"complianceLevel": lvl, "comment": cmt if cmt else f"{tot_css} CSS file(s)", "evidence": urls_unmin_css}
 
     nb_unmin_js, tot_js, urls_unmin_js = _count_unminified("javascript")
     lvl, cmt = _pct_ok(nb_unmin_js, tot_js)
-    agg["MinifiedJs"] = {"complianceLevel": lvl, "comment": cmt if cmt else f"{tot_js} fichier(s) JS", "evidence": urls_unmin_js}
+    agg["MinifiedJs"] = {"complianceLevel": lvl, "comment": cmt if cmt else f"{tot_js} JS file(s)", "evidence": urls_unmin_js}
 
     # OptimizeBitmapImages
     if nb_bitmap == 0:
-        agg["OptimizeBitmapImages"] = {"complianceLevel": "NA", "comment": "Pas d'image bitmap", "evidence": [], "evidence_images": []}
+        agg["OptimizeBitmapImages"] = {"complianceLevel": "NA", "comment": "No bitmap image", "evidence": [], "evidence_images": []}
     elif nb_bitmap_heavy == 0:
-        # Top 10 images les plus lourdes même si conformes (pour aperçu)
+        # Top 10 heaviest images even when compliant (for an overview)
         top_bitmaps = sorted(
             [(e.get("request",{}).get("url",""), e.get("response",{}).get("content",{}).get("size",0) or 0)
              for e in entries
@@ -1729,78 +1729,78 @@ def compute_greenit_from_har(har_data):
         )[:10]
         agg["OptimizeBitmapImages"] = {
             "complianceLevel": "A",
-            "comment": f"{nb_bitmap} image(s), aucune > 200 Ko non-webp/avif/jxl",
+            "comment": f"{nb_bitmap} image(s), none > 200 KB non-webp/avif/jxl",
             "evidence": [],
             "evidence_images": [{"url": u, "size_kb": round(s/1024, 1)} for u, s in top_bitmaps if u],
         }
     else:
         heavy_ko = sum(s for _, s in urls_bitmap_heavy)
-        # Gains forfaitaires cnumr JPEG/PNG -> WebP : -31,5% / -50,3% (moyenne ~-41% retenue,
-        # pas de distinction par format source ici — fourchette à préciser en méthodologie)
+        # Flat cnumr gains JPEG/PNG -> WebP: -31.5% / -50.3% (average ~-41% kept,
+        # no distinction by source format here — range to specify in the methodology)
         gain_low_ko  = round(heavy_ko * 0.315)
         gain_high_ko = round(heavy_ko * 0.503)
         agg["OptimizeBitmapImages"] = {
             "complianceLevel": "C",
-            "comment": (f"{nb_bitmap_heavy} image(s) > 200 Ko, format non-webp/avif/jxl — "
-                        f"gain estimé webp : {gain_low_ko} à {gain_high_ko} Ko (forfaitaire, non mesuré)"),
-            "evidence": [f"{u} ({s} Ko)" for u, s in urls_bitmap_heavy],
+            "comment": (f"{nb_bitmap_heavy} image(s) > 200 KB, non-webp/avif/jxl format — "
+                        f"estimated webp gain: {gain_low_ko} to {gain_high_ko} KB (flat rate, not measured)"),
+            "evidence": [f"{u} ({s} KB)" for u, s in urls_bitmap_heavy],
             "evidence_images": [{"url": u, "size_kb": s} for u, s in urls_bitmap_heavy],
         }
 
     # OptimizeSvg
     if nb_svg == 0:
-        agg["OptimizeSvg"] = {"complianceLevel": "NA", "comment": "Pas de SVG", "evidence": [], "evidence_images": []}
+        agg["OptimizeSvg"] = {"complianceLevel": "NA", "comment": "No SVG", "evidence": [], "evidence_images": []}
     elif nb_svg_heavy == 0:
-        agg["OptimizeSvg"] = {"complianceLevel": "A", "comment": f"{nb_svg} SVG, aucun > 10 Ko", "evidence": [], "evidence_images": []}
+        agg["OptimizeSvg"] = {"complianceLevel": "A", "comment": f"{nb_svg} SVG, none > 10 KB", "evidence": [], "evidence_images": []}
     else:
-        cmt = f"{nb_svg_heavy} SVG lourd(s) (> 10 Ko)"
+        cmt = f"{nb_svg_heavy} heavy SVG(s) (> 10 KB)"
         if urls_svg_fake:
-            cmt += (f" — dont {len(urls_svg_fake)} probable(s) bitmap encodé(s) en base64 "
-                    f"(> 30 Ko, signal non confirmé)")
+            cmt += (f" — including {len(urls_svg_fake)} probable base64-encoded bitmap(s) "
+                    f"(> 30 KB, unconfirmed signal)")
         agg["OptimizeSvg"] = {
             "complianceLevel": "C",
             "comment": cmt,
-            "evidence": [f"{u} ({s} Ko)" for u, s in urls_svg_heavy],
+            "evidence": [f"{u} ({s} KB)" for u, s in urls_svg_heavy],
             "evidence_images": [{"url": u, "size_kb": s} for u, s in urls_svg_heavy],
         }
 
     # PrintStyleSheet
     lvl = "A" if has_print_css else "C"
-    cmt = "Print CSS détectée" if has_print_css else "Aucune feuille de style print détectée"
+    cmt = "Print CSS detected" if has_print_css else "No print stylesheet detected"
     agg["PrintStyleSheet"] = {"complianceLevel": lvl, "comment": cmt, "evidence": []}
 
     # SocialNetworkButton
     lvl = "A" if nb_social == 0 else "C"
-    cmt = "Aucun bouton réseau social standard" if nb_social == 0 else f"{nb_social} ressource(s) réseau social détectée(s)"
+    cmt = "No standard social network button" if nb_social == 0 else f"{nb_social} social network resource(s) detected"
     agg["SocialNetworkButton"] = {"complianceLevel": lvl, "comment": cmt, "evidence": urls_social}
 
     # MaxCookiesLength
     max_cookie = max(cookie_bytes_by_domain.values()) if cookie_bytes_by_domain else 0
     if max_cookie == 0:
-        lvl, cmt = "A", "Aucun cookie"
+        lvl, cmt = "A", "No cookie"
     elif max_cookie <= 512:
-        lvl, cmt = "A", f"Max {max_cookie} octets/domaine"
+        lvl, cmt = "A", f"Max {max_cookie} bytes/domain"
     else:
-        lvl, cmt = "C", f"Max {max_cookie} octets/domaine (> 512)"
+        lvl, cmt = "C", f"Max {max_cookie} bytes/domain (> 512)"
     agg["MaxCookiesLength"] = {"complianceLevel": lvl, "comment": cmt,
-                                "evidence": [f"{d} : {b} octets" for d, b in sorted(cookie_bytes_by_domain.items(), key=lambda x: -x[1])[:10]]}
+                                "evidence": [f"{d} : {b} bytes" for d, b in sorted(cookie_bytes_by_domain.items(), key=lambda x: -x[1])[:10]]}
 
     # PreferHttp2
     nb_h1 = sum(v for k, v in http_versions.items() if "1.1" in k or k == "HTTP/1.0")
     nb_h2 = sum(v for k, v in http_versions.items() if "2" in k or "h2" in k.lower())
     if not http_versions or (nb_h1 == 0 and nb_h2 == 0):
-        # Pas d'info de version dans le HAR
-        agg["PreferHttp2"] = {"complianceLevel": "NA", "comment": "Version HTTP non disponible dans le HAR", "evidence": []}
+        # No version info in the HAR
+        agg["PreferHttp2"] = {"complianceLevel": "NA", "comment": "HTTP version not available in the HAR", "evidence": []}
     elif nb_h1 == 0:
-        agg["PreferHttp2"] = {"complianceLevel": "A", "comment": f"HTTP/2 ou supérieur ({nb_h2} requêtes)", "evidence": []}
+        agg["PreferHttp2"] = {"complianceLevel": "A", "comment": f"HTTP/2 or higher ({nb_h2} requests)", "evidence": []}
     elif nb_h2 == 0:
-        agg["PreferHttp2"] = {"complianceLevel": "C", "comment": f"HTTP/1.x uniquement ({nb_h1} requêtes)", "evidence": list(http_versions.items())}
+        agg["PreferHttp2"] = {"complianceLevel": "C", "comment": f"HTTP/1.x only ({nb_h1} requests)", "evidence": list(http_versions.items())}
     else:
-        agg["PreferHttp2"] = {"complianceLevel": "B", "comment": f"Mix HTTP/1.x ({nb_h1}) et HTTP/2+ ({nb_h2})",
-                               "evidence": [f"{k}: {v} requête(s)" for k, v in sorted(http_versions.items())]}
+        agg["PreferHttp2"] = {"complianceLevel": "B", "comment": f"Mix HTTP/1.x ({nb_h1}) and HTTP/2+ ({nb_h2})",
+                               "evidence": [f"{k}: {v} request(s)" for k, v in sorted(http_versions.items())]}
 
-    # Lot 4 : médias volumineux (vidéos, PDF) — signalement factuel, pas de badge A/B/C
-    # (pas de seuil universel défendable, pas de comparaison poids/usage réel possible ici)
+    # Lot 4: bulky media (videos, PDFs) — factual reporting, no A/B/C badge
+    # (no defensible universal threshold, no possible weight/real-usage comparison here)
     media = {
         "video": {"count": nb_video, "size_ko": round(video_bytes/1024), "urls": urls_video},
         "pdf":   {"count": nb_pdf,   "size_ko": round(pdf_bytes/1024),   "urls": urls_pdf},
@@ -1814,7 +1814,7 @@ def _section_greenit(greenit):
         return ""
 
     agg = greenit["aggregated"]
-    # Trier : C en premier, puis B, puis A, puis NA
+    # Sort: C first, then B, then A, then NA
     sorted_keys = sorted(agg.keys(), key=lambda k: COMPLIANCE_ORDER.get(agg[k]["complianceLevel"], 3))
 
     rows = ""
@@ -1825,11 +1825,11 @@ def _section_greenit(greenit):
         badge = _compliance_badge_html(level)
         detail = bp.get("comment") or bp.get("detailComment") or ""
 
-        # Bloc <details> avec les URLs incriminées si disponibles
+        # <details> block with the implicated URLs if available
         evidence = bp.get("evidence", [])
         evidence_images = bp.get("evidence_images", [])  # [{url, size_kb}]
 
-        # Dédupliquer par URL canonique (sans query string)
+        # Deduplicate by canonical URL (no query string)
         _seen_ev = {}
         for img in evidence_images:
             key = img["url"].split("?")[0]
@@ -1837,7 +1837,7 @@ def _section_greenit(greenit):
                 _seen_ev[key] = img
         evidence_images = list(_seen_ev.values())
 
-        # Thumbnails pour les 10 images les plus lourdes
+        # Thumbnails for the 10 heaviest images
         thumbs_html = ""
         if evidence_images:
             top_imgs = sorted(evidence_images, key=lambda x: -x.get("size_kb", 0))[:10]
@@ -1848,7 +1848,7 @@ def _section_greenit(greenit):
                 fname = url.split("/")[-1].split("?")[0][:40]
                 thumb = embed_image(url, alt=fname, max_dim=50)
                 if thumb:
-                    # Remplacer la figure par une version inline compacte
+                    # Replace the figure with a compact inline version
                     thumb_inline = (
                         f'<div style="display:inline-block;text-align:center;margin:4px;vertical-align:top">'
                         f'<a href="{url}" target="_blank" rel="noopener">'
@@ -1860,7 +1860,7 @@ def _section_greenit(greenit):
                     )
                     thumbs.append(thumb_inline)
                 else:
-                    # Fallback : lien texte si vipsthumbnail absent
+                    # Fallback: text link if vipsthumbnail is missing
                     thumbs.append(
                         f'<div style="display:inline-block;margin:4px;font-size:15px;vertical-align:top">'
                         f'<a href="{url}" target="_blank" rel="noopener">{fname}</a>'
@@ -1869,23 +1869,23 @@ def _section_greenit(greenit):
             if thumbs:
                 thumbs_html = (
                     f'<div style="margin-top:6px;padding:6px;background:#f8f8f8;border-radius:4px">'
-                    f'<div style="font-size:15px;color:#555;margin-bottom:4px">Top {len(thumbs)} image(s) les plus lourdes :</div>'
+                    f'<div style="font-size:15px;color:#555;margin-bottom:4px">Top {len(thumbs)} heaviest images:</div>'
                     f'{"".join(thumbs)}'
                     f'</div>'
                 )
 
         if thumbs_html:
-            # Les thumbnails remplacent la liste texte pour les règles images
+            # Thumbnails replace the text list for image rules
             nb = len(evidence_images)
             details_html = (
                 f'<details style="margin-top:4px">'
                 f'<summary style="cursor:pointer;font-size:15px;color:#555">'
-                f'Aperçu ({nb} image(s))</summary>'
+                f'Preview ({nb} image(s))</summary>'
                 f'{thumbs_html}'
                 f'</details>'
             )
         elif evidence:
-            # Autres règles : liste texte simple
+            # Other rules: simple text list
             ev_items = "".join(
                 f'<li style="font-size:15px;word-break:break-all;margin:2px 0">'
                 f'<a href="{item}" target="_blank" rel="noopener">{item}</a></li>'
@@ -1896,7 +1896,7 @@ def _section_greenit(greenit):
             details_html = (
                 f'<details style="margin-top:4px">'
                 f'<summary style="cursor:pointer;font-size:15px;color:#555">'
-                f'Détail ({len(evidence)} élément(s))</summary>'
+                f'Detail ({len(evidence)} item(s))</summary>'
                 f'<ul style="margin:4px 0 0 12px;padding:0">{ev_items}</ul>'
                 f'</details>'
             )
@@ -1924,29 +1924,29 @@ def _section_greenit(greenit):
 
     legend = (
         '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;font-size:16px">'
-        f'<span>{_compliance_badge_html("C", min_width="auto")} &nbsp;<b>Non conforme</b> - action corrective requise</span>'
-        f'<span>{_compliance_badge_html("B", min_width="auto")} &nbsp;<b>Partiellement conforme</b> - amélioration possible</span>'
-        f'<span>{_compliance_badge_html("A", min_width="auto")} &nbsp;<b>Conforme</b> - bonne pratique respectée</span>'
-        f'<span>{_compliance_badge_html("NA", min_width="auto")} &nbsp;<b>Non applicable</b> - critère sans objet pour ce site</span>'
+        f'<span>{_compliance_badge_html("C", min_width="auto")} &nbsp;<b>Non-compliant</b> - corrective action required</span>'
+        f'<span>{_compliance_badge_html("B", min_width="auto")} &nbsp;<b>Partially compliant</b> - improvement possible</span>'
+        f'<span>{_compliance_badge_html("A", min_width="auto")} &nbsp;<b>Compliant</b> - best practice followed</span>'
+        f'<span>{_compliance_badge_html("NA", min_width="auto")} &nbsp;<b>Not applicable</b> - criterion irrelevant for this site</span>'
         '</div>'
     )
 
-    source_note = ' <span style="font-size:16px;font-weight:normal;color:#888">(calculé depuis HAR)</span>' if greenit.get("_source") == "har" else ""
+    source_note = ' <span style="font-size:16px;font-weight:normal;color:#888">(computed from HAR)</span>' if greenit.get("_source") == "har" else ""
     return f"""<section id="greenit">
-  <h2>Bonnes pratiques GreenIT-Analysis{source_note}</h2>
+  <h2>GreenIT-Analysis best practices{source_note}</h2>
   <div style="margin-bottom:8px">{summary}</div>
   {legend}
   <table>
-    <thead><tr><th style="width:48px">Niveau</th><th>Bonne pratique</th><th>Description</th></tr></thead>
+    <thead><tr><th style="width:48px">Level</th><th>Best practice</th><th>Description</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
 </section>"""
 
 
 def _section_medias(greenit):
-    """Section Lot 4 : contenus médias lourds (vidéos, PDF) — signalement factuel,
-    pas de badge A/B/C (pas de seuil universel défendable pour ces formats).
-    Retourne "" si aucun média détecté (section absente, pas de ligne vide)."""
+    """Lot 4 section: heavy media content (videos, PDFs) — factual reporting,
+    no A/B/C badge (no defensible universal threshold for these formats).
+    Returns "" if no media detected (section absent, not an empty line)."""
     media = (greenit or {}).get("media") or {}
     video = media.get("video", {})
     pdf = media.get("pdf", {})
@@ -1959,67 +1959,67 @@ def _section_medias(greenit):
         rows = "".join(
             f'<tr><td><a href="{u}" target="_blank" rel="noopener" title="{u}">'
             f'{u.split("/")[-1].split("?")[0][:60] or u[:60]}</a></td>'
-            f'<td style="text-align:right">{s} Ko</td></tr>'
+            f'<td style="text-align:right">{s} KB</td></tr>'
             for u, s in data.get("urls", [])
         )
         return f"""<div style="margin-bottom:16px">
   <div class="kpi-grid" style="margin-bottom:8px">
-    <div class="kpi"><div class="val">{data['count']}</div><div class="lbl">{label} détecté(s)</div></div>
-    <div class="kpi"><div class="val">{data['size_ko']:,} Ko</div><div class="lbl">Poids cumulé</div></div>
+    <div class="kpi"><div class="val">{data['count']}</div><div class="lbl">{label} detected</div></div>
+    <div class="kpi"><div class="val">{data['size_ko']:,} KB</div><div class="lbl">Cumulative weight</div></div>
   </div>
-  <details><summary style="cursor:pointer;color:{color};font-weight:bold">Détail des {data['count']} fichier(s)</summary>
+  <details><summary style="cursor:pointer;color:{color};font-weight:bold">Detail of the {data['count']} file(s)</summary>
     <table style="margin-top:6px"><tbody>{rows}</tbody></table>
   </details>
 </div>"""
 
     return f"""<section id="medias">
-  <h2>Médias et documents à surveiller</h2>
+  <h2>Media and documents to watch</h2>
   <p style="font-size:15px;color:#888;margin-bottom:12px">
-    Signalement factuel (poids, nombre) : aucun seuil de conformité n'est appliqué ici,
-    l'usage attendu d'une vidéo ou d'un PDF variant trop selon le contexte du site pour
-    fixer un repère universel.
+    Factual reporting (weight, count): no compliance threshold is applied here,
+    the expected use of a video or PDF varying too much with the site's context to
+    set a universal benchmark.
   </p>
-  {_kpi_block("Vidéo", video, TYPE_COLORS.get("video", "#e67e22"))}
+  {_kpi_block("Video", video, TYPE_COLORS.get("video", "#e67e22"))}
   {_kpi_block("PDF", pdf, TYPE_COLORS.get("pdf", "#c0392b"))}
 </section>"""
 
 
 _CONFIDENCE_LEVELS = ("high", "medium", "low", "default", "default_efootprint",
                       "default_script", "unjustified",
-                      # Noms canoniques de l'axe provenance (chaîne EOF). Les noms
-                      # ci-dessus restent acceptés en lecture pour que les audits
-                      # déjà produits continuent de s'afficher.
-                      "collecte", "estime", "declare", "precise", "suppose",
+                      # Canonical names of the provenance axis (EOF chain). The names
+                      # above stay accepted in reading so that audits already
+                      # produced keep displaying.
+                      "collected", "estimated", "declared", "stated", "assumed",
                       "defaut_lib", "defaut_script")
 
 
 def _confidence_badge(conf):
-    """Rend un petit badge coloré pour un niveau de confiance.
+    """Renders a small colored badge for a confidence level.
 
-    "default"/"default_efootprint" : valeur par défaut de la LIBRAIRIE e-footprint
-    (ex. archétypes smartphone/laptop). "default_script" : valeur fixée en dur par
-    NOTRE script (ex. stockage 50 GB), pas par e-footprint — distinction nécessaire
-    car les deux étaient auparavant confondues sous un même badge trompeur.
-    "unjustified" : donnée précisée manuellement par la personne qui lance l'audit,
-    mais sans justification/source vérifiable fournie (ex. type d'instance choisi
-    sans preuve).
+    "default"/"default_efootprint": default value of the e-footprint LIBRARY
+    (e.g. smartphone/laptop archetypes). "default_script": value hard-coded by
+    OUR script (e.g. 50 GB storage), not by e-footprint — a distinction needed
+    because both were previously confused under a single misleading badge.
+    "unjustified": data specified manually by the person running the audit,
+    but without a verifiable justification/source provided (e.g. instance type
+    chosen without proof).
     """
-    # Table canonique avec tous les synonymes acceptés
+    # Canonical table with all accepted synonyms
     mapping = {
-        "high":               ("#1e7e34", "#e8f5e9", "✅", "collecté"),
-        "collecte":           ("#1e7e34", "#e8f5e9", "✅", "collecté"),
-        "medium":             ("#0f6674", "#e0f4f7", "🔎", "estimé"),
-        "estime":             ("#0f6674", "#e0f4f7", "🔎", "estimé"),
-        "declare":            ("#2a5f99", "#e3f0ff", "📣", "déclaré (public)"),
-        "low":                ("#9a4d00", "#fff3e0", "❓", "supposé"),
-        "suppose":            ("#9a4d00", "#fff3e0", "❓", "supposé"),
-        "unjustified":        ("#5a3d34", "#f3e8e4", "📝", "précisé"),
-        "precise":            ("#5a3d34", "#f3e8e4", "📝", "précisé"),
-        "default":            ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
-        "default_efootprint": ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
-        "defaut_lib":         ("#5a5a5a", "#eeeeee", "📦", "défaut lib"),
-        "default_script":     ("#33383d", "#e4e5e7", "🛠️", "défaut script"),
-        "defaut_script":      ("#33383d", "#e4e5e7", "🛠️", "défaut script"),
+        "high":               ("#1e7e34", "#e8f5e9", "✅", "collected"),
+        "collected":           ("#1e7e34", "#e8f5e9", "✅", "collected"),
+        "medium":             ("#0f6674", "#e0f4f7", "🔎", "estimated"),
+        "estimated":             ("#0f6674", "#e0f4f7", "🔎", "estimated"),
+        "declared":            ("#2a5f99", "#e3f0ff", "📣", "declared (public)"),
+        "low":                ("#9a4d00", "#fff3e0", "❓", "assumed"),
+        "assumed":            ("#9a4d00", "#fff3e0", "❓", "assumed"),
+        "unjustified":        ("#5a3d34", "#f3e8e4", "📝", "stated"),
+        "stated":            ("#5a3d34", "#f3e8e4", "📝", "stated"),
+        "default":            ("#5a5a5a", "#eeeeee", "📦", "lib default"),
+        "default_efootprint": ("#5a5a5a", "#eeeeee", "📦", "lib default"),
+        "defaut_lib":         ("#5a5a5a", "#eeeeee", "📦", "lib default"),
+        "default_script":     ("#33383d", "#e4e5e7", "🛠️", "script default"),
+        "defaut_script":      ("#33383d", "#e4e5e7", "🛠️", "script default"),
     }
     color, bg, emoji, label = mapping.get(conf, ("#5a5a5a", "#eeeeee", "❔", conf or "?"))
     return (
@@ -2029,20 +2029,20 @@ def _confidence_badge(conf):
     )
 
 
-def _provenance_de(entree):
-    """Lit l'axe provenance d'une entrée EOF (critère ou question de diagnostic).
+def _provenance_of(entry):
+    """Reads the provenance axis of an EOF entry (criterion or diagnostic question).
 
-    La chaîne EOF écrit `provenance` (collecte > estime > declare > precise).
-    `confidence` est l'ancien nom, gardé en repli pour que les audits produits
-    avant le renommage continuent de s'afficher. Aucune valeur par défaut : une
-    provenance absente reste absente, elle ne devient pas "collecté" en douce.
+    The EOF chain writes `provenance` (collected > estimated > declared > stated).
+    `confidence` is the old name, kept as a fallback so that audits produced
+    before the rename keep displaying. No default value: a missing provenance
+    stays missing, it does not silently become "collected".
     """
-    return entree.get("provenance") or entree.get("confidence")
+    return entry.get("provenance") or entry.get("confidence")
 
 
-# Domaines connus -> libellé court affiché dans "(↗ source <nom>)". Le nom du
-# site est TOUJOURS visible dans le lien (jamais un "source" nu qui ne dit pas
-# d'où vient la donnée) ; repli sur le domaine tel quel si non listé ici.
+# Known domains -> short label displayed in "(↗ source <name>)". The site name
+# is ALWAYS visible in the link (never a bare "source" that does not say where
+# the data comes from); fallback to the domain as-is if not listed here.
 _SOURCE_DOMAIN_LABELS = {
     "similarweb.com": "similarweb",
     "www.similarweb.com": "similarweb",
@@ -2058,9 +2058,9 @@ _SOURCE_DOMAIN_LABELS = {
 
 
 def _source_link(url, label=None):
-    """Lien '(↗ source <nom>)' vers une URL de provenance, nom du site déduit
-    du domaine (jamais un "source" nu). Retourne une chaîne vide si url est
-    absent, pour un usage direct en f-string sans test préalable."""
+    """'(↗ source <name>)' link to a provenance URL, site name deduced
+    from the domain (never a bare "source"). Returns an empty string if url is
+    absent, for direct use in an f-string without a prior test."""
     if not url:
         return ""
     if label is None:
@@ -2071,29 +2071,29 @@ def _source_link(url, label=None):
 
 
 def _audience_source_label(label, url):
-    """Libellé de source du mix pays d'audience, suffixé d'un lien lisible
-    ("↗ source similarweb") vers l'URL de provenance si fournie."""
+    """Source label of the audience country mix, suffixed with a readable link
+    ("↗ source similarweb") to the provenance URL if provided."""
     return f'{label}{_source_link(url)}' if url else label
 
 
 def _instance_type_row(hyp):
-    """Ligne "Type d'instance" avec 3 niveaux de confiance :
-    - jamais précisé (--instance non fourni) : valeur par défaut du SCRIPT
-      (pas d'e-footprint), badge "défaut script".
-    - précisé (--instance fourni) mais sans justification (--instance-source
-      absent) : badge "précisé", choix actif mais non vérifié.
-    - précisé ET justifié (--instance-source fourni) : badge "estimé", avec
-      le texte de justification (et lien source si fourni), sur le modèle de
+    """"Instance type" row with 3 confidence levels:
+    - never specified (--instance not provided): SCRIPT default value
+      (not e-footprint), "script default" badge.
+    - specified (--instance provided) but without justification (--instance-source
+      absent): "stated" badge, active choice but unverified.
+    - specified AND justified (--instance-source provided): "estimated" badge, with
+      the justification text (and source link if provided), modeled on
       _traffic_source_label()/_audience_source_label().
 
-    hyp : dict hypotheses d'efootprint-synthese-python.json. Retourne (label_value, conf).
+    hyp: hypotheses dict of efootprint-python-summary.json. Returns (label_value, conf).
     """
-    # `.get(cle, repli)` ne suffit pas : la clé EXISTE et vaut `None` quand aucun
-    # type d'instance n'a été retenu. Le repli ne servait donc jamais et le
-    # rapport affichait "Type d'instance : None" au lecteur (trouvé par
-    # check_valeurs_rapport.py sur les rapports déjà produits). "sans donnée" est
-    # le libellé déjà employé ailleurs pour une absence.
-    value = hyp.get("instance_type") or "sans donnée"
+    # `.get(key, fallback)` is not enough: the key EXISTS and is `None` when no
+    # instance type was retained. The fallback therefore never applied and the
+    # report displayed "Instance type: None" to the reader (found by
+    # check_report_values.py on already produced reports). "no data" is
+    # the label already used elsewhere for an absence.
+    value = hyp.get("instance_type") or "no data"
     source_text = hyp.get("instance_type_source")
     source_url = hyp.get("instance_type_source_url")
 
@@ -2108,19 +2108,19 @@ def _instance_type_row(hyp):
 
 
 def _traffic_source_label(traffic):
-    """Libellé de provenance du trafic annuel, avec snapshot et lien source.
+    """Provenance label of the annual traffic, with snapshot and source link.
 
-    traffic : bloc {source, source_url, snapshot, confidence} d'efootprint-synthese-python.json.
-    Retourne un libellé lisible ("estimation SimilarWeb, juin 2026 ↗ source",
-    "saisie (analytics client)", "hypothèse par défaut") destiné à la colonne source
-    des tableaux d'hypothèses."""
+    traffic: {source, source_url, snapshot, confidence} block of efootprint-python-summary.json.
+    Returns a readable label ("SimilarWeb estimate, June 2026 ↗ source",
+    "manual entry (client analytics)", "default assumption") meant for the source
+    column of the assumptions tables."""
     traffic = traffic or {}
-    source = traffic.get("source") or "paramètre"
+    source = traffic.get("source") or "parameter"
     url = traffic.get("source_url")
     snapshot = traffic.get("snapshot")
 
     if source == "default":
-        return "hypothèse par défaut (100 000/an)"
+        return "default assumption (100,000/year)"
 
     label = source
     if snapshot:
@@ -2129,14 +2129,14 @@ def _traffic_source_label(traffic):
     return label
 
 
-def load_synthese_python(audit_dir):
-    """Cherche efootprint-synthese-python.json dans audit_dir ou son parent
-    (source_dir) : résumé applicatif écrit par
-    `run_efootprint.py::save_synthese_python()`, PAS le modèle e-footprint
-    natif (`efootprint-boavizta-model.json`, jamais lu par ce rapport)."""
+def load_python_summary(audit_dir):
+    """Looks for efootprint-python-summary.json in audit_dir or its parent
+    (source_dir): application-level summary written by
+    `run_efootprint.py::save_python_summary()`, NOT the native e-footprint
+    model (`efootprint-boavizta-model.json`, never read by this report)."""
     audit_dir = Path(audit_dir)
-    for candidate in [audit_dir / "efootprint-synthese-python.json",
-                       audit_dir.parent / "efootprint-synthese-python.json"]:
+    for candidate in [audit_dir / "efootprint-python-summary.json",
+                       audit_dir.parent / "efootprint-python-summary.json"]:
         if candidate.exists():
             with open(candidate, encoding="utf-8") as f:
                 return json.load(f)
@@ -2144,11 +2144,11 @@ def load_synthese_python(audit_dir):
 
 
 def load_recommendations_gains(audit_dir):
-    """Cherche efootprint-recommendations-gains.json dans audit_dir ou son parent
-    (source_dir) : gains CO2e par palier de recommandations, écrits par
-    `run_efootprint.py::run_recommendation_scenarios()`. Optionnel — absent sur un
-    audit pas encore rejoué avec cette version du script (rapport rétrocompatible,
-    même principe que load_synthese_python())."""
+    """Looks for efootprint-recommendations-gains.json in audit_dir or its parent
+    (source_dir): CO2e gains per recommendation tier, written by
+    `run_efootprint.py::run_recommendation_scenarios()`. Optional — absent on an
+    audit not yet re-run with this version of the script (backward-compatible report,
+    same principle as load_python_summary())."""
     audit_dir = Path(audit_dir)
     for candidate in [audit_dir / "efootprint-recommendations-gains.json",
                       audit_dir.parent / "efootprint-recommendations-gains.json"]:
@@ -2159,26 +2159,26 @@ def load_recommendations_gains(audit_dir):
 
 
 def load_topology_svg(audit_dir):
-    """Cherche un topologie-*.svg dans audit_dir ou son parent (source_dir).
+    """Looks for a topology-*.svg in audit_dir or its parent (source_dir).
 
-    Produit par l'Étape 25 du skill efootprint (build_topology_overview() +
-    compilation plantuml -tsvg, cf. run_efootprint.py) : le diagramme de
-    topologie déjà validé avec l'utilisatrice avant le calcul. Ne tente
-    aucune régénération à la volée (rapport rétrocompatible si absent, même
-    principe que load_synthese_python()/load_tech_stack()).
+    Produced by Step 25 of the efootprint skill (build_topology_overview() +
+    plantuml -tsvg compilation, cf. run_efootprint.py): the topology diagram
+    already validated with the user before the calculation. Does not attempt
+    any on-the-fly regeneration (backward-compatible report if absent, same
+    principle as load_python_summary()/load_tech_stack()).
     """
     audit_dir = Path(audit_dir)
     for parent in (audit_dir, audit_dir.parent):
-        candidates = sorted(parent.glob("topologie-*.svg"))
+        candidates = sorted(parent.glob("topology-*.svg"))
         if candidates:
             return candidates[0].read_text(encoding="utf-8")
     return None
 
 
 def load_eof_results(audit_dir):
-    """Cherche eof-audit-results.json (audit_dir ou parent) — résumé léger
-    écrit par `run_eof.py::main()`. Jamais lu s'il est absent (rapport
-    rétrocompatible, même principe que load_synthese_python())."""
+    """Looks for eof-audit-results.json (audit_dir or parent) — light summary
+    written by `run_eof.py::main()`. Never read if absent (backward-compatible report,
+    same principle as load_python_summary())."""
     audit_dir = Path(audit_dir)
     for candidate in [audit_dir / "eof-audit-results.json",
                        audit_dir.parent / "eof-audit-results.json"]:
@@ -2189,9 +2189,9 @@ def load_eof_results(audit_dir):
 
 
 def load_eof_radar_svg(audit_dir):
-    """Cherche un eof-radar-*.svg (audit_dir ou parent), produit par `run_eof.py` ou
-    par `processus/fusionner_lots.py` (build_radar_from_results() du skill eof :
-    deux couches, décompte par axe, jauge de couverture)."""
+    """Looks for an eof-radar-*.svg (audit_dir or parent), produced by `run_eof.py` or
+    by `process/merge_lots.py` (build_radar_from_results() of the eof skill:
+    two layers, count per axis, coverage gauge)."""
     audit_dir = Path(audit_dir)
     for parent in (audit_dir, audit_dir.parent):
         candidates = sorted(parent.glob("eof-radar-*.svg"))
@@ -2201,11 +2201,11 @@ def load_eof_radar_svg(audit_dir):
 
 
 def load_tech_stack(audit_dir):
-    """Cherche le bloc tech_stack dans env-data.json (audit_dir ou parent).
+    """Looks for the tech_stack block in env-data.json (audit_dir or parent).
 
-    Même schéma de recherche "audit_dir ou parent" que le HAR / efootprint.
-    Retourne le dict tech_stack (technologies/categories/third_party_hosts) ou None
-    (env-data.json absent, illisible, ou schéma antérieur à 1.3 sans la clé)."""
+    Same "audit_dir or parent" lookup scheme as the HAR / efootprint.
+    Returns the tech_stack dict (technologies/categories/third_party_hosts) or None
+    (env-data.json missing, unreadable, or a schema older than 1.3 without the key)."""
     audit_dir = Path(audit_dir)
     for candidate in [audit_dir / "env-data.json",
                       audit_dir.parent / "env-data.json"]:
@@ -2220,11 +2220,11 @@ def load_tech_stack(audit_dir):
 
 
 def _section_tech(tech_stack):
-    """Section 'Stack technique' — technologies détectées (règles maison sur le HAR).
+    """'Tech stack' section — detected technologies (home-grown rules on the HAR).
 
-    Rendue en sous-section d'annexe (caractère documentaire). Groupe les
-    technologies par catégorie avec un badge de confiance et l'indice ayant permis
-    la détection. Non-régression : retourne "" si tech_stack absent (ancien
+    Rendered as an appendix sub-section (documentary character). Groups the
+    technologies by category with a confidence badge and the hint that allowed
+    the detection. Non-regression: returns "" if tech_stack is absent (old
     env-data.json)."""
     if not tech_stack:
         return ""
@@ -2236,10 +2236,10 @@ def _section_tech(tech_stack):
     if not technos:
         return ""
 
-    # Groupement par catégorie en préservant l'ordre d'arrivée (déjà trié amont)
+    # Grouping by category while preserving arrival order (already sorted upstream)
     by_cat = defaultdict(list)
     for t in technos:
-        by_cat[t.get("category", "Autre")].append(t)
+        by_cat[t.get("category", "Other")].append(t)
 
     rows = ""
     for cat, items in by_cat.items():
@@ -2267,48 +2267,48 @@ def _section_tech(tech_stack):
             for h in third_party
         )
         tp_html = (
-            f'<h4 style="margin:20px 0 8px">Hôtes tiers ({len(third_party)})</h4>'
-            f'<p style="font-size:14px;color:#666;margin:0 0 6px">Domaines distincts '
-            f'du domaine principal sollicités lors du chargement (scripts, polices, '
-            f'analytics, {_glossary_link("CDN")} externes).</p>'
+            f'<h4 style="margin:20px 0 8px">Third-party hosts ({len(third_party)})</h4>'
+            f'<p style="font-size:14px;color:#666;margin:0 0 6px">Distinct domains '
+            f'from the main domain requested during loading (scripts, fonts, '
+            f'analytics, external {_glossary_link("CDN")}).</p>'
             f'<ul style="list-style:none;padding:0;margin:0">{tp_items}</ul>'
         )
 
     return f"""<section id="stack-technique">
-  <h2>Stack technique</h2>
+  <h2>Tech stack</h2>
   <p style="font-size:16px;color:#555;margin-bottom:8px">
-    Technologies détectées par <b>règles maison</b> (pattern-matching hors-ligne sur le
-    HAR : en-têtes de réponse, URLs, HTML, cookies). Aucun appel externe, aucune
-    dépendance. Détection volontairement limitée aux signaux visibles côté client :
-    le backend caché et le type d'instance serveur restent indétectables.
+    Technologies detected by <b>home-grown rules</b> (offline pattern-matching on the
+    HAR: response headers, URLs, HTML, cookies). No external call, no
+    dependency. Detection deliberately limited to client-side visible signals:
+    the hidden backend and the server instance type remain undetectable.
   </p>
   <p style="font-size:15px;color:#666">
-    Confiance : {_confidence_badge("high")} signal distinctif
+    Confidence: {_confidence_badge("high")} distinctive signal
     &nbsp;·&nbsp;
-    {_confidence_badge("medium")} signal partagé/indirect
+    {_confidence_badge("medium")} shared/indirect signal
     &nbsp;·&nbsp;
-    {_confidence_badge("low")} indice faible (HTML)
+    {_confidence_badge("low")} weak hint (HTML)
   </p>
   <table style="width:100%;border-collapse:collapse;margin-top:8px">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Catégorie</th>
-      <th style="padding:6px 8px;text-align:left">Technologie</th>
-      <th style="padding:6px 8px;text-align:left">Confiance</th>
-      <th style="padding:6px 8px;text-align:left">Indice</th>
+      <th style="padding:6px 8px;text-align:left">Category</th>
+      <th style="padding:6px 8px;text-align:left">Technology</th>
+      <th style="padding:6px 8px;text-align:left">Confidence</th>
+      <th style="padding:6px 8px;text-align:left">Hint</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>
   {tp_html}
   <p style="font-size:14px;color:#888;margin-top:12px">
-    {len(technos)} technologie(s) détectée(s) sur {req_count} requêtes analysées.
-    Pour relancer la détection seule :
+    {len(technos)} technolog(y/ies) detected over {req_count} analyzed requests.
+    To re-run detection alone:
     <code>python3 detect_tech.py &lt;source_dir&gt;</code>
   </p>
 </section>"""
 
 
 def _section_efootprint(results, topology_svg=None, gains=None):
-    """Section 'Impact environnemental (estimation hypothétique)' - CO2e depuis e-footprint."""
+    """Section 'Environmental impact (hypothetical estimate)' - CO2e from e-footprint."""
     if not results:
         return ""
 
@@ -2316,10 +2316,10 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     hyp = results.get("hypotheses", {})
     visits = results.get("visits_per_year", 0)
     traffic = results.get("traffic", {})
-    _traffic_is_sourced = traffic.get("source") not in (None, "default", "paramètre")
+    _traffic_is_sourced = traffic.get("source") not in (None, "default", "parameter")
     _traffic_kpi_sub = (
         f'{traffic.get("source")}{", " + traffic["snapshot"] if traffic.get("snapshot") else ""}'
-        if _traffic_is_sourced else "hypothèse"
+        if _traffic_is_sourced else "assumption"
     )
 
     total_kg = totals.get("total_kg_co2e_per_year", 0)
@@ -2330,7 +2330,7 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     fab_total = sum(fab.values())
     ener_total = sum(ener.values())
 
-    # KPIs en tête
+    # KPIs at the top
     kpi_style = (
         "flex:1;min-width:180px;background:white;border:1px solid #ddd;"
         "border-radius:6px;padding:16px;text-align:center"
@@ -2338,25 +2338,25 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     kpis = (
         f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Total annuel</div>'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Annual total</div>'
         f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">~{total_kg:.1f} kg CO2e</div>'
-        f'    <div style="font-size:14px;color:#888">pour {visits:,} visites/an ({_traffic_kpi_sub})</div>'
+        f'    <div style="font-size:14px;color:#888">for {visits:,} visits/year ({_traffic_kpi_sub})</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Par visite</div>'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Per visit</div>'
         f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">~{per_visit_g:.2f} g CO2e</div>'
-        f'    <div style="font-size:14px;color:#888">ordre de grandeur (hypothèse)</div>'
+        f'    <div style="font-size:14px;color:#888">order of magnitude (assumption)</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Fabrication / Énergie</div>'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Manufacturing / Energy</div>'
         f'    <div style="font-size:24px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">'
         f'{fab_total:.1f} / {ener_total:.1f} kg</div>'
-        f'    <div style="font-size:14px;color:#888">amortie / usage annuel</div>'
+        f'    <div style="font-size:14px;color:#888">amortized / annual usage</div>'
         f'  </div>'
         f'</div>'
     )
 
-    # Breakdown : barres empilées simples pour fabrication et énergie
+    # Breakdown: simple stacked bars for manufacturing and energy
     def _breakdown_rows(d, decimals=2):
         total = sum(d.values()) or 1e-9
         rows = ""
@@ -2383,64 +2383,64 @@ def _section_efootprint(results, topology_svg=None, gains=None):
 
     fab_table = f"""<table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Poste (fabrication)</th>
-      <th style="padding:6px 8px;text-align:right">kg CO2e/an</th>
-      <th style="padding:6px 8px;text-align:right">Part</th>
-      <th style="padding:6px 8px">Répartition</th>
+      <th style="padding:6px 8px;text-align:left">Item (manufacturing)</th>
+      <th style="padding:6px 8px;text-align:right">kg CO2e/year</th>
+      <th style="padding:6px 8px;text-align:right">Share</th>
+      <th style="padding:6px 8px">Breakdown</th>
     </tr></thead>
     <tbody>{_breakdown_rows(fab, 2)}</tbody>
   </table>"""
 
     ener_table = f"""<table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Poste (énergie)</th>
-      <th style="padding:6px 8px;text-align:right">kg CO2e/an</th>
-      <th style="padding:6px 8px;text-align:right">Part</th>
-      <th style="padding:6px 8px">Répartition</th>
+      <th style="padding:6px 8px;text-align:left">Item (energy)</th>
+      <th style="padding:6px 8px;text-align:right">kg CO2e/year</th>
+      <th style="padding:6px 8px;text-align:right">Share</th>
+      <th style="padding:6px 8px">Breakdown</th>
     </tr></thead>
     <tbody>{_breakdown_rows(ener, 4)}</tbody>
   </table>"""
 
-    # Storage (fabrication) n'est pas une mesure de volume de données : sous 1 To,
-    # e-footprint/Boavizta n'a aucune résolution (tout stockage non nul est arrondi à
-    # un disque entier de 1 To). Ce poste reflète le nombre de serveurs déclarés, pas
-    # une donnée d'audit sur les pratiques de stockage (cf. dimension EOF 4, évaluée
-    # séparément). Décision actée dans tmp/handoff-2026-08-06-efootprint-fourchettes.md
-    # (section C.3), jamais écrite dans le rapport avant ce jour.
+    # Storage (manufacturing) is not a data-volume measurement: below 1 TB,
+    # e-footprint/Boavizta has no resolution (any non-null storage is rounded up to
+    # a whole 1 TB disk). This item reflects the number of declared servers, not
+    # an audit datum about storage practices (cf. EOF dimension 4, assessed
+    # separately). Decision recorded in tmp/handoff-2026-08-06-efootprint-fourchettes.md
+    # (section C.3), never written in the report before today.
     storage_caveat_html = ""
     if fab.get("Storage", 0) > 0:
         storage_caveat_html = f"""
   <p style="font-size:14px;color:#888;margin:8px 0 0">
-    Le poste <b>Storage</b> ci-dessus ({fab.get("Storage", 0):.2f} kg) ne mesure pas un
-    volume de données : sous 1 To, e-footprint n'a aucune résolution (tout stockage
-    non nul est arrondi à un disque entier de 1 To côté Boavizta). Ce chiffre reflète
-    le nombre de serveurs déclarés, pas les pratiques réelles de gestion des données
-    (archivage, doublons, bases de test...) — voir la dimension EOF "4 — Stockage et
-    données", évaluée indépendamment de ce calcul.
+    The <b>Storage</b> item above ({fab.get("Storage", 0):.2f} kg) does not measure a
+    data volume: below 1 TB, e-footprint has no resolution (any non-null storage
+    is rounded up to a whole 1 TB disk on the Boavizta side). This figure reflects
+    the number of declared servers, not the real data management practices
+    (archiving, duplicates, test databases...) — see EOF dimension "4 — Storage and
+    data", assessed independently of this calculation.
   </p>"""
 
-    # Tableau des hypothèses
-    # LOT 1 : page_weight_kb = poids TRANSFÉRÉ (réseau réel) si dispo ; on affiche le
-    # décompressé en repère quand les deux diffèrent (env-data >= 1.4).
+    # Assumptions table
+    # LOT 1: page_weight_kb = TRANSFERRED weight (real network) if available; we show the
+    # decompressed one as a reference when the two differ (env-data >= 1.4).
     _pw_transferred = hyp.get("page_weight_transferred_kb")
     _pw_uncompressed = hyp.get("page_weight_uncompressed_kb")
     if _pw_transferred:
         _ratio = hyp.get("compression_ratio")
-        _pw_label = "Poids page transféré (réseau réel)"
-        _pw_repere = f' <span style="color:#888">(décompressé : {_pw_uncompressed} kB'
-        _pw_repere += f', ratio {_ratio})</span>' if _ratio else ')</span>'
-        _pw_value = f'{hyp.get("page_weight_kb", "?")} kB{_pw_repere}'
+        _pw_label = "Transferred page weight (real network)"
+        _pw_note = f' <span style="color:#888">(decompressed: {_pw_uncompressed} kB'
+        _pw_note += f', ratio {_ratio})</span>' if _ratio else ')</span>'
+        _pw_value = f'{hyp.get("page_weight_kb", "?")} kB{_pw_note}'
     else:
-        _pw_label = "Poids de page (représentative)"
+        _pw_label = "Page weight (representative)"
         _pw_value = f'{hyp.get("page_weight_kb", "?")} kB'
     hyp_rows = [
         (_pw_label, _pw_value,                                                          hyp.get("confidence_page_weight")),
-        ("Durée chargement",                f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration")),
-        ("Pays hébergement",                hyp.get("country", "?"),                     hyp.get("confidence_country")),
-        ("Intensité carbone électricité",   f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
-        ("Provider hébergeur",              hyp.get("provider", "?"),                    hyp.get("confidence_provider")),
+        ("Load duration",                    f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration")),
+        ("Hosting country",                 hyp.get("country", "?"),                     hyp.get("confidence_country")),
+        ("Electricity carbon intensity",    f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity")),
+        ("Hosting provider",                hyp.get("provider", "?"),                    hyp.get("confidence_provider")),
         ("Instance type",                   *_instance_type_row(hyp)),
-        ("Mix device (mobile / desktop)",   f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
+        ("Device mix (mobile / desktop)",   f'{hyp.get("phone_fraction", 0):.0%} / {hyp.get("desktop_fraction", 0):.0%}',  hyp.get("confidence_device_mix")),
     ]
     audience_mix = hyp.get("audience_mix")
     if audience_mix:
@@ -2448,19 +2448,19 @@ def _section_efootprint(results, topology_svg=None, gains=None):
         if _asrc == "default":
             _asrc_short = "default"
         elif isinstance(_asrc, str) and "similarweb" in _asrc.lower():
-            _asrc_short = "SimilarWeb (estimé)"
-        elif isinstance(_asrc, str) and _asrc.startswith("saisie"):
-            _asrc_short = "saisie manuelle"
+            _asrc_short = "SimilarWeb (estimated)"
+        elif isinstance(_asrc, str) and _asrc.startswith("manual entry"):
+            _asrc_short = "manual entry"
         else:
-            _asrc_short = "estimé"
+            _asrc_short = "estimated"
         hyp_rows.append(
-            ("Mix pays d'audience (→ iOS/macOS)",
+            ("Audience country mix (→ iOS/macOS)",
              ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items()),
              _audience_source_label(_asrc_short, hyp.get("audience_source_url"))))
     hyp_rows += [
-        ("Réseau (déduit du mix appareils)", "mobile → réseau mobile ; desktop → wifi", "déduit"),
-        ("Trafic annuel estimé",            f'{visits:,} visites',                       _traffic_source_label(traffic)),
-        ("Stockage serveur (nb. serveurs déclarés, pas un volume de données — voir plus bas)",
+        ("Network (derived from device mix)", "mobile → mobile network ; desktop → wifi", "derived"),
+        ("Estimated annual traffic",        f'{visits:,} visits',                       _traffic_source_label(traffic)),
+        ("Server storage (nb. of declared servers, not a data volume — see below)",
          f'{hyp.get("storage_gb", 50)} GB',           "default_script"),
     ]
     hyp_html = "".join(
@@ -2475,18 +2475,18 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     warning = (
         f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
         f'padding:12px 16px;margin:16px 0;border-radius:4px">'
-        f'<b>&#9888; Estimation hypothétique</b><br>'
-        f'Ces valeurs sont des <b>ordres de grandeur</b> calculés à partir de données '
-        f'collectées automatiquement (HAR, CrUX, géoloc IP) et de nombreuses hypothèses '
-        f'par défaut. Elles <b>ne constituent pas une mesure réelle</b>. Elles servent '
-        f'à comparer des scénarios et identifier les postes dominants.'
+        f'<b>&#9888; Hypothetical estimate</b><br>'
+        f'These values are <b>orders of magnitude</b> computed from automatically '
+        f'collected data (HAR, CrUX, IP geolocation) and many default assumptions. '
+        f'They <b>are not a real measurement</b>. They serve to compare '
+        f'scenarios and identify the dominant items.'
         f'</div>'
     )
 
-    # Composition du poids de la page (documentaire : explique l'input, n'entre pas
-    # dans le calcul CO2e qui repose sur le poids total agrégé de page_weight_kb).
-    # LOT 4 : poids TRANSFÉRÉ (réseau réel, LOT 1) en valeur principale si dispo,
-    # décompressé en repère — cohérence avec page_weight_kb ci-dessus.
+    # Page weight composition (documentary: explains the input, does not enter
+    # the CO2e calculation which relies on the aggregated total of page_weight_kb).
+    # LOT 4: TRANSFERRED weight (real network, LOT 1) as the main value if available,
+    # decompressed as a reference — consistency with page_weight_kb above.
     weight_by_type_transfer = hyp.get("weight_by_type_transfer_bytes") or {}
     weight_by_type_uncompressed = hyp.get("weight_by_type_bytes") or {}
     weight_by_type = weight_by_type_transfer or weight_by_type_uncompressed
@@ -2495,7 +2495,7 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     if weight_by_type:
         _type_labels = {
             "html": "HTML", "css": "CSS", "js": "JavaScript",
-            "image": "Images", "font": "Polices", "autre": "Autres",
+            "image": "Images", "font": "Fonts", "other": "Other",
         }
         _wtotal = sum(v for v in weight_by_type.values() if v > 0) or 1e-9
         comp_rows = ""
@@ -2505,8 +2505,8 @@ def _section_efootprint(results, topology_svg=None, gains=None):
             pct = nbytes / _wtotal * 100
             kb = nbytes / 1024
             kb_uncompressed = weight_by_type_uncompressed.get(typ, 0) / 1024
-            repere = (
-                f' <span style="color:#888;font-size:13px">(décompressé : {kb_uncompressed:,.0f} Ko)</span>'
+            note = (
+                f' <span style="color:#888;font-size:13px">(decompressed: {kb_uncompressed:,.0f} KB)</span>'
                 if _using_transfer and weight_by_type_uncompressed else ""
             )
             bar = (
@@ -2518,7 +2518,7 @@ def _section_efootprint(results, topology_svg=None, gains=None):
                 f'<tr>'
                 f'<td style="padding:6px 8px">{_type_labels.get(typ, typ)}</td>'
                 f'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'
-                f'{kb:,.0f} Ko{repere}</td>'
+                f'{kb:,.0f} KB{note}</td>'
                 f'<td style="padding:6px 8px;text-align:right;color:#666;font-variant-numeric:tabular-nums">'
                 f'{pct:.1f} %</td>'
                 f'<td style="padding:6px 8px;width:180px">{bar}</td>'
@@ -2530,32 +2530,32 @@ def _section_efootprint(results, topology_svg=None, gains=None):
         tp_bytes = hyp.get("third_party_transfer_bytes") if _using_transfer else hyp.get("third_party_bytes")
         meta_bits = []
         if req_count is not None:
-            meta_bits.append(f'{req_count} requêtes')
+            meta_bits.append(f'{req_count} requests')
         if tp_share is not None:
             _tp_extra = ""
             if tp_requests is not None and tp_bytes is not None:
-                _tp_extra = f' ({tp_requests} requêtes, {tp_bytes / 1024:,.0f} Ko)'
+                _tp_extra = f' ({tp_requests} requests, {tp_bytes / 1024:,.0f} KB)'
             meta_bits.append(
-                f'ressources tierces : <b>{tp_share * 100:.1f} %</b> du poids{_tp_extra}')
+                f'third-party resources: <b>{tp_share * 100:.1f} %</b> of the weight{_tp_extra}')
         meta_line = (
             f'<p style="font-size:14px;color:#666;margin:8px 0 0">{" &nbsp;·&nbsp; ".join(meta_bits)}</p>'
             if meta_bits else ""
         )
-        _poids_label = "poids transféré (réseau réel)" if _using_transfer else "poids décompressé"
+        _weight_label = "transferred weight (real network)" if _using_transfer else "decompressed weight"
         weight_composition = f"""
-  <h3 style="margin-top:24px">Composition du poids de la page représentative</h3>
+  <h3 style="margin-top:24px">Page weight composition of the representative page</h3>
   <p style="font-size:14px;color:#888;margin:0 0 8px">
-    Répartition par type de ressource de la page la plus lourde du parcours (celle qui
-    sert de poids de référence au calcul), en {_poids_label}. Documentaire : cette
-    décomposition <b>explique</b> le poids retenu, elle <b>n'entre pas séparément dans le
-    calcul CO2e</b>.
+    Breakdown by resource type of the heaviest page of the journey (the one used
+    as reference weight for the calculation), in {_weight_label}. Documentary: this
+    breakdown <b>explains</b> the retained weight, it does <b>not enter separately into the
+    CO2e calculation</b>.
   </p>
   <table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Type de ressource</th>
-      <th style="padding:6px 8px;text-align:right">Poids</th>
-      <th style="padding:6px 8px;text-align:right">Part</th>
-      <th style="padding:6px 8px">Répartition</th>
+      <th style="padding:6px 8px;text-align:left">Resource type</th>
+      <th style="padding:6px 8px;text-align:right">Weight</th>
+      <th style="padding:6px 8px;text-align:right">Share</th>
+      <th style="padding:6px 8px">Breakdown</th>
     </tr></thead>
     <tbody>{comp_rows}</tbody>
   </table>
@@ -2564,60 +2564,60 @@ def _section_efootprint(results, topology_svg=None, gains=None):
     dominant_fab = max(fab, key=fab.get) if fab else "?"
     dominant_ener = max(ener, key=ener.get) if ener else "?"
 
-    # Synthèse en tête, langage clair : demande explicite de l'utilisatrice
-    # d'une lecture "très synthétique et claire" avant le détail technique
-    # (tableaux/fourchettes plus bas). Couleurs catégorielles VALIDÉES par le
-    # script du skill dataviz (validate_palette.js) : le bleu OCTO existant
-    # (#5BA1BC) échoue au plancher de chroma en usage catégoriel — remplacé
-    # ici par la paire bleu/orange de référence, jamais réutilisée pour le
-    # texte (les tokens de texte restent OCTO_DARK/gris, cf. règle "le texte
-    # ne porte jamais la couleur de la série").
+    # Summary at the top, plain language: explicit request from the user
+    # for a "very synthetic and clear" reading before the technical detail
+    # (tables/ranges below). Categorical colors VALIDATED by the dataviz skill
+    # script (validate_palette.js): the existing OCTO blue
+    # (#5BA1BC) fails the chroma floor in categorical use — replaced
+    # here by the reference blue/orange pair, never reused for the
+    # text (text tokens stay OCTO_DARK/grey, cf. the rule "text
+    # never carries the series color").
     _SYN_FAB_COLOR = "#2a78d6"
     _SYN_ENER_COLOR = "#eb6834"
-    _FR_POSTE = {
-        "Devices": "terminaux des visiteurs (mobiles, ordinateurs)",
-        "Servers": "serveurs applicatifs",
-        "Storage": "stockage",
-        "Network": "réseau (transport des données)",
-        "ExternalAPIs": "appels IA générative",
-        "EdgeDevices": "équipements réseau intermédiaires",
+    _POST_LABELS = {
+        "Devices": "visitor devices (phones, computers)",
+        "Servers": "application servers",
+        "Storage": "storage",
+        "Network": "network (data transport)",
+        "ExternalAPIs": "generative AI calls",
+        "EdgeDevices": "intermediate network equipment",
     }
     _grand_total = fab_total + ener_total
     _fab_share = fab_total / _grand_total if _grand_total else 0
     _ener_share = 1 - _fab_share
-    _top_poste_kg = {}
+    _top_post_kg = {}
     for _poste in set(fab) | set(ener):
-        _top_poste_kg[_poste] = fab.get(_poste, 0) + ener.get(_poste, 0)
-    _top_poste = max(_top_poste_kg, key=_top_poste_kg.get) if _top_poste_kg else None
-    _top_poste_share = (_top_poste_kg.get(_top_poste, 0) / _grand_total) if _top_poste and _grand_total else 0
-    _top_poste_label = _FR_POSTE.get(_top_poste, _top_poste or "?")
+        _top_post_kg[_poste] = fab.get(_poste, 0) + ener.get(_poste, 0)
+    _top_post = max(_top_post_kg, key=_top_post_kg.get) if _top_post_kg else None
+    _top_post_share = (_top_post_kg.get(_top_post, 0) / _grand_total) if _top_post and _grand_total else 0
+    _top_post_label = _POST_LABELS.get(_top_post, _top_post or "?")
 
     _fab_bar_pct = _fab_share * 100
     _ener_bar_pct = _ener_share * 100
-    synthese_html = f"""
+    summary_html = f"""
   <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:16px 20px;margin:16px 0 24px">
     <p style="font-size:16px;color:#333;margin:0 0 12px;line-height:1.5">
-      Ce site émet l'équivalent de <b>~{total_kg:.1f} kg de CO2e par an</b>, dont
-      <b>{_fab_share:.0%}</b> vient de la <b>fabrication</b> des équipements (amortie sur leur
-      durée de vie) et <b>{_ener_share:.0%}</b> de l'<b>énergie</b> consommée à l'usage.
-      Le poste le plus lourd, toutes causes confondues, est
-      <b>{_top_poste_label}</b> ({_top_poste_share:.0%} du total).
+      This site emits the equivalent of <b>~{total_kg:.1f} kg of CO2e per year</b>, of which
+      <b>{_fab_share:.0%}</b> comes from the <b>manufacturing</b> of the equipment (amortized over their
+      lifetime) and <b>{_ener_share:.0%}</b> from the <b>energy</b> consumed in use.
+      The heaviest item, all causes combined, is
+      <b>{_top_post_label}</b> ({_top_post_share:.0%} of the total).
     </p>
-    <div role="img" aria-label="Répartition {_fab_share:.0%} fabrication, {_ener_share:.0%} énergie">
+    <div role="img" aria-label="Breakdown {_fab_share:.0%} manufacturing, {_ener_share:.0%} energy">
       <div style="display:flex;height:22px;border-radius:4px;overflow:hidden;gap:2px">
         <div style="background:{_SYN_FAB_COLOR};width:{_fab_bar_pct:.1f}%"></div>
         <div style="background:{_SYN_ENER_COLOR};width:{_ener_bar_pct:.1f}%"></div>
       </div>
       <div style="display:flex;gap:20px;margin-top:8px;font-size:13px;color:#555">
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_FAB_COLOR};margin-right:5px"></span>Fabrication — {fab_total:.1f} kg ({_fab_share:.0%})</span>
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_ENER_COLOR};margin-right:5px"></span>Énergie — {ener_total:.1f} kg ({_ener_share:.0%})</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_FAB_COLOR};margin-right:5px"></span>Manufacturing — {fab_total:.1f} kg ({_fab_share:.0%})</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{_SYN_ENER_COLOR};margin-right:5px"></span>Energy — {ener_total:.1f} kg ({_ener_share:.0%})</span>
       </div>
     </div>
   </div>"""
 
-    # Fourchettes d'incertitude (Lot 4bis, rendues Lot 9) : deux axes MESURÉS en
-    # rejouant le même modèle, jamais cumulés (cf. ranges.py et mémoire persistante
-    # "fourchettes non cumulées"). Absent si model.ranges n'existe pas (ancien schéma).
+    # Uncertainty ranges (Lot 4bis, rendered in Lot 9): two MEASURED axes by
+    # replaying the same model, never cumulative (cf. ranges.py and persistent memory
+    # "non-cumulative ranges"). Absent if model.ranges does not exist (old schema).
     ranges = (results.get("model") or {}).get("ranges")
     ranges_html = ""
     if ranges:
@@ -2627,7 +2627,7 @@ def _section_efootprint(results, topology_svg=None, gains=None):
         def _range_row(label, lo, hi, detail):
             if abs(hi - lo) < 1e-9:
                 span = (f'{lo:.1f} kg <span style="color:#888;font-size:14px">'
-                        f'(fourchette fermée, faute d\'incertitude mesurable ici)</span>')
+                        f'(closed range, no measurable uncertainty here)</span>')
             else:
                 ratio = f' <span style="color:#888;font-size:14px">({hi / lo:.2f}x)</span>' if lo else ""
                 span = f'{lo:.1f} - {hi:.1f} kg{ratio}'
@@ -2638,61 +2638,61 @@ def _section_efootprint(results, topology_svg=None, gains=None):
             )
 
         ranges_html = f"""
-  <h3 style="margin-top:24px">Fourchettes d'incertitude</h3>
+  <h3 style="margin-top:24px">Uncertainty ranges</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
-    Deux incertitudes distinctes bornent l'estimation centrale ci-dessus, chacune mesurée
-    en rejouant le même modèle avec une seule hypothèse changée à la fois. Elles ne
-    s'additionnent <b>jamais</b> entre elles : cumuler le pire cas de chaque axe
-    supposerait que toutes les incertitudes jouent dans le même sens au même moment, ce
-    qui serait statistiquement malhonnête.
+    Two distinct uncertainties bound the central estimate above, each measured
+    by replaying the same model with a single assumption changed at a time. They
+    are <b>never</b> added together: stacking the worst case of each axis
+    would assume all uncertainties play in the same direction at the same time, which
+    would be statistically dishonest.
   </p>
   <table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Axe</th>
-      <th style="padding:6px 8px;text-align:left">Fourchette</th>
-      <th style="padding:6px 8px;text-align:left">Ce qui varie</th>
+      <th style="padding:6px 8px;text-align:left">Axis</th>
+      <th style="padding:6px 8px;text-align:left">Range</th>
+      <th style="padding:6px 8px;text-align:left">What varies</th>
     </tr></thead>
     <tbody>
       {_range_row("Infrastructure", infra_lo, infra_hi,
-                   "mode de dimensionnement du serveur : serverless ↔ autoscaling")}
+                   "server sizing mode: serverless ↔ autoscaling")}
       {_range_row("Usage", usage_lo, usage_hi,
-                   "temps de lecture Nielsen : recalé (mesure SimilarWeb) ↔ brut")}
+                   "Nielsen reading time: recalibrated (SimilarWeb measurement) ↔ raw")}
     </tbody>
   </table>"""
         if fab.get("Storage", 0) > 0:
             ranges_html += (
                 '\n  <p style="font-size:14px;color:#888;margin:8px 0 0">'
-                "Le stockage (storage_gb) n'apparaît volontairement pas comme un 3e axe "
-                "ici : sous 1 To, e-footprint n'a aucune résolution (voir plus haut et "
-                "annexe méthodologique) — une fourchette sur ce paramètre serait fermée "
-                "ou artificielle, pas une vraie incertitude mesurée.</p>"
+                "Storage (storage_gb) deliberately does not appear as a 3rd axis "
+                "here: below 1 TB, e-footprint has no resolution (see above and "
+                "methodology appendix) — a range on this parameter would be closed "
+                "or artificial, not a real measured uncertainty.</p>"
             )
 
-    # Cohérence CDN/tiers vs IA générative (tranché Lot 7) : affiché seulement si ce
-    # site a au moins un appel IA générative (poste ExternalAPIs non nul), sinon la
-    # distinction n'a rien à expliquer sur ce site précis.
+    # CDN/third-party vs generative AI consistency (decided in Lot 7): displayed only if this
+    # site has at least one generative AI call (non-zero ExternalAPIs item), otherwise the
+    # distinction has nothing to explain on this particular site.
     external_apis_kg = fab.get("ExternalAPIs", 0) + ener.get("ExternalAPIs", 0)
     cdn_ia_html = ""
     if external_apis_kg > 0:
         cdn_ia_html = """
   <p style="font-size:15px;color:#666;margin:12px 0 0">
-    Les services tiers de ce site sont traités différemment selon ce qu'ils font
-    réellement. Un CDN ou une police de caractères servent un fichier déjà prêt : le
-    calcul nécessaire est quasi nul, l'essentiel de leur coût est le réseau, déjà compté
-    dans ce rapport. À l'inverse, un appel à un modèle d'IA générative déclenche un vrai
-    calcul à chaque requête (le modèle produit le texte mot par mot) : ce calcul est
-    compté séparément, via une bibliothèque spécialisée (EcoLogits), car aucune source
-    publique équivalente n'existe pour un CDN.
+    This site's third-party services are treated differently depending on what they
+    really do. A CDN or a font serves an already-ready file: the necessary
+    computation is almost nil, the bulk of their cost is network, already counted
+    in this report. Conversely, a call to a generative AI model triggers a real
+    computation on every request (the model produces the text word by word): this computation is
+    counted separately, via a specialized library (EcoLogits), because no equivalent
+    public source exists for a CDN.
   </p>"""
 
-    # Repère "calcul mental" par étape (Lot 10) : ce qui pèse le plus dans le
-    # parcours, pour que la lecture n'ait plus à deviner pourquoi une étape
-    # compte plus qu'une autre. `impact_pct_of_grand_total` vient d'une
-    # RÉPARTITION proportionnelle du CO2e Devices/Network déjà calculé
-    # (step_impact_shares(), build.py) : ce n'est pas une mesure indépendante
-    # par étape, le libellé doit le dire pour ne pas laisser croire à une
-    # finesse de calcul qui n'existe pas. Absent si model.steps n'existe pas
-    # (ancien schéma) : rapport rétrocompatible, comme les autres blocs Lot 9.
+    # "Mental math" marker per step (Lot 10): what weighs the most in the
+    # journey, so reading no longer has to guess why one step
+    # counts more than another. `impact_pct_of_grand_total` comes from a
+    # PROPORTIONAL SPLIT of the already computed Devices/Network CO2e
+    # (step_impact_shares(), build.py): it is not an independent measurement
+    # per step, the label must say so to avoid suggesting a
+    # calculation finesse that does not exist. Absent if model.steps does not exist
+    # (old schema): backward-compatible report, like the other Lot 9 blocks.
     model_steps = (results.get("model") or {}).get("steps") or []
     steps_block = ""
     if model_steps:
@@ -2718,60 +2718,60 @@ def _section_efootprint(results, topology_svg=None, gains=None):
                 f'</tr>'
             )
         steps_block = f"""
-  <h3 style="margin-top:24px">Ce qui pèse le plus, étape par étape</h3>
+  <h3 style="margin-top:24px">What weighs the most, step by step</h3>
   <p style="font-size:14px;color:#888;margin:0 0 8px">
-    Répartition <b>proportionnelle</b> du CO2e des terminaux visiteurs et du réseau déjà
-    calculé ci-dessus, au prorata du temps passé et du poids transféré par étape. Ce
-    n'est <b>pas</b> une mesure indépendante par étape : c'est un repère pour situer
-    d'un coup d'œil les étapes qui comptent le plus dans le total.
+    <b>Proportional</b> split of the CO2e of visitor devices and network already
+    computed above, pro rata of the time spent and the weight transferred per step. This
+    is <b>not</b> an independent measurement per step: it is a marker to spot
+    at a glance the steps that count the most in the total.
   </p>
   <table style="width:100%;border-collapse:collapse">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Étape</th>
-      <th style="padding:6px 8px;text-align:right">Temps retenu</th>
+      <th style="padding:6px 8px;text-align:left">Step</th>
+      <th style="padding:6px 8px;text-align:right">Retained time</th>
       <th style="padding:6px 8px;text-align:left">Source</th>
-      <th style="padding:6px 8px;text-align:right">Part du CO2e total</th>
-      <th style="padding:6px 8px">Répartition</th>
+      <th style="padding:6px 8px;text-align:right">Share of total CO2e</th>
+      <th style="padding:6px 8px">Breakdown</th>
     </tr></thead>
     <tbody>{step_rows}</tbody>
   </table>"""
 
-    # Diagramme de topologie (Étape 25 du skill efootprint) : preuve documentée du
-    # modèle validé avec l'utilisatrice avant calcul, PAS régénéré ici (rapport
-    # rétrocompatible si absent, cf. load_topology_svg()).
+    # Topology diagram (Step 25 of the efootprint skill): documented proof of the
+    # model validated with the user before calculation, NOT regenerated here (report
+    # backward-compatible if absent, cf. load_topology_svg()).
     topology_block = ""
     if topology_svg:
         topology_block = f"""
-  <h3 style="margin-top:24px">Topologie du modèle</h3>
+  <h3 style="margin-top:24px">Model topology</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
-    Modèle validé avec vous avant calcul (Étape 25) : serveurs 1st-party, traitements,
-    hôtes tiers, suspicions BDD/streaming/IA générative détectées depuis le HAR, et
-    grandes hypothèses de calcul (trafic annuel, mix appareils/pays, temps de lecture).
+    Model validated with you before calculation (Step 25): 1st-party servers, jobs,
+    third-party hosts, DB/streaming/generative-AI suspicions detected from the HAR, and
+    main calculation assumptions (annual traffic, device/country mix, reading time).
   </p>
   <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white">
     {topology_svg}
   </div>"""
 
-    # Renvoi vers le gain CO2e par palier de recommandations (efootprint-recommendations-gains.json),
-    # calculé et affiché dans _recommendations_gains_block() (section Recommandations) : pas dupliqué
-    # ici, seulement référencé, pour garder un seul calcul et un seul endroit à corriger.
+    # Pointer to the CO2e gain per recommendation tier (efootprint-recommendations-gains.json),
+    # computed and displayed in _recommendations_gains_block() (Recommendations section): not duplicated
+    # here, only referenced, to keep a single calculation and a single place to fix.
     gains_ref_html = ""
-    if gains and gains.get("paliers"):
+    if gains and gains.get("tiers"):
         gains_ref_html = (
             '<p style="font-size:15px;color:#555;margin:8px 0 0">'
-            'Le gain estimé si vous appliquez les recommandations priorisées (paliers prio1 / '
-            'prio1+2 / prio1+2+3) est détaillé dans le bloc '
-            '<a href="#gain-co2e">Gain CO2e estimé</a> de la section '
-            '<a href="#recommandations">Recommandations</a>.</p>'
+            'The estimated gain if you apply the prioritized recommendations (tiers prio1 / '
+            'prio1+2 / prio1+2+3) is detailed in the block '
+            '<a href="#gain-co2e">Estimated CO2e gain</a> of the section '
+            '<a href="#recommandations">Recommendations</a>.</p>'
         )
 
     return f"""<section id="efootprint">
-  <h2>Impact environnemental (estimation {_glossary_link("CO2e")})</h2>
-  {synthese_html}
+  <h2>Environmental impact (estimate {_glossary_link("CO2e")})</h2>
+  {summary_html}
   <p style="font-size:16px;color:#555;margin-bottom:8px">
-    Estimation via la librairie <a href="https://github.com/Boavizta/e-footprint" target="_blank" rel="noopener">e-footprint</a> (Boavizta).
-    Poste dominant en fabrication : <b>{dominant_fab}</b> ({fab.get(dominant_fab, 0):.1f} kg CO2e/an).
-    Poste dominant en énergie : <b>{dominant_ener}</b> ({ener.get(dominant_ener, 0):.3f} kg CO2e/an).
+    Estimate via the <a href="https://github.com/Boavizta/e-footprint" target="_blank" rel="noopener">e-footprint</a> library (Boavizta).
+    Dominant manufacturing item: <b>{dominant_fab}</b> ({fab.get(dominant_fab, 0):.1f} kg CO2e/year).
+    Dominant energy item: <b>{dominant_ener}</b> ({ener.get(dominant_ener, 0):.3f} kg CO2e/year).
   </p>
   {warning}
   {kpis}
@@ -2779,14 +2779,14 @@ def _section_efootprint(results, topology_svg=None, gains=None):
   {ranges_html}
   {topology_block}
 
-  <h3 style="margin-top:24px">Décomposition par poste</h3>
+  <h3 style="margin-top:24px">Breakdown by item</h3>
   <div style="display:grid;grid-template-columns:1fr;gap:20px">
     <div>
-      <h4 style="margin:0 0 8px">Fabrication (amortie sur la durée de vie)</h4>
+      <h4 style="margin:0 0 8px">Manufacturing (amortized over lifetime)</h4>
       {fab_table}
     </div>
     <div>
-      <h4 style="margin:0 0 8px">Énergie (usage annuel)</h4>
+      <h4 style="margin:0 0 8px">Energy (annual usage)</h4>
       {ener_table}
     </div>
   </div>
@@ -2795,124 +2795,124 @@ def _section_efootprint(results, topology_svg=None, gains=None):
   {weight_composition}
   {steps_block}
 
-  <h3 style="margin-top:24px">Hypothèses d'entrée</h3>
+  <h3 style="margin-top:24px">Input assumptions</h3>
   <p style="font-size:15px;color:#666">
-    Niveau de confiance : {_confidence_badge("high")} API/HAR
+    Confidence level: {_confidence_badge("high")} API/HAR
     &nbsp;·&nbsp;
-    {_confidence_badge("medium")} inféré
+    {_confidence_badge("medium")} inferred
     &nbsp;·&nbsp;
-    {_confidence_badge("declare")} déclaré publiquement par l'organisation
+    {_confidence_badge("declared")} publicly declared by the organization
     &nbsp;·&nbsp;
-    {_confidence_badge("low")} valeur type
+    {_confidence_badge("low")} typical value
     &nbsp;·&nbsp;
-    {_confidence_badge("unjustified")} choix manuel sans preuve
+    {_confidence_badge("unjustified")} manual choice without proof
     &nbsp;·&nbsp;
-    {_confidence_badge("default_efootprint")} valeur par défaut de la librairie e-footprint
+    {_confidence_badge("default_efootprint")} e-footprint library default value
     &nbsp;·&nbsp;
-    {_confidence_badge("default_script")} valeur fixée par notre script (pas e-footprint)
+    {_confidence_badge("default_script")} value set by our script (not e-footprint)
   </p>
   <table style="width:100%;border-collapse:collapse;margin-top:8px">
     <thead><tr style="background:{OCTO_PALE}">
-      <th style="padding:6px 8px;text-align:left">Paramètre</th>
-      <th style="padding:6px 8px;text-align:left">Valeur retenue</th>
+      <th style="padding:6px 8px;text-align:left">Parameter</th>
+      <th style="padding:6px 8px;text-align:left">Retained value</th>
       <th style="padding:6px 8px;text-align:left">Source</th>
     </tr></thead>
     <tbody>{hyp_html}</tbody>
   </table>
 
   <p style="font-size:14px;color:#888;margin-top:12px">
-    Pour recalculer avec d'autres hypothèses :
+    To recompute with other assumptions:
     <code>python3 run_efootprint.py &lt;source_dir&gt; --visits N --instance TYPE</code>
-    puis régénérer le rapport.
+    then regenerate the report.
   </p>
 </section>"""
 
 
 def _section_eof(results, radar_svg_text=None):
-    """Section 'Potentiel d'optimisation (référentiel EOF)' - depuis
-    eof-audit-results.json (run_eof.py). Absent -> section omise, rapport
-    rétrocompatible (même principe que _section_efootprint()).
+    """Section 'Optimization potential (EOF framework)' - from
+    eof-audit-results.json (run_eof.py). Absent -> section omitted, report
+    backward-compatible (same principle as _section_efootprint()).
 
-    La grande majorité des 54 critères détaillés ne peut PAS être déduite
-    des données d'audit (questions organisationnelles/produit) : le ratio
-    réel observé est faible (quelques critères sur 54), affiché tel quel,
-    jamais maquillé. Une dimension sans aucune réponse est marquée "aucune
-    réponse", jamais un faux 0 % (cf. radar_svg() du skill eof)."""
+    The vast majority of the 54 detailed criteria CANNOT be deduced
+    from the audit data (organizational/product questions): the real
+    observed ratio is low (a few criteria out of 54), displayed as-is,
+    never glossed over. A dimension with no answer at all is marked "no
+    answer", never a false 0% (cf. radar_svg() of the eof skill)."""
     if not results:
         return ""
 
-    total = results.get("criteres_total", 0)
-    # Lire criteres_repondus (nouveau, LOT 1) avec repli sur criteres_repondus_auto (ancien)
-    n_repondus = results.get("criteres_repondus") if results.get("criteres_repondus") is not None else results.get("criteres_repondus_auto", 0)
-    n_partiel = results.get("criteres_avec_indice_partiel", 0)
-    potentiel = results.get("potentiel_optimisation_global_pct")
+    total = results.get("total_criteria", 0)
+    # Read answered_criteria (new, LOT 1) with fallback to auto_answered_criteria (old)
+    n_answered = results.get("answered_criteria") if results.get("answered_criteria") is not None else results.get("auto_answered_criteria", 0)
+    n_partial = results.get("criteria_with_partial_evidence", 0)
+    potential = results.get("global_optimization_potential_pct")
     dimensions = results.get("dimensions", [])
-    diag = results.get("diagnostic_rapide_apercu", {})
+    diag = results.get("quick_diag_overview", {})
 
-    # "répondus" mélange plusieurs provenances : collecte/estime/suppose viennent de nos
-    # outils (automatique), declare vient d'une page publiée par le service audité,
-    # precise vient d'un humain qui a rempli le questionnaire pendant CET audit. Les
-    # confondre sous "répondus automatiquement" fabrique une phrase fausse dès qu'un
-    # questionnaire a été fusionné (vu en session 32 sur octo.com : 19 précisés annoncés
-    # comme automatiques). Distinguer les trois, jamais les agréger sous un seul mot.
-    provenance = results.get("repondus_par_provenance") or {}
-    n_auto = provenance.get("collecte", 0) + provenance.get("estime", 0) + provenance.get("suppose", 0)
-    n_declare = provenance.get("declare", 0)
-    n_precise = provenance.get("precise", 0)
+    # "answered" mixes several provenances: collected/estimated/assumed come from our
+    # tools (automatic), declared comes from a page published by the audited service,
+    # stated comes from a human who filled in the questionnaire during THIS audit. The
+    # confusing them as "answered automatically" produces a false sentence as soon as a
+    # questionnaire has been merged (seen in session 32 on octo.com: 19 stated announced
+    # as automatic). Distinguish the three, never aggregate them under a single word.
+    provenance = results.get("answered_by_provenance") or {}
+    n_auto = provenance.get("collected", 0) + provenance.get("estimated", 0) + provenance.get("assumed", 0)
+    n_declared = provenance.get("declared", 0)
+    n_stated = provenance.get("stated", 0)
 
-    phrase_repondus = f'<b>{n_auto}</b> ont pu être répondus automatiquement depuis les données d’audit'
+    phrase_answered = f'<b>{n_auto}</b> could be answered automatically from the audit data'
     if n_declare:
-        phrase_repondus += f', <b>{n_declare}</b> depuis une déclaration publique du service audité'
+        phrase_answered += f', <b>{n_declared}</b> from a public declaration of the audited service'
     if n_precise:
-        phrase_repondus += f', <b>{n_precise}</b> par une personne du service audité via le questionnaire'
+        phrase_answered += f', <b>{n_stated}</b> by a person of the audited service via the questionnaire'
 
     warning = (
         f'<div style="background:#fff3cd;border-left:4px solid #ffc107;'
         f'padding:12px 16px;margin:16px 0;border-radius:4px">'
-        f'<b>&#9888; Audit automatique très partiel</b><br>'
-        f'Sur {total} critères détaillés, {phrase_repondus} '
-        f'(+ {n_partiel} indice(s) contextuel(s), jamais une réponse validée). Les autres '
-        f'restent <b>"je ne sais pas"</b> par construction : ce sont des '
-        f'questions organisationnelles ou produit, qu’aucune mesure technique '
-        f'ne peut trancher. Détail complet critère par critère en annexe. '
-        f'Pour combler ces critères, générez le questionnaire correspondant avec le script '
-        f'<code>generate_questionnaire.py</code> (il produit un fichier '
-        f'<code>questionnaire-eof.md</code>) et transmettez-le au service audité, qui pourra '
-        f'y répondre directement.'
+        f'<b>&#9888; Very partial automatic audit</b><br>'
+        f'Out of {total} detailed criteria, {phrase_answered} '
+        f'(+ {n_partial} contextual hint(s), never a validated answer). The others '
+        f'remain <b>"I don\'t know"</b> by construction: they are '
+        f'organizational or product questions that no technical measurement '
+        f'can settle. Full criterion-by-criterion detail in the appendix. '
+        f'To fill in these criteria, generate the corresponding questionnaire with the script '
+        f'<code>generate_questionnaire.py</code> (it produces a '
+        f'<code>questionnaire-eof.md</code> file) and send it to the audited service, which can '
+        f'answer it directly.'
         f'</div>'
     )
 
-    # Aperçu Diagnostic rapide (0) — toujours "à remplir humainement", jamais
-    # de tentative de réponse automatique (échelle 1-5 différente, décision
-    # explicite) : placé AVANT le radar des 6 dimensions détaillées.
+    # Quick diagnostic (0) preview — always "to be filled in by a human", never
+    # an automatic answering attempt (different 1-5 scale, explicit
+    # decision): placed BEFORE the radar of the 6 detailed dimensions.
     def _diag_row(q):
-        doublon = ' <span style="color:#888;font-size:12px">(doublon exact de 3.3)</span>' if q["id"] == "0.16" else ""
-        if q.get("reponse"):
-            valeur = f'{q["reponse"].replace("<", "&lt;")}{doublon}'
-            conf = _provenance_de(q)
+        duplicate_note = ' <span style="color:#888;font-size:12px">(exact duplicate of 3.3)</span>' if q["id"] == "0.16" else ""
+        if q.get("answer"):
+            value = f'{q["answer"].replace("<", "&lt;")}{duplicate_note}'
+            conf = _provenance_of(q)
             source = q.get("source") or "—"
-        elif q.get("indice_contextuel"):
-            valeur = f'je ne sais pas <span style="color:#888">— donnée indicative : {q["indice_contextuel"]}</span>{doublon}'
-            conf = _provenance_de(q)
+        elif q.get("context_index"):
+            value = f'I don\'t know <span style="color:#888">— indicative data: {q["context_index"]}</span>{duplicate_note}'
+            conf = _provenance_of(q)
             source = q.get("source") or "—"
         else:
-            valeur = f'je ne sais pas{doublon}'
+            value = f'I don\'t know{duplicate_note}'
             conf = None
-            source = "réservé à l’évaluation humaine (échelle 1-5, non déductible des données d’audit)"
+            source = "reserved for human assessment (1-5 scale, not derivable from audit data)"
         src_html = _confidence_badge(conf) if conf else '<span style="color:#aaa">—</span>'
         return (
             f'<tr>'
             f'<td style="padding:5px 8px;white-space:nowrap">{q["id"]}</td>'
-            f'<td style="padding:5px 8px">{q["critere"]}</td>'
-            f'<td style="padding:5px 8px">{valeur}</td>'
+            f'<td style="padding:5px 8px">{q["criterion"]}</td>'
+            f'<td style="padding:5px 8px">{value}</td>'
             f'<td style="padding:5px 8px">{src_html}</td>'
             f'<td style="padding:5px 8px;font-size:13px;color:#666">{source}</td>'
             f'</tr>'
         )
 
     diag_total = diag.get("total_questions", 0)
-    diag_repondus = sum(1 for q in diag.get("questions", []) if q.get("reponse"))
-    diag_pct = (diag_repondus / diag_total * 100) if diag_total else 0
+    diag_answered = sum(1 for q in diag.get("questions", []) if q.get("answer"))
+    diag_pct = (diag_answered / diag_total * 100) if diag_total else 0
     diag_bar = (
         f'<div style="background:#e0e0e0;border-radius:3px;height:10px;width:120px;'
         f'display:inline-block;vertical-align:middle;margin-left:10px;overflow:hidden">'
@@ -2921,201 +2921,201 @@ def _section_eof(results, radar_svg_text=None):
     )
     diag_header_row = (
         f'<tr><td colspan="5" style="padding:10px 8px 6px;background:{OCTO_PALE};font-weight:bold">'
-        f'🏦 0 — Diagnostic rapide{diag_bar} '
-        f'<span style="font-weight:normal;font-size:13px;color:#555">{diag_repondus}/{diag_total}</span>'
+        f'🏦 0 — Quick diagnostic{diag_bar} '
+        f'<span style="font-weight:normal;font-size:13px;color:#555">{diag_answered}/{diag_total}</span>'
         f'</td></tr>'
     )
     diag_rows = "".join(_diag_row(q) for q in diag.get("questions", []))
     diag_table = f"""<table style="width:100%;border-collapse:collapse;font-size:14px">
     <thead><tr style="background:{OCTO_PALE}">
       <th style="padding:5px 8px;text-align:left">ID</th>
-      <th style="padding:5px 8px;text-align:left">Critère</th>
-      <th style="padding:5px 8px;text-align:left">Réponse</th>
+      <th style="padding:5px 8px;text-align:left">Criterion</th>
+      <th style="padding:5px 8px;text-align:left">Answer</th>
       <th style="padding:5px 8px;text-align:left">Provenance</th>
-      <th style="padding:5px 8px;text-align:left">Source / donnée exploitée</th>
+      <th style="padding:5px 8px;text-align:left">Source / data used</th>
     </tr></thead>
     <tbody>{diag_header_row}{diag_rows}</tbody>
   </table>"""
     diag_block = f"""
-  <h3>🏦 0 — Diagnostic rapide (aperçu)</h3>
+  <h3>🏦 0 — Quick diagnostic (preview)</h3>
   <p style="font-size:15px;color:#666;margin:0 0 8px">
-    {diag.get("total_questions", 0)} questions, échelle 1 à 5, <b>jamais remplies
-    automatiquement</b> (décision explicite : aucune donnée d’audit ne permet de
-    juger ces critères de façon fiable), à une exception près (0.16, doublon exact
-    de 3.3, voir ci-dessous). À évaluer humainement dans le template du skill
-    <code>eof</code>.
+    {diag.get("total_questions", 0)} questions, 1-to-5 scale, <b>never filled in
+    automatically</b> (explicit decision: no audit data can reliably
+    judge these criteria), with one exception (0.16, exact duplicate
+    of 3.3, see below). To be assessed by a human in the <code>eof</code> skill
+    template.
   </p>
   <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;margin:12px 0;border-radius:4px">
-    <b>&#9888; Un préalable, pas un bonus</b><br>
-    Le référentiel EOF est formel : si le résultat de ce diagnostic est très
-    faible, il n’est pas nécessaire de poursuivre le détail des 6 dimensions
-    ci-dessous. Le potentiel d’optimisation est soit déjà faible, soit trop
-    coûteux à atteindre. À évaluer humainement AVANT de lire la suite.
+    <b>&#9888; A prerequisite, not a bonus</b><br>
+    The EOF framework is strict: if the result of this diagnostic is very
+    low, there is no need to go through the detail of the 6 dimensions
+    below. The optimization potential is either already low, or too
+    costly to reach. To be assessed by a human BEFORE reading on.
   </div>
   {diag_table}"""
 
-    # KPIs en tête, scopés aux 54 critères détaillés uniquement (décision du 2026-09-03)
+    # KPIs at the top, scoped to the 54 detailed criteria only (decision of 2026-09-03)
     kpi_style = (
         "flex:1;min-width:180px;background:white;border:1px solid #ddd;"
         "border-radius:6px;padding:16px;text-align:center"
     )
-    potentiel_txt = f"~{potentiel:.0f}%" if potentiel is not None else "n/a"
+    potential_txt = f"~{potential:.0f}%" if potential is not None else "n/a"
 
-    # Complétude globale (nouveau champ de la couche processus, optionnel)
-    completude_globale = results.get("completude_globale_pct")
-    completude_kpi = ""
-    if completude_globale is not None:
-        completude_kpi = (
+    # Overall completeness (new field of the process layer, optional)
+    completeness_global = results.get("global_completeness_pct")
+    completeness_kpi = ""
+    if completeness_global is not None:
+        completeness_kpi = (
             f'  <div style="{kpi_style}">'
-            f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Complétude</div>'
-            f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{completude_globale:.0f}%</div>'
-            f'    <div style="font-size:14px;color:#888">critères réellement examinés</div>'
+            f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Completeness</div>'
+            f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{completeness_global:.0f}%</div>'
+            f'    <div style="font-size:14px;color:#888">criteria actually examined</div>'
             f'  </div>'
         )
 
-    # Critères écartés (nouveau champ LOT C, optionnel)
-    criteres_ecartes = results.get("criteres_ecartes")
-    ecartes_kpi = ""
-    if criteres_ecartes is not None:
-        ecartes_kpi = (
+    # Discarded criteria (new LOT C field, optional)
+    criteria_discarded = results.get("discarded_criteria")
+    discarded_kpi = ""
+    if criteria_discarded is not None:
+        discarded_kpi = (
             f"  <div style=\"{kpi_style}\">"
-            f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Écartés</div>"
-            f"    <div style=\"font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0\">{criteres_ecartes}</div>"
-            f"    <div style=\"font-size:14px;color:#888\">critères hors périmètre du service</div>"
+            f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Discarded</div>"
+            f"    <div style=\"font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0\">{criteria_discarded}</div>"
+            f"    <div style=\"font-size:14px;color:#888\">criteria outside the service's scope</div>"
             f"  </div>"
         )
 
     kpis = (
         f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 24px">'
         f'  <div style="{kpi_style}">'
-        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Critères répondus</div>'
-        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{n_repondus}/{total}</div>'
-        f'    <div style="font-size:14px;color:#888">critères détaillés, quelle que soit la provenance</div>'
+        f'    <div style="font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px">Criteria answered</div>'
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{n_answered}/{total}</div>'
+        f'    <div style="font-size:14px;color:#888">detailed criteria, whatever the provenance</div>'
         f'  </div>'
         f'  <div style="{kpi_style}">'
-        f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Potentiel d'optimisation</div>"
-        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{potentiel_txt}</div>'
-        f'    <div style="font-size:14px;color:#888">sur tous les critères de chaque dimension</div>'
+        f"    <div style=\"font-size:14px;color:#666;text-transform:uppercase;letter-spacing:1px\">Optimization potential</div>"
+        f'    <div style="font-size:28px;font-weight:bold;color:{OCTO_DARK};margin:6px 0">{potential_txt}</div>'
+        f'    <div style="font-size:14px;color:#888">over all criteria of each dimension</div>'
         f'  </div>'
-        f'{completude_kpi}'
-        f'{ecartes_kpi}'
+        f'{completeness_kpi}'
+        f'{discarded_kpi}'
         f'</div>'
     )
 
     radar_block = ""
     if radar_svg_text:
-        rappel_provenances = (
+        provenance_reminder = (
             '<div style="margin-top:10px;font-size:13px;color:#444;text-align:left;'
             'max-width:700px;margin-left:auto;margin-right:auto">'
-            '<b>Détail des 5 provenances possibles :</b><br>'
-            f'{_confidence_badge("collecte")} mesure réelle &middot; '
-            f'{_confidence_badge("estime")} déduction d\'un ordre de grandeur &middot; '
-            f'{_confidence_badge("declare")} déclaration publique trouvée &middot; '
-            f'{_confidence_badge("precise")} réponse du service via le questionnaire '
-            '&rarr; <b>potentiel retenu</b> (en plein)<br>'
-            f'{_confidence_badge("suppose")} déduction depuis un indice faible '
-            '&rarr; <b>marge d\'incertitude</b> (en hachuré)'
+            '<b>Detail of the 5 possible provenances:</b><br>'
+            f'{_confidence_badge("collected")} real measurement &middot; '
+            f'{_confidence_badge("estimated")} deduction of an order of magnitude &middot; '
+            f'{_confidence_badge("declared")} public declaration found &middot; '
+            f'{_confidence_badge("stated")} service answer via the questionnaire '
+            '&rarr; <b>retained potential</b> (solid)<br>'
+            f'{_confidence_badge("assumed")} deduction from a weak hint '
+            '&rarr; <b>uncertainty margin</b> (hatched)'
             '</div>'
         )
         radar_block = f"""
   <div style="max-width:100%;overflow-x:auto;border:1px solid #ddd;border-radius:6px;padding:12px;background:white;text-align:center">
     {radar_svg_text}
-    {rappel_provenances}
+    {provenance_reminder}
   </div>"""
 
-    criteres_list = results.get("criteres", [])
+    criteria_list = results.get("criteria", [])
     dim_rows = ""
     for d in dimensions:
-        # LOT C : gérer les critères écartés
-        hors_perimetre = d.get("hors_perimetre", False)
-        ecartes = d.get("ecartes", 0)
+        # LOT C: handle discarded criteria
+        out_of_scope = d.get("out_of_scope", False)
+        discarded = d.get("discarded", 0)
 
-        if hors_perimetre:
-            # Dimension entièrement hors périmètre : ne jamais afficher 0 %
-            ecartes_s = "s" if ecartes > 1 else ""
-            pct_txt = f'<span style="color:#888">hors périmètre</span> <span style="font-size:0.85em;color:#999">({ecartes} écarté{ecartes_s})</span>'
-            completude_txt = ""
+        if out_of_scope:
+            # Dimension entirely out of scope: never display 0%
+            discarded_s = "s" if discarded > 1 else ""
+            pct_txt = f'<span style="color:#888">out of scope</span> <span style="font-size:0.85em;color:#999">({discarded} discarded{discarded_s})</span>'
+            completeness_txt = ""
         else:
-            # Accepter les deux noms (score_pct ancien, potentiel_optimisation_pct nouveau)
-            pct_val = d.get("potentiel_optimisation_pct") if d.get("potentiel_optimisation_pct") is not None else d.get("score_pct")
-            # Même libellé que le radar juste au-dessus : deux mots différents pour le
-            # même état ("sans donnée" ici, "aucune réponse" sur la figure) laisseraient
-            # croire au lecteur qu'ils désignent deux situations distinctes.
-            pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">aucune réponse</span>'
+            # Accept both names (old score_pct, new optimization_potential_pct)
+            pct_val = d.get("optimization_potential_pct") if d.get("optimization_potential_pct") is not None else d.get("score_pct")
+            # Same label as the radar just above: two different words for the
+            # same state ("no data" here, "no answer" on the figure) would make
+            # the reader believe they designate two distinct situations.
+            pct_txt = f"{pct_val:.0f}%" if pct_val is not None else '<span style="color:#888">no answer</span>'
 
-            # Afficher la complétude si disponible (nouveaux champs du LOT 1)
-            completude = d.get("completude_pct")
-            completude_txt = f' <span style="color:#888;font-size:0.85em">({completude:.0f}% complétude)</span>' if completude is not None else ""
+            # Display completeness if available (new LOT 1 fields)
+            completeness = d.get("completeness_pct")
+            completeness_txt = f' <span style="color:#888;font-size:0.85em">({completeness:.0f}% completeness)</span>' if completeness is not None else ""
 
-            # Ajouter le décompte d'écartés si partiellement écarté
-            if ecartes > 0:
-                ecartes_s = "s" if ecartes > 1 else ""
-                completude_txt += f' <span style="font-size:0.85em;color:#999">({ecartes} écarté{ecartes_s})</span>'
+            # Add the discarded count if partially discarded
+            if discarded > 0:
+                discarded_s = "s" if discarded > 1 else ""
+                completeness_txt += f' <span style="font-size:0.85em;color:#999">({discarded} discarded{discarded_s})</span>'
 
         dim_rows += (
             f'<tr>'
-            f'<td style="padding:6px 8px">{d["nom"]}</td>'
-            f'<td style="padding:6px 8px;text-align:right">{d["repondus"]}/{d["total"]}</td>'
-            f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{pct_txt}{completude_txt}</td>'
+            f'<td style="padding:6px 8px">{d["name"]}</td>'
+            f'<td style="padding:6px 8px;text-align:right">{d["answered"]}/{d["total"]}</td>'
+            f'<td style="padding:6px 8px;text-align:right;font-weight:bold">{pct_txt}{completeness_txt}</td>'
             f'</tr>'
         )
-        # Avec 1 seul critère répondu, le pourcentage repose sur un jugement unique :
-        # préciser lequel pour contextualiser le chiffre, sinon le % donne une fausse
-        # impression de verdict global (cf. plan).
-        if d.get("repondus") == 1:
+        # With only 1 answered criterion, the percentage rests on a single judgment:
+        # say which one to contextualize the figure, otherwise the % gives a false
+        # impression of an overall verdict (cf. plan).
+        if d.get("answered") == 1:
             matched = next(
-                (c for c in criteres_list if c.get("dimension") == d["nom"] and c.get("reponse")),
+                (c for c in criteria_list if c.get("dimension") == d["name"] and c.get("answer")),
                 None,
             )
             if matched:
                 dim_rows += (
                     f'<tr><td colspan="3" style="padding:0 8px 10px;font-size:13px;color:#888">'
-                    f'(repose sur {matched["id"]} — {matched["critere"]} → {matched["reponse"]})'
+                    f'(rests on {matched["id"]} — {matched["criterion"]} → {matched["answer"]})'
                     f'</td></tr>'
                 )
     dim_table = f"""<table style="width:100%;border-collapse:collapse;margin-top:12px">
     <thead><tr style="background:{OCTO_PALE}">
       <th style="padding:6px 8px;text-align:left">Dimension</th>
-      <th style="padding:6px 8px;text-align:right">Répondus</th>
-      <th style="padding:6px 8px;text-align:right">Potentiel d’optimisation</th>
+      <th style="padding:6px 8px;text-align:right">Answered</th>
+      <th style="padding:6px 8px;text-align:right">Optimization potential</th>
     </tr></thead>
     <tbody>{dim_rows}</tbody>
   </table>"""
 
     return f"""<section id="eof">
-  <h2>Potentiel d’optimisation (référentiel EOF)</h2>
+  <h2>Optimization potential (EOF framework)</h2>
   {warning}
   {diag_block}
-  <h3 style="margin-top:24px">Six dimensions détaillées</h3>
+  <h3 style="margin-top:24px">Six detailed dimensions</h3>
   {kpis}
   {radar_block}
   {dim_table}
   <p style="font-size:14px;color:#888;margin-top:12px">
-    Un pourcentage plus élevé signale un potentiel d’optimisation plus important : le
-    service est moins mature sur cette dimension, il ne s’y comporte pas mieux. Détail
-    critère par critère, source et provenance de chaque réponse en annexe.
+    A higher percentage signals a greater optimization potential: the
+    service is less mature on this dimension, it does not behave any better there. Criterion-by-criterion
+    detail, source and provenance of each answer in the appendix.
   </p>
 </section>"""
 
 
 def _section_eof_detail(results):
-    """Annexe autonome (pas une sous-partie de Méthodologie & hypothèses,
-    contenu trop substantiel pour ça) : le détail des critères EOF, un par un —
-    réponse ou "je ne sais pas", confidence, source/donnée exploitée. Jamais
-    de valeur masquée : c'est ici qu'on voit explicitement les critères
-    sans aucune donnée, pas seulement le résumé optimiste du corps."""
+    """Standalone appendix (not a sub-part of Methodology & assumptions,
+    content too substantial for that): the detail of the EOF criteria, one by one —
+    answer or "I don't know", confidence, source/data used. Never
+    a hidden value: this is where the criteria without any data
+    are explicitly visible, not just the optimistic summary of the body."""
     if not results:
         return ""
-    dims_by_nom = {d["nom"]: d for d in results.get("dimensions", [])}
+    dims_by_name = {d["name"]: d for d in results.get("dimensions", [])}
     rows = ""
     last_dimension = None
-    for c in results.get("criteres", []):
+    for c in results.get("criteria", []):
         dimension = c.get("dimension")
         emoji = dimension.split(" ", 1)[0] if dimension else ""
         if dimension != last_dimension:
-            d = dims_by_nom.get(dimension, {})
-            repondus, dim_total = d.get("repondus", 0), d.get("total", 0)
-            pct = (repondus / dim_total * 100) if dim_total else 0
+            d = dims_by_name.get(dimension, {})
+            answered, dim_total = d.get("answered", 0), d.get("total", 0)
+            pct = (answered / dim_total * 100) if dim_total else 0
             bar = (
                 f'<div style="background:#e0e0e0;border-radius:3px;height:10px;width:120px;'
                 f'display:inline-block;vertical-align:middle;margin-left:10px;overflow:hidden">'
@@ -3125,75 +3125,75 @@ def _section_eof_detail(results):
             rows += (
                 f'<tr><td colspan="5" style="padding:10px 8px 6px;background:{OCTO_PALE};font-weight:bold">'
                 f'{dimension}{bar} '
-                f'<span style="font-weight:normal;font-size:13px;color:#555">{repondus}/{dim_total}</span>'
+                f'<span style="font-weight:normal;font-size:13px;color:#555">{answered}/{dim_total}</span>'
                 f'</td></tr>'
             )
             last_dimension = dimension
-        if c["reponse"]:
-            valeur = c["reponse"]
+        if c["answer"]:
+            value = c["answer"]
             source = c.get("source") or "—"
-            conf = _provenance_de(c)
-        elif c.get("contexte"):
-            valeur = f'je ne sais pas <span style="color:#888">— indice : {c["contexte"]}</span>'
+            conf = _provenance_of(c)
+        elif c.get("context"):
+            value = f'I don\'t know <span style="color:#888">— hint: {c["context"]}</span>'
             source = c.get("source") or "—"
-            conf = _provenance_de(c)
+            conf = _provenance_of(c)
         else:
-            valeur = "je ne sais pas"
-            source = "aucune donnée d’audit (critère organisationnel/produit)"
+            value = "I don't know"
+            source = "no audit data (organizational/product criterion)"
             conf = None
         src_html = _confidence_badge(conf) if conf else '<span style="color:#aaa">—</span>'
         rows += (
             f'<tr>'
             f'<td style="padding:5px 8px;white-space:nowrap">{emoji} {c["id"]}</td>'
-            f'<td style="padding:5px 8px">{c["critere"]}</td>'
-            f'<td style="padding:5px 8px">{valeur}</td>'
+            f'<td style="padding:5px 8px">{c["criterion"]}</td>'
+            f'<td style="padding:5px 8px">{value}</td>'
             f'<td style="padding:5px 8px">{src_html}</td>'
             f'<td style="padding:5px 8px;font-size:13px;color:#666">{source}</td>'
             f'</tr>'
         )
     return f"""<section id="eof-detail">
-  <h2>Détail des critères EOF</h2>
+  <h2>EOF criteria detail</h2>
   <p style="font-size:15px;color:#666">
-    {_confidence_badge("collecte")} mesuré par nos scripts (CrUX, ipinfo, PageSpeed Insights, en-têtes HTTP)
+    {_confidence_badge("collected")} measured by our scripts (CrUX, ipinfo, PageSpeed Insights, HTTP headers)
     &nbsp;·&nbsp;
-    {_confidence_badge("estime")} déduit d’un signal indirect ou d’un seuil que nous avons fixé (détection de technologies, HTML/CSS re-fetché)
+    {_confidence_badge("estimated")} deduced from an indirect signal or a threshold we set (technology detection, re-fetched HTML/CSS)
     &nbsp;·&nbsp;
-    {_confidence_badge("declare")} déclaré publiquement par l’organisation auditée
+    {_confidence_badge("declared")} publicly declared by the audited organization
     &nbsp;·&nbsp;
-    {_confidence_badge("precise")} coché dans le questionnaire, sans preuve vérifiable
+    {_confidence_badge("stated")} ticked in the questionnaire, without verifiable proof
   </p>
   <table style="width:100%;border-collapse:collapse;font-size:14px">
     <thead><tr style="background:{OCTO_PALE}">
       <th style="padding:5px 8px;text-align:left">ID</th>
-      <th style="padding:5px 8px;text-align:left">Critère</th>
-      <th style="padding:5px 8px;text-align:left">Réponse</th>
+      <th style="padding:5px 8px;text-align:left">Criterion</th>
+      <th style="padding:5px 8px;text-align:left">Answer</th>
       <th style="padding:5px 8px;text-align:left">Provenance</th>
-      <th style="padding:5px 8px;text-align:left">Source / donnée exploitée</th>
+      <th style="padding:5px 8px;text-align:left">Source / data used</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>
   <p style="font-size:14px;color:#888;margin-top:8px">
-    Table de correspondance : <code>eof_criteria_mapping.py</code> (18 critères avec règle :
-    7 automatisables + 11 indices "partiel", 36 absents par choix = toujours "je ne sais pas").
-    Sources exploitées, en plus de <code>env-data.json</code>/<code>har-analysis.json</code>/
-    <code>coverage-analysis.json</code>/<code>cwv.json</code> : <code>html-css-criteria.json</code>
-    (re-fetch live des pages déjà auditées — <code>parse_html_criteria.py</code>),
-    <code>security-headers-analysis.json</code> (score sécurité local depuis le HAR —
-    <code>analyze_security_headers.py</code>), <code>wellknown-scan.json</code> (fetch direct
-    security.txt/robots.txt/sitemap.xml — <code>scan_wellknown.py</code>), et
-    <code>accessibility_score_pct</code>/<code>best_practices_score_pct</code> dans
-    <code>cwv.json</code> (catégories PageSpeed Insights ajoutées à l'appel existant).
-    Régénérer après une nouvelle collecte de données :
-    <code>python3 run_eof.py &lt;source_dir&gt;</code> puis régénérer le rapport.
+    Mapping table: <code>eof_criteria_mapping.py</code> (18 criteria with a rule:
+    7 automatable + 11 "partial" hints, 36 absent by choice = always "I don't know").
+    Sources used, in addition to <code>env-data.json</code>/<code>har-analysis.json</code>/
+    <code>coverage-analysis.json</code>/<code>cwv.json</code>: <code>html-css-criteria.json</code>
+    (live re-fetch of already audited pages — <code>parse_html_criteria.py</code>),
+    <code>security-headers-analysis.json</code> (local security score from the HAR —
+    <code>analyze_security_headers.py</code>), <code>wellknown-scan.json</code> (direct fetch
+    security.txt/robots.txt/sitemap.xml — <code>scan_wellknown.py</code>), and
+    <code>accessibility_score_pct</code>/<code>best_practices_score_pct</code> in
+    <code>cwv.json</code> (PageSpeed Insights categories added to the existing call).
+    Regenerate after a new data collection:
+    <code>python3 run_eof.py &lt;source_dir&gt;</code> then regenerate the report.
   </p>
 </section>"""
 
 
-def _methodo_table(rows):
-    """Rend un tableau Paramètre / Valeur / Source-confiance pour l'annexe méthodo.
+def _methodology_table(rows):
+    """Renders a Parameter / Value / Source-confidence table for the methodology appendix.
 
-    rows : liste de (label, valeur, confiance|libellé). Si la confiance correspond
-    à un niveau connu (cf. _CONFIDENCE_LEVELS), affiche le badge ; sinon texte brut.
+    rows: list of (label, value, confidence|label). If the confidence matches
+    a known level (cf. _CONFIDENCE_LEVELS), show the badge; otherwise raw text.
     """
     body = ""
     for label, value, conf in rows:
@@ -3208,115 +3208,115 @@ def _methodo_table(rows):
                  f'</tr>')
     return (f'<table style="width:100%;border-collapse:collapse;margin-top:6px">'
             f'<thead><tr style="background:{OCTO_PALE}">'
-            f'<th style="padding:6px 8px;text-align:left">Paramètre</th>'
-            f'<th style="padding:6px 8px;text-align:left">Valeur retenue</th>'
+            f'<th style="padding:6px 8px;text-align:left">Parameter</th>'
+            f'<th style="padding:6px 8px;text-align:left">Retained value</th>'
             f'<th style="padding:6px 8px;text-align:left">Source</th>'
             f'</tr></thead><tbody>{body}</tbody></table>')
 
 
-def _methodo_efootprint(synthese_python):
-    """Sous-section A : hypothèses ET méthodes du calcul CO2e."""
-    if not synthese_python:
+def _methodology_efootprint(python_summary):
+    """Sub-section A: assumptions AND methods of the CO2e calculation."""
+    if not python_summary:
         return ""
-    hyp = synthese_python.get("hypotheses", {})
-    visits = synthese_python.get("visits_per_year", 0)
-    traffic = synthese_python.get("traffic", {})
+    hyp = python_summary.get("hypotheses", {})
+    visits = python_summary.get("visits_per_year", 0)
+    traffic = python_summary.get("traffic", {})
 
     def pct(v):
         return f'{v:.0%}' if isinstance(v, (int, float)) else "?"
 
-    # Trafic : valeur mensuelle en note si dispo (ex. 36 700/mois × 12)
+    # Traffic: monthly value as a note if available (e.g. 36,700/month × 12)
     _monthly = traffic.get("monthly_visits")
     _visits_val = (f'{visits:,} visites (≈ {_monthly:,}/mois × 12)'
                    if _monthly else f'{visits:,} visites')
 
-    # --- Tableau des données/hypothèses ---
-    # LOT 1 : poids transféré (réseau réel) en valeur ; décompressé en repère si dispo.
+    # --- Data/assumptions table ---
+    # LOT 1: transferred weight (real network) as the value; decompressed as a reference if available.
     _pw_transferred_m = hyp.get("page_weight_transferred_kb")
     if _pw_transferred_m:
         _ratio_m = hyp.get("compression_ratio")
-        _repere_m = f' <span style="color:#888">(décompressé : {hyp.get("page_weight_uncompressed_kb")} kB'
-        _repere_m += f', ratio {_ratio_m})</span>' if _ratio_m else ')</span>'
-        _pw_row = ("Poids page transféré (réseau réel)",
-                   f'{hyp.get("page_weight_kb", "?")} kB{_repere_m}',
+        _note_m = f' <span style="color:#888">(decompressed: {hyp.get("page_weight_uncompressed_kb")} kB'
+        _note_m += f', ratio {_ratio_m})</span>' if _ratio_m else ')</span>'
+        _pw_row = ("Transferred page weight (real network)",
+                   f'{hyp.get("page_weight_kb", "?")} kB{_note_m}',
                    hyp.get("confidence_page_weight", "default"))
     else:
-        _pw_row = ("Poids de page (représentative)",
+        _pw_row = ("Page weight (representative)",
                    f'{hyp.get("page_weight_kb", "?")} kB',
                    hyp.get("confidence_page_weight", "default"))
     rows = [
         _pw_row,
-        ("Durée de chargement", f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration", "default")),
-        ("Pays d'hébergement", hyp.get("country", "?"), hyp.get("confidence_country", "default")),
-        ("Intensité carbone électricité", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),
-        ("Provider hébergeur", hyp.get("provider", "?"), hyp.get("confidence_provider", "default")),
-        ("Type d'instance", *_instance_type_row(hyp)),
-        ("Trafic annuel", _visits_val, _traffic_source_label(traffic)),
+        ("Load duration", f'{hyp.get("request_duration_ms", "?")} ms', hyp.get("confidence_request_duration", "default")),
+        ("Hosting country", hyp.get("country", "?"), hyp.get("confidence_country", "default")),
+        ("Electricity carbon intensity", f'{hyp.get("carbon_intensity_g_kwh", "?")} g/kWh', hyp.get("confidence_carbon_intensity", "default")),
+        ("Hosting provider", hyp.get("provider", "?"), hyp.get("confidence_provider", "default")),
+        ("Instance type", *_instance_type_row(hyp)),
+        ("Annual traffic", _visits_val, _traffic_source_label(traffic)),
     ]
-    # Mix pays d'audience (sert à pondérer iOS/macOS)
+    # Audience country mix (used to weight iOS/macOS)
     audience_mix = hyp.get("audience_mix")
     if audience_mix:
         mix_str = ", ".join(f'{cc} {w:.0%}' for cc, w in audience_mix.items())
-        rows.append(("Mix pays d'audience", mix_str,
+        rows.append(("Audience country mix", mix_str,
                      _audience_source_label(hyp.get("audience_source", "default"),
                                             hyp.get("audience_source_url"))))
-    # Mix appareils : brut CrUX (si dispo) + retenu corrigé
+    # Device mix: raw CrUX (if available) + retained corrected
     mob_raw = hyp.get("mobile_fraction_raw")
     if mob_raw is not None:
-        rows.append(("Mix brut CrUX (mobile / desktop)",
+        rows.append(("Raw CrUX mix (mobile / desktop)",
                      f'{pct(mob_raw)} / {pct(hyp.get("desktop_fraction_raw"))} '
-                     f'(dont phone {pct(hyp.get("phone_fraction_raw"))}, tablette {pct(hyp.get("tablet_fraction_raw"))})',
+                     f'(including phone {pct(hyp.get("phone_fraction_raw"))}, tablet {pct(hyp.get("tablet_fraction_raw"))})',
                      hyp.get("device_mix_source", "crux")))
-        rows.append(("Part iOS retenue (correction mobile)",
+        rows.append(("Retained iOS share (mobile correction)",
                      pct(hyp.get("ios_share_used")),
                      hyp.get("ios_share_source", "?")))
-        rows.append(("Part macOS retenue (correction desktop)",
+        rows.append(("Retained macOS share (desktop correction)",
                      pct(hyp.get("macos_share_used")),
                      hyp.get("macos_share_source", "?")))
-    rows.append(("Mix appareils retenu (mobile / desktop)",
+    rows.append(("Retained device mix (mobile / desktop)",
                  f'{pct(hyp.get("phone_fraction"))} / {pct(hyp.get("desktop_fraction"))}',
                  hyp.get("confidence_device_mix", "default")))
-    rows.append(("Split du trafic (mobile / desktop)",
-                 f'{hyp.get("visits_mobile", "?"):,} / {hyp.get("visits_desktop", "?"):,} visites'
+    rows.append(("Traffic split (mobile / desktop)",
+                 f'{hyp.get("visits_mobile", "?"):,} / {hyp.get("visits_desktop", "?"):,} visits'
                  if isinstance(hyp.get("visits_mobile"), int) else "?",
-                 "dérivé du mix"))
-    rows.append(("Réseau (déduit du mix appareils)",
-                 "mobile → réseau mobile ; desktop → wifi",
-                 "déduit du mix appareils"))
+                 "derived from the mix"))
+    rows.append(("Network (derived from device mix)",
+                 "mobile → mobile network ; desktop → wifi",
+                 "derived from device mix"))
     rows.append((
-        "Stockage serveur (nb. serveurs déclarés, pas un volume de données : sous "
-        "1 To, e-footprint n'a aucune résolution)",
+        "Server storage (nb. of declared servers, not a data volume: below "
+        "1 TB, e-footprint has no resolution)",
         f'{hyp.get("storage_gb", 50)} GB', "default_script"))
-    rows.append(("Appareils modélisés (e-footprint)", "smartphone + laptop (archétypes lib)", "default_efootprint"))
+    rows.append(("Modeled devices (e-footprint)", "smartphone + laptop (lib archetypes)", "default_efootprint"))
 
-    table = _methodo_table(rows)
+    table = _methodology_table(rows)
 
-    # --- Fourchette de scénarios iOS ---
+    # --- iOS scenario range ---
     scenarios_html = ""
     sc = hyp.get("device_scenarios")
     if sc:
         sc_rows = ""
-        for key, human in (("conservateur", "Conservateur"), ("central", "Central (retenu)"), ("apple_heavy", "Audience Apple")):
+        for key, human in (("conservative", "Conservative"), ("central", "Central (retained)"), ("apple_heavy", "Apple audience")):
             s = sc.get(key, {})
             sc_rows += (f'<tr><td style="padding:5px 8px">{human}</td>'
-                        f'<td style="padding:5px 8px">part iOS {pct(s.get("ios_share"))}</td>'
+                        f'<td style="padding:5px 8px">iOS share {pct(s.get("ios_share"))}</td>'
                         f'<td style="padding:5px 8px"><b>{pct(s.get("mobile"))}</b> mobile / {pct(s.get("desktop"))} desktop</td></tr>')
         scenarios_html = (
-            f'<h4 style="margin:14px 0 4px">Fourchette du mix selon la part iOS</h4>'
+            f'<h4 style="margin:14px 0 4px">Mix range according to the iOS share</h4>'
             f'<table style="width:100%;border-collapse:collapse">'
             f'<thead><tr style="background:{OCTO_PALE}">'
-            f'<th style="padding:6px 8px;text-align:left">Scénario</th>'
-            f'<th style="padding:6px 8px;text-align:left">Hypothèse</th>'
-            f'<th style="padding:6px 8px;text-align:left">Mix résultant</th>'
+            f'<th style="padding:6px 8px;text-align:left">Scenario</th>'
+            f'<th style="padding:6px 8px;text-align:left">Assumption</th>'
+            f'<th style="padding:6px 8px;text-align:left">Resulting mix</th>'
             f'</tr></thead><tbody>{sc_rows}</tbody></table>')
 
-    # --- Détail du mix pays d'audience (pondération iOS/macOS) ---
+    # --- Audience country mix detail (iOS/macOS weighting) ---
     audience_html = ""
     per_country = hyp.get("audience_per_country")
     if per_country:
         ac_rows = ""
         for d in per_country:
-            flag_note = "" if d.get("in_table") else ' <span style="color:#999;font-size:13px">(valeur monde par défaut)</span>'
+            flag_note = "" if d.get("in_table") else ' <span style="color:#999;font-size:13px">(default world value)</span>'
             ac_rows += (f'<tr><td style="padding:5px 8px">{_country_label(d.get("country"))}{flag_note}</td>'
                         f'<td style="padding:5px 8px">{pct(d.get("weight"))}</td>'
                         f'<td style="padding:5px 8px">{pct(d.get("ios_share"))}</td>'
@@ -3324,7 +3324,7 @@ def _methodo_efootprint(synthese_python):
         ios_w = hyp.get("audience_ios_weighted")
         mac_w = hyp.get("audience_macos_weighted")
         ac_foot = (f'<tr style="background:{OCTO_PALE};font-weight:bold">'
-                   f'<td style="padding:5px 8px">Pondéré (retenu)</td>'
+                   f'<td style="padding:5px 8px">Weighted (retained)</td>'
                    f'<td style="padding:5px 8px">100 %</td>'
                    f'<td style="padding:5px 8px">{pct(ios_w)}</td>'
                    f'<td style="padding:5px 8px">{pct(mac_w)}</td></tr>')
@@ -3334,27 +3334,27 @@ def _methodo_efootprint(synthese_python):
         caveat = ""
         if isinstance(src, str) and "similarweb" in src.lower():
             caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
-                      'Mix pays estimé via SimilarWeb (page publique, source non officielle, '
-                      'usage limite CGU, potentiellement indisponible) : ordre de grandeur, '
-                      'à confirmer avec l\'analytics du site (GA/Matomo) via <code>--audience</code>.</p>')
+                      'Country mix estimated via SimilarWeb (public page, unofficial source, '
+                      'ToS-limited usage, potentially unavailable): order of magnitude, '
+                      'to confirm with the site analytics (GA/Matomo) via <code>--audience</code>.</p>')
         elif src == "default":
             caveat = ('<p style="font-size:14px;color:#888;margin:4px 0 0">'
-                      'Aucun mix pays fourni : France (100 %) par défaut. Fournir '
-                      '<code>--audience "FR:0.7,US:0.3"</code> ou laisser l\'agent estimer via SimilarWeb.</p>')
+                      'No country mix provided: France (100%) by default. Provide '
+                      '<code>--audience "FR:0.7,US:0.3"</code> or let the agent estimate via SimilarWeb.</p>')
         audience_html = (
-            f'<h4 style="margin:14px 0 4px">Mix pays d\'audience (pondération iOS / macOS)</h4>'
-            f'<p style="font-size:15px;color:#666;margin:0 0 4px">Source : {src}{_src_link}. '
-            f'Ce mix ne sert QU\'À pondérer les parts iOS/macOS de la correction CrUX '
-            f'(CrUX n\'a pas de dimension pays) ; il ne modifie pas les Core Web Vitals.</p>'
+            f'<h4 style="margin:14px 0 4px">Audience country mix (iOS / macOS weighting)</h4>'
+            f'<p style="font-size:15px;color:#666;margin:0 0 4px">Source: {src}{_src_link}. '
+            f'This mix is ONLY used to weight the iOS/macOS shares of the CrUX correction '
+            f'(CrUX has no country dimension); it does not change the Core Web Vitals.</p>'
             f'<table style="width:100%;border-collapse:collapse">'
             f'<thead><tr style="background:{OCTO_PALE}">'
-            f'<th style="padding:6px 8px;text-align:left">Pays</th>'
-            f'<th style="padding:6px 8px;text-align:left">Poids audience</th>'
-            f'<th style="padding:6px 8px;text-align:left">Part iOS (mobile)</th>'
-            f'<th style="padding:6px 8px;text-align:left">Part macOS (desktop)</th>'
+            f'<th style="padding:6px 8px;text-align:left">Country</th>'
+            f'<th style="padding:6px 8px;text-align:left">Audience weight</th>'
+            f'<th style="padding:6px 8px;text-align:left">iOS share (mobile)</th>'
+            f'<th style="padding:6px 8px;text-align:left">macOS share (desktop)</th>'
             f'</tr></thead><tbody>{ac_rows}{ac_foot}</tbody></table>{caveat}')
 
-    # --- LOT 2/3 : signaux serveur/réseau factuels annexés (documentaire) ---
+    # --- LOT 2/3: factual server/network signals appended (documentary) ---
     har_facts_html = ""
     hf = hyp.get("har_facts")
     if hf:
@@ -3363,28 +3363,28 @@ def _methodo_efootprint(synthese_python):
         statuses_str = ", ".join(f'{v}×{k}' for k, v in sorted(hf.get("statuses", {}).items(), key=lambda kv: -kv[1]))
         cache_bytes_kb = round(hf.get("cache_304_uncompressed_bytes", 0) / 1024)
         hf_rows = [
-            ("Requêtes servies depuis le cache navigateur (304)",
+            ("Requests served from browser cache (304)",
              f'{hf.get("cache_304_count", 0)} / {hf.get("request_count", 0)} '
-             f'({pct(hf.get("cache_304_share"))}, ≈ {cache_bytes_kb} kB non retéléchargés)',
+             f'({pct(hf.get("cache_304_share"))}, ≈ {cache_bytes_kb} kB not re-downloaded)',
              conf_hf),
-            ("Temps d'attente serveur (TTFB, wait)",
-             f'médiane {hf.get("wait_ms_median", "?")} ms, p95 {hf.get("wait_ms_p95", "?")} ms',
+            ("Server wait time (TTFB, wait)",
+             f'median {hf.get("wait_ms_median", "?")} ms, p95 {hf.get("wait_ms_p95", "?")} ms',
              conf_hf),
-            ("Méthodes HTTP", methods_str or "?", conf_hf),
-            ("Statuts HTTP", statuses_str or "?", conf_hf),
-            ("Version HTTP dominante", hf.get("dominant_http_version", "?"), conf_hf),
+            ("HTTP methods", methods_str or "?", conf_hf),
+            ("HTTP statuses", statuses_str or "?", conf_hf),
+            ("Dominant HTTP version", hf.get("dominant_http_version", "?"), conf_hf),
         ]
         har_facts_html = (
-            f'<h4 style="margin:14px 0 4px">Signaux réseau/serveur factuels (annexe)</h4>'
+            f'<h4 style="margin:14px 0 4px">Factual network/server signals (appendix)</h4>'
             f'<p style="font-size:14px;color:#888;margin:0 0 4px">'
-            f'{hf.get("note", "Documentaire, n\'entre pas dans le calcul CO2e.")}</p>'
-            f'{_methodo_table(hf_rows)}'
+            f'{hf.get("note", "Documentary, does not enter the CO2e calculation.")}</p>'
+            f'{_methodology_table(hf_rows)}'
         )
 
-    # --- Temps de lecture par étape (Nielsen 2008 recalé, Lot 10) ---
+    # --- Reading time per step (Nielsen 2008 recalibrated, Lot 10) ---
     reading_html = ""
     rt = hyp.get("reading_time")
-    model_steps = (synthese_python.get("model") or {}).get("steps") or []
+    model_steps = (python_summary.get("model") or {}).get("steps") or []
     if rt and model_steps:
         rt_rows = ""
         for s in model_steps:
@@ -3407,76 +3407,76 @@ def _methodo_efootprint(synthese_python):
         if rt.get("recalibrated"):
             _swb_link = _source_link(traffic.get("source_url"))
             recal_note = (
-                f'Le brut ({total_raw:.0f} s cumulés, formule Nielsen seule) est <b>recalé</b> par un '
-                f'facteur unique <b>{factor:.3f}</b> = temps moyen SimilarWeb{_swb_link} par page vue '
-                f'tous pages confondues ({avg_swb:.1f} s/page) ÷ moyenne des Nielsen bruts des pages du '
-                f'parcours. Résultat retenu : <b>{total_recal:.0f} s</b> cumulés. Ce facteur corrige le '
-                'biais de la formule Nielsen (étude 2005, usage avant smartphone, donc structurellement '
-                'surestimée pour un usage mobile) en l\'ancrant sur une mesure réelle d\'engagement '
-                'du site entier, mais il reste propre à CE site (non générique) et porte sur un '
-                'agrégat (moyenne temps/page du site), pas sur les pages précises du parcours capturé. '
-                'Comme les autres données SimilarWeb de ce rapport : estimation tierce (page publique, '
-                'source non officielle, usage limite CGU, potentiellement indisponible), pas une mesure.'
+                f'The raw value ({total_raw:.0f} s cumulative, Nielsen formula alone) is <b>recalibrated</b> by a '
+                f'single factor <b>{factor:.3f}</b> = average SimilarWeb time{_swb_link} per page viewed '
+                f'across all pages ({avg_swb:.1f} s/page) ÷ average of the raw Nielsens of the journey pages '
+                f'Retained result: <b>{total_recal:.0f} s</b> cumulative. This factor corrects the '
+                'bias of the Nielsen formula (2005 study, pre-smartphone usage, therefore structurally '
+                'overestimated for mobile usage) by anchoring it on a real engagement measurement '
+                'of the whole site, but it remains specific to THIS site (not generic) and applies to an '
+                'aggregate (site-wide average time/page), not to the precise pages of the captured journey. '
+                'Like the other SimilarWeb data in this report: third-party estimate (public page, '
+                'unofficial source, ToS-limited usage, potentially unavailable), not a measurement.'
             )
         else:
             recal_note = (
-                f'Aucune mesure SimilarWeb disponible pour ce site : le temps retenu est le Nielsen '
-                f'<b>brut, non recalé</b> ({total_raw:.0f} s cumulés), probablement surestimé '
-                '(étude sous-jacente de 2005, avant l\'usage massif du smartphone).'
+                f'No SimilarWeb measurement available for this site: the retained time is the Nielsen '
+                f'<b>raw, unrecalibrated</b> ({total_raw:.0f} s cumulative), probably overestimated '
+                '(underlying study from 2005, before mass smartphone usage).'
             )
         reading_html = (
-            '<h4 style="margin:14px 0 4px">Temps de lecture par étape (Nielsen 2008 recalé)</h4>'
+            '<h4 style="margin:14px 0 4px">Reading time per step (Nielsen 2008 recalibrated)</h4>'
             f'<p style="font-size:15px;color:#666;margin:0 0 4px">'
-            f'Formule : <code>{rt.get("formula")}</code>, appliquée au comptage de mots RÉEL du corps '
-            f'HTML de chaque page capturée dans le HAR (source : '
+            f'Formula: <code>{rt.get("formula")}</code>, applied to the REAL word count of the body '
+            f'HTML of each page captured in the HAR (source: '
             f'<a href="{rt.get("source_url")}" target="_blank" rel="noopener">{rt.get("source_name")}</a>, '
-            f'domaine de validité publié {rt.get("domain_min_words"):.0f}-{rt.get("domain_max_words"):.0f} mots). '
+            f'published validity domain {rt.get("domain_min_words"):.0f}-{rt.get("domain_max_words"):.0f} words). '
             f'{recal_note}</p>'
             f'<table style="width:100%;border-collapse:collapse">'
             f'<thead><tr style="background:{OCTO_PALE}">'
-            f'<th style="padding:6px 8px;text-align:left">Étape</th>'
-            f'<th style="padding:6px 8px;text-align:right">Mots</th>'
-            f'<th style="padding:6px 8px;text-align:right">Nielsen brut</th>'
-            f'<th style="padding:6px 8px;text-align:right">Temps retenu</th>'
-            f'<th style="padding:6px 8px;text-align:left">Confiance</th>'
+            f'<th style="padding:6px 8px;text-align:left">Step</th>'
+            f'<th style="padding:6px 8px;text-align:right">Words</th>'
+            f'<th style="padding:6px 8px;text-align:right">Raw Nielsen</th>'
+            f'<th style="padding:6px 8px;text-align:right">Retained time</th>'
+            f'<th style="padding:6px 8px;text-align:left">Confidence</th>'
             f'</tr></thead><tbody>{rt_rows}</tbody></table>'
         )
 
-    # --- Méthodes / formules ---
+    # --- Methods / formulas ---
     methods = (
-        '<h4 style="margin:14px 0 4px">Méthodes appliquées</h4>'
+        '<h4 style="margin:14px 0 4px">Methods applied</h4>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
-        '<li><b>Correction CrUX symétrique (iOS + macOS).</b> CrUX ne mesure que Chrome : '
-        'côté mobile les iPhone/iPad (Safari, et même Chrome sur iOS) sont absents ; côté '
-        'desktop les Mac sous Safari le sont aussi. On regonfle les <b>deux</b> côtés par '
-        '<code>mobile_corrigé = mobile_brut / (1 − part_iOS)</code> et '
-        '<code>desktop_corrigé = desktop_brut / (1 − part_macOS)</code>, puis on renormalise '
-        'l\'ensemble à 100 %. Corriger aussi le desktop supprime le biais "pro-mobile" de '
-        'l\'ancienne correction unilatérale.</li>'
-        '<li><b>Pondération par mix pays d\'audience.</b> Les parts iOS et macOS dépendent '
-        'du pays. Elles sont donc pondérées par le mix pays d\'audience (voir tableau ci-dessus). '
-        'Ordre de résolution du mix : <code>--audience</code> saisi (analytics client) &gt; '
-        'estimation SimilarWeb écrite par l\'agent &gt; France (100 %) par défaut. CrUX n\'ayant '
-        'aucune dimension géographique, ce mix ne sert QU\'À cette pondération, jamais aux CWV.</li>'
-        '<li><b>Rattachement tablette.</b> La tablette est comptée avec le mobile '
-        '(logique tactile/portable). Le corps du rapport n\'affiche que mobile/desktop ; '
-        'le détail figure ci-dessus.</li>'
-        '<li><b>Pondération du CO2e.</b> Le trafic est réparti en <b>deux profils d\'usage</b> '
-        '(mobile → smartphone + réseau mobile ; desktop → laptop + wifi), avec des volumes '
-        'proportionnels au mix. Ceci corrige un surcomptage antérieur où chaque visite était '
-        'facturée à 100 % sur smartphone ET laptop.</li>'
-        '<li><b>Nature des chiffres.</b> Ordres de grandeur hypothétiques (données HAR/CrUX/géoloc IP '
-        '+ valeurs par défaut), pas une mesure réelle.</li>'
+        '<li><b>Symmetric CrUX correction (iOS + macOS).</b> CrUX only measures Chrome: '
+        'on mobile, iPhone/iPad (Safari, and even Chrome on iOS) are absent; on '
+        'desktop, Macs under Safari are too. We inflate <b>both</b> sides with '
+        '<code>corrected_mobile = raw_mobile / (1 − ios_share)</code> and '
+        '<code>corrected_desktop = raw_desktop / (1 − macos_share)</code>, then we renormalize '
+        'the whole to 100%. Correcting the desktop too removes the "pro-mobile" bias of '
+        'the old unilateral correction.</li>'
+        '<li><b>Weighting by audience country mix.</b> iOS and macOS shares depend '
+        'on the country. They are therefore weighted by the audience country mix (see table above). '
+        'Mix resolution order: <code>--audience</code> entered (client analytics) &gt; '
+        'SimilarWeb estimate written by the agent &gt; France (100%) by default. CrUX having '
+        'no geographic dimension, this mix is ONLY used for this weighting, never for the CWVs.</li>'
+        '<li><b>Tablet attachment.</b> The tablet is counted with mobile '
+        '(touch/portable logic). The report body only shows mobile/desktop; '
+        'the detail is in the table above.</li>'
+        '<li><b>CO2e weighting.</b> Traffic is split into <b>two usage profiles</b> '
+        '(mobile → smartphone + mobile network ; desktop → laptop + wifi), with volumes '
+        'proportional to the mix. This corrects a previous overcount where each visit was '
+        'charged 100% to both smartphone AND laptop.</li>'
+        '<li><b>Nature of the figures.</b> Hypothetical orders of magnitude (HAR/CrUX/IP-geolocation data '
+        '+ default values), not a real measurement.</li>'
         '</ul>'
     )
 
     return (f'<h3 id="methodo-efootprint" style="margin-top:20px">__LETTRE__. Impact environnemental ({_glossary_link("CO2e")})</h3>'
             f'<p style="font-size:16px;color:#555;margin-bottom:8px">Ce n\'est pas une {_glossary_link("ACV")} '
-            f'complète : e-footprint ne modélise que 2 phases (fabrication + usage), pas le transport ni la fin de vie.</p>'
+            f'complete: e-footprint only models 2 phases (manufacturing + usage), not transport nor end of life.</p>'
             f'{table}{audience_html}{scenarios_html}{har_facts_html}{reading_html}{methods}')
 
 
-def _methodo_cwv(cwv):
+def _methodology_cwv(cwv):
     """Sous-section B : sources et limites des Core Web Vitals."""
     if not cwv:
         return ""
@@ -3486,146 +3486,146 @@ def _methodo_cwv(cwv):
     src_items = "".join(
         f'<li><b>{_CWV_SOURCE_LABELS[s][0]}</b> : {_CWV_SOURCE_LABELS[s][2]}</li>'
         for s in ("crux", "pagespeed_lab", "lighthouse") if s in sources
-    ) or '<li>Source non renseignée</li>'
+    ) or '<li>Source not provided</li>'
     return (
         '<h3 id="methodo-cwv" style="margin-top:20px">__LETTRE__. Core Web Vitals</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
-        f'<li><b>Sources présentes :</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
-        f'<li><b>{_glossary_link("CrUX")} = terrain Chrome.</b> Les données "terrain" proviennent du champ '
-        f'<code>loadingExperience</code> de la réponse PageSpeed Insights ({_glossary_link("P75")} '
-        'des utilisateurs Chrome réels) : ce n\'est PAS un appel dédié à l\'API CrUX.</li>'
-        '<li><b>Limite iOS/Safari.</b> Comme le mix appareils, le terrain CrUX ne couvre '
-        'que Chrome ; les utilisateurs iOS/Safari ne sont pas représentés.</li>'
-        '<li><b>Mobile ET desktop, "pire des deux" par métrique.</b> Les deux stratégies '
-        'PageSpeed sont collectées. Dans le tableau de bord et les recommandations, chaque '
-        'métrique (LCP, INP, CLS) retient la valeur la <b>plus défavorable</b> entre mobile '
-        'et desktop, indépendamment métrique par métrique (un pictogramme 📱/🖥 signale '
-        'l\'appareil retenu). Un problème desktop remonte donc dans les recos. Le détail '
-        'mobile + desktop côte à côte reste consultable dans la section "Analyse Core Web '
-        'Vitals". Seuils : LCP &lt; 1,8 s bon / 1,8-2,5 s à améliorer / &gt; 2,5 s mauvais ; '
+        f'<li><b>Sources present:</b><ul style="margin:2px 0 6px 16px">{src_items}</ul></li>'
+        f'<li><b>{_glossary_link("CrUX")} = Chrome field data.</b> "Field" data comes from the field '
+        f'<code>loadingExperience</code> of the PageSpeed Insights response ({_glossary_link("P75")} '
+        'of real Chrome users): this is NOT a dedicated call to the CrUX API.</li>'
+        '<li><b>iOS/Safari limitation.</b> Like the device mix, the CrUX field data only covers '
+        'Chrome; iOS/Safari users are not represented.</li>'
+        '<li><b>Mobile AND desktop, "worst of both" per metric.</b> Both PageSpeed strategies '
+        'are collected. In the dashboard and the recommendations, each '
+        'metric (LCP, INP, CLS) retains the <b>most unfavorable</b> value between mobile '
+        'and desktop, independently metric by metric (a 📱/🖥 pictogram signals '
+        'the retained device). A desktop problem therefore surfaces in the recos. The detail '
+        'mobile + desktop side by side stays available in the "Core Web Vitals analysis" '
+        'section. Thresholds: LCP &lt; 1.8 s good / 1.8-2.5 s needs improvement / &gt; 2.5 s poor; '
         'INP 200/500 ms ; CLS 0,1/0,25.</li>'
         '<li><b>Lab (simulation).</b> Les sources "lab" (PageSpeed lab ou Lighthouse local) '
-        'sont des simulations à réseau/CPU bridés, généralement plus pessimistes que le terrain.</li>'
-        '<li><b>Signaux indicatifs (diagnostic causal).</b> Quand un problème LCP/INP/CLS est '
-        'détecté, le rapport ajoute un signal croisé avec des données déjà collectées (trackers, '
-        'polices web externes, ressource la plus lourde du parcours, taux de JS non utilisé). '
-        'Ce sont des corrélations, pas des causes confirmées : le HAR ne capture ni le JS exécuté '
-        'réellement au runtime, ni le rendu réel de la page (pas de mesure DOM/CSS). À vérifier '
+        'are simulations with throttled network/CPU, generally more pessimistic than field.</li>'
+        '<li><b>Indicative signals (causal diagnostic).</b> When an LCP/INP/CLS problem is '
+        'detected, the report adds a signal cross-referenced with already collected data (trackers, '
+        'external web fonts, heaviest resource of the journey, unused JS rate). '
+        'These are correlations, not confirmed causes: the HAR captures neither the JS actually executed '
+        'at runtime, nor the real page rendering (no DOM/CSS measurement). To check '
         'manuellement avant conclusion.</li>'
         '</ul>'
     )
 
 
-def _methodo_ecoindex():
+def _methodology_ecoindex():
     """Sous-section C : formule EcoIndex."""
     return (
         f'<h3 id="methodo-ecoindex" style="margin-top:20px">__LETTRE__. {_glossary_link("EcoIndex")} / {_glossary_link("GreenIT")}</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Formule (cnumr/ecoindex_reference) :</b> '
         '<code>score = 100 − 5 × (3·q_DOM + 2·q_req + q_poids) / 6</code>, '
-        'où q_x est le rang (0-20) de la valeur dans les quantiles de référence '
-        '(nombre d\'éléments DOM, nombre de requêtes, poids en Ko).</li>'
+        'where q_x is the rank (0-20) of the value in the reference quantiles '
+        '(number of DOM elements, number of requests, weight in KB).</li>'
         '<li><b>Grades :</b> A ≥ 80, B ≥ 70, C ≥ 55, D ≥ 40, E ≥ 25, F ≥ 10, G sinon.</li>'
-        '<li><b>Entrées :</b> DOM, requêtes et poids sont extraits du HAR de la capture.</li>'
+        '<li><b>Inputs:</b> DOM, requests and weight are extracted from the capture HAR.</li>'
         '</ul>'
     )
 
 
-def _methodo_medias():
-    """Sous-section E : limites des règles médias (Lot 4)."""
+def _methodology_medias():
+    """Sub-section E: limits of the media rules (Lot 4)."""
     return (
-        '<h3 id="methodo-medias" style="margin-top:20px">__LETTRE__. Médias et documents à surveiller</h3>'
+        '<h3 id="methodo-medias" style="margin-top:20px">__LETTRE__. Media and documents to watch</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         '<li><b>Seuils "image bitmap lourde" (200 Ko) et "SVG suspect" (30 Ko).</b> '
-        'Heuristiques internes non sourcées (aucun référentiel GreenIT-Analysis/EcoIndex '
-        'officiel ne fixe de seuil de poids en Ko pour ces règles) — <b>confiance faible</b>, '
-        'à ajuster si un référentiel documenté est identifié.</li>'
-        '<li><b>Gain estimé format WebP (-31,5 % à -50,3 %).</b> Chiffres forfaitaires cnumr '
-        'appliqués au poids cumulé des images concernées, sans mesure réelle par image ni '
+        'Unsourced internal heuristics (no official GreenIT-Analysis/EcoIndex '
+        'framework sets a weight threshold in KB for these rules) — <b>low confidence</b>, '
+        'to adjust if a documented framework is identified.</li>'
+        '<li><b>Estimated WebP format gain (-31.5% to -50.3%).</b> Flat cnumr figures '
+        'applied to the cumulative weight of the images concerned, without a real measurement per image nor '
         'distinction JPEG/PNG source.</li>'
-        '<li><b>SVG "faux" (probable bitmap encodé en base64).</b> Signal de poids anormal, pas '
-        'une confirmation : un SVG légitimement complexe (carte, illustration détaillée) peut '
-        'aussi dépasser le seuil sans contenir de bitmap.</li>'
-        '<li><b>Surdimensionnement réel non mesurable.</b> Le pipeline n\'effectue aucune capture '
-        'du DOM/CSS de rendu (pas de Puppeteer/Playwright/CDP) : impossible de comparer le poids '
-        'du fichier à sa taille d\'affichage réelle. Les règles média restent au niveau "poids '
-        'brut vs seuil", pas "surdimensionnement mesuré".</li>'
-        '<li><b>Vidéos et PDF.</b> Signalement factuel (poids, nombre), sans badge de conformité : '
-        'aucun seuil universel ne serait défendable, l\'usage attendu variant trop selon le site.</li>'
+        '<li><b>"Fake" SVG (probable base64-encoded bitmap).</b> Abnormal-weight signal, not '
+        'a confirmation: a legitimately complex SVG (map, detailed illustration) can '
+        'also exceed the threshold without containing a bitmap.</li>'
+        '<li><b>Real oversizing not measurable.</b> The pipeline performs no capture '
+        'of the render DOM/CSS (no Puppeteer/Playwright/CDP): impossible to compare the file weight '
+        'of the file to its real display size. The media rules stay at the "weight '
+        'raw vs threshold" level, not "measured oversizing".</li>'
+        '<li><b>Videos and PDFs.</b> Factual reporting (weight, count), without a compliance badge: '
+        'no universal threshold would be defensible, the expected use varying too much with the site.</li>'
         '</ul>'
     )
 
 
-def _methodo_trafic(synthese_python=None):
-    """Sous-section D : trafic et réseau. Décrit la provenance réelle du volume
-    de trafic (saisie analytics, estimation SimilarWeb, ou baseline par défaut)."""
-    traffic = (synthese_python or {}).get("traffic", {})
+def _methodology_traffic(python_summary=None):
+    """Sub-section D: traffic and network. Describes the real provenance of the traffic volume
+    (analytics entry, SimilarWeb estimate, or default baseline)."""
+    traffic = (python_summary or {}).get("traffic", {})
     source = traffic.get("source")
     url = traffic.get("source_url")
     snapshot = traffic.get("snapshot")
     monthly = traffic.get("monthly_visits")
-    visits = (synthese_python or {}).get("visits_per_year")
+    visits = (python_summary or {}).get("visits_per_year")
 
-    if source and source not in ("default", "paramètre"):
+    if source and source not in ("default", "parameter"):
         src_txt = source
         if snapshot:
             src_txt += f', {snapshot}'
         src_txt += _source_link(url)
         derivation = ""
         if monthly and visits:
-            derivation = (f' Dérivation : {monthly:,}/mois × 12 ≈ {visits:,}/an.')
+            derivation = (f' Derivation: {monthly:,}/month × 12 ≈ {visits:,}/year.')
         volume_li = (
-            f'<li><b>Volume de trafic.</b> Estimation tierce : <b>{src_txt}</b>.{derivation} '
-            'Ni PageSpeed ni CrUX ne fournissent de volume d\'audience (leurs API ne renvoient '
-            'que des distributions, jamais de compteurs) ; les estimateurs tiers restent des '
-            '<b>estimations à marge large</b>, à ne pas prendre pour une mesure. '
-            'Un chiffre exact ne peut venir que des analytics du site (GA4/Matomo/logs).</li>'
-            '<li><b>Sensibilité au volume.</b> Le CO2e <b>total</b> croît avec le trafic, au-dessus '
-            'd\'un <b>socle fixe</b> (fabrication serveur + stockage, amorti quel que soit le trafic) : '
-            'la relation est <b>affine, pas strictement proportionnelle</b>. Le CO2e <b>par visite</b> '
-            '<b>diminue</b> donc quand le trafic augmente (le socle se répartit sur plus de visites). '
-            'Une erreur sur le volume déplace surtout l\'ordre de grandeur du total, moins le par-visite.</li>'
+            f'<li><b>Traffic volume.</b> Third-party estimate: <b>{src_txt}</b>.{derivation} '
+            'Neither PageSpeed nor CrUX provide an audience volume (their APIs return '
+            'only distributions, never counters); third-party estimators remain '
+            '<b>estimates with a wide margin</b>, not to be taken as a measurement. '
+            'An exact figure can only come from the site\'s own analytics (GA4/Matomo/logs).</li>'
+            '<li><b>Sensitivity to volume.</b> The <b>total</b> CO2e grows with traffic, above '
+            'a <b>fixed base</b> (server manufacturing + storage, amortized whatever the traffic): '
+            'the relation is <b>affine, not strictly proportional</b>. The CO2e <b>per visit</b> '
+            '<b>decreases</b> therefore when traffic grows (the base spreads over more visits). '
+            'An error on the volume shifts mostly the order of magnitude of the total, less the per-visit.</li>'
         )
     else:
         volume_li = (
-            '<li><b>Volume de trafic.</b> Le nombre de visites/an est une <b>hypothèse par défaut</b> '
-            '(100 000/an) : ni PageSpeed ni CrUX ne fournissent de volume d\'audience (leurs API ne '
-            'renvoient que des distributions, jamais de compteurs). Pour fiabiliser : saisir les '
-            'analytics du site (<code>--visits</code>) ou une estimation SimilarWeb.</li>'
-            '<li><b>Sensibilité au volume.</b> Le CO2e <b>total</b> croît avec le trafic au-dessus '
-            'd\'un socle fixe (fabrication serveur + stockage) ; le CO2e <b>par visite</b> diminue '
-            'quand le trafic augmente.</li>'
+            '<li><b>Traffic volume.</b> The number of visits/year is a <b>default assumption</b> '
+            '(100 000/year): neither PageSpeed nor CrUX provides an audience volume (their APIs '
+            'only return distributions, never counters). To get a reliable figure: enter the '
+            'site analytics (<code>--visits</code>) or a SimilarWeb estimate.</li>'
+            '<li><b>Sensitivity to volume.</b> The <b>total</b> CO2e grows with traffic above '
+            'a fixed base (server manufacturing + storage); the CO2e <b>per visit</b> decreases '
+            'when traffic grows.</li>'
         )
 
     return (
-        '<h3 id="methodo-trafic" style="margin-top:20px">__LETTRE__. Trafic &amp; réseau</h3>'
+        '<h3 id="methodo-trafic" style="margin-top:20px">__LETTRE__. Traffic &amp; network</h3>'
         '<ul style="margin:0 0 0 16px;padding:0;font-size:16px;color:#555;line-height:1.5">'
         f'{volume_li}'
-        '<li><b>Volumétrie réseau.</b> Le poids transféré et le nombre de requêtes viennent '
-        'du HAR (mesure réelle de la capture), à ne pas confondre avec un volume d\'audience.</li>'
+        '<li><b>Network volume.</b> The transferred weight and the request count come '
+        'from the HAR (real measurement of the capture), not to be confused with an audience volume.</li>'
         '</ul>'
     )
 
 
-# Interface publique Boavizta pour recharger un .e-f.json et explorer le détail
-# (répartition par composant) - plafonnée à 2 modèles par comparaison (MAX_SLOTS=2,
-# vérifié dans le code de l'interface), d'où l'export en fichiers individuels.
+# Public Boavizta interface to reload a .e-f.json and explore the detail
+# (breakdown by component) - capped at 2 models per comparison (MAX_SLOTS=2,
+# verified in the interface code), hence the export as individual files.
 _MODEL_BUILDER_URL = "https://e-footprint.boavizta.org/model_builder/"
 
-# Libellés lisibles des recommandations chiffrées (efootprint-recommendations-gains.json).
+# Readable labels of the quantified recommendations (efootprint-recommendations-gains.json).
 _RECO_LABELS = {
     "js_dead": "Code JS mort",
     "css_dead": "Code CSS mort",
     "duplicates": "Ressources en double",
     "brotli": "Compression Brotli",
-    "inp": "INP (interactivité)",
-    "cls": "CLS (stabilité visuelle)",
+    "inp": "INP (interactivity)",
+    "cls": "CLS (visual stability)",
 }
 
-# Libellés de palier utilisés à la fois pour le "tier" d'une recommandation
+# Tier labels used both for a recommendation's "tier"
 # (reductions_detail/excluded_recommendations : prio1/prio2/prio3, parfois
-# prio1_2/prio1_2_3 côté excluded_recommendations) et, avec la variante
-# _PALIER_LABELS ci-dessous, pour les clés cumulatives de "paliers".
+# prio1_2/prio1_2_3 on the excluded_recommendations side) and, with the variant
+# _TIER_STAGE_LABELS below, for the cumulative keys of "tiers".
 _TIER_LABELS = {
     "prio1": "Prio 1",
     "prio2": "Prio 2",
@@ -3633,15 +3633,15 @@ _TIER_LABELS = {
     "prio1_2": "Prio 1 + 2",
     "prio1_2_3": "Prio 1 + 2 + 3",
 }
-_PALIER_LABELS = {
+_TIER_STAGE_LABELS = {
     "prio1": "Prio 1 seule",
     "prio1_2": "Prio 1 + 2",
     "prio1_2_3": "Prio 1 + 2 + 3",
 }
 
-# Mêmes ensembles de tiers cumulatifs que efootprint_model/recommendations.py::_TIER_SETS
-# (non importés d'ici : ce module ne dépend jamais d'efootprint_model, il ne fait que
-# lire le JSON déjà écrit par run_efootprint.py).
+# Same cumulative tier sets as efootprint_model/recommendations.py::_TIER_SETS
+# (not imported from here: this module never depends on efootprint_model, it only
+# reads the JSON already written by run_efootprint.py).
 _ECOINDEX_TIER_SETS = {
     "prio1": frozenset({"prio1"}),
     "prio1_2": frozenset({"prio1", "prio2"}),
@@ -3650,13 +3650,13 @@ _ECOINDEX_TIER_SETS = {
 
 
 def _ecoindex_reductions_by_page(gains):
-    """Agrège `reductions_detail` par page normalisée x palier cumulatif.
+    """Aggregates `reductions_detail` by normalized page x cumulative tier.
 
-    Retourne `{url_normalisee: {palier: {"decomp": .., "transfer": .., "requests": ..}}}`,
-    ou `None` si `gains` est vide OU si aucune entrée ne porte `page_url` (schéma
-    antérieur au chantier EcoIndex/LCP) - distinct de `{}` ("disponible mais
-    aucune réduction chiffrable"), pour que l'appelant affiche "non disponible,
-    régénérer..." plutôt qu'un tableau vide silencieux."""
+    Returns `{normalized_url: {tier: {"decomp": .., "transfer": .., "requests": ..}}}`,
+    or `None` if `gains` is empty OR no entry carries `page_url` (schema
+    older than the EcoIndex/LCP work) - distinct from `{}` ("available but
+    no quantifiable reduction"), so the caller displays "not available,
+    regenerate..." rather than a silently empty table."""
     if not gains:
         return None
     reductions = gains.get("reductions_detail") or []
@@ -3670,11 +3670,11 @@ def _ecoindex_reductions_by_page(gains):
         if not page_url or tier is None:
             continue
         url = _normalize_page_url(page_url)
-        for palier, tiers in _ECOINDEX_TIER_SETS.items():
-            if tier not in tiers:
+        for cumul_tier, member_tiers in _ECOINDEX_TIER_SETS.items():
+            if tier not in member_tiers:
                 continue
             bucket = result.setdefault(url, {}).setdefault(
-                palier, {"decomp": 0.0, "transfer": 0.0, "requests": 0}
+                cumul_tier, {"decomp": 0.0, "transfer": 0.0, "requests": 0}
             )
             bucket["decomp"] += r.get("bytes_removed_decompressed") or 0.0
             bucket["transfer"] += r.get("bytes_removed") or 0.0
@@ -3683,8 +3683,8 @@ def _ecoindex_reductions_by_page(gains):
 
 
 def _lcp_baseline_s(m, cwv):
-    """LCP de référence pour une page, même hiérarchie que `_section_dashboard` :
-    CWV réel (pire des deux stratégies) si disponible, sinon repli onLoad HAR
+    """Reference LCP for a page, same hierarchy as `_section_dashboard`:
+    real CWV (worst of both strategies) if available, else onLoad HAR fallback
     (proxy). Retourne (valeur_s, est_un_proxy)."""
     cwv_data, _ = _cwv_worst_per_metric(_cwv_for_page(m, cwv))
     if cwv_data and isinstance(cwv_data.get("lcp"), (int, float)):
@@ -3693,23 +3693,23 @@ def _lcp_baseline_s(m, cwv):
 
 
 def _ecoindex_lcp_for_tier(m, cwv, reductions_for_tier):
-    """Recalcule EcoIndex et LCP grossier pour une page, à un palier donné.
+    """Recomputes EcoIndex and rough LCP for a page, at a given tier.
 
-    `new_size_ko` retranche le poids DÉCOMPRESSÉ (EcoIndex se calcule sur ce
-    poids, cf. `har_metrics.py::extract_page_metrics` qui somme déjà
-    `content.size`) ; `lcp_delta_s` retranche lui le poids TRANSFÉRÉ (le débit
-    réseau simulé s'applique aux octets réellement envoyés sur le fil). Le DOM
-    est inchangé : aucune recommandation de ce chantier ne retire un nœud DOM."""
+    `new_size_ko` subtracts the DECOMPRESSED weight (EcoIndex is computed on this
+    weight, cf. `har_metrics.py::extract_page_metrics` which already sums
+    `content.size`); `lcp_delta_s` subtracts the TRANSFERRED weight (the simulated
+    bandwidth applies to the bytes actually sent on the wire). The DOM
+    is unchanged: no recommendation of this work removes a DOM node."""
     decomp = reductions_for_tier.get("decomp", 0.0)
     transfer = reductions_for_tier.get("transfer", 0.0)
     req_removed = reductions_for_tier.get("requests", 0)
 
-    # `duplicate_reductions()` détecte les doublons sur l'ensemble du HAR, pas
+    # `duplicate_reductions()` detects duplicates over the whole HAR, not
     # page par page (cf. efootprint_model/recommendations.py) : les octets/
-    # requêtes attribués à CETTE page peuvent dépasser son propre poids/nombre
-    # de requêtes si des doublons d'autres pages lui sont rattachés. `size_ko`/
-    # `req` sont alors CLAMPÉS à 0, pas négatifs - à signaler explicitement
-    # plutôt que de laisser croire que la page devient vide.
+    # requests attributed to THIS page can exceed its own weight/count
+    # of requests if duplicates from other pages are attached to it. `size_ko`/
+    # `req` are then CLAMPED to 0, not negative - to be reported explicitly
+    # rather than letting one believe the page becomes empty.
     size_clamped = (decomp / 1024) > m["size_ko"]
     req_clamped = req_removed > m["req"]
     new_size_ko = max(0.0, m["size_ko"] - decomp / 1024)
@@ -3730,16 +3730,16 @@ def _ecoindex_lcp_for_tier(m, cwv, reductions_for_tier):
 
 
 def _ecoindex_tier_table(page_metrics, gains, cwv, tier, tier_label):
-    """Tableau annexe détaillé pour un palier : une ligne par page, colonnes
-    Page / EcoIndex / Requêtes / Poids / DOM / LCP - PAS de colonnes INP/CLS
-    (non estimés, cf. `_EXCLUDED_RECOMMENDATIONS` côté run_efootprint.py).
-    Chaque cellule montre la nouvelle valeur avec le delta entre parenthèses."""
+    """Detailed appendix table for a tier: one row per page, columns
+    Page / EcoIndex / Requests / Weight / DOM / LCP - NO INP/CLS columns
+    (not estimated, cf. `_EXCLUDED_RECOMMENDATIONS` on the run_efootprint.py side).
+    Each cell shows the new value with the delta in parentheses."""
     reductions_by_page = _ecoindex_reductions_by_page(gains)
     if not reductions_by_page:
         return ""
 
     deduped = [m for m in _dedup_page_metrics(page_metrics)
-               if m.get("mesure", {}).get("statut") == "ok"]
+               if m.get("measurement", {}).get("status") == "ok"]
 
     rows = ""
     for m in deduped:
@@ -3768,27 +3768,27 @@ def _ecoindex_tier_table(page_metrics, gains, cwv, tier, tier_label):
 
     if not rows:
         return ""
-    return f"""<h5 style="margin:10px 0 4px">Palier {tier_label}</h5>
+    return f"""<h5 style="margin:10px 0 4px">Tier {tier_label}</h5>
   <table>
     <thead><tr>
-      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requêtes</th>
-      <th>Poids</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th>
+      <th>Page</th><th>{_glossary_link("EcoIndex")}</th><th>Requests</th>
+      <th>Weight</th><th>{_glossary_link("DOM")}</th><th>{_glossary_link("LCP")}</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>"""
 
 
-def _methodo_recommendations(gains):
-    """Sous-section F : détail du recalcul CO2e par palier de recommandations
-    (efootprint-recommendations-gains.json, écrit par
-    run_efootprint.py::run_recommendation_scenarios()). Le détail par page du
-    recalcul EcoIndex/LCP par palier vit dans l'annexe autonome séparée
-    "Gain EcoIndex & LCP par page" (`_section_gain_ecoindex_lcp`), pas ici.
+def _methodology_recommendations(gains):
+    """Sub-section F: detail of the CO2e recomputation per recommendation tier
+    (efootprint-recommendations-gains.json, written by
+    run_efootprint.py::run_recommendation_scenarios()). The per-page detail of the
+    EcoIndex/LCP recalculation per tier lives in the separate standalone appendix
+    "Gain EcoIndex & LCP per page" (`_section_gain_ecoindex_lcp`), not here.
 
-    Un VRAI recalcul du modèle e-footprint par palier cumulatif (pas une
-    approximation forfaitaire), le détail par type de recommandation (regroupé
-    par (recommendation, tier), pas par Job/page), et la liste explicite des
-    recommandations exclues du calcul chiffré et pourquoi."""
+    A REAL recomputation of the e-footprint model per cumulative tier (not a
+    flat approximation), the detail by recommendation type (grouped
+    by (recommendation, tier), not by Job/page), and the explicit list of
+    recommendations excluded from the quantified calculation and why."""
     if not gains:
         return ""
 
@@ -3798,10 +3798,10 @@ def _methodo_recommendations(gains):
 
     intro = (
         '<p style="font-size:16px;color:#555;margin-bottom:8px">'
-        'Chaque palier (Prio 1, Prio 1 + 2, Prio 1 + 2 + 3) est un recalcul RÉEL du modèle '
-        'e-footprint (nouvelle SiteSpec avec le poids transféré réduit, Job par Job), pas une '
-        'approximation forfaitaire appliquée après coup : le calcul CO2e n\'est pas strictement '
-        'linéaire au poids transféré.</p>'
+        'Each tier (Prio 1, Prio 1 + 2, Prio 1 + 2 + 3) is a REAL recomputation of the model '
+        'e-footprint (new SiteSpec with the transferred weight reduced, Job by Job), not a '
+        'flat approximation applied after the fact: the CO2e calculation is not strictly '
+        'linear in the transferred weight.</p>'
     )
 
     if reductions:
@@ -3830,16 +3830,16 @@ def _methodo_recommendations(gains):
             if g["comment"]:
                 note_items += f'<li><b>{label} ({tier_label})</b> : {g["comment"]}</li>'
 
-        table_html = _methodo_table(rows)
+        table_html = _methodology_table(rows)
         notes_html = (
-            f'<h4 style="margin:14px 0 4px">Notes par type de recommandation</h4>'
+            f'<h4 style="margin:14px 0 4px">Notes by recommendation type</h4>'
             f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#666;line-height:1.5">'
             f'{note_items}</ul>'
         ) if note_items else ""
     else:
         table_html = (
-            '<p style="font-size:15px;color:#555">Aucune recommandation chiffrable trouvée sur '
-            'cet audit (données Coverage/HAR manquantes, ou aucun seuil chiffrable dépassé).</p>'
+            '<p style="font-size:15px;color:#555">No quantifiable recommendation found on '
+            'this audit (missing Coverage/HAR data, or no quantifiable threshold exceeded).</p>'
         )
         notes_html = ""
 
@@ -3851,7 +3851,7 @@ def _methodo_recommendations(gains):
             for e in excluded
         )
         excluded_html = (
-            '<h4 style="margin:14px 0 4px">Recommandations non incluses dans le calcul chiffré, et pourquoi</h4>'
+            '<h4 style="margin:14px 0 4px">Recommendations not included in the quantified calculation, and why</h4>'
             f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#555;line-height:1.5">{items}</ul>'
         )
 
@@ -3859,22 +3859,22 @@ def _methodo_recommendations(gains):
     if hypotheses:
         hyp_items = "".join(f'<li>{h}</li>' for h in hypotheses)
         hyp_html = (
-            '<h4 style="margin:14px 0 4px">Hypothèses générales</h4>'
+            '<h4 style="margin:14px 0 4px">General assumptions</h4>'
             f'<ul style="margin:0 0 0 16px;padding:0;font-size:15px;color:#555;line-height:1.5">{hyp_items}</ul>'
         )
 
     return (
-        '<h3 id="methodo-recommandations" style="margin-top:20px">__LETTRE__. Recommandations &amp; gain estimé</h3>'
+        '<h3 id="methodo-recommandations" style="margin-top:20px">__LETTRE__. Recommendations &amp; estimated gain</h3>'
         f'{intro}{table_html}{notes_html}{excluded_html}{hyp_html}'
     )
 
 
 def _section_gain_ecoindex_lcp(gains, page_metrics, cwv):
-    """Annexe autonome (pas une sous-partie de Méthodologie & hypothèses,
-    contenu trop substantiel pour ça) : détail par page du recalcul EcoIndex/LCP
-    par palier de recommandations (mêmes `reductions_detail` que la sous-partie F
-    de Méthodologie & hypothèses, vues sous l'angle EcoIndex/LCP plutôt que CO2e).
-    3 tableaux par page : contenu de résultat, pas une note de méthode."""
+    """Standalone appendix (not a sub-part of Methodology & assumptions,
+    content too substantial for that): per-page detail of the EcoIndex/LCP recalculation
+    per recommendation tier (same `reductions_detail` as sub-section F
+    of Methodology & assumptions, seen from the EcoIndex/LCP angle rather than CO2e).
+    3 tables per page: result content, not a methodology note."""
     if not gains or page_metrics is None:
         return ""
 
@@ -3882,15 +3882,15 @@ def _section_gain_ecoindex_lcp(gains, page_metrics, cwv):
     if reductions_by_page is None:
         return (
             '<section id="gain-ecoindex-lcp">\n'
-            '<h2>Gain EcoIndex &amp; LCP par page</h2>'
-            '<p style="font-size:15px;color:#888">Non disponible pour cet audit (fichier de '
-            'gains généré avant le chantier EcoIndex/LCP) - régénérer '
-            '<code>run_efootprint.py</code> pour l\'obtenir.</p>\n'
+            '<h2>Gain EcoIndex &amp; LCP per page</h2>'
+            '<p style="font-size:15px;color:#888">Not available for this audit (gains file '
+            'gains generated before the EcoIndex/LCP work) - regenerate '
+            '<code>run_efootprint.py</code> to get it.</p>\n'
             '</section>'
         )
 
     tier_tables = "".join(
-        _ecoindex_tier_table(page_metrics, gains, cwv, tier, _PALIER_LABELS.get(tier, tier))
+        _ecoindex_tier_table(page_metrics, gains, cwv, tier, _TIER_STAGE_LABELS.get(tier, tier))
         for tier in ("prio1", "prio1_2", "prio1_2_3")
     )
     if not tier_tables:
@@ -3899,54 +3899,54 @@ def _section_gain_ecoindex_lcp(gains, page_metrics, cwv):
     return (
         '<section id="gain-ecoindex-lcp">\n'
         '<h2>Gain EcoIndex &amp; LCP par page</h2>'
-        '<p style="font-size:15px;color:#555">EcoIndex recalculé sur le poids '
-        'DÉCOMPRESSÉ (calcul direct, pas de transposition contrairement au CO2e '
-        'détaillé en F de l\'annexe Méthodologie &amp; hypothèses, plus bas). '
-        'LCP grossier via la formule sourcée dans cette même annexe (F) - '
-        '<b>risque de surestimation</b>. '
-        'Le DOM n\'est pas modifié par ces recommandations. INP et CLS ne sont pas estimés '
-        '(voir "Recommandations non incluses", annexe Méthodologie &amp; hypothèses, F). '
-        '<b>&dagger;</b> : le calcul des doublons HAR détecte les doublons sur '
-        'l\'ENSEMBLE du parcours capturé, pas page par page - le nombre de requêtes '
-        'qu\'il attribue à une page peut donc dépasser son propre nombre de requêtes '
-        'si des doublons chargés sur d\'AUTRES pages lui sont rattachés (première '
-        'occurrence vue ailleurs dans le parcours). Un &dagger; marque une valeur '
-        'ramenée à 0 dans ce cas - la page ne devient pas réellement vide, c\'est un '
-        'artefact de cette attribution cross-page (le poids, lui, exclut déjà les '
-        'revalidations HTTP 304 du calcul - seul un vrai re-téléchargement complet '
-        'compte comme poids supprimable - donc bien moins exposé au même artefact, '
-        'mais pas totalement à l\'abri si plusieurs re-téléchargements complets se '
+        '<p style="font-size:15px;color:#555">EcoIndex recomputed on the weight '
+        'DECOMPRESSED (direct calculation, unlike the CO2e '
+        'detailed in F of the Methodology &amp; assumptions appendix, below). '
+        'Rough LCP via the formula sourced in this same appendix (F) - '
+        '<b>risk of overestimation</b>. '
+        'The DOM is not modified by these recommendations. INP and CLS are not estimated '
+        '(see "Recommendations not included", Methodology &amp; assumptions appendix, F). '
+        '<b>&dagger;</b>: the HAR duplicate calculation detects duplicates over '
+        'the WHOLE captured journey, not page by page - the number of requests '
+        'it attributes to a page can therefore exceed its own request count '
+        'if duplicates loaded on OTHER pages are attached to it (first '
+        'occurrence seen elsewhere in the journey). A &dagger; marks a value '
+        'clamped to 0 in that case - the page does not really become empty, it is an '
+        'artifact of this cross-page attribution (the weight, for its part, already excludes the '
+        'HTTP 304 revalidations from the calculation - only a real full re-download '
+        'counts as removable weight - so much less exposed to the same artifact, '
+        'but not totally safe if several full re-downloads overlap '
         'chevauchent entre pages).</p>'
         f'{tier_tables}\n'
         '</section>'
     )
 
 
-def _section_methodologie(synthese_python, cwv, recommendations_gains=None):
-    """Annexe méthodologique structurée par sous-partie (CO2e, CWV, EcoIndex, trafic,
-    médias, recommandations & gain estimé) : uniquement des notes de méthode/hypothèses
-    (formules, sources, limites, niveau de confiance). Le détail du gain EcoIndex/LCP
-    par page et le détail des critères EOF n'en font plus partie : contenu de résultat
-    substantiel, ce sont des annexes autonomes (`_section_gain_ecoindex_lcp`,
-    `_section_eof_detail`), pas des notes de méthode.
+def _section_methodology(python_summary, cwv, recommendations_gains=None):
+    """Methodology appendix structured by sub-section (CO2e, CWV, EcoIndex, traffic,
+    media, recommendations & estimated gain): only methodology/assumption notes
+    (formulas, sources, limits, confidence level). The EcoIndex/LCP gain detail
+    per page and the EOF criteria detail are no longer part of it: result content
+    substantial content is in separate annexes (`_section_gain_ecoindex_lcp`,
+    `_section_eof_detail`), not methodology notes.
 
-    Les lettres A, B, C... ne sont pas câblées en dur dans chaque sous-fonction :
-    elles sont calculées ici en énumérant uniquement les sous-parties dont le HTML
-    rendu est non vide, pour que la lettre affichée corresponde toujours à la position
-    réelle (une sous-partie absente pour un audit donné ne laisse plus de trou de
+    The letters A, B, C... are not hard-coded in each sub-function:
+    they are computed here by enumerating only the sub-sections whose HTML
+    is non-empty, so that the displayed letter always matches the real
+    position (a sub-section absent for a given audit no longer leaves a letter gap).
     lettre). Retourne (html, nav_entries) : nav_entries = [(lettre, ancre, titre), ...]
-    pour que generate() puisse construire la ligne "A · B · C..." du sommaire sans
-    recalculer les sous-parties une deuxième fois.
+    so that generate() can build the "A · B · C..." line of the TOC without
+    recompute the sub-sections a second time.
 
-    Trace toutes les données et hypothèses des calculs : valeur, source, confiance,
-    et les méthodes/formules appliquées."""
+    Traces all the data and assumptions of the calculations: value, source, confidence,
+    and the methods/formulas applied."""
     entries = [
-        ("methodo-efootprint", "Impact environnemental (CO2e)", _methodo_efootprint(synthese_python)),
-        ("methodo-cwv", "Core Web Vitals", _methodo_cwv(cwv)),
-        ("methodo-ecoindex", "EcoIndex / GreenIT", _methodo_ecoindex()),
-        ("methodo-trafic", "Trafic & réseau", _methodo_trafic(synthese_python)),
-        ("methodo-medias", "Médias et documents à surveiller", _methodo_medias()),
-        ("methodo-recommandations", "Recommandations & gain estimé", _methodo_recommendations(recommendations_gains)),
+        ("methodo-efootprint", "Environmental impact (CO2e)", _methodology_efootprint(python_summary)),
+        ("methodo-cwv", "Core Web Vitals", _methodology_cwv(cwv)),
+        ("methodo-ecoindex", "EcoIndex / GreenIT", _methodology_ecoindex()),
+        ("methodo-trafic", "Traffic & network", _methodology_traffic(python_summary)),
+        ("methodo-medias", "Media and documents to watch", _methodology_medias()),
+        ("methodo-recommandations", "Recommendations & estimated gain", _methodology_recommendations(recommendations_gains)),
     ]
     present = [(anchor, title, html) for anchor, title, html in entries if html]
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -3958,10 +3958,10 @@ def _section_methodologie(synthese_python, cwv, recommendations_gains=None):
     body = "".join(body_parts)
     html_out = (
         '<section id="methodologie">\n'
-        '<h2>Méthodologie &amp; hypothèses</h2>\n'
+        '<h2>Methodology &amp; assumptions</h2>\n'
         '<p style="font-size:16px;color:#555;margin-bottom:8px">'
-        'Cette annexe recense, par domaine, les données et hypothèses entrant dans '
-        'chaque calcul (valeur, source, niveau de confiance) ainsi que les méthodes appliquées.</p>\n'
+        'This appendix lists, by domain, the data and assumptions entering '
+        'each calculation (value, source, confidence level) as well as the methods applied.</p>\n'
         f'{body}\n'
         '</section>'
     )
@@ -3969,117 +3969,117 @@ def _section_methodologie(synthese_python, cwv, recommendations_gains=None):
 
 
 def _glossary_link(acronym):
-    """Lien vers l'entrée du glossaire (Annexes) pour un acronyme donné, à
-    poser sur les en-têtes de tableau et la première mention de chaque
-    section — pas à chaque occurrence (cf. décision : un terme n'est pas
-    réexpliqué à chaque phrase, comme un lien Wikipédia une fois par article)."""
+    """Link to the glossary entry (Appendices) for a given acronym, to be
+    placed on table headers and the first mention of each
+    section — not at every occurrence (cf. decision: a term is not
+    re-explained in each sentence, like a Wikipedia link once per article)."""
     slug = acronym.lower()
-    return f'<a href="#glossaire-{slug}" title="Voir la définition dans le Glossaire">{acronym}</a>'
+    return f'<a href="#glossaire-{slug}" title="See the definition in the Glossary">{acronym}</a>'
 
 
-# (acronyme, nom complet + définition courte, seuils optionnels, url source optionnelle)
+# (acronym, full name + short definition, optional thresholds, optional source url)
 _GLOSSARY_ENTRIES = [
-    ("LCP", "Largest Contentful Paint : temps d'affichage du plus grand élément visible de la page.",
-     "< 1,8 s bon · 1,8-2,5 s à améliorer · > 2,5 s mauvais", "https://web.dev/articles/vitals"),
-    ("INP", "Interaction to Next Paint : délai entre une interaction utilisateur et la mise à jour visuelle qui en résulte.",
-     "< 200 ms bon · 200-500 ms à améliorer · > 500 ms mauvais", "https://web.dev/articles/vitals"),
-    ("CLS", "Cumulative Layout Shift : somme des décalages visuels inattendus pendant le chargement de la page.",
-     "< 0,1 bon · 0,1-0,25 à améliorer · > 0,25 mauvais", "https://web.dev/articles/vitals"),
-    ("EcoIndex", "Score d'éco-conception 0 à 100 (grade A à G), calculé depuis le nombre de requêtes, "
-     "le poids transféré et la taille du DOM d'une page (formule GreenIT-Analysis / cnumr).",
+    ("LCP", "Largest Contentful Paint: display time of the largest visible element of the page.",
+     "< 1.8 s good · 1.8-2.5 s needs improvement · > 2.5 s poor", "https://web.dev/articles/vitals"),
+    ("INP", "Interaction to Next Paint: delay between a user interaction and the resulting visual update.",
+     "< 200 ms good · 200-500 ms needs improvement · > 500 ms poor", "https://web.dev/articles/vitals"),
+    ("CLS", "Cumulative Layout Shift: sum of unexpected visual shifts during page loading.",
+     "< 0.1 good · 0.1-0.25 needs improvement · > 0.25 poor", "https://web.dev/articles/vitals"),
+    ("EcoIndex", "Eco-design score 0 to 100 (grade A to G), computed from the number of requests, "
+     "the transferred weight and the DOM size of a page (GreenIT-Analysis / cnumr formula).",
      "≥ 80 = A · ≥ 55 = C · < 25 = F/G", "https://www.ecoindex.fr/comment-ca-marche/"),
-    ("GreenIT", "GreenIT-Analysis : méthodologie et outil de référence pour mesurer l'écoconception d'un "
-     "site web, à l'origine de la formule EcoIndex utilisée dans ce rapport.",
+    ("GreenIT", "GreenIT-Analysis: reference methodology and tool to measure the eco-design of a "
+     "website, at the origin of the EcoIndex formula used in this report.",
      "", "https://www.ecoindex.fr/comment-ca-marche/"),
-    ("DOM", "Document Object Model : l'arborescence de la page telle que le navigateur la construit à "
-     "partir du HTML (chaque balise devient un nœud).", "", ""),
-    ("HAR", "HTTP Archive : format d'export du trafic réseau capturé par les outils de développement du "
-     "navigateur (onglet Réseau), source de toutes les mesures de ce rapport.", "", ""),
-    ("CDN", "Content Delivery Network : réseau de serveurs répartis géographiquement qui mettent en "
-     "cache et livrent le contenu au plus près de l'utilisateur.", "", ""),
-    ("CrUX", "Chrome UX Report : données de performance réelles agrégées par Google auprès des "
-     "utilisateurs Chrome (percentiles sur les 28 derniers jours), par opposition aux mesures « lab ».", "", ""),
-    ("P75", "75ᵉ percentile : valeur sous laquelle se situent 75 % des mesures collectées "
-     "(25 % des visiteurs vivent donc une expérience moins bonne que ce chiffre).", "", ""),
-    ("TTFB", "Time To First Byte : délai d'attente entre l'envoi de la requête et la réception du "
-     "premier octet de réponse du serveur.", "", ""),
-    ("PUE", "Power Usage Effectiveness : ratio d'efficacité énergétique d'un datacenter (énergie totale "
-     "consommée ÷ énergie utilisée par les seuls serveurs). Plus proche de 1 = plus efficace.", "", ""),
-    ("ACV", "Analyse de Cycle de Vie : méthode normalisée (ISO 14040/14044) évaluant l'impact "
-     "environnemental d'un produit sur toutes ses phases. La bibliothèque e-footprint utilisée ici n'en "
-     "modélise que deux (fabrication + usage), voir l'annexe Méthodologie A.", "", ""),
-    ("CO2e", "CO2 équivalent : unité qui convertit l'ensemble des gaz à effet de serre émis en un seul "
-     "indicateur comparable, selon leur pouvoir de réchauffement global.", "", ""),
+    ("DOM", "Document Object Model: the tree of the page as the browser builds it from "
+     "the HTML (each tag becomes a node).", "", ""),
+    ("HAR", "HTTP Archive: export format of the network traffic captured by the browser dev tools "
+     "(Network tab), source of all the measurements in this report.", "", ""),
+    ("CDN", "Content Delivery Network: network of geographically distributed servers that cache and "
+     "deliver the content as close as possible to the user.", "", ""),
+    ("CrUX", "Chrome UX Report: real performance data aggregated by Google from "
+     "Chrome users (percentiles over the last 28 days), as opposed to 'lab' measurements.", "", ""),
+    ("P75", "75th percentile: value below which 75% of the collected measurements fall "
+     "(25% of visitors therefore have a worse experience than this figure).", "", ""),
+    ("TTFB", "Time To First Byte: wait delay between sending the request and receiving the "
+     "first byte of the server response.", "", ""),
+    ("PUE", "Power Usage Effectiveness: energy efficiency ratio of a datacenter (total energy "
+     "consumed ÷ energy used by the servers alone). Closer to 1 = more efficient.", "", ""),
+    ("ACV", "Life Cycle Assessment (LCA): standardized method (ISO 14040/14044) assessing the environmental impact "
+     "of a product over all its phases. The e-footprint library used here only models "
+     "two of them (manufacturing + usage), see Methodology appendix A.", "", ""),
+    ("CO2e", "CO2 equivalent: unit that converts all emitted greenhouse gases into a single "
+     "comparable indicator, according to their global warming potential.", "", ""),
 ]
 
 
-def _section_glossaire():
-    """Glossaire centralisé de tous les acronymes du rapport, une seule
-    définition par terme (référencée par lien depuis les en-têtes de tableau
-    et la première mention de chaque section, jamais réexpliquée en clair
-    plusieurs fois — sinon le rapport devient illisible pour les termes très
-    répétés comme HAR ou CO2e)."""
+def _section_glossary():
+    """Centralized glossary of all the report acronyms, a single
+    definition per term (linked from table headers
+    and the first mention of each section, never re-explained in full
+    several times — otherwise the report becomes unreadable for very
+    repeated terms like HAR or CO2e)."""
     rows = ""
-    for acro, defi, seuils, url in _GLOSSARY_ENTRIES:
+    for acro, definition, thresholds, url in _GLOSSARY_ENTRIES:
         rows += (
             f'<tr id="glossaire-{acro.lower()}">'
             f'<td style="white-space:nowrap"><b>{acro}</b></td>'
-            f'<td>{defi}{_source_link(url)}</td>'
-            f'<td style="color:#555;font-size:15px">{seuils}</td>'
+            f'<td>{definition}{_source_link(url)}</td>'
+            f'<td style="color:#555;font-size:15px">{thresholds}</td>'
             f'</tr>'
         )
-    ordre_fiabilite = (
+    reliability_order = (
         '<p style="font-size:16px;color:#555;margin-top:16px">'
-        '<b>Ordre de fiabilité des provenances (du plus au moins fiable) :</b><br>'
-        f'{_confidence_badge("collecte")} (mesure réelle) &gt; '
-        f'{_confidence_badge("estime")} (déduction d\'un ordre de grandeur) &gt; '
-        f'{_confidence_badge("precise")} (réponse du service via le questionnaire) &gt; '
-        f'{_confidence_badge("declare")} (déclaration publique trouvée) &gt; '
-        f'{_confidence_badge("suppose")} (déduction depuis un indice faible).<br>'
-        'En cas de désaccord entre deux sources sur un même critère, c\'est la provenance la plus '
-        'haute dans cet ordre qui est retenue dans le rapport.</p>\n'
+        '<b>Provenance reliability order (from most to least reliable):</b><br>'
+        f'{_confidence_badge("collected")} (real measurement) &gt; '
+        f'{_confidence_badge("estimated")} (deduction of an order of magnitude) &gt; '
+        f'{_confidence_badge("stated")} (service answer via the questionnaire) &gt; '
+        f'{_confidence_badge("declared")} (public declaration found) &gt; '
+        f'{_confidence_badge("assumed")} (deduction from a weak hint).<br>'
+        'In case of disagreement between two sources on the same criterion, it is the highest provenance '
+        'highest in this order is retained in the report.</p>\n'
     )
     return (
         '<section id="glossaire">\n'
-        '<h2>Glossaire</h2>\n'
+        '<h2>Glossary</h2>\n'
         '<p style="font-size:16px;color:#555;margin-bottom:8px">'
-        'Chaque acronyme n\'est défini qu\'ici : les tableaux et le texte du rapport y renvoient '
-        'par un lien plutôt que de répéter la définition à chaque occurrence.</p>\n'
+        'Each acronym is defined only here: the tables and the report text refer to it '
+        'by a link rather than repeating the definition at each occurrence.</p>\n'
         '<table>\n'
-        '<thead><tr><th>Terme</th><th>Définition</th><th>Seuils</th></tr></thead>\n'
+        '<thead><tr><th>Term</th><th>Definition</th><th>Thresholds</th></tr></thead>\n'
         f'<tbody>{rows}</tbody>\n'
         '</table>\n'
-        f'{ordre_fiabilite}'
+        f'{reliability_order}'
         '</section>'
     )
 
 
 def _cwv_reco_signal_html(metric, traffic, greenit, coverage_by_page):
     """Lot 5 (recommandations) : version courte du signal indicatif de
-    _cwv_diagnostic_signal(), avec renvoi vers le détail en section Analyse CWV.
-    Retourne une chaîne vide si aucun signal exploitable (même logique de calcul
-    que la section détaillée, texte raccourci uniquement)."""
+    _cwv_diagnostic_signal(), with a pointer to the detail in the CWV analysis section.
+    Returns an empty string if no usable signal (same calculation logic
+    as the detailed section, shortened text only)."""
     long_signal = _cwv_diagnostic_signal(f"{metric}_x", traffic, greenit, coverage_by_page)
     if not long_signal:
         return ""
     short = {
-        "cls": "trackers tiers et/ou police(s) web externe(s) détectés",
-        "inp": "JS non utilisé &gt; 60 % relevé",
+        "cls": "third-party trackers and/or external web font(s) detected",
+        "inp": "unused JS &gt; 60 % found",
     }.get(metric)
     if not short:
         return ""
     return (f'<br><span style="color:#888;font-size:0.85em">Signal : {short} '
-            f'(détail en <a href="#cwv-analyse">section Analyse CWV</a>).</span>')
+            f'(detail in <a href="#cwv-analyse">CWV analysis section</a>).</span>')
 
 
 def _recommendations_gains_block(gains):
-    """Bloc synthétique "Gain CO2e estimé" pour _section_recommendations, à partir
-    d'efootprint-recommendations-gains.json. Rien n'est ajouté si `gains` est
-    vide/absent (rapport rétrocompatible pour les audits sans ce fichier)."""
+    """Synthetic "Estimated CO2e gain" block for _section_recommendations, from
+    efootprint-recommendations-gains.json. Nothing is added if `gains` is
+    empty/absent (backward-compatible report for audits without this file)."""
     if not gains:
         return ""
 
-    paliers = gains.get("paliers") or {}
+    tiers = gains.get("tiers") or {}
     reductions = gains.get("reductions_detail")
     reference = gains.get("reference") or {}
     ref_scenario = reference.get("scenario_file")
@@ -4087,64 +4087,64 @@ def _recommendations_gains_block(gains):
     if reductions == []:
         body = (
             '<p style="font-size:15px;color:#555;margin:6px 0">'
-            'Aucune recommandation chiffrable trouvée sur cet audit '
-            '(données manquantes ou aucun seuil dépassé).</p>'
+            'No quantifiable recommendation found on this audit '
+            '(missing data or no threshold exceeded).</p>'
         )
     else:
         rows_html = ""
         for key in ("prio1", "prio1_2", "prio1_2_3"):
-            p = paliers.get(key)
+            p = tiers.get(key)
             if not p:
                 continue
-            label = _PALIER_LABELS.get(key, key)
+            label = _TIER_STAGE_LABELS.get(key, key)
             delta_kg = p.get("delta_kg_co2e_per_year")
             delta_pct = p.get("delta_pct")
             scenario_file = p.get("scenario_file")
             kg_txt = f'{delta_kg:.2f} kg CO2e/an' if isinstance(delta_kg, (int, float)) else "?"
             pct_txt = f' ({delta_pct:.2f} %)' if isinstance(delta_pct, (int, float)) else ""
-            link = (f' &middot; <a href="{scenario_file}">télécharger le JSON</a>'
+            link = (f' &middot; <a href="{scenario_file}">download the JSON</a>'
                     f' &middot; <a href="{_MODEL_BUILDER_URL}" target="_blank" rel="noopener">'
                     f'ouvrir sur e-footprint.boavizta.org</a>'
                     if scenario_file else "")
             rows_html += f'<li>-<b>{kg_txt}</b>{pct_txt} en appliquant <b>{label}</b>{link}</li>'
-        ref_link = (f' <a href="{ref_scenario}" target="_blank" rel="noopener">scénario de référence</a>'
+        ref_link = (f' <a href="{ref_scenario}" target="_blank" rel="noopener">reference scenario</a>'
                     if ref_scenario else "")
         body = (
             f'<ul style="margin-top:6px;padding-left:20px">'
-            f'{rows_html or "<li>Aucun palier calculé.</li>"}</ul>'
+            f'{rows_html or "<li>No tier computed.</li>"}</ul>'
             f'<p style="font-size:15px;color:#555;margin:8px 0 4px">'
-            f'Téléchargez le fichier <code>.e-f.json</code> du palier qui vous intéresse, puis '
+            f'Download the <code>.e-f.json</code> file of the tier that interests you, then '
             f'chargez-le (bouton "Open file") sur '
             f'<a href="{_MODEL_BUILDER_URL}" target="_blank" rel="noopener">'
-            f'e-footprint.boavizta.org/model_builder</a> pour explorer le détail (répartition par '
-            f'composant) ; comparez-le au{ref_link} pour vérifier l\'écart manuellement.</p>'
+            f'e-footprint.boavizta.org/model_builder</a> to explore the detail (breakdown by '
+            f'component); compare it to the{ref_link} to check the gap manually.</p>'
         )
 
     return f"""
   <div class="prio" id="gain-co2e" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
-    <b>Gain CO2e estimé si vous appliquez ces recommandations</b>
+    <b>Estimated CO2e gain if you apply these recommendations</b>
     {body}
     <p style="font-size:13px;color:#888;margin:4px 0 0">
-      Certaines recommandations (Core Web Vitals, EcoIndex, DOM, CDN/scripts tiers, domaines tiers)
-      ne sont pas incluses dans ce calcul chiffré, faute de paramètre e-footprint fiable ou de cible
-      mesurée, voir le détail en <a href="#methodologie">annexe Méthodologie</a>.
+      Some recommendations (Core Web Vitals, EcoIndex, DOM, third-party CDN/scripts, third-party domains)
+      are not included in this quantified calculation, for lack of a reliable e-footprint parameter or a measured
+      target, see the detail in the <a href="#methodologie">Methodology appendix</a>.
     </p>
   </div>"""
 
 
 def _ecoindex_gains_block(gains, page_metrics, cwv):
-    """Bloc synthétique "Gain EcoIndex &amp; LCP estimé", même style visuel que
-    `_recommendations_gains_block` (OCTO_PALE/OCTO_BLUE). Agrégation : moyenne
-    du delta EcoIndex et du delta LCP sur les pages avec `mesure.statut == "ok"`
-    (une page = une voix, pas pondérée par trafic - cohérent avec le filtre déjà
-    appliqué par le tableau de bord). Retourne "" si aucune donnée exploitable
-    (gains absents, schéma pré-chantier, ou aucune page avec mesure réussie)."""
+    """Synthetic "Estimated EcoIndex &amp; LCP gain" block, same visual style as
+    `_recommendations_gains_block` (OCTO_PALE/OCTO_BLUE). Aggregation: average
+    of the EcoIndex and LCP delta on pages with `measurement.status == "ok"`
+    (one page = one voice, not weighted by traffic - consistent with the filter already
+    applied by the dashboard). Returns "" if no usable data
+    (gains absent, pre-work schema, or no page with a successful measurement)."""
     reductions_by_page = _ecoindex_reductions_by_page(gains)
     if not reductions_by_page:
         return ""
 
     deduped = [m for m in _dedup_page_metrics(page_metrics)
-               if m.get("mesure", {}).get("statut") == "ok"]
+               if m.get("measurement", {}).get("status") == "ok"]
     if not deduped:
         return ""
 
@@ -4162,12 +4162,12 @@ def _ecoindex_gains_block(gains, page_metrics, cwv):
             deltas_lcp.append(t["lcp_baseline"] - t["lcp"])
         if not deltas_eco:
             continue
-        label = _PALIER_LABELS.get(key, key)
+        label = _TIER_STAGE_LABELS.get(key, key)
         avg_eco = sum(deltas_eco) / len(deltas_eco)
         avg_lcp = sum(deltas_lcp) / len(deltas_lcp)
         rows_html += (
             f'<li>+<b>{avg_eco:.1f} points EcoIndex</b> en moyenne, et '
-            f'&asymp; -<b>{avg_lcp:.2f} s</b> de LCP (estimation grossière) en appliquant <b>{label}</b></li>'
+            f'&asymp; -<b>{avg_lcp:.2f} s</b> of LCP (rough estimate) by applying <b>{label}</b></li>'
         )
 
     if not rows_html:
@@ -4175,13 +4175,13 @@ def _ecoindex_gains_block(gains, page_metrics, cwv):
 
     return f"""
   <div class="prio" style="background:{OCTO_PALE};border-left:4px solid {OCTO_BLUE}">
-    <b>Gain EcoIndex &amp; LCP estimé si vous appliquez ces recommandations</b>
+    <b>Estimated EcoIndex &amp; LCP gain if you apply these recommendations</b>
     <ul style="margin-top:6px;padding-left:20px">{rows_html}</ul>
     <p style="font-size:13px;color:#888;margin:4px 0 0">
-      <b>Estimation grossière du LCP : risque de surestimation</b> (ignore la latence, la
-      parallélisation HTTP/2+ et le cache navigateur). Le DOM n'est pas modifié par ces
-      recommandations. L'INP et le CLS ne sont pas estimés, voir le détail en
-      <a href="#methodologie">annexe Méthodologie</a>.
+      <b>Rough LCP estimate: risk of overestimation</b> (ignores latency,
+      HTTP/2+ parallelization and the browser cache). The DOM is not modified by these
+      recommendations. INP and CLS are not estimated, see the detail in
+      <a href="#methodologie">Methodology appendix</a>.
     </p>
   </div>"""
 
@@ -4191,10 +4191,10 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     cwv = cwv or {}
     deduped = _dedup_page_metrics(page_metrics)
 
-    # CWV — groupé par métrique (LCP, INP, CLS), une recommandation par problème
+    # CWV — grouped by metric (LCP, INP, CLS), one recommendation per problem
     from urllib.parse import urlparse
 
-    # Vérifier si du code mort JS > 60% est présent (pour enrichir la reco LCP)
+    # Check whether dead JS > 60% is present (to enrich the LCP reco)
     _has_heavy_js = any(
         coverage_summary(pd["entries"] if isinstance(pd, dict) else pd)["js"]["pct"] > 60
         for pd in coverage_by_page.values()
@@ -4206,21 +4206,21 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     cwv_failed = []
 
     for m in deduped:
-        # Recos = "pire des deux" par métrique : un problème desktop remonte aussi.
+        # Recos = "worst of both" per metric: a desktop problem surfaces too.
         by_strat = _cwv_for_page(m, cwv)
         c, worst_strat = _cwv_worst_per_metric(by_strat)
         num = m.get("page_num", "")
         url = m["title"]
         short = urlparse(url).path.rstrip("/") or "/"
 
-        # Mesure tentée mais échouée (ex. timeout réseau) sur au moins une
-        # stratégie : le dire plutôt que de la faire disparaître silencieusement
-        # (cf. absence != échec) — même quand l'autre stratégie a réussi, sinon
-        # une mesure ratée sur mobile passe pour un "pas de problème" au vu du
-        # seul résultat desktop.
+        # Measurement attempted but failed (e.g. network timeout) on at least one
+        # strategy: say it rather than let it disappear silently
+        # (cf. absence != failure) — even when the other strategy succeeded, otherwise
+        # a failed measurement on mobile passes for a "no problem" given the
+        # desktop result alone.
         failed_strats = [
             s for s, r in (by_strat or {}).items()
-            if r and r.get("mesure", {}).get("statut") not in (None, "ok")
+            if r and r.get("measurement", {}).get("status") not in (None, "ok")
         ]
         if failed_strats:
             mk = "".join(_cwv_device_marker(s) for s in failed_strats)
@@ -4230,7 +4230,7 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
             continue
 
         def _label(metric):
-            # Annote la page avec l'appareil dont vient la valeur la plus défavorable
+            # Annotates the page with the device the most unfavorable value comes from
             mk = _cwv_device_marker(worst_strat[metric]) if worst_strat.get(metric) else ""
             mk = f'<span title="pire des deux : {worst_strat.get(metric)}">{mk}</span> ' if mk else ""
             return f'<a href="{url}" target="_blank" rel="noopener">{mk}P{num} {short}</a>'
@@ -4255,11 +4255,11 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         vals = [v for v, _ in items]
         range_str = f"{min(vals):.1f} s" if len(vals) == 1 else f"entre {min(vals):.1f} s et {max(vals):.1f} s"
         n = len(items)
-        js_note = " (code mort JS > 60 % identifié)" if _has_heavy_js else ""
+        js_note = " (dead JS code > 60% identified)" if _has_heavy_js else ""
         return (
-            f"<strong>Réduire le {_glossary_link('LCP')}</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Reduce the {_glossary_link('LCP')}</strong> ({range_str} on {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
-            f"Causes probables : image hero non préchargée, JS bloquant le rendu{js_note}, {_glossary_link('TTFB')} élevé.<br>"
+            f"Likely causes: hero image not preloaded, render-blocking JS{js_note}, high {_glossary_link('TTFB')}.<br>"
             f"Actions : ajouter <code>&lt;link rel=\"preload\"&gt;</code> sur l'image hero &middot; "
             f"passer le JS non critique en <code>defer</code>/<code>async</code> &middot; "
             f"analyser le TTFB avec WebPageTest.<br>"
@@ -4273,10 +4273,10 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         n = len(items)
         signal = _cwv_reco_signal_html("inp", traffic, greenit, coverage_by_page)
         return (
-            f"<strong>Réduire l'{_glossary_link('INP')}</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Reduce the {_glossary_link('INP')}</strong> ({range_str} on {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
-            f"Causes probables : long tasks JS, thread principal saturé lors des interactions.<br>"
-            f"Actions : découper les tâches longues (&gt; 50 ms) &middot; "
+            f"Likely causes: long JS tasks, main thread saturated during interactions.<br>"
+            f"Actions: split long tasks (&gt; 50 ms) &middot; "
             f"utiliser <code>scheduler.yield()</code> &middot; lazy-loader les composants non visibles.<br>"
             f"Pages : {_pages_str(items)}"
             f"</span>{signal}"
@@ -4288,10 +4288,10 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         n = len(items)
         signal = _cwv_reco_signal_html("cls", traffic, greenit, coverage_by_page)
         return (
-            f"<strong>Corriger les décalages de mise en page ({_glossary_link('CLS')})</strong> ({range_str} sur {n} page{'s' if n>1 else ''} — {severity})<br>"
+            f"<strong>Fix layout shifts ({_glossary_link('CLS')})</strong> ({range_str} on {n} page{'s' if n>1 else ''} — {severity})<br>"
             f'<span style="color:#555;font-size:0.9em">'
             f"Causes probables : images ou iframes sans dimensions explicites, polices web sans size-adjust.<br>"
-            f"Actions : définir <code>width</code>/<code>height</code> sur les médias &middot; "
+            f"Actions: set <code>width</code>/<code>height</code> on media &middot; "
             f"utiliser <code>font-display: optional</code> ou <code>size-adjust</code>.<br>"
             f"Pages : {_pages_str(items)}"
             f"</span>{signal}"
@@ -4300,67 +4300,67 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     if lcp_bad:
         prio1.append(_lcp_item(lcp_bad, "mauvais"))
     elif lcp_warn:
-        prio2.append(_lcp_item(lcp_warn, "à améliorer"))
+        prio2.append(_lcp_item(lcp_warn, "needs improvement"))
 
     if inp_bad:
         prio1.append(_inp_item(inp_bad, "mauvais"))
     elif inp_warn:
-        prio2.append(_inp_item(inp_warn, "à améliorer"))
+        prio2.append(_inp_item(inp_warn, "needs improvement"))
 
     if cls_bad:
         prio1.append(_cls_item(cls_bad, "mauvais"))
     elif cls_warn:
-        prio2.append(_cls_item(cls_warn, "à améliorer"))
+        prio2.append(_cls_item(cls_warn, "needs improvement"))
 
     if cwv_failed:
         n = len(cwv_failed)
         prio2.append(
-            f"Mesure CWV échouée (timeout réseau) sur {n} page{'s' if n > 1 else ''} : "
+            f"CWV measurement failed (network timeout) on {n} page{'s' if n > 1 else ''} : "
             + ", ".join(cwv_failed)
-            + " - à rejouer avant de conclure sur ces pages."
+            + " - re-run before concluding on these pages."
         )
 
-    # EcoIndex < 40 → priorité 1
+    # EcoIndex < 40 → priority 1
     for m in page_metrics:
         if m["ecoindex"] < 40:
             prio1.append(f"<b>{m['title'][:40]}</b> : {_glossary_link('EcoIndex')} {m['ecoindex']}/100 (grade {m['grade']}) - optimisation urgente")
         elif m["ecoindex"] < 55:
-            prio2.append(f"<b>{m['title'][:40]}</b> : {_glossary_link('EcoIndex')} {m['ecoindex']}/100 (grade {m['grade']}) - à améliorer")
+            prio2.append(f"<b>{m['title'][:40]}</b> : {_glossary_link('EcoIndex')} {m['ecoindex']}/100 (grade {m['grade']}) - needs improvement")
 
-    # DOM élevé
+    # High DOM
     for m in page_metrics:
         if m["dom"] > 1500:
-            prio1.append(f"{_glossary_link('DOM')} {m['dom']} éléments sur <b>{m['title'][:30]}</b> - réduire les composants inactifs")
+            prio1.append(f"{_glossary_link('DOM')} {m['dom']} elements on <b>{m['title'][:30]}</b> - remove inactive components")
         elif m["dom"] > 800:
-            prio2.append(f"{_glossary_link('DOM')} {m['dom']} éléments sur <b>{m['title'][:30]}</b> - évaluer les composants superflus")
+            prio2.append(f"{_glossary_link('DOM')} {m['dom']} elements on <b>{m['title'][:30]}</b> - assess superfluous components")
 
     # Doublons
     if traffic["duplicates"]:
         prio2.append(
-            f"{len(traffic['duplicates'])} ressources chargées en double - configurer le cache navigateur"
-            f' <a href="#trafic-doublons" style="color:inherit;text-decoration:underline;font-size:16px">&#8594; voir le d&eacute;tail</a>'
+            f"{len(traffic['duplicates'])} resources loaded twice - configure the browser cache"
+            f' <a href="#trafic-doublons" style="color:inherit;text-decoration:underline;font-size:16px">&#8594; see the detail</a>'
         )
 
     # Code mort > 70%
     for page_name, page_data in coverage_by_page.items():
         entries = page_data["entries"] if isinstance(page_data, dict) else page_data
         summ = coverage_summary(entries)
-        # page_name est un chemin brut ("/recrutement") : préfixer "Page" pour
-        # éviter qu'une puce démarre directement par un "/" sans contexte, et
-        # lier vers l'URL complète quand elle est connue.
+        # page_name is a raw path ("/jobs"): prefix "Page" to
+        # avoid a bullet starting directly with a "/" without context, and
+        # link to the full URL when known.
         page_label = f"Page {page_name}" if page_name.startswith("/") else page_name
         page_url = page_data.get("url") if isinstance(page_data, dict) else None
         if page_url:
             page_label = f'<a href="{page_url}" target="_blank" rel="noopener">{page_label}</a>'
         if summ["js"]["pct"] > 70:
-            prio1.append(f"<b>{page_label}</b> : {summ['js']['pct']}% du JS non utilisé ({summ['js']['unused_kb']} Ko) - lazy loading + tree shaking")
+            prio1.append(f"<b>{page_label}</b> : {summ['js']['pct']}% of JS unused ({summ['js']['unused_kb']} KB) - lazy loading + tree shaking")
         elif summ["js"]["pct"] > 50:
-            prio2.append(f"<b>{page_label}</b> : {summ['js']['pct']}% du JS non utilisé - évaluer le découpage par route")
+            prio2.append(f"<b>{page_label}</b> : {summ['js']['pct']}% of JS unused - assess route-level splitting")
         if summ["css"]["pct"] > 80:
-            prio2.append(f"<b>{page_label}</b> : {summ['css']['pct']}% du CSS non utilisé ({summ['css']['unused_kb']} Ko) - PurgeCSS recommandé")
+            prio2.append(f"<b>{page_label}</b> : {summ['css']['pct']}% of CSS unused ({summ['css']['unused_kb']} KB) - PurgeCSS recommended")
 
-    # PRIORITÉ 3 — amélioration continue, croisée avec la stack détectée (documentaire).
-    # Les règles lisent les CATÉGORIES détectées, jamais des noms de sites : génériques.
+    # PRIORITY 3 — continuous improvement, cross-referenced with the detected stack (documentary).
+    # The rules read the detected CATEGORIES, never site names: generic.
     prio3 = ["Activer la compression Brotli sur tous les serveurs"]
 
     _technos = (tech_stack or {}).get("technologies", []) if tech_stack else []
@@ -4371,40 +4371,40 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
         if _name:
             _by_cat[_t.get("category")].append(_name)
 
-    # CDN : valoriser s'il est présent, sinon recommander de le mettre en place.
+    # CDN: highlight it if present, otherwise recommend setting one up.
     if "CDN" in _cats:
         _cdn_names = ", ".join(dict.fromkeys(_by_cat.get("CDN", [])))
         prio3.append(
-            f"<b>CDN déjà en place</b> ({_cdn_names}) : bon point, les assets statiques "
-            "sont diffusés au plus près des visiteurs. À maintenir."
+            f"<b>CDN already in place</b> ({_cdn_names}): good point, static assets "
+            "are served as close as possible to visitors. Keep it up."
         )
     else:
         prio3.append("Mettre en place un CDN pour les assets statiques")
 
-    # Scripts tiers : les nommer s'ils sont détectés, sinon garder la piste générique.
+    # Third-party scripts: name them if detected, otherwise keep the generic lead.
     _third_labels = []
-    for _cat in ("Analytics", "Balise / Tag manager", "Bibliothèque JS"):
+    for _cat in ("Analytics", "Tag manager", "JS library"):
         for _name in _by_cat.get(_cat, []):
             _third_labels.append(f"{_name} ({_cat.lower()})")
     if _third_labels:
         prio3.append(
-            "Scripts tiers détectés : <b>" + ", ".join(_third_labels) + "</b>. "
-            "Évaluer leur poids réel et leur nécessité ; envisager des alternatives légères "
-            "ou un chargement différé."
+            "Third-party scripts detected: <b>" + ", ".join(_third_labels) + "</b>. "
+            "Assess their real weight and necessity; consider lighter alternatives "
+            "or deferred loading."
         )
     else:
         prio3.append(
-            "Évaluer le remplacement des librairies tierces lourdes (analytics, chatbot) "
-            "par des alternatives légères"
+            "Assess replacing heavy third-party libraries (analytics, chatbot) "
+            "with lighter alternatives"
         )
 
-    # Multiplication des domaines tiers : chaque hôte ajoute DNS + TLS.
+    # Third-party domain multiplication: each host adds DNS + TLS.
     _tp_hosts = (tech_stack or {}).get("third_party_hosts", []) if tech_stack else []
     if len(_tp_hosts) >= 8:
         prio3.append(
-            f"<b>{len(_tp_hosts)} domaines tiers</b> sollicités au chargement : chaque domaine "
-            "ajoute une résolution DNS et une négociation TLS. Regrouper ou auto-héberger "
-            "les ressources critiques réduit la latence et les connexions."
+            f"<b>{len(_tp_hosts)} third-party domains</b> requested at load time: each domain "
+            "adds a DNS resolution and a TLS handshake. Grouping or self-hosting "
+            "critical resources reduces latency and connections."
         )
 
     def _items(lst):
@@ -4422,26 +4422,26 @@ def _section_recommendations(page_metrics, traffic, coverage_by_page, cwv=None, 
     return f"""<section id="recommandations">
   <h2>Recommandations</h2>
   <div class="prio prio-1">
-    <b>PRIORITÉ 1 - Impact fort</b>
+    <b>PRIORITY 1 - High impact</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio1)}</ul>
-    {_see_also(prio1, ("dashboard", "A.1 Tableau de bord EcoIndex"), ("cwv-analyse", "Analyse CWV"), ("coverage", "A.3 Code mort (Coverage)"))}
+    {_see_also(prio1, ("dashboard", "A.1 EcoIndex dashboard"), ("cwv-analyse", "CWV analysis"), ("coverage", "A.3 Dead code (Coverage)"))}
   </div>
   <div class="prio prio-2">
-    <b>PRIORITÉ 2 - Impact moyen</b>
+    <b>PRIORITY 2 - Medium impact</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio2)}</ul>
-    {_see_also(prio2, ("trafic", "A.2 Trafic réseau"), ("dashboard", "A.1 Tableau de bord EcoIndex"))}
+    {_see_also(prio2, ("traffic", "A.2 Network traffic"), ("dashboard", "A.1 EcoIndex dashboard"))}
   </div>
   <div class="prio prio-3">
-    <b>PRIORITÉ 3 - Amélioration continue</b>
+    <b>PRIORITY 3 - Continuous improvement</b>
     <ul style="margin-top:6px;padding-left:20px">{_items(prio3)}</ul>
-    {_see_also(prio3, ("trafic", "A.2 Trafic réseau"), ("greenit", "2. Bonnes pratiques GreenIT"))}
+    {_see_also(prio3, ("traffic", "A.2 Network traffic"), ("greenit", "2. GreenIT best practices"))}
   </div>
   {_recommendations_gains_block(gains)}
   {_ecoindex_gains_block(gains, page_metrics, cwv)}
 </section>"""
 
 
-# ── Entrée principale ─────────────────────────────────────────────────────────
+# ── Main entry point ──────────────────────────────────────────────────────────
 
 def generate(audit_dir, output_path=None):
     audit_dir = Path(audit_dir)
@@ -4455,19 +4455,19 @@ def generate(audit_dir, output_path=None):
             source_dir = audit_dir.parent
     if not har_files:
         # Dernier repli : le sous-dossier de captures brutes (dans .gitignore),
-        # cherché sous audit_dir puis sous son parent.
+        # searched under audit_dir then under its parent.
         for cand in (audit_dir, audit_dir.parent):
             har_files = list((cand / RAW_DATA_DIR).glob("*.har"))
             if har_files:
                 source_dir = cand
                 break
     if not har_files:
-        raise FileNotFoundError(f"Aucun fichier .har dans {audit_dir} ni dans {audit_dir.parent}")
+        raise FileNotFoundError(f"No .har file in {audit_dir} nor in {audit_dir.parent}")
     har_path = har_files[0]
 
-    # Les Coverage suivent le même rangement que le HAR : à plat, sinon dans le
+    # Coverage files follow the same layout as the HAR: flat, otherwise in the
     # sous-dossier de captures brutes. source_dir reste le dossier de l'audit, car
-    # c'est là que vivent les fichiers PRODUITS (cwv.json, etc.).
+    # that is where the PRODUCED files live (cwv.json, etc.).
     cov_files = (sorted(source_dir.glob("Coverage-*.json"))
                  or sorted(source_dir.glob("*coverage*.json"))
                  or sorted((source_dir / RAW_DATA_DIR).glob("Coverage-*.json"))
@@ -4479,16 +4479,16 @@ def generate(audit_dir, output_path=None):
     greenit_path = audit_dir / "greenit.json"
 
     print(f"HAR      : {har_path.name}")
-    print(f"Coverage : {len(cov_files)} fichier(s)")
-    print(f"CWV      : {'oui' if cwv_path.exists() else 'non (timings HAR utilisés)'}")
-    print(f"GreenIT  : {'fichier JSON' if greenit_path.exists() else 'calculé depuis HAR'}")
+    print(f"Coverage : {len(cov_files)} file(s)")
+    print(f"CWV      : {'yes' if cwv_path.exists() else 'no (HAR timings used)'}")
+    print(f"GreenIT  : {'JSON file' if greenit_path.exists() else 'computed from HAR'}")
 
     har_data     = parse_har(har_path)
     page_metrics = extract_page_metrics(har_data)
     traffic      = har_traffic_analysis(har_data)
     cwv          = load_cwv(cwv_path) if cwv_path.exists() else {}
     greenit      = load_greenit(audit_dir) or compute_greenit_from_har(har_data)
-    synthese_python = load_synthese_python(audit_dir)
+    python_summary = load_python_summary(audit_dir)
     recommendations_gains = load_recommendations_gains(audit_dir)
     topology_svg = load_topology_svg(audit_dir)
     tech_stack = load_tech_stack(audit_dir)
@@ -4500,7 +4500,7 @@ def generate(audit_dir, output_path=None):
     _generic_scripts = {"header", "footer", "orejime", "swetrix", "gtm", "analytics",
                         "style", "main", "bundle", "chunk", "home", "index"}
 
-    # URLs que le HAR déclare servies en text/html : elles seules sont des pages.
+    # URLs the HAR declares as served as text/html: only those are pages.
     _har_documents = {
         e.get("request", {}).get("url", "").split("?")[0]
         for e in har_data.get("log", {}).get("entries", [])
@@ -4514,11 +4514,11 @@ def generate(audit_dir, output_path=None):
         entries = parse_coverage_file(cf)
 
         # 1. URL de page : chercher une URL sans extension d'asset dans tous les domaines,
-        #    en privilégiant les URLs qui ne sont pas des fonts/cdn tiers.
+        #    preferring URLs that are not third-party fonts/cdn.
         from urllib.parse import urlparse as _up0
         from collections import Counter as _Counter
 
-        # Domaine principal = le plus représenté parmi les URLs avec assets
+        # Main domain = the most represented among URLs with assets
         _domain_counts = _Counter()
         for item in raw_entries:
             u = item.get("url", "")
@@ -4526,11 +4526,11 @@ def generate(audit_dir, output_path=None):
                 _domain_counts[_up0(u).netloc] += 1
         _main_domain = _domain_counts.most_common(1)[0][0] if _domain_counts else ""
 
-        # Le HAR dit lesquelles de ces URLs ont réellement été servies en
-        # text/html. Sans cette corroboration, la première URL sans extension
-        # d'asset l'emporte : sur une téléprocédure, c'est souvent une URL
+        # The HAR says which of these URLs were actually served as
+        # text/html. Without this corroboration, the first URL without
+        # asset extension wins: on a teleprocedure, it is often a
         # technique (jeton anti-CSRF, endpoint de messages) et la page s'affiche
-        # sous un libellé qui n'est pas celui de l'écran vu par l'usager.
+        # under a label that is not the one of the screen seen by the user.
         _candidates = []
         first_party = None
         for item in raw_entries:
@@ -4555,7 +4555,7 @@ def generate(audit_dir, output_path=None):
         if not page_url and _candidates:
             page_url = _candidates[0]
 
-        # 2. Fallback : script JS spécifique à une page
+        # 2. Fallback: page-specific JS script
         if not page_url and first_party:
             from urllib.parse import urlparse as _up
             _p = _up(first_party)
@@ -4574,7 +4574,7 @@ def generate(audit_dir, output_path=None):
             label = path
         else:
             label = f"Page — {ts_human}"
-        # Éviter les collisions si deux captures de la même page
+        # Avoid collisions if two captures of the same page
         base_label = label
         n = 2
         while label in coverage_by_page:
@@ -4589,101 +4589,101 @@ def generate(audit_dir, output_path=None):
     # Construction HTML
     today   = date.today().strftime("%d/%m/%Y")
     domains = ", ".join(list(traffic["domains"].keys())[:4])
-    title   = f"Audit de parcours web - {today}"
+    title   = f"Web journey audit - {today}"
     deduped_metrics = _dedup_page_metrics(page_metrics)
     nb_pages = len(deduped_metrics)
 
-    # La section techno n'est rendue que si des technologies ont été détectées
+    # The tech section is only rendered if technologies were detected
     has_tech = bool(tech_stack and tech_stack.get("technologies"))
 
-    # Gain EcoIndex/LCP par page et détail EOF calculés tôt : ce sont des annexes
-    # autonomes (résultat substantiel, pas des notes de méthode - cf. leurs docstrings)
-    # dont la présence conditionne à la fois la liste des annexes du sommaire et le
-    # corps du rapport plus bas ; on ne les calcule qu'une fois.
+    # EcoIndex/LCP gain per page and EOF detail computed early: these are appendices
+    # standalone (substantial result, not methodology notes - cf. their docstrings)
+    # whose presence conditions both the appendix list of the TOC and the
+    # corps du rapport plus bas ; on ne les computed qu'une fois.
     gain_lcp_html = _section_gain_ecoindex_lcp(recommendations_gains, page_metrics, cwv)
     eof_detail_html = _section_eof_detail(eof_results)
 
-    # Sections présentes (pour le sommaire). Méthodologie & hypothèses en dernière
-    # position (après Glossaire, pas avant) : demande explicite, pour que ses
-    # sous-parties A→F poursuivent la même séquence sans rien laisser derrière elles.
-    annexe_sections = [
-        ("dashboard", "Tableau de bord EcoIndex"),
-        ("trafic",    "Trafic réseau"),
+    # Sections present (for the TOC). Methodology & assumptions last
+    # position (after Glossary, not before): explicit request, so that its
+    # sub-sections A→F continue the same sequence without leaving anything behind.
+    annex_sections = [
+        ("dashboard", "EcoIndex dashboard"),
+        ("traffic",    "Network traffic"),
         ("coverage",  "Code mort (Coverage)"),
     ]
     if cwv:
-        annexe_sections.append(("cwv", "Core Web Vitals"))
+        annex_sections.append(("cwv", "Core Web Vitals"))
     if has_tech:
-        annexe_sections.append(("stack-technique", "Stack technique"))
+        annex_sections.append(("stack-technique", "Tech stack"))
     if gain_lcp_html:
-        annexe_sections.append(("gain-ecoindex-lcp", "Gain EcoIndex & LCP par page"))
+        annex_sections.append(("gain-ecoindex-lcp", "EcoIndex & LCP gain per page"))
     if eof_detail_html:
-        annexe_sections.append(("eof-detail", "Détail des critères EOF"))
-    annexe_sections.append(("glossaire", "Glossaire"))
-    annexe_sections.append(("methodologie", "Méthodologie & hypothèses"))
+        annex_sections.append(("eof-detail", "EOF criteria detail"))
+    annex_sections.append(("glossaire", "Glossary"))
+    annex_sections.append(("methodologie", "Methodology & assumptions"))
 
     has_medias = bool((greenit or {}).get("media", {}).get("video", {}).get("count") or
                        (greenit or {}).get("media", {}).get("pdf", {}).get("count"))
 
-    # Sections principales (1-6) numérotées en énumérant uniquement celles présentes -
-    # remplace l'ancien compteur manuel `n`, qui pouvait se désynchroniser du sommaire
-    # si une section était ajoutée au corps du rapport sans être répercutée ici.
+    # Main sections (1-6) numbered by enumerating only those present -
+    # replaces the old manual counter `n`, which could desync from the TOC
+    # if a section was added to the report body without being reflected here.
     main_sections = [
         ("recommandations", "Recommandations", True),
         ("greenit", "Bonnes pratiques GreenIT", True),
-        ("medias", "Médias et documents à surveiller", has_medias),
+        ("medias", "Media and documents to watch", has_medias),
         ("cwv-analyse", "Analyse Core Web Vitals", bool(cwv)),
-        ("efootprint", "Impact environnemental (CO2e)", bool(synthese_python)),
-        ("eof", "Potentiel d’optimisation (EOF)", bool(eof_results)),
+        ("efootprint", "Environmental impact (CO2e)", bool(python_summary)),
+        ("eof", "Optimization potential (EOF)", bool(eof_results)),
     ]
     present_main = [(anchor, title) for anchor, title, present in main_sections if present]
     main_nav_items = "".join(
         f'<li><a href="#{anchor}">{i}. {title}</a></li>'
         for i, (anchor, title) in enumerate(present_main, start=1)
     )
-    annexes_num = len(present_main) + 1
-    # Numéro de sommaire par ancre, pour préfixer le <h2> de chaque section principale
-    # (même numéro que le lien "N. Titre" du sommaire, cf. _prefix_h2_main plus bas).
+    annex_num = len(present_main) + 1
+    # TOC number per anchor, to prefix the <h2> of each main section
+    # (same number as the "N. Title" link of the TOC, cf. _prefix_h2_main below).
     main_num = {anchor: i for i, (anchor, _) in enumerate(present_main, start=1)}
 
-    # Méthodologie calculée avant le sommaire : ses lettres A/B/C... dépendent des
-    # sous-parties effectivement présentes pour cet audit, il faut donc son résultat
-    # pour construire le sommaire, avant même d'assembler le corps du rapport plus bas.
-    methodo_html, methodo_nav_entries = _section_methodologie(synthese_python, cwv, recommendations_gains)
-    methodo_inline = " &nbsp;·&nbsp; ".join(
-        f'<a href="#{manchor}">{letter}. {mtitle}</a>' for letter, manchor, mtitle in methodo_nav_entries
+    # Methodology computed before the TOC: its letters A/B/C... depend on the
+    # sub-sections actually present for this audit, so its result is needed
+    # to build the TOC, even before assembling the report body below.
+    methodology_html, methodology_nav_entries = _section_methodology(python_summary, cwv, recommendations_gains)
+    methodology_inline = " &nbsp;·&nbsp; ".join(
+        f'<a href="#{manchor}">{letter}. {mtitle}</a>' for letter, manchor, mtitle in methodology_nav_entries
     )
 
-    # "{annexes_num}.N" pour matcher exactement la numérotation du corps des annexes
+    # "{annex_num}.N" to match exactly the numbering of the appendix body
     # (_prefix_h2 avec _anum(), plus bas dans cette fonction).
-    annexe_inline = " &nbsp;·&nbsp; ".join(
-        f'<a href="#{sid}">{annexes_num}.{i+1} {slabel}</a>'
-        for i, (sid, slabel) in enumerate(annexe_sections)
+    annex_inline = " &nbsp;·&nbsp; ".join(
+        f'<a href="#{sid}">{annex_num}.{i+1} {slabel}</a>'
+        for i, (sid, slabel) in enumerate(annex_sections)
     )
     nav_items = (
         f'{main_nav_items}'
         f'<li>'
-        f'<a href="#annexes">{annexes_num}. Annexes</a>'
-        f'<div style="margin-top:6px;margin-left:18px;font-size:15px;opacity:.85">{annexe_inline}</div>'
-        + (f'<div style="margin-top:4px;margin-left:36px;font-size:14px;opacity:.85">{methodo_inline}</div>'
-           if methodo_nav_entries else '')
+        f'<a href="#annexes">{annex_num}. Appendices</a>'
+        f'<div style="margin-top:6px;margin-left:18px;font-size:15px;opacity:.85">{annex_inline}</div>'
+        + (f'<div style="margin-top:4px;margin-left:36px;font-size:14px;opacity:.85">{methodology_inline}</div>'
+           if methodology_nav_entries else '')
         + f'</li>'
-        f'<li><a href="#couts" style="opacity:.75">Coûts de génération</a></li>'
+        f'<li><a href="#couts" style="opacity:.75">Generation costs</a></li>'
     )
 
     html = _html_head(title)
     html += f"""<header>
-  <h1>Audit EROOM Version {AGENT_VERSION}</h1>
+  <h1>EROOM Audit Version {AGENT_VERSION}</h1>
   <div style="font-size:18px;margin-top:6px;opacity:.9">{domains}</div>
   <div class="meta">
-    Date : {today} &nbsp;|&nbsp;
-    {nb_pages} page(s) analysée(s) &nbsp;|&nbsp;
-    <a href="#glossaire-har" title="Voir la définition dans le Glossaire" style="color:inherit;text-decoration:underline">HAR</a> : {har_path.name} &nbsp;|&nbsp;
-    Coverage : {len(cov_files)} fichier(s)
+    Date: {today} &nbsp;|&nbsp;
+    {n_pages} page(s) analyzed &nbsp;|&nbsp;
+    <a href="#glossaire-har" title="See the definition in the Glossary" style="color:inherit;text-decoration:underline">HAR</a> : {har_path.name} &nbsp;|&nbsp;
+    Coverage: {len(cov_files)} file(s)
   </div>
 </header>
-<nav role="navigation" aria-label="Sommaire du rapport">
-  <h2>Sommaire</h2>
+<nav role="navigation" aria-label="Report contents">
+  <h2>Contents</h2>
   <ul style="list-style:none;padding:0;margin:0">{nav_items}</ul>
 </nav>
 <main id="contenu">
@@ -4692,9 +4692,9 @@ def generate(audit_dir, output_path=None):
         return html_str.replace('<h2>', f'<h2>{prefix} — ', 1)
 
     def _prefix_h2_main(html_str, anchor):
-        # Même mécanisme que _prefix_h2 pour les annexes, mais "N. " (comme le
-        # sommaire) plutôt que "N — " : ce sont les 6 sections de tête, pas des
-        # sous-parties d'annexe.
+        # Same mechanism as _prefix_h2 for appendices, but "N. " (like the
+        # TOC) rather than "N — ": these are the 6 top sections, not
+        # appendix sub-sections.
         return html_str.replace('<h2>', f'<h2>{main_num[anchor]}. ', 1)
 
     html += _prefix_h2_main(
@@ -4706,23 +4706,23 @@ def generate(audit_dir, output_path=None):
     if cwv:
         html += _prefix_h2_main(
             _section_cwv_analyse(page_metrics, cwv, traffic, greenit, coverage_by_page), "cwv-analyse")
-    if synthese_python:
+    if python_summary:
         html += _prefix_h2_main(
-            _section_efootprint(synthese_python, topology_svg, gains=recommendations_gains), "efootprint")
+            _section_efootprint(python_summary, topology_svg, gains=recommendations_gains), "efootprint")
     if eof_results:
         html += _prefix_h2_main(_section_eof(eof_results, eof_radar_svg), "eof")
 
-    # Numérotation {annexes_num}.N dérivée uniformément de la position dans
-    # annexe_sections (même mécanisme pour toutes les annexes, plus de cas particulier).
-    _annexe_ids = [sid for sid, _ in annexe_sections]
+    # Numbering {annex_num}.N derived uniformly from the position in
+    # annex_sections (same mechanism for all appendices, no more special case).
+    _annex_ids = [sid for sid, _ in annex_sections]
 
     def _anum(sid):
-        return f"{annexes_num}.{_annexe_ids.index(sid) + 1}"
+        return f"{annex_num}.{_annex_ids.index(sid) + 1}"
 
     html += '<section id="annexes" style="background:#f4f6fa;border:2px solid var(--octo-blue);border-radius:6px;padding:24px 24px 8px;margin-bottom:40px">\n'
     html += '<h2 style="border-left:none;padding-left:0;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:20px">Annexes</h2>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_dashboard(page_metrics, cwv), _anum("dashboard"))}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_traffic(traffic), _anum("trafic"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_traffic(traffic), _anum("traffic"))}</div>\n'
     html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_coverage(coverage_by_page), _anum("coverage"))}</div>\n'
     if cwv:
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_cwv(page_metrics, cwv), _anum("cwv"))}</div>\n'
@@ -4732,103 +4732,103 @@ def generate(audit_dir, output_path=None):
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(gain_lcp_html, _anum("gain-ecoindex-lcp"))}</div>\n'
     if eof_detail_html:
         html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(eof_detail_html, _anum("eof-detail"))}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossaire(), _anum("glossaire"))}</div>\n'
-    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(methodo_html, _anum("methodologie"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(_section_glossary(), _anum("glossaire"))}</div>\n'
+    html += f'<div style="background:white;border-radius:4px;padding:20px;margin-bottom:16px">{_prefix_h2(methodology_html, _anum("methodologie"))}</div>\n'
     html += '</section>\n'
 
     html += "</main>\n"
     html += f"""<div id="couts" class="cost-info" style="background:#f0f4f8;border-top:1px solid #ccc;padding:1.5rem 0;">
   <div style="max-width:700px;margin:0 auto 0 40px">
     <details style="padding:0.75rem 1rem;background:white;border:1px solid #ccc;border-radius:4px;">
-      <summary style="cursor:pointer;font-weight:600;">Coûts de génération (<span data-cost-field="cout">—</span> [*])</summary>
-      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimation calculée par fenêtre temporelle sur le fichier JSONL de session. La durée est un temps d'horloge entre le premier et le dernier message de la session (lecture, rédaction, allers-retours avec l'utilisateur inclus), pas un temps de calcul actif ; elle et les tokens peuvent donc inclure des échanges hors analyse. Coût aux tarifs API Anthropic publics ; sous AWS Bedrock, consulter AWS Cost Explorer.</p>
-      <p style="margin:0.3rem 0;"><strong>Modèle :</strong> <span data-cost-field="modele">—</span></p>
+      <summary style="cursor:pointer;font-weight:600;">Generation costs (<span data-cost-field="cout">—</span> [*])</summary>
+      <p style="margin:0.75rem 0 0.5rem;font-size:0.9rem;font-style:italic;opacity:0.8;">[*] Estimate computed over a time window on the session JSONL file. The duration is wall-clock time between the first and last message of the session (reading, writing, back-and-forths with the user included), not active computation time; it and the tokens can therefore include exchanges outside the analysis. Cost at public Anthropic API rates; under AWS Bedrock, consult AWS Cost Explorer.</p>
+      <p style="margin:0.3rem 0;"><strong>Model:</strong> <span data-cost-field="modele">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Effort :</strong> <span data-cost-field="effort">—</span></p>
-      <p style="margin:0.3rem 0;"><strong>Durée :</strong> <span data-cost-field="duree">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>Duration:</strong> <span data-cost-field="duration">—</span></p>
       <p style="margin:0.3rem 0;"><strong>Tokens :</strong> <span data-cost-field="tokens">—</span></p>
-      <p style="margin:0.3rem 0;"><strong>CO2e estimé :</strong> <span data-cost-field="co2e">—</span></p>
+      <p style="margin:0.3rem 0;"><strong>Estimated CO2e:</strong> <span data-cost-field="co2e">—</span></p>
       <p style="margin:0.3rem 0;font-size:0.9rem;color:#666;"><span data-cost-field="ratio-co2e"></span></p>
-      <p style="margin:0.75rem 0 0 0;font-size:0.8rem;font-style:italic;opacity:0.75;">CO2e estimé à partir des tokens de calcul (input + output + cache creation, hors lecture de cache) : 0,3-1,0 Wh/1000 tokens (Epoch AI 2025, Google Cloud août 2025), {_glossary_link("PUE")} 1,1-1,3, intensité carbone électrique 450-480 gCO2/kWh (moyenne mondiale, IEA). Fourchette large car aucune donnée publique précise sur l'infrastructure de calcul réelle de la session ; ordre de grandeur, pas une mesure.</p>
-      <p style="margin:0.3rem 0;font-size:0.85rem;color:#888;"><strong>Fichiers sources :</strong> {har_path.name}, {len(cov_files)} fichier(s) Coverage</p>
+      <p style="margin:0.75rem 0 0 0;font-size:0.8rem;font-style:italic;opacity:0.75;">Estimated CO2e from the compute tokens (input + output + cache creation, excluding cache reads): 0.3-1.0 Wh/1000 tokens (Epoch AI 2025, Google Cloud August 2025), {_glossary_link("PUE")} 1.1-1.3, electricity carbon intensity 450-480 gCO2/kWh (world average, IEA). Wide range because no precise public data exists on the real compute infrastructure of the session; order of magnitude, not a measurement.</p>
+      <p style="margin:0.3rem 0;font-size:0.85rem;color:#888;"><strong>Source files:</strong> {har_path.name}, {len(cov_files)} Coverage file(s)</p>
     </details>
   </div>
 </div>
-<footer>Rapport généré le {today} - Agent EROOM v{AGENT_VERSION}</footer>
+<footer>Report generated on {today} - EROOM Agent v{AGENT_VERSION}</footer>
 """
     html += "</body>\n</html>\n"
 
     if output_path is None:
-        output_path = audit_dir / f"rapport-parcours-{date.today().isoformat()}.html"
+        output_path = audit_dir / f"journey-report-{date.today().isoformat()}.html"
     output_path = Path(output_path)
     output_path.write_text(html, encoding="utf-8")
-    print(f"\nRapport HTML généré : {output_path}")
+    print(f"\nHTML report generated: {output_path}")
 
     import subprocess
     patch_script = Path.home() / ".claude/scripts/patch-audit-cost.sh"
     if patch_script.exists():
         subprocess.run(["bash", str(patch_script), str(output_path)], check=False)
     else:
-        print(f"[coûts] patch-audit-cost.sh introuvable ({patch_script}) — section coûts non patchée")
+        print(f"[costs] patch-audit-cost.sh not found ({patch_script}) — costs section not patched")
 
-    _avertir_valeurs_internes(output_path)
+    _warn_internal_values(output_path)
 
     return output_path
 
 
-def _avertir_valeurs_internes(output_path):
-    """Relit le rapport produit et signale les valeurs internes visibles.
+def _warn_internal_values(output_path):
+    """Relit le rapport produit et signale les values internes visibles.
 
-    AVERTIT, ne bloque pas : le rapport reste écrit et la génération se termine
-    normalement. Un axe EOF sans réponse est un état légitime du référentiel
-    aujourd'hui, il n'a pas à casser la production du livrable. Le contrôle
-    complet, lui, rend un code de sortie non nul et peut entrer dans une
-    batterie : `python3 check_valeurs_rapport.py <rapport>`.
+    WARNS, does not block: the report stays written and the generation ends
+    normally. An EOF axis without an answer is a legitimate state of the framework
+    today, it must not break the deliverable's production. The full check,
+    complete, returns a non-zero exit code and can join a
+    batterie : `python3 check_report_values.py <rapport>`.
 
-    Lancé APRÈS `patch-audit-cost.sh`, donc sur le fichier réellement final.
+    Run AFTER `patch-audit-cost.sh`, hence on the really final file.
 
-    Ce contrôle existe parce que les validateurs du projet surveillent les NOMS
-    des clés et jamais les VALEURS affichées : un `None%` en gras au centre du
-    radar EOF a traversé toute la chaîne sans être vu.
+    This check exists because the project's validators watch the NAMES
+    of keys and never the DISPLAYED VALUES: a bold `None%` in the center of the
+    EOF radar went through the whole chain unseen.
 
-    Un contrôle qui se veut non bloquant ne doit pas pouvoir faire tomber la
-    génération par la bande : toute erreur de sa part est rattrapée et signalée.
-    Le rapport est déjà écrit à ce stade, il ne risque rien, mais un plantage ici
+    A non-blocking check must not be able to crash the
+    generation as a side effect: any error on its part is caught and reported.
+    The report is already written at this stage, it is safe, but a crash here
     donnerait une trace Python en fin de commande et ferait croire que la
-    génération a échoué.
+    would look like the generation failed.
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
-        from check_valeurs_rapport import controler
-        fuites, _exemptees, _malformees = controler(
+        from check_report_values import check
+        leaks, _exempted, _malformed = check(
             output_path.read_text(encoding="utf-8", errors="replace")
         )
-    except Exception as erreur:  # volontairement large, cf. la docstring
+    except Exception as error:  # volontairement large, cf. la docstring
         print(
-            f"[valeurs] contrôle non lancé ({type(erreur).__name__}: {erreur}) - "
-            "valeurs affichées NON vérifiées, le rapport est produit quand même"
+            f"[values] check not run ({type(error).__name__}: {error}) - "
+            "displayed values NOT checked, the report is produced anyway"
         )
         return
 
-    if not fuites:
-        print("[valeurs] aucune valeur interne visible dans le rapport.")
+    if not leaks:
+        print("[values] no internal value visible in the report.")
         return
 
     print(
-        f"\n[valeurs] AVERTISSEMENT : {len(fuites)} valeur(s) interne(s) visible(s) "
-        "par le lecteur du rapport."
+        f"\n[values] WARNING: {len(leaks)} internal value(s) visible "
+        "to the report reader."
     )
-    for numero, nom, raison, extrait in fuites[:10]:
-        print(f"    {output_path.name}:{numero}  {nom} - {raison}")
-        print(f"        {extrait}")
-    if len(fuites) > 10:
-        print(f"    ... et {len(fuites) - 10} autre(s).")
-    print(f"    Détail : python3 check_valeurs_rapport.py {output_path}")
-    print("    Le rapport a bien été produit : cet avertissement ne bloque rien.")
+    for line_no, name, reason, excerpt in leaks[:10]:
+        print(f"    {output_path.name}:{line_no}  {name} - {reason}")
+        print(f"        {excerpt}")
+    if len(leaks) > 10:
+        print(f"    ... and {len(leaks) - 10} more.")
+    print(f"    Detail: python3 check_report_values.py {output_path}")
+    print("    The report was indeed produced: this warning blocks nothing.")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 generate_report_html.py <dossier-audit> [--output fichier.html]")
+        print("Usage: python3 generate_report_html.py <audit-dir> [--output report.html]")
         sys.exit(1)
 
     audit_dir = sys.argv[1]

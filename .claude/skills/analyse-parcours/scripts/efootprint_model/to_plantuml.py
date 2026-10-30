@@ -1,80 +1,78 @@
 #!/usr/bin/env python3
 """
-Diagramme depuis une `SiteSpec` : parcours utilisateur, traitements et
-infrastructure technique, qui parle à qui.
+Diagram from a `SiteSpec`: user journey, jobs and technical infrastructure,
+who talks to whom.
 
-ZÉRO import e-footprint ici, comme spec.py/compose.py/from_har.py : ce module
-ne lit que des dataclasses de spec.py, il ne construit aucun objet
-e-footprint. Utile pour visualiser une spec AVANT de la calculer (ex. vérifier
-qu'un archétype ou une composition a bien le nombre de serveurs attendu).
+ZERO e-footprint import here, like spec.py/compose.py/from_har.py: this module
+only reads spec.py dataclasses, it builds no e-footprint object. Useful to
+visualize a spec BEFORE calculating it (e.g. check that an archetype or a
+composition has the expected number of servers).
 
-PALETTE ET DISPOSITION : calquées sur la vraie interface e-footprint
-(model_builder, https://e-footprint.boavizta.org/model_builder/) — 3 colonnes
-"Parcours" / "Traitements" / "Infrastructure", cartes à coins arrondis,
-liens fins sans pointe de flèche. Choix ASSUMÉ (décision explicite de
-l'utilisatrice) : ressemblance visuelle à l'outil de référence plutôt que
-cohérence avec la palette OCTO des autres diagrammes du projet (usage
-ponctuel/pédagogique, pas un livrable permanent). PlantUML ne sachant pas
-dessiner de point rond en bout de ligne, le lien reste un trait nu (`--`),
-approximation acceptée du rendu LeaderLine de l'interface source.
+PALETTE AND LAYOUT: copied from the real e-footprint interface
+(model_builder, https://e-footprint.boavizta.org/model_builder/) — 3 columns
+"Journey" / "Jobs" / "Infrastructure", rounded-corner cards, thin links
+without arrowheads. ASSUMED choice (explicit decision of the user): visual
+resemblance to the reference tool rather than consistency with the OCTO
+palette of the project's other diagrams (one-off/pedagogical use, not a
+permanent deliverable). PlantUML cannot draw a round dot at the end of a
+line, so the link stays a bare line (`--`), an accepted approximation of the
+source interface's LeaderLine rendering.
 
-DISPOSITION : 3 colonnes côte à côte, PLUS HAUTE QUE LARGE (police agrandie,
-texte replié). Une première version "large" (`left to right direction`
-classique) a existé puis a été abandonnée après comparaison : l'utilisatrice
-a jugé cette disposition-ci nettement plus lisible. Testé réellement
-(`plantuml -tsvg` + rendu PNG), pas supposé :
-  - `skinparam wrapWidth N` seul, `left to right direction` conservé : quasi
-    aucun effet sur la largeur — GraphViz range toujours les composants d'une
-    colonne en GRILLE horizontale, jamais empilés verticalement.
-  - Liens invisibles (`-[hidden]->`) SANS retirer `left to right direction` :
-    contre-productif, fait EXPLOSER la largeur totale (conflit entre le flux
-    global gauche-droite et l'empilement local demandé).
-  - Solution qui marche (mesurée sur les 2 audits du dépôt, octo.com
-    1491x565 -> 1104x1182, ants-permis 2294x346 -> 1120x1098) : RETIRER
-    `left to right direction` (c'est elle qui étale en grille), puis forcer la
-    disposition avec des liens invisibles `-[hidden]d-` (empilement vertical
-    intra-colonne) et `-[hidden]r-` entre packages consécutifs (colonnes
-    maintenues côte à côte malgré l'absence de la directive globale), plus une
-    police agrandie et un retour à la ligne du texte (`wrapWidth`).
-  - LIMITE ACCEPTÉE : au-delà de 3 packages consécutifs chaînés par
-    `-[hidden]r-` (cas à 5 packages : IA générative + hôtes tiers en plus des
-    3 colonnes de base), un léger effet d'escalier apparaît (décalage vertical
-    progressif). Documenté comme défaut esthétique mineur, nettement moins
-    pénalisant que l'alternative `left to right direction` classique dans ce
-    cas (largeur démesurée).
-  - PIÈGE DE RENDU (découvert par test, corrigé) : découper un label en
-    tranches de N caractères peut faire commencer une ligne de continuation
-    par un caractère creole PlantUML (`=`, notamment issu d'une URL du type
-    `?lang=fr` coupée en `lang`/`=fr`), interprété comme un titre H1 (rendu
-    gras centré) au lieu du texte attendu. `_wrap_label()` s'en protège, ET
-    coupe désormais sur des frontières naturelles (mots, séparateurs d'URL
-    `/`, `-`, `_`, `.`, `?`, `&`, `=`) plutôt qu'au caractère près — un mot ou
-    un segment de chemin n'est jamais scindé en son milieu.
-  - PIÈGE (découvert par test, corrigé) : `skinparam wrapWidth N` était
-    utilisé EN PLUS de `_wrap_label()`, en pensant qu'il ne s'appliquerait
-    qu'aux textes non encore repliés. Faux : combiné à `*FontSize 16` (police
-    agrandie), PlantUML recalcule SES PROPRES césures sur un texte déjà
-    replié par notre code, et casse par exemple "~1 s" en deux lignes ("~1"
-    puis "s") — un texte identique sans `RectangleFontSize` custom ne casse
-    pas, la régression n'apparaît qu'à police modifiée. Retiré du header :
-    notre wrap Python suffit, `skinparam wrapWidth` est redondant et devient
-    dangereux dès que la taille de police change.
+LAYOUT: 3 columns side by side, TALLER THAN WIDE (enlarged font, wrapped
+text). A first "wide" version (`left to right direction` classic) existed then
+was dropped after comparison: the user judged this layout clearly more
+readable. Really tested (`plantuml -tsvg` + PNG render), not assumed:
+  - `skinparam wrapWidth N` alone, `left to right direction` kept: almost no
+    effect on width — GraphViz still lays out a column's components in a
+    horizontal GRID, never stacked vertically.
+  - Invisible links (`-[hidden]->`) WITHOUT removing `left to right
+    direction`: counterproductive, BLOWS UP the total width (conflict
+    between the global left-right flow and the requested local stacking).
+  - The solution that works (measured on the repo's 2 audits, octo.com
+    1491x565 -> 1104x1182, ants-permis 2294x346 -> 1120x1098): REMOVE
+    `left to right direction` (it is what spreads into a grid), then force
+    the layout with invisible links `-[hidden]d-` (vertical stacking within a
+    column) and `-[hidden]r-` between consecutive packages (columns kept side
+    by side despite the absence of the global directive), plus an enlarged
+    font and text wrapping (`wrapWidth`).
+  - ACCEPTED LIMIT: beyond 3 consecutive packages chained by `-[hidden]r-`
+    (the 5-package case: generative AI + third-party hosts on top of the 3
+    base columns), a slight staircase effect appears (progressive vertical
+    offset). Documented as a minor aesthetic defect, clearly less penalizing
+    than the classic `left to right direction` alternative in that case
+    (huge width).
+  - RENDERING PITFALL (discovered by test, fixed): cutting a label into
+    N-character slices can make a continuation line start with a PlantUML
+    creole character (`=`, notably from a URL of the type `?lang=fr` cut into
+    `lang`/`=fr`), interpreted as an H1 title (bold centered render) instead
+    of the expected text. `_wrap_label()` protects against it, AND now cuts
+    on natural boundaries (words, URL separators `/`, `-`, `_`, `.`, `?`,
+    `&`, `=`) rather than at the exact character — a word or a path segment
+    is never split in its middle.
+  - PITFALL (discovered by test, fixed): `skinparam wrapWidth N` was used IN
+    ADDITION to `_wrap_label()`, thinking it would only apply to not-yet-
+    wrapped texts. Wrong: combined with `*FontSize 16` (enlarged font),
+    PlantUML recomputes ITS OWN breaks on text already wrapped by our code,
+    and splits e.g. "~1 s" into two lines ("~1" then "s") — an identical text
+    without a custom `RectangleFontSize` does not split, the regression only
+    appears with a modified font size. Removed from the header: our Python
+    wrap is enough, `skinparam wrapWidth` is redundant and becomes dangerous
+    as soon as the font size changes.
 
-HYPOTHÈSES DE CALCUL AFFICHÉES : demande explicite de l'utilisatrice de
-retrouver, DANS le diagramme, les grandes hypothèses qui pilotent le résultat
-(pas seulement dans le tableau texte séparé de `print_hypotheses()` /
-`_section_efootprint()`). Deux niveaux :
-  - une note globale (trafic annuel, mix appareils, mix pays d'audience,
-    temps de lecture total cumulé du parcours), rendue en `legend bottom`
-    (PAS une `note` flottante : testé, une note sans ancrage reçoit une
-    largeur arbitraire bien trop étroite du moteur de layout — un mot par
-    ligne, illisible ; `legend bottom` s'étale sur toute la largeur du
-    diagramme, une ligne par hypothèse) ;
-  - un détail sur chaque composant concerné (temps de l'étape, poids
-    transféré du traitement, type d'instance/provider du serveur).
-Valeur seule, SANS badge de confiance (décision explicite : le diagramme
-reste lisible, le détail source/confiance vit dans le tableau d'hypothèses
-du rapport, pas dupliqué ici).
+CALCULATION HYPOTHESES DISPLAYED: explicit request of the user to find, IN
+the diagram, the big hypotheses driving the result (not only in the separate
+text table of `print_hypotheses()` / `_section_efootprint()`). Two levels:
+  - one global note (annual traffic, device mix, audience country mix,
+    cumulative reading time of the journey), rendered in `legend bottom`
+    (NOT a floating `note`: tested, an unanchored note gets an arbitrarily
+    too-narrow width from the layout engine — one word per line, unreadable;
+    `legend bottom` spreads over the whole diagram width, one line per
+    hypothesis);
+  - a detail on each concerned component (step time, job transferred weight,
+    server instance type/provider).
+Value alone, WITHOUT a confidence badge (explicit decision: the diagram stays
+readable, the source/confidence detail lives in the report's hypotheses
+table, not duplicated here).
 """
 
 _HEADER = """@startuml {diagram_id}
@@ -115,41 +113,39 @@ skinparam PackageFontSize 18
 skinparam defaultFontName Arial
 skinparam defaultFontColor #111928
 
-title <color:#2D4675>{title} - Topologie technique</color>
+title <color:#2D4675>{title} - Technical topology</color>
 """
 
 
 def _sanitize_alias(key):
-    """Alias PlantUML valide : ASCII lettres/chiffres/underscore seulement,
-    jamais vide. ASCII strict (pas juste `isalnum()`, qui accepte l'Unicode
-    accentué) : cet alias devient aussi un nom de fichier de sortie pour
-    `@startuml <id>` (cf. site_to_plantuml()), et un nom de fichier accentué
-    est fragile selon la plateforme/l'outil de build."""
+    """Valid PlantUML alias: ASCII letters/digits/underscore only, never
+    empty. Strict ASCII (not just `isalnum()`, which accepts accented Unicode):
+    this alias also becomes an output file name for `@startuml <id>` (cf.
+    site_to_plantuml()), and an accented file name is fragile depending on the
+    platform/build tool."""
     cleaned = "".join(c if c.isascii() and (c.isalnum() or c == "_") else "_" for c in key)
     return cleaned if cleaned and cleaned[0].isalpha() else f"c_{cleaned}"
 
 
 def _escape_label(text):
-    """Échappe les guillemets d'un label PlantUML, jamais les doubles tirets
-    (cf. règle rédactionnelle du skill diagrammes-analyse-parcours : `--` est
-    interprété comme du texte barré par PlantUML)."""
+    """Escapes the quotes of a PlantUML label, never the double dashes
+    (cf. the writing rule of the diagrammes-analyse-parcours skill: `--` is
+    interpreted as strikethrough text by PlantUML)."""
     escaped = (text or "").replace('"', "'")
     return escaped.replace("--", "- -")
 
 
-# Caractères après lesquels une URL/un chemin peut être coupé proprement
-# (le séparateur reste collé au morceau de GAUCHE, jamais en tête de ligne
-# suivante) : segments de chemin (`/`), mots composés (`-`, `_`), requête
-# (`?`, `&`, `=`), domaine (`.`).
+# Characters after which a URL/path can be cut cleanly (the separator stays
+# glued to the LEFT chunk, never at the head of the next line): path segments
+# (`/`), compound words (`-`, `_`), query (`?`, `&`, `=`), domain (`.`).
 _URL_BREAK_CHARS = frozenset("/?&=._-")
 
 
 def _break_long_word(word, width):
-    """Découpe un "mot" (sans espace, typiquement une URL) trop long pour
-    `width`, en coupant APRÈS le séparateur le plus proche de `width` sans le
-    dépasser (jamais au caractère près si un séparateur existe). Coupe brute
-    à `width` en dernier recours, si aucun séparateur n'est trouvé dans la
-    fenêtre."""
+    """Splits a "word" (no space, typically a URL) too long for `width`, by
+    cutting AFTER the separator closest to `width` without exceeding it (never
+    at the exact character if a separator exists). Brute cut at `width` as a
+    last resort, if no separator is found in the window."""
     chunks = []
     remaining = word
     while len(remaining) > width:
@@ -165,10 +161,10 @@ def _break_long_word(word, width):
 
 
 def _wrap_segment(segment, width):
-    """Replie une ligne (sans `\\n`) sur des frontières de MOTS (jamais au
-    milieu d'un mot, comme un traitement de texte classique) ; un mot seul
-    trop long pour `width` (typiquement une URL sans espace) est ensuite
-    replié par `_break_long_word()` sur ses séparateurs naturels."""
+    """Wraps a line (without `\\n`) on WORD boundaries (never in the middle
+    of a word, like a classic word processor); a single word too long for
+    `width` (typically a space-less URL) is then wrapped by
+    `_break_long_word()` on its natural separators."""
     lines = []
     current = ""
     for word in segment.split(" "):
@@ -190,23 +186,23 @@ def _wrap_segment(segment, width):
 
 
 def _wrap_label(text, width):
-    """Replie `text` en lignes d'au plus `width` caractères, laisse `text`
-    inchangé si `width` est None. Appeler APRÈS `_escape_label()` (le
-    repliement n'introduit jamais de `--`).
+    """Wraps `text` into lines of at most `width` characters, leaves `text`
+    unchanged if `width` is None. Call AFTER `_escape_label()` (the wrapping
+    never introduces `--`).
 
-    Coupe sur les frontières naturelles (mots séparés par un espace ; à
-    défaut, séparateurs d'URL `/`, `-`, `_`, `.`, `?`, `&`, `=`) plutôt qu'au
-    caractère près (cf. `_wrap_segment()`/`_break_long_word()`).
+    Cuts on natural boundaries (words separated by a space; failing that, URL
+    separators `/`, `-`, `_`, `.`, `?`, `&`, `=`) rather than at the exact
+    character (cf. `_wrap_segment()`/`_break_long_word()`).
 
-    Chaque ligne de continuation (jamais la première) est préfixée d'un
-    espace SI elle commence par un caractère creole PlantUML (`=`, `-`, `*`,
-    `#`, `_`) : PIÈGE TESTÉ, pas supposé — une ligne commençant par `=`
-    (notamment issu d'une URL du type `?lang=fr` coupée en `lang`/`=fr`) est
-    interprétée comme un titre H1 (rendu gras centré) au lieu du texte
-    littéral attendu. L'espace neutralise l'interprétation sans autre effet
-    visuel notable. Le découpage sur séparateurs naturels rend ce cas rare
-    (le séparateur reste collé au morceau de gauche), le garde-fou reste
-    nécessaire pour la coupe brute de dernier recours."""
+    Each continuation line (never the first) is prefixed with a space IF it
+    starts with a PlantUML creole character (`=`, `-`, `*`, `#`, `_`): a TESTED
+    pitfall, not assumed — a line starting with `=` (notably from a URL of the
+    type `?lang=fr` cut into `lang`/`=fr`) is interpreted as an H1 title (bold
+    centered render) instead of the literal expected text. The space
+    neutralizes the interpretation without any other notable visual effect.
+    Cutting on natural separators makes this case rare (the separator stays
+    glued to the left chunk), the guard-rail remains necessary for the brute
+    last-resort cut."""
     if not text or width is None:
         return text
     wrapped_segments = []
@@ -221,19 +217,18 @@ def _wrap_label(text, width):
 
 
 def _format_seconds(traced):
-    """Temps utilisateur d'une étape, lisible ("~28 s"), ou None si absent.
-    Valeur seule, sans source/confiance (cf. docstring du module)."""
+    """User time of a step, readable ("~28 s"), or None if absent. Value
+    alone, without source/confidence (cf. module docstring)."""
     if traced is None or traced.value is None:
         return None
     return f"~{traced.value:.0f} s"
 
 
 def _format_bytes(traced):
-    """Poids transféré d'un traitement, lisible en kB ("~180 kB"), ou None si
-    absent. `data_transferred.unit` varie selon l'appelant du modèle ("B" en
-    octets depuis from_har.py, "kB" depuis les archétypes de démo) : lire
-    l'unité plutôt que supposer un octet fixe, sous peine d'un facteur 1000
-    d'erreur silencieuse."""
+    """Transferred weight of a job, readable in kB ("~180 kB"), or None if
+    absent. `data_transferred.unit` varies with the model's caller ("B" in
+    bytes from from_har.py, "kB" from the demo archetypes): read the unit
+    rather than assume a fixed byte, on pain of a silent factor-1000 error."""
     if traced is None or traced.value is None:
         return None
     unit = (traced.unit or "").strip().lower()
@@ -245,13 +240,13 @@ def _format_bytes(traced):
         kb_value = traced.value * 1000
     else:
         kb_value = traced.value
-    return f"~{kb_value:.0f} kB transférés"
+    return f"~{kb_value:.0f} kB transferred"
 
 
 def _format_server_infra(server):
-    """Type d'instance + provider si connu (cloud public via Boavizta),
-    sinon le type de serveur générique (autoscaling/serverless/on_premise).
-    Valeur seule, sans source/confiance (cf. docstring du module)."""
+    """Instance type + provider if known (public cloud via Boavizta), else the
+    generic server type (autoscaling/serverless/on_premise). Value alone,
+    without source/confidence (cf. module docstring)."""
     if server.instance_type and server.instance_type.value:
         provider = server.provider.value if server.provider and server.provider.value else None
         return f"{server.instance_type.value} ({provider})" if provider else server.instance_type.value
@@ -261,37 +256,36 @@ def _format_server_infra(server):
 
 
 def _global_hypotheses_note(spec, audience_mix=None):
-    """Lignes d'une note PlantUML récapitulant les hypothèses transverses :
-    trafic annuel, mix appareils, mix pays d'audience, temps de lecture total
-    cumulé du parcours. Retourne None si aucune de ces hypothèses n'est
-    disponible (spec sans AudienceSpec, ex. archétype de démo minimal).
+    """Lines of a PlantUML note recapping the cross-cutting hypotheses: annual
+    traffic, device mix, audience country mix, cumulative reading time of the
+    journey. Returns None if none of these hypotheses is available (spec
+    without AudienceSpec, e.g. minimal demo archetype).
 
-    `audience_mix` (dict {code_pays: part}) est un paramètre SÉPARÉ de
-    `spec.audience` : le mix pays d'audience vient de env-data.json
-    (SimilarWeb), jamais de la SiteSpec elle-même (AudienceSpec.country_mix
-    existe mais n'est peuplé par aucun adaptateur actuellement) — cf.
+    `audience_mix` (dict {country_code: share}) is a parameter SEPARATE from
+    `spec.audience`: the audience country mix comes from env-data.json
+    (SimilarWeb), never from the SiteSpec itself (AudienceSpec.country_mix
+    exists but is not populated by any adapter at the moment) — cf.
     run_efootprint.py::build_topology_overview()."""
     lines = []
     audience = spec.audience
     if audience and audience.visits_per_year and audience.visits_per_year.value:
-        lines.append(f"Trafic annuel estimé : {audience.visits_per_year.value:,.0f} visites".replace(",", " "))
+        lines.append(f"Estimated annual traffic: {audience.visits_per_year.value:,.0f} visits".replace(",", " "))
     if audience and audience.phone_fraction and audience.desktop_fraction:
         lines.append(
-            f"Mix appareils : {audience.phone_fraction.value:.0%} mobile / "
+            f"Device mix: {audience.phone_fraction.value:.0%} mobile / "
             f"{audience.desktop_fraction.value:.0%} desktop")
     if audience_mix:
         top = sorted(audience_mix.items(), key=lambda kv: kv[1], reverse=True)
-        lines.append("Mix pays d'audience : " + ", ".join(f"{cc} {w:.0%}" for cc, w in top))
+        lines.append("Audience country mix: " + ", ".join(f"{cc} {w:.0%}" for cc, w in top))
     total_user_time = sum(
         step.user_time.value for step in spec.steps if step.user_time and step.user_time.value)
     if total_user_time:
-        lines.append(f"Temps de lecture cumulé du parcours : ~{total_user_time:.0f} s")
+        lines.append(f"Total journey reading time: ~{total_user_time:.0f} s")
     return lines or None
 
 
 def _build_links(spec, step_alias, job_alias, server_alias):
-    """Lignes des liens visibles étape -> traitement déclenché, traitement ->
-    serveur."""
+    """Lines of the visible links step -> triggered job, job -> server."""
     lines = []
     for step in spec.steps:
         step_a = step_alias[step.key]
@@ -311,33 +305,33 @@ def _build_links(spec, step_alias, job_alias, server_alias):
 
 
 def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step_shares=None):
-    """Génère le texte PlantUML d'une `SiteSpec`, en 3 colonnes reprenant la
-    disposition de l'interface e-footprint (model_builder) : "Parcours"
-    (JourneySpec/StepSpec), "Traitements" (JobSpec, dont les appels IA
-    générative), "Infrastructure" (ServerSpec, hôtes tiers) — colonnes côte à
-    côte, plus hautes que larges (cf. docstring du module).
+    """Generates the PlantUML text of a `SiteSpec`, in 3 columns mimicking the
+    e-footprint interface (model_builder) layout: "Journey"
+    (JourneySpec/StepSpec), "Jobs" (JobSpec, including generative AI calls),
+    "Infrastructure" (ServerSpec, third-party hosts) — columns side by side,
+    taller than wide (cf. module docstring).
 
-    Affiche aussi les grandes hypothèses de calcul : une note globale
-    (trafic annuel, mix appareils, mix pays via `audience_mix`, temps de
-    lecture cumulé) et un détail par composant (temps de l'étape, poids
-    transféré du traitement, instance/provider du serveur).
+    Also displays the big calculation hypotheses: one global note (annual
+    traffic, device mix, countries via `audience_mix`, cumulative reading
+    time) and a detail per component (step time, job transferred weight,
+    server instance/provider).
 
-    step_shares : {step_key: pct_of_grand_total} optionnel, cf.
-    `build.py::step_impact_shares()`. Absent AVANT le calcul (Étape 25, vue
-    d'ensemble) : la part d'impact n'existe qu'une fois le CO2e effectivement
-    calculé. Fourni après (Étape 40) pour afficher, en plus du temps déjà
-    présent, la part ESTIMÉE (répartition proportionnelle, pas une mesure
-    indépendante) de chaque étape dans le total CO2e du site.
+    step_shares : {step_key: pct_of_grand_total} optional, cf.
+    `build.py::step_impact_shares()`. Absent BEFORE the calculation (Step 25,
+    overview): the impact share only exists once the CO2e has actually been
+    computed. Provided after (Step 40) to display, in addition to the time
+    already present, the ESTIMATED share (proportional distribution, not an
+    independent measurement) of each step in the site's total CO2e.
 
-    Retourne une chaîne, à écrire dans un fichier `.puml` par l'appelant
-    (ce module ne touche jamais au disque, comme spec.py/compose.py).
+    Returns a string, to be written into a `.puml` file by the caller (this
+    module never touches the disk, like spec.py/compose.py).
     """
     diagram_title = title or spec.name
-    # `@startuml <id>` PILOTE LE NOM DU FICHIER DE SORTIE quand plantuml
-    # génère depuis un .puml multi-diagrammes ou sans -o explicite : un titre
-    # avec espaces/accents/parenthèses (nom de site réel) produirait un nom de
-    # fichier fragile. L'identifiant reste un alias technique, le TITRE AFFICHÉ
-    # (ligne `title`, plus bas) porte le nom lisible du site.
+    # `@startuml <id>` DRIVES THE OUTPUT FILE NAME when plantuml generates
+    # from a multi-diagram .puml or without an explicit -o: a title with
+    # spaces/accents/parentheses (real site name) would produce a fragile file
+    # name. The identifier stays a technical alias, the DISPLAYED TITLE
+    # (`title` line, below) carries the readable site name.
     diagram_id = _sanitize_alias(f"site_{spec.name}")
     lines = [_HEADER.format(diagram_id=diagram_id, title=_escape_label(diagram_title))]
 
@@ -348,13 +342,13 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
     def wrapped(text):
         return _wrap_label(_escape_label(text), wrap_width)
 
-    package_order = []  # alias de chaque package de tête (pour le chaînage -[hidden]r-)
+    package_order = []  # alias of each top-level package (for the -[hidden]r- chaining)
 
-    # --- Colonne 1 : Parcours (JourneySpec regroupant des StepSpec) --------
+    # --- Column 1: Journey (JourneySpec grouping StepSpecs) ----------------
     if spec.journeys:
-        pkg_alias = "pkg_parcours"
+        pkg_alias = "pkg_journey"
         package_order.append(pkg_alias)
-        lines.append(f'package "Parcours" as {pkg_alias} {{')
+        lines.append(f'package "Journey" as {pkg_alias} {{')
         for journey in spec.journeys:
             journey_alias = _sanitize_alias(f"jrn_{journey.key}")
             lines.append(f'  package "{wrapped(journey.label)}" as {journey_alias} {{')
@@ -368,7 +362,7 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
                 if user_time_txt:
                     step_label = f"{step_label}\\n{user_time_txt}"
                 if step_shares and step.key in step_shares:
-                    step_label = f"{step_label}\\n~{step_shares[step.key] * 100:.0f} % du CO2e"
+                    step_label = f"{step_label}\\n~{step_shares[step.key] * 100:.0f} % of CO2e"
                 lines.append(f'    rectangle "{wrapped(step_label)}" as {alias}')
             for a, b in zip(step_aliases_in_journey, step_aliases_in_journey[1:]):
                 lines.append(f"    {a} -[hidden]d- {b}")
@@ -376,14 +370,14 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
         lines.append("}")
         lines.append("")
 
-    # --- Colonne 2 : Traitements (JobSpec, dont appels IA générative) ------
+    # --- Column 2: Jobs (JobSpec, including generative AI calls) -----------
     ai_jobs = [job for job in spec.jobs if job.external_api is not None]
     network_only_jobs = [job for job in spec.jobs if job.external_api is None]
 
     if network_only_jobs:
-        pkg_alias = "pkg_traitements"
+        pkg_alias = "pkg_jobs"
         package_order.append(pkg_alias)
-        lines.append(f'package "Traitements" as {pkg_alias} {{')
+        lines.append(f'package "Jobs" as {pkg_alias} {{')
         job_aliases_here = [job_alias[job.key] for job in network_only_jobs]
         for job in network_only_jobs:
             alias = job_alias[job.key]
@@ -398,9 +392,9 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
         lines.append("")
 
     if ai_jobs:
-        pkg_alias = "pkg_ia"
+        pkg_alias = "pkg_ai"
         package_order.append(pkg_alias)
-        lines.append(f'package "Appels IA générative (empreinte calculée via EcoLogits)" as {pkg_alias} {{')
+        lines.append(f'package "Generative AI calls (footprint computed via EcoLogits)" as {pkg_alias} {{')
         job_aliases_here = [job_alias[job.key] for job in ai_jobs]
         for job in ai_jobs:
             alias = job_alias[job.key]
@@ -415,7 +409,7 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
         lines.append("}")
         lines.append("")
 
-    # --- Colonne 3 : Infrastructure (ServerSpec, hôtes tiers) ---------------
+    # --- Column 3: Infrastructure (ServerSpec, third-party hosts) ----------
     pkg_alias = "pkg_infra"
     package_order.append(pkg_alias)
     lines.append(f'package "Infrastructure" as {pkg_alias} {{')
@@ -433,9 +427,9 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
     lines.append("")
 
     if spec.third_party_hosts:
-        pkg_alias = "pkg_tiers"
+        pkg_alias = "pkg_third_party"
         package_order.append(pkg_alias)
-        lines.append(f'package "Hôtes tiers (réseau seulement)" as {pkg_alias} {{')
+        lines.append(f'package "Third-party hosts (network only)" as {pkg_alias} {{')
         tp_aliases_here = []
         for host in spec.third_party_hosts:
             alias = _sanitize_alias(f"tp_{host.host}")
@@ -447,24 +441,24 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
         lines.append("}")
         lines.append("")
 
-    # --- Liens invisibles entre packages : colonnes côte à côte sans
-    # `left to right direction` (cf. docstring du module) -------------------
+    # --- Invisible links between packages: columns side by side without
+    # `left to right direction` (cf. module docstring) ----------------------
     for a, b in zip(package_order, package_order[1:]):
         lines.append(f"{a} -[hidden]r- {b}")
     lines.append("")
 
-    # --- Liens visibles : étape -> traitement déclenché, traitement -> serveur
+    # --- Visible links: step -> triggered job, job -> server
     lines.extend(_build_links(spec, step_alias, job_alias, server_alias))
 
-    # --- Légende globale : hypothèses transverses ---------------------------
-    # `legend bottom` (pleine largeur, sous le diagramme), PAS une `note`
-    # flottante : testé, une note sans ancrage reçoit une largeur arbitraire
-    # bien trop étroite du moteur de layout (un mot par ligne, illisible).
+    # --- Global legend: cross-cutting hypotheses ----------------------------
+    # `legend bottom` (full width, under the diagram), NOT a floating `note`:
+    # tested, an unanchored note gets an arbitrarily too-narrow width from the
+    # layout engine (one word per line, unreadable).
     hyp_lines = _global_hypotheses_note(spec, audience_mix=audience_mix)
     if hyp_lines:
         lines.append("")
         lines.append("legend bottom")
-        lines.append("<b>Hypothèses de calcul</b>")
+        lines.append("<b>Calculation assumptions</b>")
         for hyp_line in hyp_lines:
             escaped = _escape_label(hyp_line)
             lines.append(escaped if not escaped or escaped[0] not in "=-*#_" else f" {escaped}")
@@ -476,28 +470,28 @@ def site_to_plantuml(spec, *, title=None, wrap_width=30, audience_mix=None, step
 
 
 if __name__ == "__main__":
-    from .archetypes import dynamique_bdd
+    from .archetypes import dynamic_db
 
-    frag = dynamique_bdd.apply(
+    frag = dynamic_db.apply(
         prefix="demo",
         visits_per_year=50_000,
         page_weight_kb=250,
         user_time_seconds=45,
-        source_name="démonstration __main__ (données fictives)",
+        source_name="__main__ demo (fictional data)",
     )
     puml = site_to_plantuml(frag, audience_mix={"FR": 0.8, "BE": 0.2})
-    assert "@startuml" in puml and "@enduml" in puml, "diagramme mal formé"
+    assert "@startuml" in puml and "@enduml" in puml, "malformed diagram"
     assert puml.count("database") == len(frag.servers), \
-        "un composant database par serveur attendu"
+        "one database component per server expected"
     assert "left to right direction" not in puml, \
-        "cette disposition ne doit jamais réintroduire left to right direction"
-    assert "Hypothèses de calcul" in puml, "note globale d'hypothèses attendue"
+        "this layout must never reintroduce left to right direction"
+    assert "Calculation assumptions" in puml, "expected global assumptions note"
     for line in puml.splitlines():
         stripped = line.strip()
         if stripped and stripped[0] in "=-*#_":
             raise AssertionError(
-                f"ligne repliée commençant par un caractère creole PlantUML : {stripped!r}")
+                f"wrapped line starting with a PlantUML creole character: {stripped!r}")
     print(puml)
     print()
-    print(f"OK : diagramme généré, {len(frag.servers)} serveur(s), "
-          f"{len(frag.jobs)} traitement(s), {len(frag.steps)} étape(s).")
+    print(f"OK: diagram generated, {len(frag.servers)} server(s), "
+          f"{len(frag.jobs)} job(s), {len(frag.steps)} step(s).")

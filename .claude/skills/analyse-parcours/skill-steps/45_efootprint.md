@@ -1,32 +1,32 @@
-# Étape 45 - Estimation CO2e (e-footprint)
+# Step 45 - CO2e estimation (e-footprint)
 
-## Vue d'ensemble
+## Overview
 
-Cette étape orchestre le calcul d'une estimation CO2e du site analysé,
-via la librairie e-footprint (Boavizta). Elle s'appuie sur les scripts
-existants dans `.claude/skills/analyse-parcours/scripts/` :
+This step orchestrates the calculation of a CO2e estimate of the analyzed site,
+via the e-footprint library (Boavizta). It relies on the existing
+scripts in `.claude/skills/analyse-parcours/scripts/`:
 
-- `collect_env_data.py` : collecte HAR + CrUX + ipinfo -> `env-data.json`
-- `run_efootprint.py` : calcul CO2e + sérialisation -> `efootprint-boavizta-model.json`
+- `collect_env_data.py`: collects HAR + CrUX + ipinfo -> `env-data.json`
+- `run_efootprint.py`: CO2e calculation + serialization -> `efootprint-boavizta-model.json`
 
-**Cette étape ne duplique pas la logique** : elle détecte, questionne, appelle.
+**This step does not duplicate the logic**: it detects, asks, calls.
 
 -----
 
-## AVERTISSEMENT OBLIGATOIRE
+## MANDATORY WARNING
 
-Toutes les valeurs produites sont des **estimations hypothétiques**.
-Elles reposent sur des données collectées automatiquement (HAR, CrUX, ipinfo)
-et sur de nombreuses hypothèses par défaut (trafic, instance, mix électrique).
+All produced values are **hypothetical estimates**.
+They rest on automatically collected data (HAR, CrUX, ipinfo)
+and on many default assumptions (traffic, instance, electricity mix).
 
-Ces résultats **ne constituent pas une mesure réelle** de l'impact
-environnemental. Ils donnent un ordre de grandeur pour comparer des
-scénarios ou identifier les postes dominants.
+These results **are not a real measurement** of the
+environmental impact. They give an order of magnitude to compare
+scenarios or identify the dominant items.
 
-Ce rappel doit apparaître :
-- au démarrage de l'étape (avant de demander les paramètres)
-- sur chaque paramètre saisi (`hypothèse` ou `paramètre`)
-- dans le résumé final des résultats
+This reminder must appear:
+- at the start of the step (before asking for parameters)
+- on each entered parameter (`hypothesis` or `parameter`)
+- in the final results summary
 
 -----
 
@@ -34,512 +34,505 @@ Ce rappel doit apparaître :
 
 ```
 /efootprint <source_dir>
-/efootprint                       # source_dir déduit du contexte analyse-parcours
+/efootprint                       # source_dir inferred from the analyse-parcours context
 ```
 
-Déclencheurs textuels :
-- "estime l'empreinte du site"
-- "calcule l'impact CO2"
-- "e-footprint sur ce parcours"
-- "impact environnemental"
+Text triggers:
+- "estimate the site's footprint"
+- "calculate the CO2 impact"
+- "e-footprint on this journey"
+- "environmental impact"
 
 -----
 
-## Principe architectural : chaque étape est relançable
+## Architectural principle: each step is re-runnable
 
 ```
-Étape 10 -> source_dir           (détection ou saisie)
-Étape 20 -> env-data.json        (collect_env_data.py, cache permanent)
-Étape 25 -> vue d'ensemble (topologie + BDD/streaming/IA suspectés, PlantUML)
-Étape 30 -> paramètres utilisateur (AskUserQuestion sur trafic + instance)
-Étape 40 -> efootprint-boavizta-model.json + efootprint-synthese-python.json (run_efootprint.py, recalcul à chaque run)
-Étape 50 -> synthèse + propositions
+Step 10 -> source_dir           (detection or input)
+Step 20 -> env-data.json        (collect_env_data.py, permanent cache)
+Step 25 -> overview (topology + suspected DB/streaming/AI, PlantUML)
+Step 30 -> user parameters (AskUserQuestion on traffic + instance)
+Step 40 -> efootprint-boavizta-model.json + efootprint-python-summary.json (run_efootprint.py, recalculated at each run)
+Step 50 -> synthesis + proposals
 ```
 
-Chaque étape peut être relancée indépendamment :
-- Relancer étape 20 : passer `--refresh` à `collect_env_data.py`
-- Relancer étape 25 : rappeler `build_topology_overview()` (aucun paramètre,
-  relit env-data.json + le HAR tels qu'ils sont au moment de l'appel)
-- Relancer étape 40 : rappeler `run_efootprint.py` avec d'autres `--visits` ou `--instance`
+Each step can be re-run independently:
+- Re-run step 20: pass `--refresh` to `collect_env_data.py`
+- Re-run step 25: call `build_topology_overview()` again (no parameter,
+  re-reads env-data.json + the HAR as they are at call time)
+- Re-run step 40: call `run_efootprint.py` again with other `--visits` or `--instance`
 
 -----
 
-## Étape 10 - Localisation du source_dir
+## Step 10 - Locating source_dir
 
-Objectif : déterminer le dossier contenant le HAR (ou au moins un `env-data.json`).
+Objective: determine the folder containing the HAR (or at least an `env-data.json`).
 
-Ordre de résolution :
-1. **Argument explicite** : `/efootprint <chemin>` -> utiliser tel quel
-2. **Contexte analyse-parcours** : si un HAR a été analysé récemment dans la
-   conversation, proposer son dossier parent en confirmation à l'utilisateur
-3. **Fichier ouvert** : si un `.har` est visible dans le contexte, proposer son parent
-4. **Défaut** : demander via AskUserQuestion avec une liste des dossiers
-   contenant un `.har` ou un `env-data.json` à la racine du projet
+Resolution order:
+1. **Explicit argument**: `/efootprint <path>` -> use as-is
+2. **analyse-parcours context**: if a HAR was analyzed recently in the
+   conversation, suggest its parent folder to the user for confirmation
+3. **Open file**: if a `.har` is visible in the context, suggest its parent
+4. **Default**: ask via AskUserQuestion with a list of folders
+   containing a `.har` or an `env-data.json` at the project root
 
-Vérifier ensuite que `source_dir` existe et contient soit un `.har`, soit un
-`env-data.json`. Sinon : signaler mode dégradé et proposer d'abandonner ou
-de créer manuellement `env-data.json`.
+Then verify that `source_dir` exists and contains either a `.har` or an
+`env-data.json`. Otherwise: report degraded mode and offer to give up or
+to create `env-data.json` manually.
 
 -----
 
-## Étape 20 - Collecte env-data.json
+## Step 20 - Collecting env-data.json
 
-Si ce dossier a déjà été traité par `/analyse-parcours`, `env-data.json`
-existe probablement déjà (Wave 1 de l'étape 25, bloc `collecte-env-data`,
-cf. `skill-steps/25_dispatch-orchestration.md`) : cette étape se limite
-alors à proposer `--refresh` si les données doivent être rafraîchies. Le
-flux `/efootprint <source_dir>` autonome (sans `/analyse-parcours`
-préalable) reste inchangé ci-dessous.
+If this folder was already processed by `/analyse-parcours`, `env-data.json`
+probably already exists (Wave 1 of step 25, block `collect-env-data`,
+cf. `skill-steps/25_dispatch-orchestration.md`): this step is then
+limited to offering `--refresh` if the data must be refreshed. The
+standalone `/efootprint <source_dir>` flow (without a prior `/analyse-parcours`)
+remains unchanged below.
 
-Vérifier la présence de `<source_dir>/env-data.json` :
+Check the presence of `<source_dir>/env-data.json`:
 
-- **Absent** : lancer `collect_env_data.py <source_dir>` (sans `--refresh`)
-- **Présent** : proposer via AskUserQuestion :
-  - "Utiliser le cache existant" (défaut, rapide)
-  - "Recollecte fraîche (--refresh)" (utile si HAR mis à jour)
+- **Absent**: run `collect_env_data.py <source_dir>` (without `--refresh`)
+- **Present**: offer via AskUserQuestion:
+  - "Use the existing cache" (default, fast)
+  - "Fresh re-collection (--refresh)" (useful if the HAR was updated)
 
-**Mode dégradé** : si `collect_env_data.py` échoue (pas de HAR, pas de clé API),
-l'étape continue avec ce qui existe. Signaler explicitement les champs
-en `confidence: default` -- ils auront le plus fort impact sur la précision.
+**Degraded mode**: if `collect_env_data.py` fails (no HAR, no API key),
+the step continues with what exists. Explicitly report the fields
+in `confidence: default` -- they will have the highest impact on precision.
 
-Après collecte, afficher un résumé court des données collectées (2-3 lignes).
+After collection, display a short summary of the collected data (2-3 lines).
 
-### Étape 20b - Mix pays d'audience (pondération iOS/macOS)
+### Step 20b - Audience country mix (iOS/macOS weighting)
 
-Le mix pays sert **uniquement** à pondérer les parts iOS (mobile) et macOS (desktop)
-de la correction CrUX (CrUX = Chrome only ; voir Étape 30). Il ne touche pas aux CWV.
-Ordre de priorité (résolu par `collect_env_data.py`) :
+The country mix is used **only** to weight the iOS (mobile) and macOS (desktop)
+shares of the CrUX correction (CrUX = Chrome only; see Step 30). It does not touch the CWVs.
+Priority order (resolved by `collect_env_data.py`):
 
-1. **`--audience` saisi** (le plus fiable) : si l'utilisatrice dispose de l'analytics
-   du site (GA/Matomo), lui demander la répartition pays et la passer en
-   `--audience "FR:0.7,US:0.3"` (ou raccourci pays unique `--audience FR`).
-2. **API interne SimilarWeb** (automatique, voir Étape 20e) : `collect_env_data.py`
-   interroge lui-même l'API quand le bloc `audience` manque et qu'aucun `--audience`
-   n'est fourni. C'est la voie normale à défaut d'analytics client.
-3. **Récupération assistée** (Étape 20d) : si l'API échoue (403, domaine non suivi).
-4. **Défaut France (100 %)** + avertissement : dernier recours.
+1. **`--audience` entered** (most reliable): if the user has the site's
+   analytics (GA/Matomo), ask for the country split and pass it as
+   `--audience "FR:0.7,US:0.3"` (or single-country shorthand `--audience FR`).
+2. **Internal SimilarWeb API** (automatic, see Step 20e): `collect_env_data.py`
+   queries the API itself when the `audience` block is missing and no `--audience`
+   is provided. This is the default path when client analytics are unavailable.
+3. **Assisted retrieval** (Step 20d): if the API fails (403, untracked domain).
+4. **France default (100%)** + warning: last resort.
 
-Le bloc `audience` écrit (par l'API ou en assisté) a ce format :
+The `audience` block written (by the API or assisted) has this format:
 ```json
 "audience": {
   "mix": {"FR": 0.61, "SN": 0.105, "US": 0.041},
-  "source": "SimilarWeb (estimation)",
-  "source_url": "https://www.similarweb.com/website/<domaine>/",
+  "source": "SimilarWeb (estimate)",
+  "source_url": "https://www.similarweb.com/website/<domain>/",
   "confidence": "medium"
 }
 ```
-`source_url` est repris tel quel dans le rapport comme lien "↗ source" à côté du
-libellé de provenance du mix. `collect_env_data.py --refresh` **préserve** un bloc
-`audience` déjà présent avec une vraie source (sauf si `--audience` est fourni, qui
-prime), le renormalise et calcule les parts iOS/macOS pondérées.
+`source_url` is reused as-is in the report as a "↗ source" link next to the provenance label of the mix. `collect_env_data.py --refresh` **preserves** an `audience` block already present with a real source (unless `--audience` is provided, which takes precedence), renormalizes it and computes the weighted iOS/macOS shares.
 
-**Caveat obligatoire** : SimilarWeb est une estimation grossière, source non
-officielle, usage limite CGU. Le caveat figure aussi dans l'annexe du rapport.
+**Mandatory caveat**: SimilarWeb is a rough estimate, unofficial source, borderline ToS use. The caveat also appears in the report appendix.
 
-### Étape 20c - Volume de trafic annuel (visites/an)
+### Step 20c - Annual traffic volume (visits/year)
 
-Même logique que le mix pays : **aucune API publique** (PageSpeed, CrUX) ne donne de
-volume d'audience (uniquement des distributions, jamais de compteurs). Le trafic est
-donc résolu par ordre de priorité :
+Same logic as the country mix: **no public API** (PageSpeed, CrUX) gives
+audience volume (only distributions, never counters). Traffic is therefore
+resolved by priority order:
 
-1. **`--visits` saisi** (le plus fiable, dans `run_efootprint.py`) : analytics du site
-   (GA4/Matomo/logs serveur).
-2. **API interne SimilarWeb** (automatique, voir Étape 20e) : `collect_env_data.py`
-   remplit le bloc `traffic` quand il manque. Voie normale à défaut d'analytics.
-3. **Récupération assistée** (Étape 20d) : si l'API échoue.
-4. **Défaut 100 000 visites/an** + avertissement : dernier recours.
+1. **`--visits` entered** (most reliable, in `run_efootprint.py`): the site's
+   analytics (GA4/Matomo/server logs).
+2. **Internal SimilarWeb API** (automatic, see Step 20e): `collect_env_data.py`
+   fills the `traffic` block when it is missing. Default path when analytics are unavailable.
+3. **Assisted retrieval** (Step 20d): if the API fails.
+4. **Default 100,000 visits/year** + warning: last resort.
 
-Le bloc `traffic` écrit a ce format :
+The written `traffic` block has this format:
 ```json
 "traffic": {
   "visits_per_year": 440000,
   "monthly_visits": 36700,
-  "source": "SimilarWeb (estimation)",
-  "source_url": "https://www.similarweb.com/website/<domaine>/",
-  "snapshot": "juin 2026",
+  "source": "SimilarWeb (estimate)",
+  "source_url": "https://www.similarweb.com/website/<domain>/",
+  "snapshot": "June 2026",
   "confidence": "medium"
 }
 ```
 
-- `visits_per_year` = `monthly_visits × 12` (annualisation). Renseigner `monthly_visits`
-  et `snapshot` (mois de la mesure) permet au rapport d'afficher la dérivation.
-- `collect_env_data.py <source_dir> --refresh` **préserve** ce bloc `traffic` (comme
-  `audience`) ; `run_efootprint.py` le lit automatiquement si `--visits` n'est pas passé.
-- `source_url` est repris comme lien "↗ source" dans le rapport (corps + annexe D).
-- **Caveat obligatoire** : estimation tierce à **marge large**, pas une mesure. Seuls
-  les analytics du site donnent un chiffre exact. Rappeler aussi que le CO2e **total**
-  croît avec le trafic (au-dessus d'un socle fixe fabrication serveur + stockage) alors
-  que le CO2e **par visite** diminue quand le trafic augmente (relation affine).
+- `visits_per_year` = `monthly_visits × 12` (annualization). Filling in `monthly_visits`
+  and `snapshot` (month of the measurement) lets the report display the derivation.
+- `collect_env_data.py <source_dir> --refresh` **preserves** this `traffic` block (like
+  `audience`); `run_efootprint.py` reads it automatically if `--visits` is not passed.
+- `source_url` is reused as a "↗ source" link in the report (body + appendix D).
+- **Mandatory caveat**: third-party estimate with a **wide margin**, not a measurement. Only
+  the site's analytics give an exact figure. Also recall that total CO2e **grows**
+  with traffic (above a fixed base of server manufacturing + storage) while CO2e **per visit**
+  decreases when traffic increases (affine relationship).
 
-### Étape 20d - Récupération assistée si l'API SimilarWeb échoue (captcha / challenge WAF)
+### Step 20d - Assisted retrieval if the SimilarWeb API fails (captcha / WAF challenge)
 
-SimilarWeb sert régulièrement un **captcha à sélection d'images** ou un challenge AWS WAF
-aux accès automatisés. **Ne jamais inventer de chiffres, ne pas contourner le
-captcha** : la donnée doit transiter par l'utilisatrice. Deux voies, à lui proposer
-**toutes les deux**.
+SimilarWeb regularly serves an **image-selection captcha** or an AWS WAF challenge
+to automated access. **Never invent figures, do not bypass the
+captcha**: the data must go through the user. Two ways, offer
+**both**.
 
-**Déclencheur** : l'appel automatique à l'API interne (Étape 20e, lancé par
-`collect_env_data.py`) échoue — 403 CloudFront, domaine peu/pas suivi (message
-`⚠ SimilarWeb : …`), ou réseau. Ne PAS enchaîner silencieusement sur le défaut :
-proposer d'abord cette récupération assistée.
+**Trigger**: the automatic call to the internal API (Step 20e, launched by
+`collect_env_data.py`) fails — CloudFront 403, little/untracked domain (message
+`⚠ SimilarWeb: …`), or network. Do NOT silently fall through to the default:
+offer this assisted retrieval first.
 
-Message à afficher (adapter `<domaine>` et l'URL exacte) :
+Message to display (adapt `<domain>` and the exact URL):
 
-> 🔒 **SimilarWeb me bloque (captcha). J'ai besoin de ton aide pour récupérer le trafic
-> et le mix pays d'audience.**
+> 🔒 **SimilarWeb is blocking me (captcha). I need your help to retrieve the traffic
+> and the audience country mix.**
 >
-> 1. Ouvre cette URL dans ton navigateur : `https://www.similarweb.com/website/<domaine>/`
-> 2. Passe le captcha (sélection d'images).
-> 3. Repère ces **deux** informations sur la page :
->    - **Total Visits** : le gros chiffre du trafic mensuel (ex. "36.7K") **+ la période
->      affichée** (ex. "Jun 2026").
->    - Le bloc **"Top Countries"** : les 3-5 premiers pays avec leurs pourcentages
->      (ex. FR 61 %, SN 10 %, US 4 %, TN 3 %, BR 3 %).
-> 4. Transmets-les moi **au choix** :
->    - **Voie A - dictée** : colle-moi directement ces valeurs en chat (le plus rapide).
->    - **Voie B - capture d'écran** : fais une ou deux captures montrant clairement ces
->      deux blocs, dépose-les dans le dossier `<source_dir>/` et nomme-les
->      `similarweb-<domaine>.png` (ou `.jpg`), puis dis-moi "c'est fait".
+> 1. Open this URL in your browser: `https://www.similarweb.com/website/<domain>/`
+> 2. Pass the captcha (image selection).
+> 3. Find these **two** pieces of information on the page:
+>    - **Total Visits**: the big monthly traffic figure (e.g. "36.7K") **+ the displayed
+>      period** (e.g. "Jun 2026").
+>    - The **"Top Countries"** block: the top 3-5 countries with their percentages
+>      (e.g. FR 61%, SN 10%, US 4%, TN 3%, BR 3%).
+> 4. Send them to me **either way**:
+>    - **Way A - dictation**: paste these values directly in the chat (fastest).
+>    - **Way B - screenshot**: take one or two screenshots clearly showing these
+>      two blocks, drop them in the `<source_dir>/` folder and name them
+>      `similarweb-<domain>.png` (or `.jpg`), then tell me "done".
 
-Précisions pour bien "mâcher" la demande, quelle que soit la voie :
-- **Toujours nommer les deux blocs** attendus (Total Visits **+ période**, Top Countries) :
-  ne pas demander "toute la page", demander ces zones précises.
-- **Voie A (dictée)** : après réception, relire à l'utilisatrice ce que tu as compris
-  (chiffre mensuel, période, liste pays %) avant d'écrire, pour rattraper une faute de
-  frappe. `source` = `"SimilarWeb (saisie assistée après captcha)"`.
-- **Voie B (capture)** : formats lisibles = **PNG, JPG/JPEG, WebP, PDF**. **Éviter le
-  HTML enregistré** (Cmd+S) : les chiffres SimilarWeb sont chargés en JavaScript, le HTML
-  brut est souvent vide. La seule contrainte réelle est la **lisibilité** (chiffres nets,
-  présents dans l'image). Lire le fichier déposé avec l'outil Read, extraire les valeurs.
-  `source` = `"SimilarWeb (capture après captcha)"`.
-- **Écriture** : dans les deux cas, écrire les blocs `audience` (Étape 20b) **et**
-  `traffic` (Étape 20c) dans `env-data.json`, avec `source_url` = l'URL consultée et
-  `snapshot` = la période lue, puis relancer `collect_env_data.py <source_dir> --refresh`
-  (qui préserve les deux blocs). Le libellé de source et le lien "↗ source" remontent
-  tels quels dans le rapport (corps + annexe D) : distincts d'un vrai analytics client.
-- **Dernier recours** : si l'utilisatrice ne peut pas fournir la donnée (pas d'accès,
-  page indisponible), alors seulement retomber sur les défauts (France 100 % + 100 000/an)
-  avec l'avertissement `⚠`, en le signalant explicitement dans le rapport.
+Details to properly "frame" the request, whichever way:
+- **Always name the two** expected blocks (Total Visits **+ period**, Top Countries):
+  do not ask for "the whole page", ask for these specific areas.
+- **Way A (dictation)**: after receiving, read back to the user what you understood
+  (monthly figure, period, country list %) before writing, to catch a typo.
+  `source` = `"SimilarWeb (manual entry after captcha)"`.
+- **Way B (screenshot)**: readable formats = **PNG, JPG/JPEG, WebP, PDF**. **Avoid saved
+  HTML** (Cmd+S): SimilarWeb figures are loaded in JavaScript, the raw HTML
+  is often empty. The only real constraint is **readability** (clear figures,
+  present in the image). Read the dropped file with the Read tool, extract the values.
+  `source` = `"SimilarWeb (screenshot after captcha)"`.
+- **Writing**: in both cases, write the `audience` (Step 20b) **and**
+  `traffic` (Step 20c) blocks into `env-data.json`, with `source_url` = the consulted URL and
+  `snapshot` = the read period, then re-run `collect_env_data.py <source_dir> --refresh`
+  (which preserves both blocks). The source label and the "↗ source" link appear
+  as-is in the report (body + appendix D): distinct from real client analytics.
+- **Last resort**: if the user cannot provide the data (no access,
+  page unavailable), only then fall back to the defaults (France 100% + 100,000/year)
+  with the `⚠` warning, explicitly reported in the report.
 
-### Étape 20e - Automatisation via l'API interne SimilarWeb (voie principale, intégrée)
+### Step 20e - Automation via the internal SimilarWeb API (main path, integrated)
 
-**Contexte :** L'extension Chrome/Firefox SimilarWeb (`hoklmmgfnpapgjgcpechhaamimifchmp`) interroge
-une API interne (endpoint extrait du `.crx`) qui répond **sans authentification** : ni cookie, ni
-compte, ni session. Le module `similarweb_api.py` reproduit cet appel et construit les blocs
-`audience` (20b) et `traffic` (20c). C'est la **voie principale** : elle évite le captcha et la
-saisie assistée dans la plupart des cas.
+**Context:** The SimilarWeb Chrome/Firefox extension (`hoklmmgfnpapgjgcpechhaamimifchmp`) queries
+an internal API (endpoint extracted from the `.crx`) that responds **without authentication**: no cookie, no
+account, no session. The `similarweb_api.py` module reproduces this call and builds the
+`audience` (20b) and `traffic` (20c) blocks. This is the **main path**: it avoids the captcha and
+assisted entry in most cases.
 
-**Intégration (nouveau) :** `collect_env_data.py` appelle **lui-même** ce module, automatiquement,
-quand un bloc `audience` ou `traffic` manque. Plus besoin de lancer deux commandes : une seule
-suffit.
+**Integration (new):** `collect_env_data.py` calls this module **itself**, automatically,
+when an `audience` or `traffic` block is missing. No need to run two commands anymore: a single
+one suffices.
 ```bash
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
 ```
-Options associées :
-- `--sw-domain <domaine>` : force le domaine interrogé (sinon déduit de `env-data.json`/HAR).
-- `--no-similarweb` : désactive l'appel (mode hors-ligne / éviter le réseau).
-- Le module reste utilisable en **standalone** pour inspection : `similarweb_api.py <dir>
+Associated options:
+- `--sw-domain <domain>`: force the queried domain (otherwise inferred from `env-data.json`/HAR).
+- `--no-similarweb`: disable the call (offline mode / avoid the network).
+- The module remains usable in **standalone** for inspection: `similarweb_api.py <dir>
   [--domain octo.com] [--print-only]`.
 
-**Déclenchement et garde-fous** (l'ordre de priorité reste sacré) :
-- Appel lancé **seulement** si le bloc visé manque (absent, ou `source` = `default`/`None`).
-- `--audience` fourni → la saisie manuelle prime, l'API **n'écrit pas** le mix pays (elle peut
-  toujours compléter le trafic s'il manque).
-- Bloc déjà présent avec une vraie source → **jamais écrasé** (idempotent sur `--refresh`).
-- Blocs écrits avec `source = "SimilarWeb (estimation)"` (libellé neutre, la méthode API reste doc
-  interne), `source_url` (page lisible `www.similarweb.com/website/<domaine>/` pour vérification) et
-  `snapshot`. Ne touche à rien d'autre dans `env-data.json`.
+**Trigger and guardrails** (the priority order remains sacred):
+- Call launched **only** if the targeted block is missing (absent, or `source` = `default`/`None`).
+- `--audience` provided → manual entry takes precedence, the API **does not write** the country mix (it can
+  still complete the traffic if it is missing).
+- Block already present with a real source → **never overwritten** (idempotent on `--refresh`).
+- Blocks written with `source = "SimilarWeb (estimate)"` (neutral label, the API method remains internal doc),
+  `source_url` (readable page `www.similarweb.com/website/<domain>/` for verification) and
+  `snapshot`. Touches nothing else in `env-data.json`.
 
-**Ce qui a été validé (juillet 2026) :**
-- Endpoint : `https://data.similarweb.com/api/v1/data?domain=<domaine>` (GET)
-- En-têtes **suffisants** : `Content-Type: application/json`, `X-Extension-Version: 6.12.21`,
-  et **un vrai `User-Agent` de navigateur**.
-- Retourne `TopCountryShares` (mix pays), `EstimatedMonthlyVisits` (visites/mois),
-  `Engagments`, `GlobalRank`, `TrafficSources`… : tout ce dont 20b/20c ont besoin.
+**What was validated (July 2026):**
+- Endpoint: `https://data.similarweb.com/api/v1/data?domain=<domain>` (GET)
+- **Sufficient** headers: `Content-Type: application/json`, `X-Extension-Version: 6.12.21`,
+  and **a real browser `User-Agent`**.
+- Returns `TopCountryShares` (country mix), `EstimatedMonthlyVisits` (visits/month),
+  `Engagments`, `GlobalRank`, `TrafficSources`…: everything 20b/20c need.
 
-**Diagnostic du 403 (corrigé) :** le blocage documenté auparavant ne venait **pas** d'un manque
-de cookies (hypothèse fausse), mais de deux erreurs dans la requête de test :
-1. En-tête `Origin: chrome-extension://...` → CloudFront le rejette (403). **Ne pas l'envoyer.**
-2. User-Agent non navigateur (défaut d'un client HTTP) → 403. **Envoyer un UA navigateur.**
-Sans `Origin` et avec un UA navigateur, l'appel répond **200** depuis un simple client HTTP.
+**403 diagnostic (fixed):** the previously documented block did **not** come
+from a lack of cookies (false hypothesis), but from two errors in the test request:
+1. `Origin: chrome-extension://...` header → CloudFront rejects it (403). **Do not send it.**
+2. Non-browser User-Agent (default of an HTTP client) → 403. **Send a browser UA.**
+Without `Origin` and with a browser UA, the call answers **200** from a plain HTTP client.
 
-**En cas d'échec** (403 réapparu, domaine peu/pas suivi, réseau), `collect_env_data.py` affiche un
-message `⚠ SimilarWeb : …` puis **continue sans crasher** : retomber alors sur la **récupération
-assistée (Étape 20d)**, pas sur le défaut silencieux. Note : l'API répond 200 même pour un domaine
-inconnu, mais sans `TopCountryShares` ni visites → les blocs ne sont pas construits (message
-explicite).
+**In case of failure** (403 reappears, little/untracked domain, network), `collect_env_data.py` displays a
+`⚠ SimilarWeb: …` message then **continues without crashing**: then fall back to the **assisted
+retrieval (Step 20d)**, not to the silent default. Note: the API answers 200 even for an
+unknown domain, but without `TopCountryShares` or visits → the blocks are not built (explicit
+message).
 
-**Ordre de priorité global des sources** (mix pays ET trafic) :
-1. Analytics client (`--audience` / `--visits`) : le plus fiable.
-2. **API interne SimilarWeb** (automatique, intégrée à `collect_env_data.py`) : voie principale.
-3. Récupération assistée (20d) : si l'API échoue (captcha/WAF/domaine non suivi).
-4. Défauts France 100 % + 100 000/an + `⚠` : dernier recours.
+**Global source priority order** (country mix AND traffic):
+1. Client analytics (`--audience` / `--visits`): the most reliable.
+2. **Internal SimilarWeb API** (automatic, integrated into `collect_env_data.py`): main path.
+3. Assisted retrieval (20d): if the API fails (captcha/WAF/untracked domain).
+4. France 100% + 100,000/year defaults + `⚠`: last resort.
 
-**Robustesse à surveiller :** si l'API se remet à renvoyer 403, revalider la version d'extension
-(`EXTENSION_VERSION` dans `similarweb_api.py`) et l'absence d'en-tête `Origin`. Caveat inchangé :
-SimilarWeb reste une **estimation tierce à marge large**, source non officielle (usage limite CGU),
-distincte d'un vrai analytics client : le caveat figure dans l'annexe du rapport.
+**Robustness to watch:** if the API goes back to returning 403, re-validate the extension version
+(`EXTENSION_VERSION` in `similarweb_api.py`) and the absence of the `Origin` header. Caveat unchanged:
+SimilarWeb remains a **third-party estimate with a wide margin**, unofficial source (borderline ToS use),
+distinct from real client analytics: the caveat appears in the report appendix.
 
 -----
 
-## Étape 25 - Vue d'ensemble du système avant calcul
+## Step 25 - System overview before calculation
 
-**AVERTISSEMENT (rappel obligatoire) :** ce qui suit est une hypothèse de
-topologie construite depuis le HAR, pas une architecture confirmée. La
-détection BDD/streaming/IA est une SUSPICION (heuristique sur signaux réseau
-visibles côté client), jamais une mesure — sauf pour un provider IA/BaaS
-reconnu par son nom de domaine exact, où le signal est quasi certain.
+**WARNING (mandatory reminder):** what follows is a topology hypothesis built from the HAR, not a confirmed architecture. DB/streaming/AI detection is a SUSPICION (heuristic on network signals
+visible on the client side), never a measurement — except for an AI/BaaS provider
+recognized by its exact domain name, where the signal is almost certain.
 
-Objectif : avant de lancer le calcul CO2e (Étape 40), présenter à
-l'utilisatrice le système que l'agent a "en tête" — serveurs détectés,
-services tiers, suspicions BDD/streaming/IA — et converger avec elle par
-QCM sur cette vue avant de poursuivre.
+Objective: before launching the CO2e calculation (Step 40), present to
+the user the system the agent has "in mind" — detected servers,
+third-party services, suspected DB/streaming/AI — and converge with them via
+multiple-choice questions on this view before continuing.
 
-### Étape 25a - Construction de la vue d'ensemble
+### Step 25a - Building the overview
 
-Appeler `run_efootprint.py::build_topology_overview(source_dir)` (chaîne :
+Call `run_efootprint.py::build_topology_overview(source_dir)` (chain:
 `load_env_data` -> `find_har` -> `infer_audited_domain` -> `spec_from_env_data`
--> `detect_tech.detect_from_har` -> annotation des hôtes tiers suspects ->
-`site_to_plantuml`, avec le mix pays d'audience lu dans `env-data.json`). Ne
-dépend d'AUCUN paramètre de l'Étape 30 : le trafic a toujours un défaut résolu
-(100 000/an) dès l'Étape 20.
+-> `detect_tech.detect_from_har` -> annotation of suspected third-party hosts ->
+`site_to_plantuml`, with the audience country mix read from `env-data.json`). Depends on NO parameter of Step 30: traffic always has a resolved default
+(100,000/year) from Step 20.
 
-**Préconditions** (si non réunies, informer et proposer de relancer l'Étape 20
-avant de continuer) :
-- un `.har` doit exister dans `source_dir` (ou son sous-dossier
-  `donnees-brutes-potentiellement-sensibles/`)
-- `env-data.json` doit contenir au moins un serveur détecté (`servers` non
-  vide) — sinon `collect_env_data.py` n'a pas encore tourné avec ce HAR
+**Preconditions** (if not met, inform and offer to re-run Step 20
+before continuing):
+- a `.har` must exist in `source_dir` (or its
+  `raw-data-potentially-sensitive/` subfolder)
+- `env-data.json` must contain at least one detected server (`servers` non
+  empty) — otherwise `collect_env_data.py` has not yet run with this HAR
 
-`build_topology_overview()` lève `RuntimeError` avec un message actionnable
-si une précondition manque : afficher ce message et proposer de relancer
-l'Étape 20, jamais laisser remonter une trace brute.
+`build_topology_overview()` raises `RuntimeError` with an actionable message
+if a precondition is missing: display this message and offer to re-run
+Step 20, never let a raw traceback bubble up.
 
-### Étape 25b - Présentation texte
+### Step 25b - Text presentation
 
-Afficher, dans cet ordre :
-1. Le rappel "estimation hypothétique" (cf. AVERTISSEMENT OBLIGATOIRE en tête
-   de fichier).
-2. `print_hypotheses(spec)` (résumé des serveurs détectés, nombre d'étapes,
-   trafic par défaut) — déjà existant, réutilisé À L'IDENTIQUE, AVANT tout
-   ajustement --visits/--instance.
-3. Le résumé de topologie (deuxième élément retourné par
-   `build_topology_overview()`) :
-   - Nombre et libellé des serveurs 1st-party détectés.
-   - Services Backend-as-a-Service / BDD tiers suspectés (domaine exact
-     reconnu -> "identifié" ; sinon -> "suspecté").
-   - Streaming média suspecté (extension .m3u8/.mpd ou content-type
-     vidéo/audio observé).
-   - IA générative tierce identifiée (domaine d'API reconnu : OpenAI,
+Display, in this order:
+1. The "hypothetical estimate" reminder (cf. MANDATORY WARNING at the top
+   of the file).
+2. `print_hypotheses(spec)` (summary of detected servers, number of steps,
+   default traffic) — already existing, reused AS-IS, BEFORE any --visits/--instance
+   adjustment.
+3. The topology summary (second element returned by
+   `build_topology_overview()`):
+   - Number and label of detected 1st-party servers.
+   - Suspected Backend-as-a-Service / third-party DBs (exact domain
+     recognized -> "identified"; otherwise -> "suspected").
+   - Suspected media streaming (.m3u8/.mpd extension or
+     video/audio content-type observed).
+   - Identified third-party generative AI (recognized API domain: OpenAI,
      Anthropic, Google Generative AI, Mistral AI, Cohere, Azure OpenAI,
      Hugging Face).
-   - **Rappel honnête et systématique**, déjà inclus dans le texte généré :
-     "une base de données ou un service auto-hébergé DERRIÈRE le serveur
-     applicatif n'émet aucun signal visible depuis le trafic réseau
-     capturé. Cette section ne peut donc JAMAIS conclure à son absence."
-4. Toute réserve de calcul (`calculation_reserves(spec)`), à titre
-   INFORMATIF uniquement à ce stade (jamais bloquant ici — elle ne bloque
-   qu'à l'Étape 40).
+   - **Honest and systematic reminder**, already included in the generated text:
+     "a database or a self-hosted service BEHIND the application server
+     emits no signal visible from the captured network traffic.
+     This section can therefore NEVER conclude to its absence."
+4. Any calculation reserve (`calculation_reserves(spec)`), for
+   INFORMATION only at this stage (never blocking here — it only blocks
+   at Step 40).
 
-### Étape 25c - Présentation graphique (PlantUML)
+### Step 25c - Graphical presentation (PlantUML)
 
-Priorité annoncée à l'utilisatrice : **d'abord l'interface web e-footprint**
-(https://e-footprint.boavizta.org/model_builder/), qui reste la référence
-visuelle si elle souhaite l'utiliser directement. **À défaut** (pour rester
-autonome, sans dépendance lourde type Playwright), proposer le diagramme
-PlantUML généré automatiquement (troisième élément retourné par
-`build_topology_overview()`) :
+Announced priority to the user: **first the e-footprint web interface**
+(https://e-footprint.boavizta.org/model_builder/), which remains the visual
+reference if they want to use it directly. **Failing that** (to stay
+autonameous, without a heavy dependency like Playwright), offer the automatically
+generated PlantUML diagram (third element returned by
+`build_topology_overview()`):
 
-1. Écrire le texte PlantUML dans `<source_dir>/topologie-<domaine>.puml`
-   (fichier généré, non commité — cf. `.gitignore`).
-2. Si `plantuml`/`rsvg-convert` sont disponibles dans l'environnement :
-   générer le SVG puis le PDF (mêmes commandes que le skill
-   `diagrammes-analyse-parcours`), et le montrer à l'utilisatrice.
-   **PIÈGE** : `plantuml -tsvg` nomme le fichier de sortie d'après l'identifiant
-   `@startuml <id>` du diagramme (ex. `site_octo_com.svg`), JAMAIS d'après le
-   nom du fichier `.puml` d'entrée. Toujours renommer le SVG produit en
-   `topologie-<domaine>.svg` juste après la génération (sinon
-   `load_topology_svg()` dans `generate_report_html.py`, qui ne cherche que
-   `topologie-*.svg`, ne le trouve pas et le rapport HTML retombe sur un SVG
-   périmé ou reste sans diagramme).
-3. Sinon : présenter le texte PlantUML brut dans la conversation (elle peut
-   le coller dans https://www.plantuml.com/plantuml/uml/ pour un rendu
-   ponctuel sans installation).
+1. Write the PlantUML text to `<source_dir>/topology-<domain>.puml`
+   (generated file, not committed — cf. `.gitignore`).
+2. If `plantuml`/`rsvg-convert` are available in the environment:
+   generate the SVG then the PDF (same commands as the skill
+   `diagrammes-analyse-parcours`), and show it to the user.
+   **PITFALL**: `plantuml -tsvg` names the output file after the
+   `@startuml <id>` identifier of the diagram (e.g. `site_octo_com.svg`), NEVER after the
+   name of the input `.puml` file. Always rename the produced SVG to
+   `topology-<domain>.svg` right after generation (otherwise
+   `load_topology_svg()` in `generate_report_html.py`, which only looks for
+   `topology-*.svg`, does not find it and the HTML report falls back on a stale SVG
+   or stays without a diagram).
+3. Otherwise: present the raw PlantUML text in the conversation (they can
+   paste it into https://www.plantuml.com/plantuml/uml/ for a one-off rendering
+   without installation).
 
-Disposition : 3 colonnes côte à côte (Parcours / Traitements / Infrastructure),
-plus hautes que larges, police agrandie et texte replié pour la lisibilité
-(cf. docstring de `to_plantuml.py` pour le détail des essais testés).
+Layout: 3 side-by-side columns (Journey / Processing / Infrastructure),
+taller than wide, enlarged font and folded text for readability
+(cf. `to_plantuml.py` docstring for the tested attempts).
 
-Contenu du diagramme : serveurs 1st-party (`database`), traitements réseau
-(dont appels IA générative), hôtes tiers — dont ceux annotés d'une suspicion
-BDD/streaming/IA affichent leur note dans le label du composant — ainsi que
-les grandes hypothèses de calcul : une note globale (trafic annuel, mix
-appareils, mix pays d'audience, temps de lecture cumulé du parcours) et un
-détail par composant concerné (temps de l'étape, poids transféré du
-traitement, type d'instance/provider du serveur). Valeur seule, sans badge de
-confiance : le détail source/confiance reste dans le tableau d'hypothèses du
-rapport (`print_hypotheses()`/section HTML dédiée), pas dupliqué ici.
+Diagram content: 1st-party servers (`database`), network processing
+(including generative AI calls), third-party hosts — including those annotated with a
+DB/streaming/AI suspicion showing their note in the component label — as well as
+the main calculation assumptions: a global note (annual traffic, device mix,
+audience country mix, cumulative journey reading time) and a
+per-component detail (step time, transferred weight of the
+processing, server instance/provider type). Value only, without a confidence badge:
+the source/confidence detail remains in the report's assumptions table
+(`print_hypotheses()`/dedicated HTML section), not duplicated here.
 
-### Étape 25d - Validation par QCM avant de poursuivre
+### Step 25d - Multiple-choice validation before continuing
 
-Toujours converger avec l'utilisatrice avant l'Étape 30, via `AskUserQuestion` :
+Always converge with the user before Step 30, via `AskUserQuestion`:
 
 ```
-Question : "Voici le système que j'ai identifié à partir du parcours capturé.
-            Correspond-il à ce que vous connaissez du site ?"
-Header   : "Topologie détectée"
+Question : "Here is the system I identified from the captured journey.
+            Does it match what you know about the site?"
+Header   : "Detected topology"
 Options  :
-  - Oui, cette topologie est correcte, on peut continuer - Recommandé
-  - Non, il manque un serveur ou une infrastructure (préciser en réponse)
-  - Non, une suspicion (BDD/streaming/IA) est fausse (préciser laquelle)
-  - Je ne sais pas / je veux vérifier sur l'interface e-footprint avant
+  - Yes, this topology is correct, we can continue - Recommended
+  - No, a server or an infrastructure is missing (specify in the answer)
+  - No, a suspicion (DB/streaming/AI) is wrong (specify which one)
+  - I don't know / I want to verify on the e-footprint interface first
 ```
 
-- **"Oui"** -> poursuivre vers l'Étape 30.
-- **"Il manque une infrastructure"** -> noter l'infrastructure manquante
-  (elle ne pourra pas être ajoutée automatiquement par ce lot, mais la
-  garder en note pour un futur archétype manuel, ou signaler qu'elle sera
-  absente du calcul).
-- **"Suspicion fausse"** -> retirer/corriger la mention dans le résumé
-  affiché à l'utilisatrice (ne PAS modifier le modèle e-footprint : cette
-  étape s'arrête à la présentation).
-- **"Vérifier sur l'interface"** -> rappeler l'URL de l'interface web
-  e-footprint et attendre son retour avant de poursuivre.
+- **"Yes"** -> continue to Step 30.
+- **"Infrastructure missing"** -> note the missing infrastructure
+  (it cannot be added automatically by this lot, but keep it as a note
+  for a future manual archetype, or report that it will be
+  absent from the calculation).
+- **"Wrong suspicion"** -> remove/correct the mention in the summary
+  displayed to the user (do NOT modify the e-footprint model: this
+  step stops at presentation).
+- **"Verify on the interface"** -> recall the e-footprint web interface
+  URL and wait for their feedback before continuing.
 
-**Limite explicite de cette étape (à rappeler si l'utilisatrice s'attend à
-plus) :** elle affiche des SUSPICIONS, elle ne construit JAMAIS
-automatiquement un serveur BDD dédié dans le modèle e-footprint (lot
-ultérieur, distinct, non planifié — piste 3 du bilan comparatif). Pour l'IA
-générative tierce **texte** en revanche (OpenAI/Anthropic/Gemini/Mistral/
-Cohere/Azure OpenAI/Hugging Face), cette étape ne s'arrête plus à la
-présentation : voir "IA générative tierce" à l'Étape 30 ci-dessous, qui peut
-faire entrer cet appel dans le calcul de l'Étape 40 si l'utilisatrice connaît
-le modèle exact. Sans réponse (ou "je ne sais pas"), le calcul de l'Étape 40
-reste strictement identique à ce qu'il était avant cette étape.
+**Explicit limitation of this step (to repeat if the user expects
+more):** it displays SUSPICIONS, it NEVER
+automatically builds a dedicated DB server in the e-footprint model (later
+lot, distinct, unscheduled — lead 3 of the comparative review). For third-party
+**text** generative AI however (OpenAI/Anthropic/Gemini/Mistral/
+Cohere/Azure OpenAI/Hugging Face), this step no longer stops at
+presentation: see "Third-party generative AI" at Step 30 below, which can
+include this call in the Step 40 calculation if the user knows
+the exact model. Without an answer (or "I don't know"), the Step 40 calculation
+remains strictly identical to what it was before this step.
 
 -----
 
-## Étape 30 - Paramètres utilisateur
+## Step 30 - User parameters
 
-Les paramètres non auto-détectables sont demandés via `AskUserQuestion`.
-**Toujours** rappeler qu'il s'agit d'hypothèses.
+The non-auto-detectable parameters are asked via `AskUserQuestion`.
+**Always** remind that these are hypotheses.
 
-### Trafic annuel
+### Annual traffic
 
-**Priorité : réutiliser le volume déjà résolu à l'Étape 20c** (analytics client via
-`--visits`, ou estimation SimilarWeb du bloc `traffic`). Ne poser la question ci-dessous
-que si aucune source n'est disponible et qu'on doit tomber sur une hypothèse manuelle.
+**Priority: reuse the volume already resolved at Step 20c** (client analytics via
+`--visits`, or the SimilarWeb estimate of the `traffic` block). Only ask the
+question below if no source is available and we must fall back to a manual hypothesis.
 
 ```
-Question : "Quel trafic annuel hypothétique retenir pour l'estimation ?"
-Header   : "Trafic estimé"
+Question : "Which hypothetical annual traffic should be used for the estimate?"
+Header   : "Estimated traffic"
 Options  :
-  - 10 000 visites/an   (site vitrine, faible trafic)
-  - 100 000 visites/an  (site actif, ordre de grandeur médian) - Recommandé
-  - 500 000 visites/an  (site de contenu à trafic soutenu)
-  - 1 000 000 visites/an (site à fort trafic)
+  - 10 000 visits/year   (showcase site, low traffic)
+  - 100 000 visits/year  (active site, median order of magnitude) - Recommended
+  - 500 000 visits/year  (content site with sustained traffic)
+  - 1 000 000 visits/year (high-traffic site)
 ```
 
-Autoriser "Other" pour valeur libre. La valeur retenue est passée en `--visits`
-(prioritaire sur le bloc `traffic`). Toujours rappeler qu'il s'agit d'une estimation.
+Allow "Other" for a free-form value. The chosen value is passed as `--visits`
+(takes precedence over the `traffic` block). Always remind that it is an estimate.
 
-### Type d'instance (uniquement si provider cloud détecté)
+### Instance type (only if a cloud provider is detected)
 
-Si `env-data.json` contient un `server.detected_provider` dans
-[aws, gcp, azure, scaleway, ovh] : demander l'instance.
+If `env-data.json` contains a `server.detected_provider` in
+[aws, gcp, azure, scaleway, ovh]: ask for the instance.
 
 ```
-Question : "Quelle taille d'instance {provider} supposer ?"
+Question : "Which {provider} instance size should be assumed?"
 Header   : "Instance"
-Options AWS :
-  - t3.medium    (défaut, hypothèse petite prod) - Recommandé
+AWS options:
+  - t3.medium    (default, small prod hypothesis) - Recommended
   - t3.large
   - m5.large
   - m5.xlarge
 ```
 
-Adapter la liste au provider détecté. Si provider inconnu ou non supporté :
-`run_efootprint.py` bascule automatiquement sur `Server` générique
-(pas de question à poser).
+Adapt the list to the detected provider. If the provider is unknown or unsupported:
+`run_efootprint.py` automatically falls back to a generic `Server`
+(no question to ask).
 
-### IA générative tierce (uniquement si un host détecté n'est pas encore résolu)
+### Third-party generative AI (only if a detected host is not yet resolved)
 
-`env-data.json::ai_external_apis` contient un host avec `"resolved": false`
-quand l'Étape 25 a identifié un appel à une IA générative tierce **texte**
-sans que l'utilisatrice ait encore précisé le modèle exact. Tant qu'un host
-reste non résolu (ou que le modèle est "inconnu"), son appel n'est PAS compté
-dans le total CO2e — statu quo, jamais de valeur inventée. Ces deux questions
-permettent de l'inclure. Contrairement au trafic/à l'instance, la réponse est
-**persistée dans env-data.json** (jamais redemandée, sauf `--refresh`).
+`env-data.json::ai_external_apis` contains a host with `"resolved": false`
+when Step 25 identified a call to a third-party **text** generative AI
+without the user having specified the exact model yet. As long as a host
+remains unresolved (or the model is "unknown"), its call is NOT counted
+in the total CO2e — status quo, never an invented value. These two questions
+let us include it. Unlike traffic/instance, the answer is
+**persisted in env-data.json** (never asked again, except with `--refresh`).
 
-Poser une question par host non résolu, dans l'ordre de détection.
+Ask one question per unresolved host, in detection order.
 
-**Question 1 — modèle exact** :
+**Question 1 — exact model**:
 ```
-Question : "Ce site semble appeler {provider} (host {host}). Quel modèle
-            utilise-t-il probablement ?"
-Header   : "Modèle {provider}"
-Options  : 3-4 modèles courants du catalogue EcoLogits pour CE provider
-           (ex. pour Anthropic : Claude Sonnet 4.5, Claude Haiku 4.5,
-           Claude Opus 4.1) + "Je ne sais pas"
+Question : "This site seems to call {provider} (host {host}). Which model
+            does it probably use?"
+Header   : "Model {provider}"
+Options  : 3-4 common models from the EcoLogits catalog for THIS provider
+           (e.g. for Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5,
+           Claude Opus 4.1) + "I don't know"
 ```
-- Ne JAMAIS proposer de saisie libre non vérifiée : EcoLogits refuse tout nom
-  de modèle absent de son catalogue (erreur à la construction plutôt qu'un
-  défaut deviné). Un modèle non listé -> orienter vers "Je ne sais pas".
-- **Modèle choisi** -> passer à la Question 2.
-- **"Je ne sais pas"** -> `collect_env_data.py <source_dir> --set-ai-model <host> unknown`
-  (marque `resolved=true, model_name=null` : jamais redemandé sauf `--refresh`),
-  informer que ce host reste hors calcul, passer au host suivant.
+- NEVER offer unverified free-form entry: EcoLogits rejects any model
+  name absent from its catalog (error at construction rather than a
+  guessed default). A model not listed -> steer to "I don't know".
+- **Model chosen** -> move to Question 2.
+- **"I don't know"** -> `collect_env_data.py <source_dir> --set-ai-model <host> unknown`
+  (marks `resolved=true, model_name=null`: never asked again except with `--refresh`),
+  inform that this host stays out of the calculation, move to the next host.
 
-**Question 2 (si modèle connu) — longueur type d'une réponse** :
+**Question 2 (if model known) — typical response length**:
 ```
-Question : "En moyenne, une réponse de ce modèle fait plutôt combien de mots ?"
-Header   : "Longueur réponse"
-Options  : Courte (~50 mots) / Moyenne (~150 mots) / Longue (~400 mots) /
-           Je ne sais pas
+Question : "On average, how long is a response from this model?"
+Header   : "Response length"
+Options  : Short (~50 words) / Average (~150 words) / Long (~400 words) /
+           I don't know
 ```
-- Convertir l'option en `output_tokens` (ordre de grandeur 1 mot ≈ 1,3 token) :
+- Convert the option to `output_tokens` (order of magnitude 1 word ≈ 1.3 tokens):
   50 -> 65, 150 -> 195, 400 -> 520.
-- **Option choisie** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name> --set-ai-output-tokens <host> <tokens>`.
-- **"Je ne sais pas"** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name>`
-  SEUL (sans `--set-ai-output-tokens`). **Décision QCM du 28/08/2026, différente
-  de la Question 1** : contrairement au modèle inconnu (exclusion, aucun défaut
-  raisonnable entre fournisseurs), l'appel EST compté ici, avec une hypothèse
-  par défaut "réponse moyenne" (~150 mots, `_DEFAULT_OUTPUT_TOKENS` dans
-  `from_har.py`) — visible comme telle dans l'annexe hypothèses du rapport,
-  jamais un défaut silencieux. Toujours le dire explicitement à l'utilisatrice
-  ("je compte cet appel avec une hypothèse de longueur moyenne, faute de
-  précision").
+- **Option chosen** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name> --set-ai-output-tokens <host> <tokens>`.
+- **"I don't know"** -> `collect_env_data.py <source_dir> --set-ai-model <host> <model_name>`
+  ALONE (without `--set-ai-output-tokens`). **Multiple-choice decision of 2026-08-28, different
+  from Question 1**: unlike the unknown model (exclusion, no reasonable default
+  between providers), the call IS counted here, with a default "average response"
+  assumption (~150 words, `_DEFAULT_OUTPUT_TOKENS` in
+  `from_har.py`) — visible as such in the report's assumptions appendix,
+  never a silent default. Always say it explicitly to the user
+  ("I count this call with an average-length assumption, for lack of
+  precision").
 
-**Le volume d'appels par an n'est PAS demandé** : il est dérivé automatiquement
-du nombre de requêtes vers ce host observées dans le HAR capturé (cf.
-`from_har.py::_ai_job_specs_for_step()`), jamais d'une question supplémentaire.
+**The annual number of calls is NOT asked**: it is derived automatically
+from the number of requests to this host observed in the captured HAR (cf.
+`from_har.py::_ai_job_specs_for_step()`), never from an extra question.
 
-### Autres paramètres
+### Other parameters
 
-Les autres paramètres (durée requête, poids page, mix device, pays)
-sont **imposés par `env-data.json`**. Ne pas les demander -- si l'utilisateur
-veut les modifier, il édite `env-data.json` puis relance.
+The other parameters (request duration, page weight, device mix, country)
+are **imposed by `env-data.json`**. Do not ask for them -- if the user
+wants to change them, they edit `env-data.json` then re-run.
 
-**Mix appareils (mobile/desktop).** Collecté via CrUX (`form_factors`), puis :
-- la **tablette est rattachée au mobile** ;
-- **correction CrUX symétrique** (CrUX = Chrome only) : le mobile est regonflé de
-  l'absence d'iOS (`mobile / (1 − part_iOS)`) ET le desktop de l'absence de macOS/Safari
-  (`desktop / (1 − part_macOS)`), puis l'ensemble est renormalisé. Corriger aussi le
-  desktop supprime le biais "pro-mobile" de l'ancienne correction unilatérale ;
-- les parts iOS et macOS sont **pondérées par le mix pays d'audience** (Étape 20b).
-  Override avancé de la seule part iOS : `collect_env_data.py --ios-mobile-share 0.45`.
+**Device mix (mobile/desktop).** Collected via CrUX (`form_factors`), then:
+- **tablet is attached to mobile**;
+- **symmetric CrUX correction** (CrUX = Chrome only): mobile is inflated by the
+  absence of iOS (`mobile / (1 − part_iOS)`) AND desktop by the absence of macOS/Safari
+  (`desktop / (1 − part_macOS)`), then the whole is renormalized. Correcting the
+  desktop too removes the "pro-mobile" bias of the old unilateral correction;
+- the iOS and macOS shares are **weighted by the audience country mix** (Step 20b).
+  Advanced override of the iOS share only: `collect_env_data.py --ios-mobile-share 0.45`.
 
-Le mix pondère **réellement** le CO2e : le trafic est réparti en deux profils d'usage
-(mobile → smartphone/réseau mobile, desktop → laptop/wifi). Le brut CrUX, les parts
-iOS/macOS, le mix pays et sa provenance, la fourchette de scénarios et le split de
-trafic sont tracés dans l'annexe du rapport.
+The mix **really** weights the CO2e: traffic is split into two usage profiles
+(mobile → smartphone/mobile network, desktop → laptop/wifi). The raw CrUX mix,
+the iOS/macOS shares, the country mix and its provenance, the scenario range and the
+traffic split are traced in the report appendix.
 
 -----
 
-## Étape 40 - Calcul e-footprint
+## Step 40 - e-footprint calculation
 
-Lancer le script :
+Run the script:
 
 ```bash
 python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py \
@@ -548,128 +541,127 @@ python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py \
     --instance <instance>
 ```
 
-Le script :
-1. Affiche le tableau des hypothèses (déjà géré, ne pas dupliquer)
-2. Construit le modèle e-footprint
-3. Affiche les résultats CO2e (fabrication + énergie)
-4. Sérialise dans `<source_dir>/efootprint-boavizta-model.json` (modèle
-   e-footprint natif) et `<source_dir>/efootprint-synthese-python.json`
-   (résumé consommé par le rapport HTML et le contrôle de non-régression)
-5. Régénère `<source_dir>/topologie-<domaine>.puml` (écrasant celui de
-   l'Étape 25) en y ajoutant la part de CO2e de chaque étape, maintenant
-   connue puisque le calcul a tourné (répartition proportionnelle, cf.
-   `build.py::step_impact_shares()`, pas une mesure indépendante par étape)
+The script:
+1. Displays the assumptions table (already handled, do not duplicate)
+2. Builds the e-footprint model
+3. Displays the CO2e results (manufacturing + energy)
+4. Serializes to `<source_dir>/efootprint-boavizta-model.json` (native
+   e-footprint model) and `<source_dir>/efootprint-python-summary.json`
+   (summary consumed by the HTML report and the non-regression check)
+5. Regenerates `<source_dir>/topology-<domain>.puml` (overwriting the one from
+   Step 25) adding the CO2e share of each step, now known
+   since the calculation ran (proportional distribution, cf.
+   `build.py::step_impact_shares()`, not an independent measurement per step)
 
-**Après l'Étape 40, si un diagramme SVG doit accompagner le rapport final**,
-recompiler ce `.puml` régénéré (`plantuml -tsvg <chemin affiché par le
-script>`, puis renommer en `topologie-<domaine>.svg` comme à l'Étape 25c) :
-c'est cette version, avec la part d'impact, qui doit être utilisée dans le
-rapport HTML final, pas celle de l'Étape 25 (vue d'ensemble pré-calcul).
+**After Step 40, if an SVG diagram must accompany the final report**,
+recompile this regenerated `.puml` (`plantuml -tsvg <path printed by the
+script>`, then rename to `topology-<domain>.svg` as at Step 25c):
+this version, with the impact share, is the one that must be used in
+the final HTML report, not the Step 25 one (pre-calculation overview).
 
-Capturer stdout pour le renvoyer à l'utilisateur en bloc, puis synthétiser.
+Capture stdout to send it back to the user as a block, then synthesize.
 
 -----
 
-## Étape 50 - Synthèse et itération
+## Step 50 - Synthesis and iteration
 
-Après affichage brut, produire une synthèse en 3 lignes :
+After the raw display, produce a 3-line synthesis:
 
 ```
-Estimation CO2e (hypothèse {visits} visites/an, {instance}) :
-- ~{total_kg} kg CO2e/an
-- ~{per_visit_g} g CO2e/visite
-- Poste dominant : {devices|server|network|storage}
+CO2e estimate (hypothesis {visits} visits/year, {instance}):
+- ~{total_kg} kg CO2e/year
+- ~{per_visit_g} g CO2e/visit
+- Dominant item: {devices|server|network|storage}
 ```
 
-Puis proposer via AskUserQuestion :
-- **Relancer avec d'autres hypothèses** (nouveau trafic ou nouvelle instance)
-- **Recollecte des données** (`--refresh` sur `collect_env_data.py`)
-- **Regénérer le rapport HTML** (voir section "Intégration rapport HTML" ci-dessous)
-- **Terminer**
+Then offer via AskUserQuestion:
+- **Re-run with other assumptions** (new traffic or new instance)
+- **Re-collect the data** (`--refresh` on `collect_env_data.py`)
+- **Regenerate the HTML report** (see section "HTML report integration" below)
+- **Finish**
 
-Ne pas lancer d'itération automatique : c'est une boucle humain-dans-la-boucle.
-
------
-
-## Mode dégradé (sans HAR)
-
-Si `source_dir` ne contient pas de HAR mais que l'utilisateur veut quand même
-une estimation :
-
-1. Signaler explicitement les champs qui vont être en défaut :
-   - Poids de page : 500 kB (défaut lib)
-   - Durée requête : 1000 ms (défaut lib)
-   - Provider : inconnu -> Server générique
-   - Mix device : 60/40 phone/desktop (défaut)
-2. Demander confirmation avant de lancer
-3. Ne pas prétendre à la précision : le résultat est un ordre de grandeur
-   très grossier
+Do not launch an automatic iteration: this is a human-in-the-loop loop.
 
 -----
 
-## Récapitulatif : commandes CLI équivalentes
+## Degraded mode (without HAR)
 
-Pour l'utilisateur qui préfère lancer les scripts en direct :
+If `source_dir` contains no HAR but the user still wants
+an estimate:
+
+1. Explicitly report the fields that will be defaulted:
+   - Page weight: 500 kB (library default)
+   - Request duration: 1000 ms (library default)
+   - Provider: unknown -> generic Server
+   - Device mix: 60/40 phone/desktop (default)
+2. Ask for confirmation before launching
+3. Do not claim precision: the result is a very rough order of magnitude
+
+-----
+
+## Recap: equivalent CLI commands
+
+For the user who prefers to run the scripts directly:
 
 ```bash
-# Collecte (une fois, puis --refresh manuel)
+# Collection (once, then manual --refresh)
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir>
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --check
-# Mix pays d'audience (pondère les parts iOS/macOS de la correction CrUX) :
+# Audience country mix (weights the iOS/macOS shares of the CrUX correction):
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --audience "FR:0.7,US:0.3"
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --audience FR
-# Override avancé de la seule part iOS (debug) :
+# Advanced override of the iOS share only (debug):
 python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --ios-mobile-share 0.45
 
-# Calcul (relançable à volonté)
-# Sans --visits : lit le bloc 'traffic' (SimilarWeb) d'env-data.json, sinon baseline 100k/an.
+# Calculation (re-runnable at will)
+# Without --visits: reads the 'traffic' block (SimilarWeb) from env-data.json, else baseline 100k/year.
 python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py <source_dir>
-# Avec --visits : force le trafic (analytics client), prioritaire sur le bloc 'traffic'.
+# With --visits: forces the traffic (client analytics), takes precedence over the 'traffic' block.
 python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py <source_dir> --visits 500000 --instance t3.large
 python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py <source_dir> --refresh-data
 ```
 
 -----
 
-## Fichiers produits
+## Produced files
 
-Dans `<source_dir>/` :
-- `env-data.json` - Données collectées (cache permanent, --refresh manuel)
-- `efootprint-boavizta-model.json` - Modèle e-footprint (Boavizta) natif,
-  sérialisé complet (recréé à chaque run) : rechargeable dans le vrai
-  model_builder ou via `json_to_system`, jamais lu par ce projet
-- `efootprint-synthese-python.json` - Résumé applicatif propre à ce projet
-  (totaux CO2e + hypothèses, format léger), consommé par
-  `generate_report_html.py` et `check_efootprint_contract.py`
+In `<source_dir>/`:
+- `env-data.json` - Collected data (permanent cache, manual --refresh)
+- `efootprint-boavizta-model.json` - Native e-footprint model (Boavizta),
+  fully serialized (recreated at each run): reloadable into the real
+  model_builder or via `json_to_system`, never read by this project
+- `efootprint-python-summary.json` - Application summary specific to this project
+  (CO2e totals + assumptions, lightweight format), consumed by
+  `generate_report_html.py` and `check_efootprint_contract.py`
 
-Ces fichiers **ne doivent pas être commités** dans git.
+These files **must not be committed** to git.
 
 -----
 
-## Intégration rapport HTML
+## HTML report integration
 
-Le générateur `generate_report_html.py` détecte automatiquement
-`efootprint-synthese-python.json` (dans `audit_dir` ou son parent) et insère une
-section "Impact environnemental (estimation CO2e)" dans le rapport, entre
-"Analyse Core Web Vitals" et "Annexes". Si le fichier est absent, la section
-est simplement omise (rapport rétro-compatible).
+The `generate_report_html.py` generator automatically detects
+`efootprint-python-summary.json` (in `audit_dir` or its parent) and inserts a
+section "Environmental impact (CO2e estimate)" into the report, between
+"Core Web Vitals analysis" and "Appendices". If the file is absent, the section
+is simply omitted (backward-compatible report).
 
-Contenu de la section :
-- KPI en tête : total kg CO2e/an, g CO2e/visite, split fab/énergie
-- Bandeau d'avertissement "estimation hypothétique"
-- Décomposition par poste (Devices, Storage, Servers, Network, ...) avec barres
-- Tableau des hypothèses d'entrée avec niveau de confiance
-  (collecté / estimé / supposé / défaut lib)
+Section content:
+- KPI at the top: total kg CO2e/year, g CO2e/visit, manufacturing/energy split
+- "Hypothetical estimate" warning banner
+- Breakdown by item (Devices, Storage, Servers, Network, ...) with bars
+- Table of input assumptions with confidence level
+  (collected / estimated / assumed / library default)
 
-Une **annexe méthodologique** (section "Méthodologie & hypothèses", dans les Annexes)
-trace en plus, par domaine (A: CO2e, B: CWV, C: EcoIndex, D: trafic), toutes les données
-et hypothèses : mix brut CrUX, parts iOS ET macOS avec leurs sources, mix pays d'audience
-et sa provenance (SimilarWeb estimé / saisie / défaut FR) avec détail par pays,
-rattachement tablette→mobile, fourchette de scénarios, split du trafic mobile/desktop,
-et pour les CWV la stratégie "pire des deux" par métrique. Formules appliquées incluses.
+A **methodological appendix** (section "Methodology & assumptions", in the Appendices)
+also traces, per domain (A: CO2e, B: CWV, C: EcoIndex, D: traffic), all the data
+and assumptions: raw CrUX mix, iOS AND macOS shares with their sources, audience country mix
+and its provenance (SimilarWeb estimated / entered / FR default) with per-country detail,
+tablet→mobile attachment, scenario range, mobile/desktop traffic split,
+and for the CWVs the "worst of both" strategy per metric. Applied formulas included.
 
-Régénération après changement d'hypothèses :
+Regeneration after an assumptions change:
 ```bash
 python3 .claude/skills/analyse-parcours/scripts/run_efootprint.py <source_dir> --visits N
 python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <source_dir>/audit
@@ -677,13 +669,13 @@ python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <source_
 
 -----
 
-## Décisions clés (référence)
+## Key decisions (reference)
 
-- e-footprint : librairie Python uniquement (pas d'API REST), sortie CO2e uniquement
-- Approche générique : pas limité à octo.com, applicable à tout site web
-- Cache `env-data.json` : jamais expiré automatiquement (--refresh manuel)
-- Trafic annuel : résolu par priorité `--visits` (analytics) > bloc `traffic` SimilarWeb
-  (écrit par l'agent, jamais scrapé par le script) > baseline 100 000/an + avertissement
-  (voir Étape 20c). Le total CO2e croît avec le trafic ; le CO2e/visite en dépend peu.
-- Rappel "estimation hypothétique" obligatoire sur chaque paramètre et sur les résultats
-- IPINFO_TOKEN pas provisionné : mode anonyme accepté (50k req/mois)
+- e-footprint: Python library only (no REST API), CO2e output only
+- Generic approach: not limited to octo.com, applicable to any website
+- `env-data.json` cache: never expires automatically (manual --refresh)
+- Annual traffic: resolved by priority `--visits` (analytics) > `traffic` block SimilarWeb
+  (written by the agent, never scraped by the script) > baseline 100,000/year + warning
+  (see Step 20c). Total CO2e grows with traffic; CO2e/visit depends little on it.
+- Mandatory "hypothetical estimate" reminder on each parameter and on the results
+- IPINFO_TOKEN not provisioned: anonymous mode accepted (50k req/month)

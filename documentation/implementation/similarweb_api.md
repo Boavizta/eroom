@@ -1,150 +1,151 @@
-# Récupération SimilarWeb via l'API interne - Agent EROOM
+# Retrieving SimilarWeb via the internal API - Agent EROOM
 
-Ce document explique comment le projet récupère le trafic et le mix pays d'audience
-d'un site, sans passer par le site web SimilarWeb (bloqué par captcha).
-
------
-
-## But
-
-Deux données ne sont fournies par aucune API publique (ni PageSpeed, ni CrUX) :
-
-- le **volume de trafic** (visites par mois / par an) ;
-- le **mix pays d'audience** (répartition des visiteurs par pays).
-
-SimilarWeb les estime. La page web publique `https://www.similarweb.com/website/<domaine>/`
-est protégée par un captcha à sélection d'images (challenge AWS WAF), qui bloque tout accès
-automatisé. On récupère donc ces données autrement.
+This document explains how the project retrieves the traffic and the country audience mix
+of a site, without going through the SimilarWeb website (blocked by captcha).
 
 -----
 
-## Méthode retenue
+## Goal
 
-Le script `similarweb_api.py` appelle directement l'**API interne de l'extension Chrome/Firefox
-SimilarWeb**, en imitant les requêtes que l'extension fait en arrière-plan. On ne scrape plus
-la page web : on rejoue l'appel API en Python.
+Two data points are provided by no public API (neither PageSpeed, nor CrUX):
 
-- Endpoint : `https://data.similarweb.com/api/v1/data?domain=<domaine>` (GET)
-- En-têtes suffisants (dict de `fetch_domain_data()`) :
+- the **traffic volume** (visits per month / per year);
+- the **country audience mix** (distribution of visitors by country).
+
+SimilarWeb estimates them. The public web page `https://www.similarweb.com/website/<domain>/`
+is protected by an image-selection captcha (AWS WAF challenge), which blocks any automated
+access. We therefore retrieve this data another way.
+
+-----
+
+## Chosen method
+
+The `similarweb_api.py` script calls the **internal API of the SimilarWeb Chrome/Firefox
+extension** directly, imitating the requests the extension makes in the background. We no
+longer scrape the web page: we replay the API call in Python.
+
+- Endpoint: `https://data.similarweb.com/api/v1/data?domain=<domain>` (GET)
+- Sufficient headers (dict of `fetch_domain_data()`):
   - `Content-Type: application/json`
-  - `X-Extension-Version: 6.12.21` (version de l'extension, cf. constante `EXTENSION_VERSION`)
-  - un vrai `User-Agent` de navigateur (constante `BROWSER_USER_AGENT`)
+  - `X-Extension-Version: 6.12.21` (extension version, cf. constant `EXTENSION_VERSION`)
+  - a real browser `User-Agent` (constant `BROWSER_USER_AGENT`)
   - `Accept: */*`
-  - PAS d'en-tête `Origin` (voir Diagnostic du 403 ci-dessous)
+  - NO `Origin` header (see the 403 diagnostic below)
 
-Point important : **aucun cookie, aucun compte, aucune session** n'est nécessaire. L'API répond
-directement en JSON, d'où on extrait `TopCountryShares` (mix pays), `EstimatedMonthlyVisits`
-et `Engagments` (visites).
-
------
-
-## Diagnostic du 403 (piège historique)
-
-Une première investigation avait conclu à tort qu'il fallait des cookies de session : l'API
-renvoyait un 403. En réalité, le 403 venait de deux erreurs dans la requête de test, pas d'un
-manque d'authentification :
-
-1. Un en-tête `Origin: chrome-extension://...` : CloudFront le rejette. **Ne pas l'envoyer.**
-2. L'absence d'un vrai `User-Agent` de navigateur (le User-Agent par défaut d'un client HTTP
-   est bloqué). **Toujours envoyer un User-Agent navigateur.**
-
-Sans en-tête `Origin` et avec un User-Agent navigateur, l'appel répond 200 depuis un simple
-client HTTP.
+Important point: **no cookie, no account, no session** is needed. The API answers directly
+in JSON, from which we extract `TopCountryShares` (country mix), `EstimatedMonthlyVisits`
+and `Engagments` (visits).
 
 -----
 
-## Comment ce module a été construit (via HAR)
+## 403 diagnostic (historical pitfall)
 
-Le module n'a pas été deviné : il a été bâti en **observant l'extension SimilarWeb en
-fonctionnement**, en capturant son appel réseau (export HAR), puis en rejouant cette requête
-en Python. L'extension étant en Manifest V3, l'appel part de son **service worker** : on le
-capture via `chrome://extensions` (mode développeur > "service worker" > Network), pas dans le
-Network de l'onglet du site. C'est le HAR qui a révélé l'URL, les en-têtes (dont l'absence
-d'`Origin`) et la forme du JSON de réponse, d'où sont tirés les champs parsés
+A first investigation wrongly concluded that session cookies were needed: the API returned a
+403. In reality, the 403 came from two errors in the test request, not from a lack of
+authentication:
+
+1. An `Origin: chrome-extension://...` header: CloudFront rejects it. **Do not send it.**
+2. The absence of a real browser `User-Agent` (the default User-Agent of an HTTP client is
+   blocked). **Always send a browser User-Agent.**
+
+Without an `Origin` header and with a browser User-Agent, the call answers 200 from a plain
+HTTP client.
+
+-----
+
+## How this module was built (via HAR)
+
+The module was not guessed: it was built by **observing the SimilarWeb extension in operation**,
+capturing its network call (HAR export), then replaying that request in Python. Being in
+Manifest V3, the call goes out from its **service worker**: we capture it via
+`chrome://extensions` (developer mode > "service worker" > Network), not in the Network tab of
+the site. It was the HAR that revealed the URL, the headers (including the absence of
+`Origin`) and the shape of the JSON response, from which the parsed fields are taken
 (`TopCountryShares`, `EstimatedMonthlyVisits`, `Engagments`).
 
-Récit de genèse détaillé + procédure de capture pas-à-pas : voir
-`similarweb_reconstitution.md` (Méthode B - Capture HAR).
+Detailed genesis story + step-by-step capture procedure: see
+`similarweb-reconstruction.md` (Method B - HAR capture).
 
 -----
 
-## Utilisation
+## Usage
 
-L'appel est **intégré à `collect_env_data.py`** : une seule commande suffit. Quand un bloc
-`audience` ou `traffic` manque dans `env-data.json`, le script interroge lui-même l'API interne
-SimilarWeb (via le module frère `similarweb_api.py`), écrit les blocs manquants, puis les normalise
-et les intègre au calcul CO2e.
+The call is **integrated into `collect_env_data.py`**: a single command suffices. When an
+`audience` or `traffic` block is missing in `env-data.json`, the script itself queries the
+internal SimilarWeb API (via the sibling module `similarweb_api.py`), writes the missing
+blocks, then normalizes and integrates them into the CO2e calculation.
 
 ```bash
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
 
-# Une commande : collecte HAR/CrUX/ipinfo + appel auto SimilarWeb si audience/traffic manquent
+# One command: HAR/CrUX/ipinfo collection + automatic SimilarWeb call if audience/traffic are missing
 .venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_env_data.py <source_dir> --refresh
 ```
 
-Options associées (sur `collect_env_data.py`) :
+Associated options (on `collect_env_data.py`):
 
-- `--sw-domain octo.com` : force le domaine interrogé. Sinon déduit de `env-data.json` (ou du `.har`).
-- `--no-similarweb` : désactive l'appel automatique (mode hors-ligne / éviter le réseau).
-- `--audience "FR:0.7,US:0.3"` : saisie manuelle du mix pays ; **prime** sur SimilarWeb (l'API
-  n'écrit alors pas le mix, mais peut toujours compléter le trafic).
+- `--sw-domain octo.com` : force the queried domain. Otherwise deduced from `env-data.json` (or the `.har`).
+- `--no-similarweb` : disable the automatic call (offline mode / avoid the network).
+- `--audience "FR:0.7,US:0.3"` : manual entry of the country mix ; **takes precedence** over
+  SimilarWeb (the API then does not write the mix, but can still complete the traffic).
 
-Déclenchement et garde-fous :
+Triggering and guardrails:
 
-- L'appel n'a lieu que si le bloc visé **manque** (absent, ou `source` = `default`/`None`).
-- Un bloc déjà présent avec une vraie source n'est **jamais écrasé** (idempotent sur `--refresh`).
-- L'appel écrit uniquement les blocs `audience`/`traffic` manquants ; il ne touche à rien d'autre
-  dans `env-data.json` (HAR, device, serveur préservés).
+- The call only happens if the targeted block is **missing** (absent, or `source` = `default`/`None`).
+- A block already present with a real source is **never overwritten** (idempotent on `--refresh`).
+- The call only writes the missing `audience`/`traffic` blocks ; it touches nothing else in
+  `env-data.json` (HAR, device, server preserved).
 
-Le module `similarweb_api.py` reste utilisable **en standalone** pour inspection :
+The `similarweb_api.py` module remains usable **standalone** for inspection:
 
 ```bash
 .venv/bin/python3 .claude/skills/analyse-parcours/scripts/similarweb_api.py <source_dir> [--domain octo.com] [--print-only]
 ```
 
-- `--domain octo.com` : force le domaine. Sinon déduit de `env-data.json` (ou du `.har`).
-- `--print-only` : affiche le JSON brut renvoyé par l'API et n'écrit rien (utile pour inspecter).
+- `--domain octo.com` : force the domain. Otherwise deduced from `env-data.json` (or the `.har`).
+- `--print-only` : displays the raw JSON returned by the API and writes nothing (useful for inspection).
 
 -----
 
-## Repli si l'API échoue
+## Fallback if the API fails
 
-Si l'appel échoue (403 réapparu, domaine peu/pas suivi par SimilarWeb, coupure réseau),
-`collect_env_data.py` affiche un message `⚠ SimilarWeb : …` puis **continue sans crasher** : il
-n'écrit pas le bloc concerné et poursuit avec les blocs disponibles ou les défauts.
+If the call fails (403 back, domain little/not tracked by SimilarWeb, network cut),
+`collect_env_data.py` displays a `⚠ SimilarWeb : …` message then **continues without crashing**:
+it does not write the block concerned and proceeds with the available blocks or the defaults.
 
-Note : l'API répond 200 même pour un domaine inconnu (elle fait écho au nom), mais sans
-`TopCountryShares` ni visites exploitables → les blocs ne sont pas construits, avec un message
-explicite (pas de repli silencieux). En standalone, `similarweb_api.py` sort en code `2` dans ce cas.
+Note: the API answers 200 even for an unknown domain (it echoes the name back), but without
+`TopCountryShares` nor exploitable visits → the blocks are not built, with an explicit message
+(no silent fallback). Standalone, `similarweb_api.py` exits with code `2` in this case.
 
-Dans ce cas, basculer sur la **récupération assistée** (skill efootprint, Étape 20d) : l'agent
-demande à l'utilisatrice d'ouvrir la page SimilarWeb, de passer le captcha et de lui transmettre
-les chiffres (dictée ou capture d'écran).
-
------
-
-## Libellé et vérification dans le rapport
-
-- Le rapport affiche la source sous le libellé neutre **"SimilarWeb (estimation)"** : il n'expose
-  pas la méthode technique (API interne). La description technique reste dans cette doc et le code.
-- Le rapport fournit un lien de vérification "↗ source" vers la **page web lisible**
-  `https://www.similarweb.com/website/<domaine>/`, pour que le lecteur puisse contrôler les
-  chiffres lui-même. Ce n'est jamais l'URL de l'API (qui renvoie du JSON illisible).
+In this case, switch to **assisted retrieval** (efootprint skill, Step 20d): the agent asks the
+user to open the SimilarWeb page, pass the captcha and transmit the figures (dictation or
+screenshot).
 
 -----
 
-## Caveats et robustesse
+## Label and verification in the report
 
-- SimilarWeb est une **estimation tierce à marge large**, source non officielle, dont l'usage
-  automatisé est à la limite des CGU. Seuls les analytics du site (GA4, Matomo, logs serveur)
-  donnent des chiffres exacts ; ils sont prioritaires (`--audience` / `--visits`).
-- Ordre de priorité des sources : analytics client (`--audience`/`--visits`) > API interne
-  SimilarWeb (automatique) > récupération assistée après captcha (Étape 20d) > défauts
-  (France 100 %, 100 000 visites/an). La voie WebFetch de la page publique a été retirée
-  (systématiquement bloquée par le captcha, rendue inutile par l'API interne).
-- Si l'API se remet à renvoyer 403 : vérifier l'absence d'en-tête `Origin`, la présence d'un
-  User-Agent navigateur, et revalider la valeur de `EXTENSION_VERSION` (installer/mettre à jour
-  l'extension, relever la version courante dans `chrome://extensions`).
-- Si une simple revalidation de version ne suffit pas (endpoint ou en-têtes changés), refaire la
-  découverte de zéro : voir le guide de reconstitution `similarweb_reconstitution.md`
-  (récupération de l'extension, extraction de l'endpoint/en-têtes/version, vérification).
+- The report displays the source under the neutral label **"SimilarWeb (estimate)"**: it does
+  not expose the technical method (internal API). The technical description stays in this doc
+  and the code.
+- The report provides a "↗ source" verification link to the **human-readable web page**
+  `https://www.similarweb.com/website/<domain>/`, so the reader can check the figures
+  themselves. It is never the API URL (which returns unreadable JSON).
+
+-----
+
+## Caveats and robustness
+
+- SimilarWeb is a **third-party estimate with a wide margin**, an unofficial source, whose
+  automated use is at the limit of the ToS. Only the site's analytics (GA4, Matomo, server
+  logs) give exact figures ; they are prioritized (`--audience` / `--visits`).
+- Source priority order: client analytics (`--audience`/`--visits`) > internal SimilarWeb API
+  (automatic) > assisted retrieval after captcha (Step 20d) > defaults (France 100 %,
+  100,000 visits/year). The WebFetch route of the public page was removed (systematically
+  blocked by the captcha, made useless by the internal API).
+- If the API goes back to returning 403: check the absence of an `Origin` header, the presence
+  of a browser User-Agent, and revalidate the `EXTENSION_VERSION` value (install/update the
+  extension, read the current version in `chrome://extensions`).
+- If a simple version revalidation is not enough (endpoint or headers changed), redo the
+  discovery from zero: see the reconstruction guide `similarweb-reconstruction.md`
+  (extension retrieval, endpoint/headers/version extraction, verification).

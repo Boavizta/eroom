@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
 """
-Parsing HTML + CSS statique des pages déjà auditées, pour des critères EOF
-déterministes (autoplay, images adaptatives, media queries, viewport...).
+Static HTML + CSS parsing of already-audited pages, for deterministic EOF
+criteria (autoplay, adaptive images, media queries, viewport...).
 
-Écart assumé par rapport au plan initial : le .har capturé pour ce projet ne
-contient PAS les corps de réponse HTML/CSS (vérifié sur audits/octo.com :
-46/311 entrées avec un body, aucune n'étant du HTML/CSS de page — capture
-DevTools sans "response bodies"). Ce script refait donc un fetch HTTP direct
-des MÊMES URLs de pages déjà listées dans env-data.json (aucune page
-nouvelle), plus leurs feuilles de style liées — pas un nouveau périmètre
-d'audit, seulement une source de donnée différente pour le même périmètre.
+Assumed deviation from the initial plan: the .har captured for this project does
+NOT contain HTML/CSS response bodies (verified on audits/octo.com:
+46/311 entries with a body, none of them page HTML/CSS — DevTools capture
+without "response bodies"). This script therefore re-fetches over HTTP the
+SAME page URLs already listed in env-data.json (no new page), plus their
+linked stylesheets — not a new audit scope, only a different data source for
+the same scope.
 
-Le HTML est lu par html.parser (bibliothèque standard, aucune dépendance),
-PAS par des expressions régulières : voir _HtmlFacts et autotest().
+The HTML is read with html.parser (standard library, no dependency),
+NOT with regular expressions: see _HtmlFacts and autotest().
 
-CHANTIER 27 — archivage pour reproductibilité. Le .har capturé ne contient pas
-les corps de réponse (voir plus haut), donc ce script re-télécharge en direct ;
-mais retélécharger à CHAQUE exécution casse la reproductibilité (deux passages
-peuvent rendre des résultats différents si le site a changé). Chaque page/CSS
-récupéré est donc archivé tel quel sous <source_dir>/pages-html/, avec un nom
-de fichier déterministe (voir archive_filename()). Par défaut, une exécution
-relit l'archive existante au lieu de refaire une requête réseau ; --refresh
-force un nouveau téléchargement. Un futur script (hors périmètre ici) pourra
-retrouver le fichier archivé à partir d'une URL en appelant archive_filename()
-lui-même, sans jamais avoir à "dérivider" un nom de fichier.
+WORK ITEM 27 — archiving for reproducibility. The captured .har does not contain
+response bodies (see above), so this script re-downloads live; but
+re-downloading on EVERY run breaks reproducibility (two passes can give
+different results if the site changed). Each fetched page/CSS is therefore
+archived as-is under <source_dir>/html-pages/, with a deterministic file name
+(see archive_filename()). By default, a run re-reads the existing archive
+instead of making a new network request; --refresh forces a new download. A
+future script (out of scope here) will be able to find the archived file from
+a URL by calling archive_filename() itself, without ever having to
+"reverse-engineer" a file name.
 
-Usage :
+Usage:
     python3 parse_html_criteria.py <source_dir>
     python3 parse_html_criteria.py <source_dir> --refresh
     python3 parse_html_criteria.py --autotest
 
-Écrit <source_dir>/html-css-criteria.json et archive les pages/CSS récupérés
-sous <source_dir>/pages-html/.
+Writes <source_dir>/html-css-criteria.json and archives the fetched pages/CSS
+under <source_dir>/html-pages/.
 """
 
 import argparse
@@ -51,34 +51,34 @@ from urllib.parse import urljoin, urlparse
 TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (compatible; eof-audit-scan/1.0)"
 MAX_CSS_PER_PAGE = 8
-ARCHIVE_DIRNAME = "pages-html"
+ARCHIVE_DIRNAME = "html-pages"
 
 
 def archive_filename(url, is_css):
-    """Nom de fichier d'archive déterministe pour une URL.
+    """Deterministic archive file name for a URL.
 
-    Propriété essentielle, exploitée par un futur script (chantier 35) : la
-    MÊME url donne TOUJOURS le même nom, et deux urls différentes (même si
-    elles ne diffèrent que par la query string) donnent des noms différents.
-    Le slug rend le nom lisible (déboguage), le hachage SHA1 tranche toute
-    ambiguïté — y compris entre deux urls dont seule la query string diffère,
-    puisque le slug seul l'ignorerait.
+    Essential property, exploited by a future script (work item 35): the
+    SAME url ALWAYS gives the same name, and two different urls (even if they
+    differ only by the query string) give different names.
+    The slug makes the name readable (debugging), the SHA1 hash settles any
+    ambiguity — including between two urls differing only by the query string,
+    since the slug alone would ignore it.
     """
     parsed = urlparse(url)
     slug = (parsed.netloc + parsed.path).strip("/").replace("/", "_") or "index"
-    slug = slug[:80]  # évite les noms de fichier absurdement longs
+    slug = slug[:80]  # avoids absurdly long file names
     digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
     ext = ".css" if is_css else ".html"
     return f"{slug}__{digest}{ext}"
 
 
 def fetch_text(url):
-    """Récupère le contenu textuel d'une URL par requête réseau directe.
+    """Fetches the textual content of a URL via a direct network request.
 
-    Retourne un dict avec :
-    - content : str|None (contenu si succès)
-    - status : "ok" | "rien_trouve" | "echec_reseau" | "echec_lecture"
-    - error_detail : str|None (description de l'erreur si échec)
+    Returns a dict with:
+    - content: str|None (content on success)
+    - status: "ok" | "not_found" | "network_error" | "read_error"
+    - error_detail: str|None (error description on failure)
     """
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
@@ -87,37 +87,37 @@ def fetch_text(url):
                 content = resp.read().decode("utf-8", errors="replace")
                 return {"content": content, "status": "ok", "error_detail": None}
             except Exception as exc:
-                return {"content": None, "status": "echec_lecture",
-                       "error_detail": f"Erreur de décodage: {type(exc).__name__}"}
+                return {"content": None, "status": "read_error",
+                        "error_detail": f"Decoding error: {type(exc).__name__}"}
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            return {"content": None, "status": "rien_trouve",
-                   "error_detail": f"HTTP {exc.code}"}
-        return {"content": None, "status": "echec_reseau",
-               "error_detail": f"HTTP {exc.code}"}
+            return {"content": None, "status": "not_found",
+                    "error_detail": f"HTTP {exc.code}"}
+        return {"content": None, "status": "network_error",
+                "error_detail": f"HTTP {exc.code}"}
     except urllib.error.URLError as exc:
-        return {"content": None, "status": "echec_reseau",
-               "error_detail": f"URLError: {exc.reason}"}
+        return {"content": None, "status": "network_error",
+                "error_detail": f"URLError: {exc.reason}"}
     except Exception as exc:
-        return {"content": None, "status": "echec_reseau",
-               "error_detail": f"{type(exc).__name__}: {str(exc)}"}
+        return {"content": None, "status": "network_error",
+                "error_detail": f"{type(exc).__name__}: {str(exc)}"}
 
 
 def fetch_text_cached(url, source_dir, is_css, refresh=False):
-    """Récupère le contenu d'une URL via l'archive locale <source_dir>/pages-html/,
-    en repli sur le réseau — c'est la fonction à appeler à la place de
-    fetch_text() partout où le résultat doit être archivé.
+    """Fetches the content of a URL via the local archive <source_dir>/html-pages/,
+    falling back to the network — this is the function to call instead of
+    fetch_text() wherever the result must be archived.
 
-    Comportement :
-    - --refresh actif : ignore toute archive existante, télécharge toujours
-      en réseau.
-    - Sinon, si le fichier d'archive existe et se lit correctement : le
-      rendre tel quel, statut "ok", SANS requête réseau.
-    - Sinon (archive absente, ou présente mais illisible/vide) : télécharger
-      en réseau comme fetch_text(), puis, SEULEMENT en cas de succès, écrire
-      (ou réécrire) l'archive. Choix assumé : un échec réseau ponctuel ne
-      doit jamais écraser une bonne archive déjà sur disque ; seul un succès
-      la remplace.
+    Behavior:
+    - --refresh active: ignores any existing archive, always downloads
+      over the network.
+    - Otherwise, if the archive file exists and reads correctly: return it
+      as-is, status "ok", WITHOUT a network request.
+    - Otherwise (archive absent, or present but unreadable/empty): download
+      over the network like fetch_text(), then, ONLY on success, write
+      (or rewrite) the archive. Assumed choice: a one-off network failure must
+      never overwrite a good archive already on disk; only a success
+      replaces it.
     """
     archive_dir = source_dir / ARCHIVE_DIRNAME
     archive_path = archive_dir / archive_filename(url, is_css)
@@ -126,14 +126,14 @@ def fetch_text_cached(url, source_dir, is_css, refresh=False):
         try:
             content = archive_path.read_text(encoding="utf-8")
             if not content:
-                raise ValueError("fichier d'archive vide")
+                raise ValueError("empty archive file")
             return {"content": content, "status": "ok", "error_detail":
-                    "lu depuis l'archive locale (pages-html/), aucune requête réseau"}
+                    "read from the local archive (html-pages/), no network request"}
         except Exception as exc:
-            print(f"  [parse_html] archive illisible pour {url} "
+            print(f"  [parse_html] unreadable archive for {url} "
                   f"({archive_path.name}) : {type(exc).__name__}: {exc} "
-                  f"— repli sur le réseau")
-            # Pas de return ici : on tombe dans le fetch réseau ci-dessous.
+                  f"— falling back to the network")
+            # No return here: we fall through to the network fetch below.
 
     result = fetch_text(url)
     if result["status"] == "ok":
@@ -141,7 +141,7 @@ def fetch_text_cached(url, source_dir, is_css, refresh=False):
             archive_dir.mkdir(parents=True, exist_ok=True)
             archive_path.write_text(result["content"], encoding="utf-8")
         except Exception as exc:
-            print(f"  [parse_html] écriture de l'archive impossible pour "
+            print(f"  [parse_html] archive write failed for "
                   f"{url} : {type(exc).__name__}: {exc}")
     return result
 
@@ -161,21 +161,21 @@ def load_page_urls(source_dir):
 
 
 # ---------------------------------------------------------------------------
-# Règles HTML
+# HTML rules
 # ---------------------------------------------------------------------------
 
 class _HtmlFacts(HTMLParser):
-    """Relève, en une passe, les faits HTML dont les critères EOF ont besoin.
+    """Collects, in a single pass, the HTML facts the EOF criteria need.
 
-    POURQUOI un parseur et pas des expressions régulières. En HTML, l'ordre
-    des attributs ne veut rien dire, les guillemets sont facultatifs, la casse
-    est libre, une valeur d'attribut peut contenir un chevron, et un attribut
-    peut porter une entité (&amp;). Une expression régulière qui suppose une
-    seule de ces formes rend un résultat FAUX sans lever d'erreur : le compte
-    tombe à zéro, ce qui est indistinguable d'une absence légitime. Quatre
-    défauts de ce type ont réellement vécu ici, chacun est un cas d'autotest().
+    WHY a parser and not regular expressions. In HTML, attribute order means
+    nothing, quotes are optional, case is free, an attribute value can contain
+    a chevron, and an attribute can carry an entity (&amp;). A regular
+    expression that assumes only one of these forms returns a FALSE result
+    without raising an error: the count drops to zero, which is
+    indistinguishable from a legitimate absence. Four defects of this kind
+    really happened here, each is an autotest() case.
 
-    Attributs répétés : le premier gagne, comme dans un navigateur.
+    Repeated attributes: the first one wins, like in a browser.
     """
 
     def __init__(self):
@@ -190,76 +190,76 @@ class _HtmlFacts(HTMLParser):
         self.stylesheet_hrefs = []
 
     def handle_starttag(self, tag, attrs):
-        noms = {nom.lower() for nom, _ in attrs}
-        valeurs = {}
-        for nom, valeur in attrs:
-            nom = nom.lower()
-            if nom not in valeurs:
-                valeurs[nom] = valeur if valeur is not None else ""
+        names = {name.lower() for name, _ in attrs}
+        values = {}
+        for name, value in attrs:
+            name = name.lower()
+            if name not in values:
+                values[name] = value if value is not None else ""
 
         if tag in ("video", "audio"):
-            # "autoplay" doit être un attribut à lui seul : ni data-autoplay,
-            # ni une classe CSS qui contient le mot.
-            if "autoplay" in noms:
+            # "autoplay" must be a standalone attribute: neither data-autoplay,
+            # nor a CSS class containing the word.
+            if "autoplay" in names:
                 self.has_autoplay_media = True
         elif tag == "img":
             self.img_count += 1
-            if "srcset" in noms:
+            if "srcset" in names:
                 self.img_with_srcset += 1
         elif tag == "picture":
             self.picture_count += 1
         elif tag == "button":
             self.native_buttons += 1
         elif tag == "meta":
-            if valeurs.get("name", "").strip().lower() == "viewport":
+            if values.get("name", "").strip().lower() == "viewport":
                 if self.viewport_content is None:
-                    self.viewport_content = valeurs.get("content")
+                    self.viewport_content = values.get("content")
         elif tag == "link":
-            # rel est une liste de mots séparés par des espaces : rel="stylesheet
-            # preload" est bien une feuille de style, rel="preload" non.
-            if "stylesheet" in valeurs.get("rel", "").lower().split():
-                href = valeurs.get("href", "").strip()
+            # rel is a list of space-separated words: rel="stylesheet
+            # preload" IS a stylesheet, rel="preload" is not.
+            if "stylesheet" in values.get("rel", "").lower().split():
+                href = values.get("href", "").strip()
                 if href:
                     self.stylesheet_hrefs.append(href)
 
-        if valeurs.get("role", "").strip().lower() == "button":
+        if values.get("role", "").strip().lower() == "button":
             self.custom_role_buttons += 1
 
 
-# CSS : ces deux motifs cherchent une présence dans du CSS, pas dans du HTML.
-# Ni ordre d'attributs ni guillemets en jeu, une expression régulière est ici
-# le bon outil.
+# CSS: these two patterns look for a presence in CSS, not in HTML.
+# Neither attribute order nor quotes involved, a regular expression is the
+# right tool here.
 _MEDIA_QUERY_RE = re.compile(r"@media\b", re.IGNORECASE)
 _PREFERS_RE = re.compile(r"@media[^{]*prefers-(reduced-motion|color-scheme)", re.IGNORECASE)
 
 
 def analyze_html(html, page_url):
-    faits = _HtmlFacts()
+    facts = _HtmlFacts()
     try:
-        faits.feed(html)
-        faits.close()
+        facts.feed(html)
+        facts.close()
     except Exception as exc:
-        # Lecture interrompue : les faits relevés jusque-là sont conservés,
-        # mais l'échec est DIT, il ne se déguise pas en absence de donnée.
-        print(f"  [parse_html] lecture HTML interrompue sur {page_url} : {exc}")
+        # Interrupted reading: the facts collected so far are kept,
+        # but the failure is SAID, it does not disguise itself as an absence of data.
+        print(f"  [parse_html] interrupted HTML reading on {page_url} : {exc}")
 
     adaptive_img_ratio = None
-    if faits.img_count:
+    if facts.img_count:
         adaptive_img_ratio = round(
-            (faits.img_with_srcset + faits.picture_count) / faits.img_count, 2)
+            (facts.img_with_srcset + facts.picture_count) / facts.img_count, 2)
 
-    viewport_content = faits.viewport_content
+    viewport_content = facts.viewport_content
     viewport_ok = bool(viewport_content
                        and "width=device-width" in viewport_content.lower())
 
-    stylesheet_hrefs = faits.stylesheet_hrefs[:MAX_CSS_PER_PAGE]
+    stylesheet_hrefs = facts.stylesheet_hrefs[:MAX_CSS_PER_PAGE]
     return {
         "url": page_url,
-        "has_autoplay_media": faits.has_autoplay_media,
-        "img_count": faits.img_count,
+        "has_autoplay_media": facts.has_autoplay_media,
+        "img_count": facts.img_count,
         "adaptive_img_ratio": adaptive_img_ratio,
-        "native_buttons": faits.native_buttons,
-        "custom_role_buttons": faits.custom_role_buttons,
+        "native_buttons": facts.native_buttons,
+        "custom_role_buttons": facts.custom_role_buttons,
         "viewport_content": viewport_content,
         "viewport_ok": viewport_ok,
         "stylesheet_urls": [urljoin(page_url, href) for href in stylesheet_hrefs],
@@ -273,105 +273,105 @@ def analyze_css(css_texts):
 
 
 # ---------------------------------------------------------------------------
-# Autotest : chaque cas est un HTML qu'un navigateur lit d'une seule façon.
-# Un cas marqué "regression" est une écriture que la version à expressions
-# régulières lisait FAUX, en silence. Ne pas les retirer.
+# Autotest: each case is an HTML that a browser reads in a single way.
+# A case marked "regression" is a construct that the regex version read
+# WRONG, silently. Do not remove them.
 # ---------------------------------------------------------------------------
 
 _URL_TEST = "https://exemple.test/p/"
 _A_CSS = "https://exemple.test/a.css"
 
 CAS_AUTOTEST = [
-    # --- feuille de style : alimente le CSS téléchargé, donc les critères 1.6 et 1.11
-    ("stylesheet, ordre rel puis href",
+    # --- stylesheet: feeds the downloaded CSS, hence criteria 1.6 and 1.11
+    ("stylesheet, rel before href",
      '<link rel="stylesheet" href="/a.css">', "stylesheet_urls", [_A_CSS], False),
-    ("stylesheet, ordre INVERSE href puis rel",
+    ("stylesheet, REVERSE order href before rel",
      '<link href="/a.css" rel="stylesheet">', "stylesheet_urls", [_A_CSS], True),
-    ("stylesheet, sans guillemets (page minifiee)",
+    ("stylesheet, unquoted (minified page)",
      "<link rel=stylesheet href=/a.css>", "stylesheet_urls", [_A_CSS], True),
-    ("stylesheet, href en premier et attribut intercale",
+    ("stylesheet, href first and interleaved attribute",
      '<link href="/a.css" type="text/css" rel="stylesheet">',
      "stylesheet_urls", [_A_CSS], True),
-    ("stylesheet, entite &amp; dans l'URL",
+    ("stylesheet, &amp; entity in the URL",
      '<link rel="stylesheet" href="/a.css?x=1&amp;y=2">',
      "stylesheet_urls", ["https://exemple.test/a.css?x=1&y=2"], True),
-    ("stylesheet, majuscules",
+    ("stylesheet, uppercase",
      '<LINK REL="STYLESHEET" HREF="/a.css">', "stylesheet_urls", [_A_CSS], False),
-    ("stylesheet, balise auto-fermante",
+    ("stylesheet, self-closing tag",
      '<link rel="stylesheet" href="/a.css" />', "stylesheet_urls", [_A_CSS], False),
-    ("stylesheet, rel a plusieurs mots",
+    ("stylesheet, multi-word rel",
      '<link rel="stylesheet preload" href="/a.css">', "stylesheet_urls", [_A_CSS], False),
-    ("rel=preload n'est PAS une feuille de style",
+    ("rel=preload is NOT a stylesheet",
      '<link rel="preload" href="/a.css">', "stylesheet_urls", [], False),
-    ("aucune feuille de style",
-     "<html><body>rien</body></html>", "stylesheet_urls", [], False),
+    ("no stylesheet",
+     "<html><body>nothing</body></html>", "stylesheet_urls", [], False),
 
-    # --- autoplay : critere 1.5, provenance "collecte", donc presente comme mesure
-    ("autoplay, attribut nu",
+    # --- autoplay: criterion 1.5, provenance "collected", hence shown as a measurement
+    ("autoplay, bare attribute",
      "<video autoplay></video>", "has_autoplay_media", True, False),
-    ("autoplay sur audio",
+    ("autoplay on audio",
      '<audio autoplay src="a.mp3"></audio>', "has_autoplay_media", True, False),
-    ("data-autoplay n'est PAS autoplay",
+    ("data-autoplay is NOT autoplay",
      '<video data-autoplay="false"></video>', "has_autoplay_media", False, True),
-    ("une classe CSS nommee no-autoplay n'est PAS autoplay",
+    ("a CSS class named no-autoplay is NOT autoplay",
      '<video class="no-autoplay"></video>', "has_autoplay_media", False, True),
-    ("autoplay apres une valeur d'attribut contenant un chevron",
+    ("autoplay after an attribute value containing a chevron",
      '<video title="a > b" autoplay></video>', "has_autoplay_media", True, True),
-    ("video sans autoplay",
+    ("video without autoplay",
      '<video src="a.mp4"></video>', "has_autoplay_media", False, False),
 
-    # --- role=button : critere 1.4
-    ("role=button, guillemets doubles",
+    # --- role=button: criterion 1.4
+    ("role=button, double quotes",
      '<div role="button">x</div>', "custom_role_buttons", 1, False),
-    ("role=button, sans guillemets (page minifiee)",
+    ("role=button, unquoted (minified page)",
      "<div role=button>x</div>", "custom_role_buttons", 1, True),
-    ("role=button, guillemets simples",
+    ("role=button, single quotes",
      "<div role='button'>x</div>", "custom_role_buttons", 1, False),
-    ("role=button, espaces autour du signe egal",
+    ("role=button, spaces around the equals sign",
      '<div role = "button">x</div>', "custom_role_buttons", 1, True),
-    ("role=buttonbar n'est PAS role=button",
+    ("role=buttonbar is NOT role=button",
      '<div role="buttonbar">x</div>', "custom_role_buttons", 0, False),
-    ("role=button dans un commentaire ne compte pas",
+    ("role=button inside a comment does not count",
      '<!-- <div role="button"> --><p>x</p>', "custom_role_buttons", 0, True),
-    ("bouton natif",
+    ("native button",
      "<button>x</button>", "native_buttons", 1, False),
 
-    # --- viewport : collecte aujourd'hui lue par aucun critere, corrigee quand meme
-    ("viewport, ordre name puis content",
+    # --- viewport: collected today, read by no criterion, fixed anyway
+    ("viewport, name before content",
      '<meta name="viewport" content="width=device-width, initial-scale=1">',
      "viewport_ok", True, False),
-    ("viewport, ordre INVERSE content puis name",
+    ("viewport, REVERSE order content before name",
      '<meta content="width=device-width" name="viewport">', "viewport_ok", True, True),
-    ("viewport, name sans guillemets",
+    ("viewport, unquoted name",
      '<meta name=viewport content="width=device-width">', "viewport_ok", True, False),
-    ("viewport, majuscules dans la valeur",
+    ("viewport, uppercase in the value",
      '<meta name="VIEWPORT" content="WIDTH=DEVICE-WIDTH">', "viewport_ok", True, True),
     ("viewport absent",
      "<html><head></head></html>", "viewport_ok", False, False),
 
-    # --- images adaptatives : critere 1.6
-    ("img avec srcset",
+    # --- adaptive images: criterion 1.6
+    ("img with srcset",
      '<img src="a.png" srcset="a.png 1x">', "adaptive_img_ratio", 1.0, False),
-    ("img sans srcset",
+    ("img without srcset",
      '<img src="a.png">', "adaptive_img_ratio", 0.0, False),
-    ("srcset apres une valeur d'attribut contenant un chevron",
+    ("srcset after an attribute value containing a chevron",
      '<img alt="a > b" srcset="a.png 1x">', "adaptive_img_ratio", 1.0, True),
-    ("aucune image",
-     "<p>rien</p>", "adaptive_img_ratio", None, False),
+    ("no image",
+     "<p>nothing</p>", "adaptive_img_ratio", None, False),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Autotest — chantier 27 : archivage sous pages-html/ pour reproductibilité.
-# Chaque cas est une fonction sans argument qui rend True si elle passe. Ils
-# utilisent un dossier temporaire (jamais audits/*) et monkeypatchent
-# urllib.request.urlopen pour prouver l'absence — ou la présence — d'un appel
-# réseau, sans jamais en faire un vrai.
+# Autotest — work item 27: archiving under html-pages/ for reproducibility.
+# Each case is a no-argument function returning True if it passes. They use
+# a temporary folder (never audits/*) and monkeypatch urllib.request.urlopen
+# to prove the absence — or the presence — of a network call, without ever
+# making a real one.
 # ---------------------------------------------------------------------------
 
-class _FakeReponseReseau:
-    """Réponse HTTP factice, juste assez pour le `with ... as resp: resp.read()`
-    utilisé par fetch_text()."""
+class _FakeNetworkResponse:
+    """Fake HTTP response, just enough for the `with ... as resp: resp.read()`
+    used by fetch_text()."""
 
     def __init__(self, data: bytes):
         self._data = data
@@ -386,198 +386,198 @@ class _FakeReponseReseau:
         return self._data
 
 
-def _reseau_interdit(*_args, **_kwargs):
-    raise AssertionError("réseau appelé alors que l'archive locale existait")
+def _network_forbidden(*_args, **_kwargs):
+    raise AssertionError("network called although the local archive existed")
 
 
-def _test_nommage_meme_url_meme_nom():
+def _test_naming_same_url_same_name():
     url = "https://exemple.test/a/b.css"
     return archive_filename(url, True) == archive_filename(url, True)
 
 
-def _test_nommage_query_string_distingue():
+def _test_naming_query_string_distinguishes():
     a = archive_filename("https://exemple.test/a.css?x=1", True)
     b = archive_filename("https://exemple.test/a.css?x=2", True)
     return a != b
 
 
-def _test_archive_lue_sans_reseau():
+def _test_archive_read_without_network():
     with tempfile.TemporaryDirectory() as tmp:
         source_dir = Path(tmp)
-        url = "https://exemple.test/page-en-cache.html"
+        url = "https://exemple.test/page-in-cache.html"
         archive_dir = source_dir / ARCHIVE_DIRNAME
         archive_dir.mkdir()
-        nom = archive_filename(url, False)
-        (archive_dir / nom).write_text("<html>depuis l'archive</html>", encoding="utf-8")
+        archive_name = archive_filename(url, False)
+        (archive_dir / archive_name).write_text("<html>from the archive</html>", encoding="utf-8")
 
         original = urllib.request.urlopen
-        urllib.request.urlopen = _reseau_interdit
+        urllib.request.urlopen = _network_forbidden
         try:
-            resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+            result = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
         finally:
             urllib.request.urlopen = original
 
-        return (resultat["status"] == "ok"
-                and resultat["content"] == "<html>depuis l'archive</html>"
-                and "archive locale" in (resultat["error_detail"] or ""))
+        return (result["status"] == "ok"
+                and result["content"] == "<html>from the archive</html>"
+                and "local archive" in (result["error_detail"] or ""))
 
 
-def _test_refresh_force_le_reseau():
+def _test_refresh_forces_network():
     with tempfile.TemporaryDirectory() as tmp:
         source_dir = Path(tmp)
-        url = "https://exemple.test/page-a-rafraichir.html"
+        url = "https://exemple.test/page-to-refresh.html"
         archive_dir = source_dir / ARCHIVE_DIRNAME
         archive_dir.mkdir()
-        nom = archive_filename(url, False)
-        (archive_dir / nom).write_text("<html>ancienne version</html>", encoding="utf-8")
+        archive_name = archive_filename(url, False)
+        (archive_dir / archive_name).write_text("<html>old version</html>", encoding="utf-8")
 
-        appels = []
+        calls = []
 
-        def _reseau_ok(*_args, **_kwargs):
-            appels.append(1)
-            return _FakeReponseReseau(b"<html>fraiche du reseau</html>")
+        def _network_ok(*_args, **_kwargs):
+            calls.append(1)
+            return _FakeNetworkResponse(b"<html>fresh from the network</html>")
 
         original = urllib.request.urlopen
-        urllib.request.urlopen = _reseau_ok
+        urllib.request.urlopen = _network_ok
         try:
-            resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=True)
+            result = fetch_text_cached(url, source_dir, is_css=False, refresh=True)
         finally:
             urllib.request.urlopen = original
 
-        contenu_archive = (archive_dir / nom).read_text(encoding="utf-8")
-        return (len(appels) == 1
-                and resultat["content"] == "<html>fraiche du reseau</html>"
-                and contenu_archive == "<html>fraiche du reseau</html>")
+        archive_content = (archive_dir / archive_name).read_text(encoding="utf-8")
+        return (len(calls) == 1
+                and result["content"] == "<html>fresh from the network</html>"
+                and archive_content == "<html>fresh from the network</html>")
 
 
-def _test_archive_vide_replie_sur_reseau():
+def _test_empty_archive_falls_back_to_network():
     with tempfile.TemporaryDirectory() as tmp:
         source_dir = Path(tmp)
-        url = "https://exemple.test/page-archive-vide.html"
+        url = "https://exemple.test/page-empty-archive.html"
         archive_dir = source_dir / ARCHIVE_DIRNAME
         archive_dir.mkdir()
-        nom = archive_filename(url, False)
-        (archive_dir / nom).write_text("", encoding="utf-8")  # archive vide = corrompue
+        archive_name = archive_filename(url, False)
+        (archive_dir / archive_name).write_text("", encoding="utf-8")  # empty archive = corrupted
 
-        appels = []
+        calls = []
 
-        def _reseau_ok(*_args, **_kwargs):
-            appels.append(1)
-            return _FakeReponseReseau(b"<html>reparee</html>")
+        def _network_ok(*_args, **_kwargs):
+            calls.append(1)
+            return _FakeNetworkResponse(b"<html>repaired</html>")
 
         original = urllib.request.urlopen
-        urllib.request.urlopen = _reseau_ok
-        sortie = io.StringIO()
+        urllib.request.urlopen = _network_ok
+        output = io.StringIO()
         try:
-            with contextlib.redirect_stdout(sortie):
-                resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+            with contextlib.redirect_stdout(output):
+                result = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
         finally:
             urllib.request.urlopen = original
 
-        message_affiche = "archive illisible" in sortie.getvalue()
-        contenu_reecrit = (archive_dir / nom).read_text(encoding="utf-8")
-        return (len(appels) == 1
-                and resultat["status"] == "ok"
-                and resultat["content"] == "<html>reparee</html>"
-                and message_affiche
-                and contenu_reecrit == "<html>reparee</html>")
+        message_shown = "unreadable archive" in output.getvalue()
+        rewritten_content = (archive_dir / archive_name).read_text(encoding="utf-8")
+        return (len(calls) == 1
+                and result["status"] == "ok"
+                and result["content"] == "<html>repaired</html>"
+                and message_shown
+                and rewritten_content == "<html>repaired</html>")
 
 
-def _test_archive_indecodable_replie_sur_reseau():
+def _test_undecodable_archive_falls_back_to_network():
     with tempfile.TemporaryDirectory() as tmp:
         source_dir = Path(tmp)
-        url = "https://exemple.test/page-archive-indecodable.html"
+        url = "https://exemple.test/page-undecodable-archive.html"
         archive_dir = source_dir / ARCHIVE_DIRNAME
         archive_dir.mkdir()
-        nom = archive_filename(url, False)
-        # Octets invalides en UTF-8 strict : provoque une UnicodeDecodeError
-        # à la lecture, pas un simple contenu vide.
-        (archive_dir / nom).write_bytes(b"\xff\xfe\x00garbage")
+        archive_name = archive_filename(url, False)
+        # Invalid bytes in strict UTF-8: causes a UnicodeDecodeError
+        # on read, not just an empty content.
+        (archive_dir / archive_name).write_bytes(b"\xff\xfe\x00garbage")
 
-        appels = []
+        calls = []
 
-        def _reseau_ok(*_args, **_kwargs):
-            appels.append(1)
-            return _FakeReponseReseau(b"<html>reparee 2</html>")
+        def _network_ok(*_args, **_kwargs):
+            calls.append(1)
+            return _FakeNetworkResponse(b"<html>repaired 2</html>")
 
         original = urllib.request.urlopen
-        urllib.request.urlopen = _reseau_ok
-        sortie = io.StringIO()
+        urllib.request.urlopen = _network_ok
+        output = io.StringIO()
         try:
-            with contextlib.redirect_stdout(sortie):
-                resultat = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
+            with contextlib.redirect_stdout(output):
+                result = fetch_text_cached(url, source_dir, is_css=False, refresh=False)
         finally:
             urllib.request.urlopen = original
 
-        message_affiche = "archive illisible" in sortie.getvalue()
-        return (len(appels) == 1
-                and resultat["status"] == "ok"
-                and resultat["content"] == "<html>reparee 2</html>"
-                and message_affiche)
+        message_shown = "unreadable archive" in output.getvalue()
+        return (len(calls) == 1
+                and result["status"] == "ok"
+                and result["content"] == "<html>repaired 2</html>"
+                and message_shown)
 
 
 CAS_AUTOTEST_ARCHIVE = [
-    ("nommage : la même URL donne toujours le même nom", _test_nommage_meme_url_meme_nom),
-    ("nommage : une query string différente change le nom", _test_nommage_query_string_distingue),
-    ("archive présente : lue sans requête réseau", _test_archive_lue_sans_reseau),
-    ("--refresh : force le réseau même si l'archive existe", _test_refresh_force_le_reseau),
-    ("archive vide : message + repli réseau + réécriture", _test_archive_vide_replie_sur_reseau),
-    ("archive indécodable : message + repli réseau", _test_archive_indecodable_replie_sur_reseau),
+    ("naming: the same URL always gives the same name", _test_naming_same_url_same_name),
+    ("naming: a different query string changes the name", _test_naming_query_string_distinguishes),
+    ("archive present: read without a network request", _test_archive_read_without_network),
+    ("--refresh: forces the network even if the archive exists", _test_refresh_forces_network),
+    ("empty archive: message + network fallback + rewrite", _test_empty_archive_falls_back_to_network),
+    ("undecodable archive: message + network fallback", _test_undecodable_archive_falls_back_to_network),
 ]
 
 
 def autotest():
-    echecs = []
-    corriges = 0
-    for libelle, html, champ, attendu, regression in CAS_AUTOTEST:
-        obtenu = analyze_html(html, _URL_TEST).get(champ)
-        if obtenu != attendu:
-            echecs.append((libelle, champ, attendu, obtenu))
+    failures = []
+    fixed_count = 0
+    for label, html, field, expected, regression in CAS_AUTOTEST:
+        obtained = analyze_html(html, _URL_TEST).get(field)
+        if obtained != expected:
+            failures.append((label, field, expected, obtained))
         elif regression:
-            corriges += 1
+            fixed_count += 1
 
-    for libelle, fonction_test in CAS_AUTOTEST_ARCHIVE:
+    for label, test_fn in CAS_AUTOTEST_ARCHIVE:
         try:
-            ok = fonction_test()
+            ok = test_fn()
         except Exception as exc:
             ok = False
-            libelle = f"{libelle} (exception : {type(exc).__name__}: {exc})"
+            label = f"{label} (exception: {type(exc).__name__}: {exc})"
         if not ok:
-            echecs.append((libelle, "archive", True, False))
+            failures.append((label, "archive", True, False))
 
     total = len(CAS_AUTOTEST) + len(CAS_AUTOTEST_ARCHIVE)
-    if echecs:
-        print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
-        for libelle, champ, attendu, obtenu in echecs:
-            print(f"  - {libelle}")
-            print(f"      {champ} : attendu {attendu!r}, obtenu {obtenu!r}")
+    if failures:
+        print(f"AUTOTEST FAILED: {len(failures)} of {total} cases")
+        for label, field, expected, obtained in failures:
+            print(f"  - {label}")
+            print(f"      {field} : expected {expected!r}, got {obtained!r}")
         return 1
 
-    print(f"Autotest : {total} cas passés, dont {corriges} écritures HTML "
-          f"que la version à expressions régulières lisait faux.")
+    print(f"Autotest: {total} cases passed, including {fixed_count} HTML constructs "
+          f"that the regex version misread.")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Relève les faits HTML/CSS des pages auditées pour les critères EOF.")
+        description="Collects the HTML/CSS facts of the audited pages for the EOF criteria.")
     parser.add_argument("source_dir", nargs="?",
-                        help="dossier d'audit contenant env-data.json")
+                        help="audit folder containing env-data.json")
     parser.add_argument("--autotest", action="store_true",
-                        help="rejoue les cas de lecture HTML embarqués et sort 1 si un cas échoue")
+                        help="replays the embedded HTML reading cases and exits 1 if a case fails")
     parser.add_argument("--refresh", action="store_true",
-                        help="ignore l'archive locale pages-html/ et retélécharge tout en réseau")
+                        help="ignores the local html-pages/ archive and re-downloads everything over the network")
     args = parser.parse_args()
 
     if args.autotest:
         sys.exit(autotest())
     if not args.source_dir:
-        parser.error("source_dir est requis (ou utiliser --autotest)")
+        parser.error("source_dir is required (or use --autotest)")
     source_dir = Path(args.source_dir).resolve()
 
     urls = load_page_urls(source_dir)
     if not urls:
-        print(f"Erreur : aucune page trouvée dans {source_dir}/env-data.json.")
+        print(f"Error: no page found in {source_dir}/env-data.json.")
         sys.exit(1)
 
     pages_result = []
@@ -586,66 +586,66 @@ def main():
     for url in urls:
         fetch_result = fetch_text_cached(url, source_dir, is_css=False, refresh=args.refresh)
         if fetch_result["status"] != "ok":
-            # Page non récupérée : créer une entrée avec bloc mesure
+            # Page not fetched: create an entry with a measurement block
             page_entry = {
                 "url": url,
-                "mesure": {
-                    "statut": fetch_result["status"],
-                    "cible": url,
+                "measurement": {
+                    "status": fetch_result["status"],
+                    "target": url,
                     "detail": fetch_result["error_detail"]
                 }
             }
             pages_result.append(page_entry)
-            print(f"  [parse_html] échec fetch page : {url} — {fetch_result['status']}: {fetch_result['error_detail']}")
+            print(f"  [parse_html] fetch failed for page: {url} — {fetch_result['status']}: {fetch_result['error_detail']}")
             continue
 
-        # Page récupérée : analyser
+        # Page fetched: analyze it
         html = fetch_result["content"]
         page_data = analyze_html(html, url)
-        # Ajouter le bloc mesure pour indiquer succès (detail précise si le
-        # contenu vient de l'archive locale ou d'une requête réseau fraîche)
-        page_data["mesure"] = {
-            "statut": "ok",
-            "cible": url,
+        # Add the measurement block to indicate success (detail specifies whether the
+        # content came from the local archive or from a fresh network request)
+        page_data["measurement"] = {
+            "status": "ok",
+            "target": url,
             "detail": fetch_result["error_detail"]
         }
 
-        # Récupérer les CSS
+        # Fetch the CSS
         for css_url in page_data["stylesheet_urls"]:
             css_result = fetch_text_cached(css_url, source_dir, is_css=True, refresh=args.refresh)
             if css_result["status"] == "ok":
                 all_css_texts.append(css_result["content"])
             else:
-                # CSS non récupéré : tracer l'échec
+                # CSS not fetched: trace the failure
                 stylesheets_failed.append({
                     "url": css_url,
                     "source_page": url,
-                    "mesure": {
-                        "statut": css_result["status"],
-                        "cible": f"feuille de style {css_url} (liée depuis {url})",
+                    "measurement": {
+                        "status": css_result["status"],
+                        "target": f"stylesheet {css_url} (linked from {url})",
                         "detail": css_result["error_detail"]
                     }
                 })
-                print(f"  [parse_html] échec fetch CSS : {css_url} — {css_result['status']}: {css_result['error_detail']}")
+                print(f"  [parse_html] fetch failed for CSS: {css_url} — {css_result['status']}: {css_result['error_detail']}")
 
         pages_result.append(page_data)
         print(f"  [parse_html] {url} — autoplay={page_data['has_autoplay_media']} "
               f"adaptive_img_ratio={page_data['adaptive_img_ratio']} viewport_ok={page_data['viewport_ok']}")
 
-    # Vérifier combien de pages ont été mesurées avec succès
-    pages_ok = [p for p in pages_result if p.get("mesure", {}).get("statut") == "ok"]
+    # Check how many pages were measured successfully
+    pages_ok = [p for p in pages_result if p.get("measurement", {}).get("status") == "ok"]
     if not pages_ok:
-        print("Attention : aucune page n'a pu être récupérée avec succès (réseau indisponible ?). "
-              "Les entrées en échec seront tracées dans le fichier de sortie.")
+        print("Warning: no page could be fetched successfully (network unavailable?). "
+              "The failed entries will be traced in the output file.")
 
     css_result = analyze_css(all_css_texts)
 
     result = {
         "pages": pages_result,
         "css": css_result,
-        "note": "HTML/CSS re-fetchés en direct sur les mêmes URLs déjà listées dans "
-                "env-data.json (le .har capturé ne contient pas les corps de réponse "
-                "HTML/CSS) — pas de nouveau périmètre de pages.",
+        "note": "HTML/CSS re-fetched live on the same URLs already listed in "
+                "env-data.json (the captured .har does not contain the HTML/CSS "
+                "response bodies) — no new page scope.",
     }
 
     if stylesheets_failed:
@@ -653,7 +653,7 @@ def main():
 
     out_path = source_dir / "html-css-criteria.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"html-css-criteria.json écrit : {out_path}")
+    print(f"html-css-criteria.json written: {out_path}")
 
 
 if __name__ == "__main__":

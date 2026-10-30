@@ -1,133 +1,133 @@
 #!/usr/bin/env python3
-"""Génère un radar SVG (grille circulaire) pour la synthèse du référentiel EOF.
+"""Generates an SVG radar chart (circular grid) for the synthesis of the EOF reference framework.
 
-Usage :
-    python3 generate_radar_svg.py sortie.svg
-        -> génère un radar de démonstration à deux couches avec des valeurs
-           fictives (les 6 axes du référentiel EOF, un axe sans réponse,
-           une couche déclarée non vide) pour voir le rendu complet
+Usage:
+    python3 generate_radar_svg.py output.svg
+        -> generates a two-layer demo radar with fictitious values
+           (the 6 axes of the EOF framework, one axis with no answer,
+           one declared non-empty layer) to see the full rendering
 
     from generate_radar_svg import build_radar_from_results
     svg_text = build_radar_from_results(audit_results, "octo.com")
 
-DEUX COUCHES, ET POURQUOI ELLES EXISTENT
-----------------------------------------
-Un axe à 0 % parce que tout a été regardé et que tout va bien, et un axe à 0 %
-parce qu'un critère sur six a été regardé, ne doivent pas se ressembler. Mesuré
-sur un audit réel : la dimension 4 est passée de "vide" à 0 % le jour où UN
-critère sur six a reçu une réponse, et une bonne. Le radar affichait alors un axe
-exemplaire là où personne n'avait presque rien regardé.
+TWO LAYERS, AND WHY THEY EXIST
+--------------------------------
+An axis at 0% because everything was looked at and everything is fine, and an
+axis at 0% because one criterion out of six was looked at, must not look the
+same. Measured on a real audit: dimension 4 went from "empty" to 0% the day
+ONE criterion out of six got an answer, and a good one. The radar then showed
+an exemplary axis where almost nothing had been looked at.
 
-Trois éléments répondent à ça, et aucun n'invente de chiffre :
+Three elements answer this, and none of them invents a number:
 
-  - la couche PLEINE : le potentiel RETENU, c'est-à-dire tout ce qui n'est pas une
-    simple supposition depuis un indice faible (provenances de
-    PROVENANCES_RETENUES : mesuré, déduit d'un ordre de grandeur, déclaré
-    publiquement par le service, ou indiqué par le service via le questionnaire) ;
-  - la couche HACHURÉE : la MARGE D'INCERTITUDE, c'est-à-dire la part du potentiel
-    qui ne repose que sur une déduction depuis un indice faible (provenance
-    `suppose`, la seule dans PROVENANCES_MARGE_INCERTITUDE). Le contour extérieur
-    de la figure (plein + hachuré additionnés) reste l'estimation globale du
-    potentiel d'optimisation de l'axe ;
-  - sous chaque axe, le nombre de critères renseignés sur son total ; et sous le
-    radar, une jauge de ce qui est renseigné à l'échelle du référentiel.
+  - the SOLID layer: the RETAINED potential, i.e. everything that is not a
+    mere assumption from a weak signal (provenances of
+    PROVENANCES_RETENUES: measured, inferred from a magnitude, publicly
+    declared by the service, or indicated by the service via the questionnaire);
+  - the HATCHED layer: the UNCERTAINTY MARGIN, i.e. the share of the potential
+    that rests only on an inference from a weak signal (provenance
+    `assumed`, the only one in PROVENANCES_MARGE_INCERTITUDE). The outer
+    outline of the figure (solid + hatched added together) remains the global
+    estimate of the axis's optimization potential;
+  - under each axis, the number of criteria filled in out of its total; and
+    under the radar, a gauge of what is filled in at the framework's scale.
 
-Un critère sans réponse ne reçoit AUCUNE valeur par défaut, ni la meilleure ni la
-pire : la jauge dit ce qui manque au lieu de le combler.
+A criterion with no answer gets NO default value, neither the best nor the
+worst: the gauge says what is missing instead of filling it in.
 
-Toutes les coordonnées sont calculées par trigonométrie (math.cos/sin), jamais
-estimées à l'œil. Tout le texte est échappé XML (xml.sax.saxutils.escape) :
-un "&" non échappé dans un libellé (ex. "Stockage & Données") casse le
-parsing XML et peut faire disparaître silencieusement tout ce qui suit dans
-certains navigateurs.
+All coordinates are computed by trigonameetry (math.cos/sin), never estimated
+by eye. All text is XML-escaped (xml.sax.saxutils.escape): an unescaped "&" in
+a label (e.g. "Storage & Data") breaks XML parsing and can silently make
+everything after it disappear in some browsers.
 """
 import math
 import sys
 from xml.sax.saxutils import escape
 
-NAVY = "#2D4675"  # contraste ~9,35:1 sur fond blanc (RGAA/WCAG AAA)
-GREY = "#5F5F5F"  # contraste ~6,7:1 sur fond blanc : couleur de l'absence de réponse,
-                  # visiblement éteinte par rapport au NAVY sans descendre sous le seuil AA
-SCALE = 100  # axe en pourcentage (0-100%), comme le radar du Google Sheet source
+NAVY = "#2D4675"  # contrast ~9.35:1 on white background (RGAA/WCAG AAA)
+GREY = "#5F5F5F"  # contrast ~6.7:1 on white background: color of the absence of an answer,
+                   # visibly muted compared to NAVY without dropping below the AA threshold
+SCALE = 100  # axis in percent (0-100%), like the radar of the source Google Sheet
 
-# Identifiant du motif de hachures. Distinctif à dessein : le SVG est INLINÉ dans
-# le rapport HTML, au milieu d'autres SVG. Un id générique ("hachure") serait
-# capturé par le premier motif du document portant le même nom, et la couche
-# de marge d'incertitude se remplirait avec les hachures d'un diagramme voisin.
-HACHURE_ID = "eof-radar-couche-declaree"
+# Identifier of the hatch pattern. Distinctive on purpose: the SVG is INLINED in
+# the HTML report, among other SVGs. A generic id ("hatch") would be captured by
+# the first pattern of the document with the same name, and the uncertainty-margin
+# layer would be filled with the hatching of a neighboring diagram.
+HACHURE_ID = "eof-radar-declared-layer"
 
 AXES_EOF = [
-    "🛖 Produit",
+    "🛖 Product",
     "🗺️ Architecture",
     "🏢 Infrastructure",
-    "💾 Stockage & Données",
+    "💾 Storage & Data",
     "👨‍💻 Algo & Code",
-    "🛠 Facilité de changement",
+    "🛠 Ease of change",
 ]
 
-# Répartition des provenances entre les deux couches.
+# Distribution of provenances between the two layers.
 #
-# Décidé le 2026-09-11 avec l'utilisatrice : la couche pleine porte le potentiel
-# RETENU (tout ce qui n'est pas une simple supposition depuis un indice faible),
-# la couche hachurée porte la MARGE D'INCERTITUDE (uniquement `suppose`, la
-# provenance la plus fragile de l'axe de précédence du manifeste). Avant cette
-# date, la répartition opposait "nous" (collecte/estime/suppose) à "eux"
-# (declare/precise) ; ce découpage mélangeait la provenance la plus solide
-# (collecte) et la plus fragile (suppose) dans la même couche, ce qui ne
-# correspondait à aucune notion de fiabilité utile pour le lecteur.
-PROVENANCES_RETENUES = ("collecte", "estime", "declare", "precise")
-PROVENANCES_MARGE_INCERTITUDE = ("suppose",)
+# Decided on 2026-09-11 with the user: the solid layer carries the RETAINED
+# potential (everything that is not a mere assumption from a weak signal),
+# the hatched layer carries the UNCERTAINTY MARGIN (only `assumed`, the
+# most fragile provenance of the manifest's precedence axis). Before that
+# date, the split opposed "us" (collected/estimated/assumed) to "them"
+# (declared/stated); that split mixed the most solid provenance
+# (collected) and the most fragile one (assumed) in the same layer, which
+# corresponded to no reliability notion useful to the reader.
+PROVENANCES_RETENUES = ("collected", "estimated", "declared", "stated")
+PROVENANCES_MARGE_INCERTITUDE = ("assumed",)
 
-# Libellés lisibles des provenances, pour la ligne de décompte sous le radar.
-# Le manifeste impose que les provenances restent distinguables sur le radar :
-# les deux couches en distinguent l'origine, cette ligne en donne le détail.
+# Readable labels of the provenances, for the breakdown line under the radar.
+# The manifest requires that provenances stay distinguishable on the radar:
+# the two layers distinguish their origin, this line gives the detail.
 LIBELLES_PROVENANCE = {
-    "collecte": "collecte",
-    "estime": "estimation",
-    "declare": "déclaré",
-    "precise": "précisé",
-    "suppose": "supposé",
+    "collected": "collected",
+    "estimated": "estimate",
+    "declared": "declared",
+    "stated": "stated",
+    "assumed": "assumed",
 }
 
 
-def _pct(valeur, decimales=1):
-    """Formate un pourcentage à la française : virgule décimale, espace avant %.
+def _pct(value, decimals=1):
+    """Formats a percentage the French way: decimal comma, space before %.
 
-    Ne reçoit jamais None : l'appelant traite l'absence de réponse à part, par le
-    libellé "aucune réponse". Un None arrivant ici afficherait "None %" dans un
-    livrable client, accident déjà vécu et surveillé par check_valeurs_rapport.py.
+    Never receives None: the caller handles the absence of an answer separately,
+    with the label "no answer". A None arriving here would display "None %" in a
+    client deliverable, an accident that already happened and is monitored by
+    check_report_values.py.
     """
-    return f"{valeur:.{decimales}f}".replace(".", ",") + " %"
+    return f"{value:.{decimals}f}".replace(".", ",") + " %"
 
 
-def _decompte_criteres(repondus, total):
-    """Formate "4 critères renseignés sur 16", accord compris, y compris à zéro.
+def _decompte_criteres(answered, total):
+    """Formats "4 criteria filled in out of 16", agreement included, including zero.
 
-    Écrit pour être lu à voix haute : "0 critères sur 10 renseignés" se prononce mal
-    et laisse penser qu'il existe un critère nul.
+    Written to be read aloud: "0 criteria out of 10 filled in" sounds wrong
+    and suggests that a null criterion exists.
     """
-    if repondus == 0:
-        return f"aucun critère renseigné sur {total}"
-    if repondus == 1:
-        return f"1 critère renseigné sur {total}"
-    return f"{repondus} critères renseignés sur {total}"
+    if answered == 0:
+        return f"no criterion filled in out of {total}"
+    if answered == 1:
+        return f"1 criterion filled in out of {total}"
+    return f"{answered} criteria filled in out of {total}"
 
 
 def _wrap_text(text):
-    """Découpe un texte long en lignes qui tiennent dans la largeur du radar.
+    """Splits a long text into lines that fit within the radar's width.
 
-    Coupe aux espaces sans jamais couper un mot. 152 caractères est la longueur
-    de la note d'origine, qui tenait sur une ligne sans déborder : une note de
-    cette longueur ou moins n'est pas découpée, ce qui préserve la non-régression.
-    Au-delà, le découpage se fait à 110 caractères par ligne, ce qui correspond
-    à environ 880 pixels en police 12pt sans-serif, largeur qui tient confortablement
-    dans les 1100 pixels du canevas avec des marges.
+    Cuts at spaces without ever cutting a word. 152 characters is the length
+    of the original note, which fit on one line without overflowing: a note of
+    this length or less is not split, which preserves non-regression.
+    Beyond that, wrapping happens at 110 characters per line, which corresponds
+    to roughly 880 pixels in 12pt sans-serif, a width that fits comfortably
+    within the 1100-pixel canvas with margins.
     """
-    # Si le texte tient sur une ligne (note d'origine), ne pas découper.
+    # If the text fits on one line (original note), do not split it.
     if len(text) <= 152:
         return [text]
 
-    # Sinon, découper à 110 caractères par ligne.
+    # Otherwise, wrap at 110 characters per line.
     max_length = 110
     lines = []
     words = text.split()
@@ -135,19 +135,19 @@ def _wrap_text(text):
     current_length = 0
 
     for word in words:
-        # +1 pour l'espace qui précède le mot (sauf pour le premier mot de la ligne)
+        # +1 for the space preceding the word (except for the first word of the line)
         word_length = len(word) + (1 if current_line else 0)
         if current_length + word_length <= max_length:
             current_line.append(word)
             current_length += word_length
         else:
-            # La ligne courante est pleine, on la ferme
+            # The current line is full, close it
             if current_line:
                 lines.append(" ".join(current_line))
             current_line = [word]
             current_length = len(word)
 
-    # Ajouter la dernière ligne si elle existe
+    # Add the last line if it exists
     if current_line:
         lines.append(" ".join(current_line))
 
@@ -155,68 +155,67 @@ def _wrap_text(text):
 
 
 def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
-              axes_etabli=None, axes_renseignes=None, axes_hors_perimetre=None,
-              axes_ecartes=None, couverture=None, provenances=None):
-    """axes : liste de tuples (nom, valeur 0-100 OU None). Retourne le texte SVG complet.
+               axes_set=None, axes_answered=None, axes_out_of_scope=None,
+               axes_discarded=None, coverage=None, provenances=None):
+    """axes: list of tuples (name, value 0-100 OR None). Returns the full SVG text.
 
-    Une valeur `None` (dimension sans aucune donnée réelle) est rendue à
-    r=0 (le polygone se pince sur cet axe), avec un anneau gris et le libellé
-    "aucune réponse" au lieu d'un pourcentage : jamais assimilée à un vrai 0 %
-    (qui signifierait "point fort confirmé partout"), une absence de réponse
-    n'est pas une réponse.
+    A `None` value (dimension with no real data) is rendered at
+    r=0 (the polygon pinches on that axis), with a grey ring and the label
+    "no answer" instead of a percentage: never assimilated to a real 0%
+    (which would mean "confirmed strength everywhere"), an absence of an answer
+    is not an answer.
 
-    Paramètres facultatifs, tous omissibles : sans eux, la fonction rend le radar
-    à une seule couche d'avant le chantier 13, ce qui garde les appelants anciens
-    valides.
+    Optional parameters, all omittable: without them, the function renders the
+    single-layer radar from before chantier 13, which keeps old callers valid.
 
-      axes_etabli      liste de valeurs (0-100 ou None), MÊME ORDRE que `axes`,
-                       pour la couche pleine. `axes` porte alors le total, qui est
-                       dessiné hachuré autour d'elle.
-      axes_renseignes  liste de tuples (répondus, total), même ordre : affichée
-                       sous chaque libellé d'axe.
-      couverture       tuple (pourcentage, répondus, total) pour la jauge.
-      provenances      dict {provenance: nombre} pour la ligne de décompte.
+      axes_set      list of values (0-100 or None), SAME ORDER as `axes`,
+                       for the solid layer. `axes` then carries the total, which is
+                       drawn hatched around it.
+      axes_answered  list of tuples (answered, total), same order: displayed
+                       under each axis label.
+      coverage       tuple (percentage, answered, total) for the gauge.
+      provenances      dict {provenance: count} for the breakdown line.
 
-    width généreux par défaut : le libellé le plus long ("Facilité de
-    changement") dépasse largement le rayon du radar. Une valeur trop petite
-    le coupe sur le bord de l'image (constaté et corrigé après vérification
-    par rendu réel, pas par relecture du code).
+    width generous by default: the longest label ("Ease of
+    change") far exceeds the radar's radius. A value too small
+    clips it on the edge of the image (observed and corrected after checking
+    by real rendering, not by re-reading the code).
 
-    height serré à l'inverse, et calculé selon ce qui est demandé : sans pied de
-    figure, le contenu le plus bas est le libellé de l'axe du bas, dont la ligne
-    de base tombe à cy + R + 55 + 34 = 669. Une valeur trop grande ne coupe rien mais
-    laisse une bande blanche vide sous le radar, bien visible dans le rapport HTML
-    où le SVG est encadré (constaté à 900, ramené à 720).
+    height tight on the contrary, and computed according to what is requested: without
+    a caption, the lowest content is the bottom axis's label, whose baseline
+    falls at cy + R + 55 + 34 = 669. A value too large clips nothing but
+    leaves an empty white band under the radar, clearly visible in the HTML
+    report where the SVG is framed (observed at 900, brought back to 720).
 
-    Piège de vérification : contrôler ce rendu avec `qlmanage -t` (QuickLook)
-    donne une image fausse. Il produit une vignette carrée, décale le contenu
-    et coupe les libellés de droite, ce qui fait croire à un débordement
-    inexistant. Utiliser `rsvg-convert -o sortie.png fichier.svg`, qui respecte
-    le viewBox (il rend en revanche les emojis en noir, faute de police
-    couleur : c'est sa limite, pas celle du SVG).
+    Verification pitfall: checking this rendering with `qlmanage -t` (QuickLook)
+    gives a false image. It produces a square thumbnail, shifts the content
+    and clips the right-hand labels, which makes it look like an overflow that
+    does not exist. Use `rsvg-convert -o output.png file.svg`, which respects
+    the viewBox (it does render emojis in black, lacking a color font:
+    that is its limit, not the SVG's).
     """
     n = len(axes)
-    if axes_etabli is not None and len(axes_etabli) != n:
+    if axes_set is not None and len(axes_set) != n:
         raise ValueError(
-            f"axes_etabli a {len(axes_etabli)} valeurs pour {n} axes : les deux couches "
-            "sont indexées par position, un décalage attribuerait la mesure d'une "
-            "dimension à sa voisine sans que le rendu paraisse faux"
+            f"axes_set has {len(axes_set)} values for {n} axes: the two layers "
+            "are indexed by position, a shift would attribute one "
+            "dimension's measure to its neighbor without the rendering looking wrong"
         )
-    if axes_renseignes is not None and len(axes_renseignes) != n:
+    if axes_answered is not None and len(axes_answered) != n:
         raise ValueError(
-            f"axes_renseignes a {len(axes_renseignes)} valeurs pour {n} axes"
+            f"axes_answered has {len(axes_answered)} values for {n} axes"
         )
 
-    pied = couverture is not None or provenances is not None
+    footer = coverage is not None or provenances is not None
     if height is None:
-        height = 792 if pied else 720
+        height = 792 if footer else 720
 
-    # Ajuster la hauteur si la note nécessite plusieurs lignes.
+    # Adjust the height if the note needs several lines.
     if note:
         note_lines = _wrap_text(note)
         if len(note_lines) > 1:
-            # Interligne de 18, première ligne à y=766, dernière à y=766 + (n-1)*18
-            # On ajoute 22 pixels de marge en bas après la dernière ligne.
+            # Line height of 18, first line at y=766, last at y=766 + (n-1)*18
+            # We add 22 pixels of margin at the bottom after the last line.
             height_needed = 766 + (len(note_lines) - 1) * 18 + 22
             if height < height_needed:
                 height = height_needed
@@ -239,11 +238,11 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
 
     svg = []
     svg.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '  # genericite: ok - espace de noms XML du format SVG, pas un domaine audité
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '  # genericity: ok - XML namespace of the SVG format, not an audited domain
         f'viewBox="0 0 {width} {height}" font-family="sans-serif">'
     )
-    # Motif de hachures : pas de fond opaque, sinon la couche déclarée masquerait
-    # la grille et les axes qu'elle recouvre.
+    # Hatch pattern: no opaque background, otherwise the declared layer would hide
+    # the grid and the axes it covers.
     svg.append(
         f'<defs><pattern id="{HACHURE_ID}" width="9" height="9" '
         f'patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
@@ -256,14 +255,14 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
         f'font-weight="bold">{escape(title)}</text>'
     )
 
-    # grille = vrais cercles (pas des hexagones)
+    # grid = true circles (not hexagons)
     #
-    # Les graduations sont mises de côté et rendues APRÈS les polygones, avec un halo
-    # blanc. Elles sont posées sur l'axe vertical, à l'endroit exact où passe le
-    # polygone : dessinées avant, la couche pleine les recouvre. stroke-width doit
-    # rester fin (1.5) : à 3, le halo d'un chiffre comme "25 %" devient un bloc plein
-    # qui avale le texte au lieu de le souligner (vu sur le rendu de démonstration,
-    # où le "2" disparaissait et la graduation se lisait "5 %").
+    # The graduations are set aside and rendered AFTER the polygons, with a white
+    # halo. They are placed on the vertical axis, at the exact spot where the
+    # polygon passes: drawn before, the solid layer would cover them. stroke-width
+    # must stay thin (1.5): at 3, the halo of a digit like "25 %" becomes a solid
+    # block that swallows the text instead of underlining it (seen on the demo
+    # rendering, where the "2" disappeared and the graduation read "5 %").
     graduations = []
     for ring in (25, 50, 75, 100):
         color = "#333" if ring == 100 else "#ccc"
@@ -277,24 +276,24 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
             f'paint-order="stroke" stroke="white" stroke-width="1.5">{ring} %</text>'
         )
 
-    # axes = lignes droites du centre au bord
+    # axes = straight lines from the center to the edge
     for i in range(n):
         ex, ey = axis_end(i)
         svg.append(f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" stroke="#999" stroke-width="1"/>')
 
-    # Bloc de libellé de chaque axe : le nom, la valeur, puis le nombre de critères
-    # renseignés.
+    # Label block of each axis: the name, the value, then the number of criteria
+    # filled in.
     #
-    # ⚠️ La valeur est écrite ICI et pas près de son point sur le polygone, contre
-    # l'usage des radars, et c'est délibéré. Sur un audit réel, quatre dimensions
-    # sur six valaient presque zéro : leurs quatre nombres se sont empilés au
-    # centre, par-dessus les marqueurs des dimensions sans réponse, illisibles.
-    # Les repousser à un rayon minimal aurait été pire : un "0,0 %" posé au-delà du
-    # cercle des 25 % se lit comme 28 %. Le bloc de libellé, lui, est toujours hors
-    # de la grille et son axe est nommé juste au-dessus : aucune ambiguïté possible.
+    # ⚠️ The value is written HERE and not next to its point on the polygon, against
+    # the usual radar practice, and it is deliberate. On a real audit, four dimensions
+    # out of six were worth almost zero: their four numbers piled up at the
+    # center, on top of the markers of the dimensions with no answer, unreadable.
+    # Pushing them out to a minimum radius would have been worse: a "0.0 %" placed
+    # beyond the 25% circle reads as 28%. The label block, however, is always outside
+    # the grid and its axis is named just above: no ambiguity possible.
     #
-    # La troisième ligne est ce qui empêche de lire un axe à 0 % comme un axe
-    # exemplaire : elle dit combien de critères ont réellement répondu.
+    # The third line is what prevents reading a 0% axis as an exemplary axis:
+    # it says how many criteria actually answered.
     for i, (name, val) in enumerate(axes):
         lx, ly = label_point(i)
         anchor = "middle"
@@ -307,143 +306,143 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
             f'font-weight="bold" fill="#222">{escape(name)}</text>'
         )
         if val is None:
-            # Distinguer hors périmètre (dimension qui ne concerne pas ce service)
-            # d'une absence de réponse (dimension que nous n'avons pas su instruire).
-            # Le rapport est lu à voix haute par une synthèse vocale, qui épelle les
-            # sigles, d'où "aucune réponse" plutôt que "N/A". Une absence de réponse
-            # n'est jamais assimilée à un 0 %, qui voudrait dire "point fort confirmé
-            # partout".
-            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
-            libelle = "hors périmètre" if hors_perimetre else "aucune réponse"
+            # Distinguish out of scope (a dimension that does not concern this service)
+            # from an absence of an answer (a dimension we failed to assess).
+            # The report is read aloud by a speech synthesis, which spells out
+            # acronyms, hence "no answer" rather than "N/A". An absence of an answer
+            # is never assimilated to 0%, which would mean "confirmed strength
+            # everywhere".
+            out_of_scope = axes_out_of_scope and i < len(axes_out_of_scope) and axes_out_of_scope[i]
+            label = "out of scope" if out_of_scope else "no answer"
             svg.append(
                 f'<text x="{lx:.1f}" y="{ly + 18:.1f}" text-anchor="{anchor}" font-size="13" '
-                f'font-weight="bold" fill="{GREY}">{escape(libelle)}</text>'
+                f'font-weight="bold" fill="{GREY}">{escape(label)}</text>'
             )
         else:
             svg.append(
                 f'<text x="{lx:.1f}" y="{ly + 18:.1f}" text-anchor="{anchor}" font-size="13" '
-                f'font-weight="bold" fill="{NAVY}">{escape(_pct(val))} de potentiel</text>'
+                f'font-weight="bold" fill="{NAVY}">{escape(_pct(val))} of potential</text>'
             )
-        if axes_renseignes is not None:
-            repondus, total = axes_renseignes[i]
-            # Pour un axe hors périmètre, afficher le nombre de critères écartés
-            # au lieu du décompte "sur 0", qui ne veut rien dire pour un lecteur.
-            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
-            if hors_perimetre and axes_ecartes is not None and i < len(axes_ecartes):
-                nb_ecartes = axes_ecartes[i]
-                texte_ecartes = f"{nb_ecartes} critère écarté" if nb_ecartes == 1 else f"{nb_ecartes} critères écartés"
+        if axes_answered is not None:
+            answered, total = axes_answered[i]
+            # For an out-of-scope axis, display the number of excluded criteria
+            # instead of the "out of 0" count, which means nothing to a reader.
+            out_of_scope = axes_out_of_scope and i < len(axes_out_of_scope) and axes_out_of_scope[i]
+            if out_of_scope and axes_discarded is not None and i < len(axes_discarded):
+                excluded_count = axes_discarded[i]
+                excluded_text = f"{excluded_count} criterion excluded" if excluded_count == 1 else f"{excluded_count} criteria excluded"
                 svg.append(
                     f'<text x="{lx:.1f}" y="{ly + 34:.1f}" text-anchor="{anchor}" font-size="12" '
-                    f'fill="{GREY}">{texte_ecartes}</text>'
+                    f'fill="{GREY}">{excluded_text}</text>'
                 )
             else:
-                # "renseignés" placé juste après "critères", pas après le total : la
-                # première tournure essayée, "1 critère sur 5 renseigné", laissait
-                # entendre que c'était le 5 qui était renseigné.
+                # "filled in" placed right after "criteria", not after the total: the
+                # first wording tried, "1 criterion out of 5 filled in", suggested
+                # that it was the 5 that was filled in.
                 svg.append(
                     f'<text x="{lx:.1f}" y="{ly + 34:.1f}" text-anchor="{anchor}" font-size="12" '
-                    f'fill="{GREY}">{_decompte_criteres(repondus, total)}</text>'
+                    f'fill="{GREY}">{_decompte_criteres(answered, total)}</text>'
                 )
 
-    # Polygones de données (lignes droites entre points, comme le Sheet source).
-    # La couche hachurée d'abord, la pleine par-dessus : dans l'autre ordre les
-    # hachures recouvriraient la couche pleine et les deux se confondraient.
-    def polygone(valeurs, fill, fill_opacity=None, stroke_dash=None, stroke=NAVY):
-        pts = [point(i, v) for i, v in enumerate(valeurs)]
+    # Data polygons (straight lines between points, like the source Sheet).
+    # The hatched layer first, the solid one on top: in the other order the
+    # hatching would cover the solid layer and the two would blend together.
+    def polygone(values, fill, fill_opacity=None, stroke_dash=None, stroke=NAVY):
+        pts = [point(i, v) for i, v in enumerate(values)]
         pts_str = " ".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts)
         opacity = f' fill-opacity="{fill_opacity}"' if fill_opacity else ""
         dash = f' stroke-dasharray="{stroke_dash}"' if stroke_dash else ""
         stroke_attr = f' stroke="{stroke}" stroke-width="2.5"' if stroke else ""
         return f'<polygon points="{pts_str}" fill="{fill}"{opacity}{stroke_attr}{dash}/>'
 
-    def anneau_hachure(valeurs_ext, valeurs_int):
-        # Chemin à deux sous-chemins + fill-rule evenodd : le sous-chemin intérieur
-        # devient un trou dans le remplissage de l'extérieur. Corrige un bug constaté
-        # le 2026-09-11 : dessiner le hachuré sur TOUTE la surface du total, puis le
-        # plein par-dessus en semi-transparence (fill-opacity 0.40), laissait la
-        # texture hachurée visible PAR TRANSPARENCE même quand établi == total (marge
-        # d'incertitude nulle) — un axe sans aucune marge avait l'air d'en avoir une.
-        # La technique marche parce que chaque axe est un rayon depuis le centre :
-        # l'intérieur est toujours <= l'extérieur sur ce même rayon, donc entièrement
-        # contenu dedans, quels que soient les 6 axes.
-        pts_ext = [point(i, v) for i, v in enumerate(valeurs_ext)]
-        pts_int = [point(i, v) for i, v in enumerate(valeurs_int)]
+    def anneau_hachure(outer_values, inner_values):
+        # Path with two sub-paths + fill-rule evenodd: the inner sub-path
+        # becomes a hole in the fill of the outer one. Fixes a bug observed
+        # on 2026-09-11: drawing the hatched area over the WHOLE surface of the total, then the
+        # solid layer on top semi-transparent (fill-opacity 0.40), left the
+        # hatch texture visible THROUGH TRANSPARENCY even when established == total (zero uncertainty
+        # margin) — an axis with no margin at all looked like it had one.
+        # The technique works because each axis is a radius from the center:
+        # the inside is always <= the outside on that same radius, so it is entirely
+        # contained within it, whatever the 6 axes.
+        pts_ext = [point(i, v) for i, v in enumerate(outer_values)]
+        pts_int = [point(i, v) for i, v in enumerate(inner_values)]
         d_ext = "M" + " L".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts_ext) + " Z"
         d_int = "M" + " L".join(f"{p[0]:.1f},{p[1]:.1f}" for p in pts_int) + " Z"
         return f'<path d="{d_ext} {d_int}" fill="url(#{HACHURE_ID})" fill-rule="evenodd" stroke="none"/>'
 
-    valeurs_totales = [val for _, val in axes]
-    if axes_etabli is None:
-        svg.append(polygone(valeurs_totales, NAVY, fill_opacity="0.40"))
+    total_values = [val for _, val in axes]
+    if axes_set is None:
+        svg.append(polygone(total_values, NAVY, fill_opacity="0.40"))
     else:
-        svg.append(polygone(valeurs_totales, "none", stroke_dash="7 4"))
-        svg.append(anneau_hachure(valeurs_totales, axes_etabli))
-        svg.append(polygone(axes_etabli, NAVY, fill_opacity="0.40"))
+        svg.append(polygone(total_values, "none", stroke_dash="7 4"))
+        svg.append(anneau_hachure(total_values, axes_set))
+        svg.append(polygone(axes_set, NAVY, fill_opacity="0.40"))
 
     svg.extend(graduations)
 
-    # Marqueurs sur les axes. Aucun texte ici : tous les nombres sont dans les blocs
-    # de libellé, hors de la grille.
+    # Markers on the axes. No text here: all numbers are in the label
+    # blocks, outside the grid.
     for i, (name, val) in enumerate(axes):
         p = point(i, val)
         if val is None:
-            # Absence de réponse ou hors périmètre : anneau gris au centre. La
-            # dimension est bien dessinée, mais éteinte. Le bloc de libellé
-            # distingue les deux cas.
-            hors_perimetre = axes_hors_perimetre and i < len(axes_hors_perimetre) and axes_hors_perimetre[i]
-            titre = f"{name} : hors périmètre, ne concerne pas ce service" if hors_perimetre else f"{name} : aucune réponse, ce n'est pas un 0 %"
+            # No answer or out of scope: grey ring at the center. The
+            # dimension is still drawn, but muted. The label block
+            # distinguishes the two cases.
+            out_of_scope = axes_out_of_scope and i < len(axes_out_of_scope) and axes_out_of_scope[i]
+            tooltip = f"{name}: out of scope, does not concern this service" if out_of_scope else f"{name}: no answer, this is not a 0%"
             svg.append(
                 f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="5" fill="white" '
                 f'stroke="{GREY}" stroke-width="2"><title>'
-                f'{escape(titre)}</title></circle>'
+                f'{escape(tooltip)}</title></circle>'
             )
             continue
         svg.append(
             f'<circle cx="{p[0]:.1f}" cy="{p[1]:.1f}" r="6" fill="{NAVY}" stroke="white" '
             f'stroke-width="1.5"><title>{escape(name)} : {escape(_pct(val))} '
-            f'de potentiel d\'optimisation</title></circle>'
+            f'of optimization potential</title></circle>'
         )
-        # Couche pleine : un anneau creux là où elle s'arrête sur cet axe. Sa
-        # valeur n'est PAS écrite sur l'image, elle est portée par un <title>,
-        # que le navigateur montre au survol et qu'un lecteur d'écran énonce.
+        # Solid layer: a hollow ring where it stops on this axis. Its
+        # value is NOT written on the image, it is carried by a <title>,
+        # which the browser shows on hover and a screen reader announces.
         #
-        # Deux placements du nombre ont été essayés et jetés après avoir regardé
-        # l'image : près de l'anneau, les axes dont rien n'est établi se pincent
-        # tous sur le centre et leurs nombres s'y empilent par-dessus le marqueur
-        # "N/A" ; sous la valeur du total, le nombre retombe sur le bord du
-        # polygone des axes obliques. La valeur chiffrée de chaque couche est de
-        # toute façon dans eof-rempli.md et dans le rapport : sur le radar, ce qui
-        # doit se voir est l'écart entre les deux couches, et il se voit.
-        if axes_etabli is not None and axes_etabli[i] is not None and axes_etabli[i] < val:
-            pe = point(i, axes_etabli[i])
-            infobulle = (
-                f"{name} : {_pct(val)} de potentiel d'optimisation au total, "
-                f"dont {_pct(val - axes_etabli[i])} de marge d'incertitude "
-                f"(déduction depuis un indice faible)"
+        # Two placements of the number were tried and rejected after looking
+        # at the image: next to the ring, the axes where nothing is established all
+        # pinch at the center and their numbers pile up there on top of the
+        # "N/A" marker; under the total's value, the number falls back on the edge
+        # of the oblique axes' polygon. The numeric value of each layer is
+        # anyway in eof-filled.md and in the report: on the radar, what
+        # must be seen is the gap between the two layers, and it is seen.
+        if axes_set is not None and axes_set[i] is not None and axes_set[i] < val:
+            pe = point(i, axes_set[i])
+            tooltip = (
+                f"{name}: {_pct(val)} of optimization potential in total, "
+                f"of which {_pct(val - axes_set[i])} of uncertainty margin "
+                f"(inference from a weak signal)"
             )
             svg.append(
                 f'<circle cx="{pe[0]:.1f}" cy="{pe[1]:.1f}" r="4.5" fill="white" '
-                f'stroke="{NAVY}" stroke-width="2"><title>{escape(infobulle)}</title></circle>'
+                f'stroke="{NAVY}" stroke-width="2"><title>{escape(tooltip)}</title></circle>'
             )
 
-    # Légende en haut à gauche : le coin est libre, et le pied de figure est déjà
-    # chargé. Deux lignes plutôt qu'une : les libellés dépassent 40 caractères et
-    # côte à côte ils atteindraient le libellé de l'axe du haut.
-    if axes_etabli is not None:
-        # Le cas où aucune réponse ne repose sur `suppose` est un cas SAIN (pas
-        # rare comme avant le 2026-09-11) : les deux couches se superposent et la
-        # marge d'incertitude est invisible. Le dire, plutôt que d'afficher une
-        # légende pour une couche absente : sans cette mention, le lecteur cherche
-        # des hachures qui n'existent pas et doute de la figure.
+    # Legend at the top left: the corner is free, and the caption is already
+    # busy. Two lines rather than one: the labels exceed 40 characters and
+    # side by side they would reach the top axis's label.
+    if axes_set is not None:
+        # The case where no answer rests on `assumed` is a HEALTHY case (not
+        # rare as before 2026-09-11): the two layers overlap and the
+        # uncertainty margin is invisible. Say it, rather than displaying a
+        # legend for an absent layer: without this note, the reader looks
+        # for hatching that does not exist and doubts the figure.
         rien_de_declare = all(
-            e == t for e, (_, t) in zip(axes_etabli, axes)
+            e == t for e, (_, t) in zip(axes_set, axes)
         )
-        libelle_marge = "en hachuré : marge d'incertitude (déduction depuis un indice faible)"
+        margin_label = "hatched: uncertainty margin (inference from a weak signal)"
         if rien_de_declare:
-            libelle_marge = "en hachuré : marge d'incertitude (aucune à ce jour)"
-        for k, (fill, opacity, libelle) in enumerate([
-            (NAVY, ' fill-opacity="0.40"', "en plein : potentiel retenu (mesuré, déduit ou indiqué par le service)"),
-            (f"url(#{HACHURE_ID})", "", libelle_marge),
+            margin_label = "hatched: uncertainty margin (none to date)"
+        for k, (fill, opacity, label) in enumerate([
+            (NAVY, ' fill-opacity="0.40"', "solid: retained potential (measured, inferred, or indicated by the service)"),
+            (f"url(#{HACHURE_ID})", "", margin_label),
         ]):
             y = 46 + k * 22
             svg.append(
@@ -451,72 +450,72 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
                 f'stroke="{NAVY}" stroke-width="1.5"/>'
             )
             svg.append(
-                f'<text x="48" y="{y + 12}" font-size="12" fill="#222">{escape(libelle)}</text>'
+                f'<text x="48" y="{y + 12}" font-size="12" fill="#222">{escape(label)}</text>'
             )
 
-    # Pied de figure : jauge de ce qui est renseigné, puis décompte par provenance,
-    # puis la note. La jauge est là pour qu'un potentiel bas ne se lise pas comme
-    # un service mûr alors qu'il ne dit que "nous n'avons presque rien regardé".
-    if couverture is not None:
-        # Accepter ancien format (3 éléments) et nouveau format (4 éléments avec écartés)
-        if len(couverture) == 4:
-            pct, repondus, total, ecartes = couverture
+    # Caption: gauge of what is filled in, then count by provenance,
+    # then the note. The gauge is there so that a low potential does not read as
+    # a mature service when it only says "we have hardly looked at anything".
+    if coverage is not None:
+        # Accept old format (3 elements) and new format (4 elements with excluded)
+        if len(coverage) == 4:
+            pct, answered, total, excluded = coverage
         else:
-            pct, repondus, total = couverture
-            ecartes = None
+            pct, answered, total = coverage
+            excluded = None
         bar_w, bar_h, bar_y = 560, 14, 708
         bar_x = (width - bar_w) / 2
-        ecartes_txt = ""
-        if ecartes is not None and ecartes > 0:
-            ecartes_txt = f', {ecartes} écarté{"s" if ecartes > 1 else ""}'
-        # Le dénominateur change selon qu'il y a des critères écartés ou non.
-        # Sans écartés : "du potentiel maximum du référentiel" (le dénominateur
-        # est bien le référentiel complet). Avec écartés : "du potentiel retenu"
-        # (les écartés sont sortis du dénominateur).
-        libelle_denominateur = "du potentiel retenu" if (ecartes is not None and ecartes > 0) else "du potentiel maximum du référentiel"
+        excluded_txt = ""
+        if excluded is not None and excluded > 0:
+            excluded_txt = f', {excluded} excluded'
+        # The denameinator changes depending on whether there are excluded criteria.
+        # Without excluded: "of the framework's maximum potential" (the denameinator
+        # is indeed the complete framework). With excluded: "of the retained potential"
+        # (the excluded are removed from the denameinator).
+        denameinator_label = "of the retained potential" if (excluded is not None and excluded > 0) else "of the framework's maximum potential"
         svg.append(
             f'<text x="{width/2:.1f}" y="700" text-anchor="middle" font-size="12" fill="#222">'
-            f'Renseigné à ce jour : {escape(_pct(pct, 0))} {libelle_denominateur} '
-            f'({repondus} critères sur {total}{ecartes_txt})</text>'
+            f'Filled in to date: {escape(_pct(pct, 0))} {denameinator_label} '
+            f'({answered} criteria out of {total}{excluded_txt})</text>'
         )
         svg.append(
             f'<rect x="{bar_x:.1f}" y="{bar_y}" width="{bar_w}" height="{bar_h}" '
             f'fill="#EEE" stroke="{GREY}" stroke-width="1"/>'
         )
-        remplie = bar_w * max(0.0, min(100.0, pct)) / 100
-        if remplie > 0:
+        filled = bar_w * max(0.0, min(100.0, pct)) / 100
+        if filled > 0:
             svg.append(
-                f'<rect x="{bar_x:.1f}" y="{bar_y}" width="{remplie:.1f}" height="{bar_h}" '
+                f'<rect x="{bar_x:.1f}" y="{bar_y}" width="{filled:.1f}" height="{bar_h}" '
                 f'fill="{NAVY}"/>'
             )
 
     if provenances is not None:
         detail = ", ".join(
             f"{LIBELLES_PROVENANCE.get(p, p)} {provenances.get(p, 0)}"
-            for p in ("collecte", "estime", "declare", "precise", "suppose")
+            for p in ("collected", "estimated", "declared", "stated", "assumed")
         )
         svg.append(
             f'<text x="{width/2:.1f}" y="748" text-anchor="middle" font-size="12" '
-            f'fill="{GREY}">Provenance des réponses : {escape(detail)}</text>'
+            f'fill="{GREY}">Provenance of answers: {escape(detail)}</text>'
         )
 
     if note:
-        # Découper la note en lignes si elle est trop longue. Une note courte
-        # (qui tient sur une ligne) n'est pas modifiée, ce qui préserve la
-        # non-régression sur les radars existants.
+        # Split the note into lines if it is too long. A short note
+        # (that fits on one line) is not modified, which preserves
+        # non-regression on existing radars.
         note_lines = _wrap_text(note)
-        interligne = 18
-        # Placer les lignes après la ligne de provenance (y=748) ou à la position
-        # standard (height - 22 = 770) si une seule ligne. Interligne de 18 pixels.
+        line_height = 18
+        # Place the lines after the provenance line (y=748) or at the
+        # standard position (height - 22 = 770) if a single line. Line height of 18 pixels.
         if len(note_lines) == 1:
-            # Note courte : position standard, inchangée
+            # Short note: standard position, unchanged
             y_start = height - 22
         else:
-            # Note longue : commencer à y=766 (après provenance à 748 + 18)
-            # et augmenter la hauteur du canevas si nécessaire pour que tout tienne.
+            # Long note: start at y=766 (after provenance at 748 + 18)
+            # and increase the canvas height if needed so everything fits.
             y_start = 766
         for i, line in enumerate(note_lines):
-            y = y_start + i * interligne
+            y = y_start + i * line_height
             svg.append(
                 f'<text x="{width/2:.1f}" y="{y}" text-anchor="middle" font-size="12" '
                 f'fill="#666">{escape(line)}</text>'
@@ -526,247 +525,247 @@ def radar_svg(axes, title="Radar EROOM", note=None, width=1100, height=None,
     return "\n".join(svg)
 
 
-def _est_critere_ecarte(critere):
-    """Retourne vrai si le critère est écarté (hors périmètre).
+def _est_critere_ecarte(criterion):
+    """Returns true if the criterion is excluded (out of scope).
 
-    Un critère est écarté quand il ne s'applique pas au service audité. Deux
-    chemins mènent au même état, comme établi dans la convention session 26 :
-    - sa `reponse` vaut `🚫 Non applicable` ;
-    - ou son booléen `sans_objet` vaut vrai.
+    A criterion is excluded when it does not apply to the audited service. Two
+    paths lead to the same state, as established in session 26 convention:
+    - its `answer` is `🚫 Not applicable`;
+    - or its `not_applicable` boolean is true.
     """
-    return critere.get("reponse") == "🚫 Non applicable" or critere.get("sans_objet") is True
+    return criterion.get("answer") == "🚫 Not applicable" or criterion.get("not_applicable") is True
 
 
-def build_radar_from_results(audit_results, domaine=None, title=None, note=None):
-    """Construit le radar à deux couches depuis un `eof-audit-results.json` chargé.
+def build_radar_from_results(audit_results, domain=None, title=None, note=None):
+    """Builds the two-layer radar from a loaded `eof-audit-results.json`.
 
-    Point d'entrée UNIQUE des deux producteurs du fichier de résultats
-    (`run_eof.py` et `processus/fusionner_lots.py`). Ils ont déjà deux
-    arithmétiques jumelles à tenir alignées ; leur laisser en plus deux façons de
-    dessiner le radar garantissait qu'un jour l'une des deux montrerait autre
-    chose que l'autre sur les mêmes données.
+    SINGLE entry point of the two producers of the results file
+    (`run_eof.py` and `process/merge_lots.py`). They already have two
+    twin arithmetics to keep aligned; leaving them two ways of
+    drawing the radar as well guaranteed that one day one of the two would
+    show something different from the other on the same data.
 
-    La couche pleine n'est PAS recalculée depuis un dénominateur maison : elle est
-    prise comme la part du potentiel déjà affiché qui vient de nos propres
-    provenances. Le producteur reste seul maître de son dénominateur, et depuis
-    la session 26 les deux producteurs traitent les critères écartés de la même
-    façon. La couche pleine ne peut pas sortir de la couche hachurée.
+    The solid layer is NOT recomputed from a homemade denameinator: it is
+    taken as the share of the already displayed potential that comes from our own
+    provenances. The producer remains sole master of its denameinator, and since
+    session 26 the two producers treat excluded criteria the same
+    way. The solid layer cannot come out of the hatched layer.
     """
     dimensions = audit_results.get("dimensions") or []
-    criteres = audit_results.get("criteres") or []
-    noms_dimensions = [d.get("nom") for d in dimensions]
+    criteria = audit_results.get("criteria") or []
+    dimension_names = [d.get("name") for d in dimensions]
 
-    # Potentiel retenu par dimension, séparé selon l'origine de la réponse.
-    retenu = {nom: {"etabli": 0.0, "total": 0.0} for nom in noms_dimensions}
-    pmax_par_dimension = {nom: {"repondu": 0.0, "total": 0.0} for nom in noms_dimensions}
-    for c in criteres:
-        nom = c.get("dimension")
-        if nom not in retenu:
-            # Les questions du diagnostic rapide n'appartiennent à aucune des 6
-            # dimensions détaillées et n'ont pas de potentiel : elles ne comptent
-            # ni dans le radar ni dans la jauge.
+    # Retained potential per dimension, split by the origin of the answer.
+    retained = {name: {"set": 0.0, "total": 0.0} for name in dimension_names}
+    max_potential_per_dimension = {name: {"answered": 0.0, "total": 0.0} for name in dimension_names}
+    for c in criteria:
+        name = c.get("dimension")
+        if name not in retained:
+            # The quick-diagnostic questions belong to none of the 6
+            # detailed dimensions and have no potential: they count
+            # neither in the radar nor in the gauge.
             continue
-        # Un critère écarté sort de tous les dénominateurs et ne compte dans
-        # aucun numérateur. Il n'est ni une réussite ni un manque.
+        # An excluded criterion leaves all denameinators and counts in
+        # no numerator. It is neither a success nor a miss.
         if _est_critere_ecarte(c):
             continue
-        pmax = c.get("potentiel_max") or 0.0
-        pmax_par_dimension[nom]["total"] += pmax
-        if c.get("reponse") is None:
+        max_pot = c.get("max_potential") or 0.0
+        max_potential_per_dimension[name]["total"] += max_pot
+        if c.get("answer") is None:
             continue
-        pmax_par_dimension[nom]["repondu"] += pmax
+        max_potential_per_dimension[name]["answered"] += max_pot
         coefficient = c.get("coefficient") or 0.0
-        retenu[nom]["total"] += coefficient * pmax
+        retained[name]["total"] += coefficient * max_pot
         if c.get("provenance") in PROVENANCES_RETENUES:
-            retenu[nom]["etabli"] += coefficient * pmax
+            retained[name]["set"] += coefficient * max_pot
 
     axes = []
-    axes_etabli = []
-    axes_renseignes = []
-    axes_hors_perimetre = []
-    axes_ecartes = []
+    axes_set = []
+    axes_answered = []
+    axes_out_of_scope = []
+    axes_discarded = []
     for d in dimensions:
-        nom = d.get("nom")
-        total_pct = d.get("potentiel_optimisation_pct")
-        hors_perimetre = d.get("hors_perimetre", False)
-        axes.append((nom, total_pct))
-        axes_hors_perimetre.append(hors_perimetre)
-        axes_ecartes.append(d.get("ecartes") or 0)
+        name = d.get("name")
+        total_pct = d.get("optimization_potential_pct")
+        out_of_scope = d.get("out_of_scope", False)
+        axes.append((name, total_pct))
+        axes_out_of_scope.append(out_of_scope)
+        axes_discarded.append(d.get("discarded") or 0)
         if total_pct is None:
-            axes_etabli.append(None)
-        elif retenu[nom]["total"] > 0:
-            axes_etabli.append(total_pct * retenu[nom]["etabli"] / retenu[nom]["total"])
+            axes_set.append(None)
+        elif retained[name]["total"] > 0:
+            axes_set.append(total_pct * retained[name]["set"] / retained[name]["total"])
         else:
-            # Tout ce qui a répondu porte un coefficient nul : le potentiel affiché
-            # est 0, les deux couches se confondent au centre.
-            axes_etabli.append(total_pct)
-        axes_renseignes.append((d.get("repondus") or 0, d.get("total") or 0))
+            # Everything that answered carries a zero coefficient: the displayed potential
+            # is 0, the two layers merge at the center.
+            axes_set.append(total_pct)
+        axes_answered.append((d.get("answered") or 0, d.get("total") or 0))
 
-    # Jauge : part du potentiel maximum du référentiel déjà renseignée. Pondérée
-    # par `potentiel_max`, comme le demande le manifeste : un critère à 2,0 qui
-    # manque ne laisse pas le même trou qu'un critère à 0,5. Un critère écarté
-    # (répondu "non applicable" ou sans_objet=true) sort du dénominateur et ne
-    # compte dans aucun numérateur : il n'est ni une réussite ni un manque.
-    pmax_total = sum(v["total"] for v in pmax_par_dimension.values())
-    pmax_repondu = sum(v["repondu"] for v in pmax_par_dimension.values())
-    couverture = None
-    criteres_ecartes = audit_results.get("criteres_ecartes")
+    # Gauge: share of the framework's maximum potential already filled in. Weighted
+    # by `potential_max`, as the manifest requires: a criterion at 2.0 that
+    # is missing does not leave the same hole as a criterion at 0.5. An excluded criterion
+    # (answered "not applicable" or not_applicable=true) leaves the denameinator and
+    # counts in no numerator: it is neither a success nor a miss.
+    pmax_total = sum(v["total"] for v in max_potential_per_dimension.values())
+    pmax_answered = sum(v["answered"] for v in max_potential_per_dimension.values())
+    coverage = None
+    excluded_criteria = audit_results.get("discarded_criteria")
     if pmax_total > 0:
-        criteres_des_dimensions = [
-            c for c in criteres
-            if c.get("dimension") in retenu and not _est_critere_ecarte(c)
+        dimension_criteria = [
+            c for c in criteria
+            if c.get("dimension") in retained and not _est_critere_ecarte(c)
         ]
-        couverture = (
-            pmax_repondu / pmax_total * 100,
-            sum(1 for c in criteres_des_dimensions if c.get("reponse") is not None),
-            len(criteres_des_dimensions),
-            criteres_ecartes,
+        coverage = (
+            pmax_answered / pmax_total * 100,
+            sum(1 for c in dimension_criteria if c.get("answer") is not None),
+            len(dimension_criteria),
+            excluded_criteria,
         )
 
     if title is None:
-        domaine_txt = domaine or audit_results.get("domaine") or "service audité"
-        title = f"EOF : potentiel d'optimisation ({domaine_txt})"
+        domain_text = domain or audit_results.get("domain") or "audited service"
+        title = f"EOF: optimization potential ({domain_text})"
     if note is None:
         note = (
-            "Le bord extérieur de chaque axe donne l'estimation globale du potentiel "
-            "d'optimisation (plein et hachuré additionnés). "
-            "Une dimension dont aucun critère n'a répondu est marquée \"aucune réponse\", "
-            "jamais 0 % : un 0 % voudrait dire point fort confirmé sur toute la dimension."
+            "The outer edge of each axis gives the global estimate of the optimization "
+            "potential (solid and hatched added together). "
+            "A dimension whose criteria all have no answer is marked \"no answer\", "
+            "never 0%: a 0% would mean confirmed strength across the whole dimension."
         )
-        # Ajouter une explication de "hors périmètre" si au moins un axe l'est.
-        if any(axes_hors_perimetre):
+        # Add an explanation of "out of scope" if at least one axis is.
+        if any(axes_out_of_scope):
             note += (
-                " Une dimension hors périmètre est une dimension dont nous savons "
-                "qu'elle ne concerne pas ce service, alors qu'une dimension sans réponse "
-                "est une dimension que nous n'avons pas su instruire."
+                " An out-of-scope dimension is a dimension we know "
+                "does not concern this service, while a dimension with no answer "
+                "is a dimension we failed to assess."
             )
 
     return radar_svg(
         axes,
         title=title,
         note=note,
-        axes_etabli=axes_etabli,
-        axes_renseignes=axes_renseignes,
-        axes_hors_perimetre=axes_hors_perimetre,
-        axes_ecartes=axes_ecartes,
-        couverture=couverture,
-        provenances=audit_results.get("repondus_par_provenance"),
+        axes_set=axes_set,
+        axes_answered=axes_answered,
+        axes_out_of_scope=axes_out_of_scope,
+        axes_discarded=axes_discarded,
+        coverage=coverage,
+        provenances=audit_results.get("answered_by_provenance"),
     )
 
 
 def _demo(output_path):
-    """Radar de démonstration : le rendu complet, y compris le cas rare.
+    """Demo radar: the full rendering, including the rare case.
 
-    Les valeurs sont fictives, mais chaque pourcentage est vérifié contre les
-    poids réels du référentiel (`eof-referentiel.json`) : un pourcentage ne
-    peut jamais dépasser ce que le nombre de critères répondus peut porter au
-    maximum (formule canonique, `run_eof.py::compute_dimension_scores` —
-    somme des `coefficient × potentiel_max` des critères répondus ÷ somme des
-    `potentiel_max` de TOUS les critères retenus de la dimension, répondus ou
-    pas). Exemple : Stockage & Données pèse 8,0 au total sur 6 critères ; les
-    2 mieux pondérés ne pèsent que 3,0 ensemble → le maximum atteignable avec
-    2 répondus est 3,0 / 8,0 = 37,5 %, jamais 85 % (valeur trouvée dans une
-    version antérieure de cette démo, corrigée le 2026-09-15 — l'Architecture
-    affichait le même défaut : 70 % annoncés pour un maximum réel de 62,5 %
-    avec 3 répondus sur 5).
+    The values are fictitious, but each percentage is checked against the
+    reference framework's real weights (`eof-reference.json`): a percentage can
+    never exceed what the number of answered criteria can carry at
+    maximum (canonical formula, `run_eof.py::compute_dimension_scores` —
+    sum of the `coefficient × potential_max` of answered criteria ÷ sum of the
+    `potential_max` of ALL the retained criteria of the dimension, answered or
+    not). Example: Storage & Data weighs 8.0 in total over 6 criteria; the
+    2 best-weighted ones weigh only 3.0 together → the maximum reachable with
+    2 answered is 3.0 / 8.0 = 37.5%, never 85% (value found in an earlier
+    version of this demo, corrected on 2026-09-15 — Architecture
+    showed the same defect: 70% announced for a real maximum of 62.5%
+    with 3 answered out of 5).
 
-    Depuis le 2026-09-11 (cf. PROVENANCES_RETENUES / PROVENANCES_MARGE_INCERTITUDE
-    plus haut), la couche hachurée ne porte plus que la provenance `suppose` :
-    dans un audit normal, elle reste minoritaire face au plein, car `suppose`
-    est la provenance la plus fragile et la moins fréquente. Les valeurs
-    ci-dessous illustrent, dans l'ordre des axes :
+    Since 2026-09-11 (cf. PROVENANCES_RETENUES / PROVENANCES_MARGE_INCERTITUDE
+    above), the hatched layer only carries the `assumed` provenance:
+    in a normal audit, it stays a minority against the solid layer, because `assumed`
+    is the most fragile and least frequent provenance. The values
+    below illustrate, in axis order:
 
-      - Produit                : aucune supposition (marge nulle) ;
-      - Architecture            : cas courant, une petite marge minoritaire ;
-      - Infrastructure          : cas courant, marge minoritaire elle aussi ;
-      - Stockage & Données      : marge non négligeable en valeur absolue,
-                                  mais toujours minoritaire par rapport au plein ;
-      - Algo & Code             : cas RARE et volontairement extrême où la marge
-                                  dépasse le plein (beaucoup de `suppose`), gardé
-                                  pour vérifier que le rendu reste lisible même
-                                  dans ce cas defavorable — ne pas le lire comme
-                                  une situation représentative ;
-      - Facilité de changement : cas courant, même profil qu'Architecture/
-                                  Infrastructure (le cas "aucune réponse" est
-                                  illustré à part, voir `_demo_comparaison`).
+      - Product                : no assumption (zero margin);
+      - Architecture            : common case, a small minority margin;
+      - Infrastructure          : common case, minority margin too;
+      - Storage & Data      : non-negligible margin in absolute value,
+                                   but always a minority compared to the solid layer;
+      - Algo & Code             : RARE and deliberately extreme case where the margin
+                                   exceeds the solid layer (a lot of `assumed`), kept
+                                   to check that the rendering stays readable even
+                                   in this unfavorable case — do not read it as
+                                   a representative situation;
+      - Ease of change: common case, same profile as Architecture/
+                                   Infrastructure (the "no answer" case is
+                                   illustrated separately, see `_demo_comparaison`).
     """
-    totaux = [35, 55, 15, 30, 50, 25]
-    etablis = [35, 48, 12, 25, 10, 22]
-    renseignes = [(16, 16), (3, 5), (8, 8), (2, 6), (5, 9), (4, 10)]
+    totals = [35, 55, 15, 30, 50, 25]
+    established = [35, 48, 12, 25, 10, 22]
+    answered_counts = [(16, 16), (3, 5), (8, 8), (2, 6), (5, 9), (4, 10)]
     svg_text = radar_svg(
-        list(zip(AXES_EOF, totaux)),
-        title="Radar EROOM : test complet (6 axes, valeurs fictives)",
+        list(zip(AXES_EOF, totals)),
+        title="EROOM radar: full test (6 axes, fictitious values)",
         note=(
-            "Le bord extérieur de chaque axe donne l'estimation globale du potentiel "
-            "d'optimisation (plein et hachuré additionnés). Valeurs fictives, uniquement "
-            "pour valider le rendu visuel."
+            "The outer edge of each axis gives the global estimate of the optimization "
+            "potential (solid and hatched added together). Fictitious values, only "
+            "to validate the visual rendering."
         ),
-        axes_etabli=etablis,
-        axes_renseignes=renseignes,
-        couverture=(34.0, 38, 54),
-        provenances={"collecte": 16, "estime": 6, "declare": 9, "precise": 1, "suppose": 6},
+        axes_set=established,
+        axes_answered=answered_counts,
+        coverage=(34.0, 38, 54),
+        provenances={"collected": 16, "estimated": 6, "declared": 9, "stated": 1, "assumed": 6},
     )
     with open(output_path, "w") as f:
         f.write(svg_text)
-    print(f"SVG de démonstration écrit : {output_path}")
+    print(f"Demo SVG written: {output_path}")
 
 
 def _demo_comparaison(output_path):
-    """Radar de démonstration : "aucune réponse" vs "hors périmètre".
+    """Demo radar: "no answer" vs "out of scope".
 
-    Reprend les mêmes axes que `_demo`, corrigés le 2026-09-15, sauf deux :
+    Reuses the same axes as `_demo`, corrected on 2026-09-15, except two:
 
-      - Stockage & Données      : ici HORS PÉRIMÈTRE (les 6 critères de la
-                                  dimension sont écartés, `axes_hors_perimetre`) ;
-      - Facilité de changement : ici SANS RÉPONSE (0 critère répondu sur 10),
-                                  contrairement à `_demo` où cet axe porte
-                                  maintenant une vraie valeur (25 %, 4/10) —
-                                  volontairement différent, pour isoler le cas
-                                  "aucune réponse" sur un axe dédié plutôt que
-                                  de prétendre reprendre "le même axe vide du
-                                  radar de référence" (affirmation fausse dans
-                                  la version précédente : Stockage & Données
-                                  n'y était jamais vide, il portait déjà 2
-                                  critères répondus).
+      - Storage & Data      : here OUT OF SCOPE (the 6 criteria of the
+                                   dimension are excluded, `axes_out_of_scope`);
+      - Ease of change: here NO ANSWER (0 criteria answered out of 10),
+                                   unlike `_demo` where this axis now
+                                   carries a real value (25%, 4/10) —
+                                   deliberately different, to isolate the
+                                   "no answer" case on a dedicated axis rather than
+                                   pretending to reuse "the same empty axis of the
+                                   reference radar" (false claim in
+                                   the previous version: Storage & Data
+                                   was never empty there, it already carried 2
+                                   answered criteria).
     """
-    totaux = [35, 55, 15, None, 50, None]
-    etablis = [35, 48, 12, None, 10, None]
-    renseignes = [(16, 16), (3, 5), (8, 8), (0, 6), (5, 9), (0, 10)]
+    totals = [35, 55, 15, None, 50, None]
+    established = [35, 48, 12, None, 10, None]
+    answered_counts = [(16, 16), (3, 5), (8, 8), (0, 6), (5, 9), (0, 10)]
     svg_text = radar_svg(
-        list(zip(AXES_EOF, totaux)),
-        title="Radar EROOM : aucune réponse vs hors périmètre (valeurs fictives)",
+        list(zip(AXES_EOF, totals)),
+        title="EROOM radar: no answer vs out of scope (fictitious values)",
         note=(
-            "Deux façons différentes de ne pas remplir un axe : \"Stockage & Données\" "
-            "est hors périmètre (les 6 critères sont écartés, la dimension ne concerne "
-            "pas ce service), \"Facilité de changement\" reste sans réponse (nous "
-            "n'avons pas su l'instruire). Les autres axes reprennent les valeurs "
-            "corrigées du radar de référence. Valeurs fictives, uniquement pour "
-            "comparer le rendu visuel."
+            "Two different ways of not filling an axis: \"Storage & Data\" "
+            "is out of scope (the 6 criteria are excluded, the dimension does "
+            "not concern this service), \"Ease of change\" stays with no answer (we "
+            "failed to assess it). The other axes reuse the "
+            "corrected values of the reference radar. Fictitious values, only to "
+            "compare the visual rendering."
         ),
-        axes_etabli=etablis,
-        axes_renseignes=renseignes,
-        axes_hors_perimetre=[False, False, False, True, False, False],
-        axes_ecartes=[None, None, None, 6, None, None],
-        # Stockage & Données est hors périmètre : ses 6 critères (potentiel_max
-        # total 8,0) sortent du dénominateur, comme le ferait le vrai calcul
-        # (`criteres_des_dimensions` exclut une dimension écartée en bloc dans
-        # `run_eof.py`). D'où 48 critères (54 - 6) et un pourcentage différent
-        # de celui de `_demo` (29,1 % ici contre 34,0 % côté référence) : les
-        # deux jauges ne sont PAS comparables terme à terme, seule la figure
-        # radar l'est axe par axe.
-        couverture=(29.1, 32, 48),
-        provenances={"collecte": 13, "estime": 6, "declare": 8, "precise": 1, "suppose": 4},
+        axes_set=established,
+        axes_answered=answered_counts,
+        axes_out_of_scope=[False, False, False, True, False, False],
+        axes_discarded=[None, None, None, 6, None, None],
+        # Storage & Data is out of scope: its 6 criteria (potential_max
+        # total 8.0) leave the denameinator, as the real calculation
+        # would do (`criteria_des_dimensions` excludes an excluded dimension as a block in
+        # `run_eof.py`). Hence 48 criteria (54 - 6) and a percentage different
+        # from `_demo` (29.1% here vs 34.0% on the reference side): the
+        # two gauges are NOT comparable term by term, only the
+        # radar figure is, axis by axis.
+        coverage=(29.1, 32, 48),
+        provenances={"collected": 13, "estimated": 6, "declared": 8, "stated": 1, "assumed": 4},
     )
     with open(output_path, "w") as f:
         f.write(svg_text)
-    print(f"SVG de démonstration (comparaison) écrit : {output_path}")
+    print(f"Demo SVG (comparison) written: {output_path}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python3 generate_radar_svg.py <fichier_sortie.svg>")
+        print("Usage: python3 generate_radar_svg.py <output_file.svg>")
         sys.exit(1)
     if sys.argv[1].startswith("-"):
-        print("Usage: python3 generate_radar_svg.py <fichier_sortie.svg>")
+        print("Usage: python3 generate_radar_svg.py <output_file.svg>")
         sys.exit(1)
     _demo(sys.argv[1])

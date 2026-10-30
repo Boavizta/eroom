@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 """
-Spécifications déclaratives d'un service web, pour modélisation e-footprint.
+Declarative specifications of a web service, for e-footprint modeling.
 
-ZÉRO import e-footprint dans ce fichier. C'est une contrainte, pas un hasard :
-ces structures doivent être testables sans la librairie installée et sans
-réseau. La construction du modèle e-footprint est le travail d'un autre module.
+ZERO e-footprint import in this file. This is a constraint, not an accident:
+these structures must be testable without the library installed and without
+network access. Building the e-footprint model is another module's job.
 
-LE PRINCIPE CENTRAL : LA SOURCE VOYAGE AVEC LA VALEUR
------------------------------------------------------
-Toute grandeur qui entre dans le calcul est un `Traced` : la valeur, son unité
-et sa provenance sont le MÊME objet. Il est donc impossible d'écrire un chiffre
-sans dire d'où il vient, parce qu'il n'existe pas de champ où poser un nombre
-nu.
+THE CENTRAL PRINCIPLE: THE SOURCE TRAVELS WITH THE VALUE
+--------------------------------------------------------
+Every quantity that enters the calculation is a `Traced`: the value, its
+unit and its provenance are the SAME object. It is therefore impossible to
+write a number without saying where it comes from, because there is no field
+where a bare number could be placed.
 
-Sur les champs CRITIQUES (temps utilisateur, poids transféré, type d'instance),
-une valeur sans provenance fait ÉCHOUER la construction. Le raisonnement : un
-chiffre non tracé qui atterrit dans un rapport ressemble à une mesure. Mieux
-vaut une erreur bruyante à la construction qu'une fausse mesure publiée.
+On CRITICAL fields (user time, transferred weight, instance type), a value
+without provenance makes the build FAIL. The reasoning: an untraced number
+that lands in a report looks like a measurement. Better a loud error at
+build time than a false measurement published.
 
-LE VOCABULAIRE DE CONFIANCE N'EST PAS LIBRE
--------------------------------------------
-`CONFIDENCE_LEVELS` reproduit EXACTEMENT les sept niveaux reconnus par
-`_confidence_badge()` dans `generate_report_html.py`. Un niveau inventé ici
-serait affiché tel quel, en chaîne brute, à la place du badge. D'où la
-validation à la construction.
+THE CONFIDENCE VOCABULARY IS NOT FREE
+-------------------------------------
+`CONFIDENCE_LEVELS` reproduces EXACTLY the seven levels recognized by
+`_confidence_badge()` in `generate_report_html.py`. A level invented here
+would be displayed as-is, as a raw string, in place of the badge. Hence the
+validation at construction time.
 
-GÉNÉRICITÉ
+GENERICITY
 ----------
-Aucune valeur par défaut chiffrée tirée d'un site réel n'a sa place dans ce
-fichier. Une spécification qui ne reçoit rien ne doit rien pouvoir inventer :
-c'est ce qui garantit qu'un chiffre publié vient des données du site analysé.
-Contrôlé mécaniquement par `check_genericite.py`.
+No hardcoded numeric default taken from a real site belongs in this file. A
+specification that receives nothing must not be able to invent anything:
+that is what guarantees a published number comes from the analyzed site's
+data. Mechanically checked by `check_genericite.py`.
 """
 
 from dataclasses import dataclass, field
@@ -38,19 +38,20 @@ from numbers import Real
 from typing import Any, Mapping, Optional, Tuple
 
 # ---------------------------------------------------------------------------
-# Vocabulaire
+# Vocabulary
 # ---------------------------------------------------------------------------
 
-# Les sept niveaux de `_confidence_badge()`, dans l'ordre décroissant de
-# fiabilité. Ne pas en ajouter sans ajouter le badge correspondant au rapport.
-#   high               : collecté (API, HAR, mesure directe)
-#   medium             : estimé (inféré à partir d'une donnée collectée)
-#   low                : supposé (hypothèse assumée, argumentée)
-#   default            : niveau historique conservé pour les JSON déjà produits
-#   default_efootprint : valeur par défaut de la LIBRAIRIE e-footprint
-#   default_script     : valeur fixée par NOS scripts — distinction volontaire,
-#                        pour ne pas faire passer nos choix pour ceux de l'outil
-#   unjustified        : précisé à la main, sans justification vérifiable
+# The seven levels of `_confidence_badge()`, in decreasing order of
+# reliability. Do not add one without adding the corresponding badge in the
+# report.
+#   high               : collected (API, HAR, direct measurement)
+#   medium             : estimated (inferred from a collected datum)
+#   low                : assumed (argued hypothesis)
+#   default            : historical level kept for already-produced JSON
+#   default_efootprint : default value of the e-footprint LIBRARY
+#   default_script     : value set by OUR scripts — deliberate distinction,
+#                        so our choices are not passed off as the tool's
+#   unjustified        : set by hand, without verifiable justification
 CONFIDENCE_LEVELS = (
     "high",
     "medium",
@@ -61,44 +62,43 @@ CONFIDENCE_LEVELS = (
     "unjustified",
 )
 
-# Deux natures de valeur, qui deviendront deux classes e-footprint distinctes
-# (SourceValue pour une grandeur physique, SourceObject pour un libellé
-# catégoriel comme un nom de fournisseur ou un type d'instance). La distinction
-# est faite ICI, dans le Python pur, pour que le constructeur n'ait pas à
-# deviner à partir du type Python.
+# Two natures of value, which will become two distinct e-footprint classes
+# (SourceValue for a physical quantity, SourceObject for a categorical label
+# such as a provider name or an instance type). The distinction is made HERE,
+# in pure Python, so the builder does not have to guess from the Python type.
 KINDS = ("value", "object")
 
 
 class SpecError(ValueError):
-    """Spécification invalide : incohérence structurelle ou provenance manquante.
+    """Invalid specification: structural inconsistency or missing provenance.
 
-    Volontairement une exception, jamais un avertissement. Une spécification
-    incohérente qui continue produit un chiffre, et un chiffre est cru.
+    Deliberately an exception, never a warning. An inconsistent specification
+    that keeps going produces a number, and a number is believed.
     """
 
 
 # ---------------------------------------------------------------------------
-# Traced : l'unité de traçabilité de toute la bibliothèque
+# Traced: the traceability unit of the whole library
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Traced:
-    """Une valeur et sa provenance, indissociables.
+    """A value and its provenance, inseparable.
 
-    value       : le nombre (kind="value") ou le libellé (kind="object")
-    unit        : unité e-footprint sous forme de texte ("kB", "ms", "GB_stored",
-                  "cpu_core", "g/kWh", "dimensionless"). Obligatoire pour une
-                  grandeur, interdite pour un libellé. Reste du texte : la
-                  conversion en unité e-footprint appartient au constructeur,
-                  pas à la spécification.
-    source_name : d'où vient la valeur, en clair ("CrUX", "mesure HAR",
-                  "défaut du script"). Ce n'est pas forcément une publication :
-                  nommer un défaut du script EST une provenance.
-    source_url  : lien vérifiable si la source en a un.
-    confidence  : un des CONFIDENCE_LEVELS.
-    comment     : ce que le lecteur du rapport doit savoir en plus, notamment
-                  les LIMITES de la valeur (période de la mesure, biais connu).
-    kind        : "value" ou "object".
+    value       : the number (kind="value") or the label (kind="object")
+    unit        : e-footprint unit as text ("kB", "ms", "GB_stored",
+                  "cpu_core", "g/kWh", "dimensionless"). Mandatory for a
+                  quantity, forbidden for a label. Still text: conversion to
+                  an e-footprint unit belongs to the builder, not to the
+                  specification.
+    source_name : where the value comes from, in plain words ("CrUX",
+                  "HAR measurement", "script default"). It does not have to
+                  be a publication: naming a script default IS a provenance.
+    source_url  : verifiable link if the source has one.
+    confidence  : one of CONFIDENCE_LEVELS.
+    comment     : what the report reader must also know, especially the
+                  LIMITS of the value (measurement period, known bias).
+    kind        : "value" or "object".
     """
 
     value: Any
@@ -112,50 +112,50 @@ class Traced:
     def __post_init__(self):
         if self.confidence not in CONFIDENCE_LEVELS:
             raise SpecError(
-                f"niveau de confiance inconnu : {self.confidence!r}. "
-                f"Attendu un de {', '.join(CONFIDENCE_LEVELS)}. "
-                "Un niveau hors liste s'afficherait en chaîne brute dans le "
-                "rapport, à la place du badge."
+                f"unknown confidence level: {self.confidence!r}. "
+                f"Expected one of {', '.join(CONFIDENCE_LEVELS)}. "
+                "A level outside the list would be displayed as a raw string "
+                "in the report, in place of the badge."
             )
         if self.kind not in KINDS:
             raise SpecError(
-                f"nature de valeur inconnue : {self.kind!r}. "
-                f"Attendu un de {', '.join(KINDS)}."
+                f"unknown value kind: {self.kind!r}. "
+                f"Expected one of {', '.join(KINDS)}."
             )
 
         if self.kind == "value":
             if isinstance(self.value, bool) or not isinstance(self.value, Real):
                 raise SpecError(
-                    f"une grandeur (kind=\"value\") doit être un nombre, "
-                    f"reçu {type(self.value).__name__} : {self.value!r}. "
-                    "Pour un libellé, utiliser kind=\"object\"."
+                    f"a quantity (kind=\"value\") must be a number, "
+                    f"got {type(self.value).__name__}: {self.value!r}. "
+                    "For a label, use kind=\"object\"."
                 )
             if not self.unit:
                 raise SpecError(
-                    f"unité manquante pour la grandeur {self.value!r}. "
-                    "Une grandeur sans unité est inexploitable et se convertit "
-                    "silencieusement de travers. Utiliser \"dimensionless\" "
-                    "pour un ratio."
+                    f"missing unit for the quantity {self.value!r}. "
+                    "A quantity without a unit is unusable and converts "
+                    "silently the wrong way. Use \"dimensionless\" "
+                    "for a ratio."
                 )
         else:
             if not isinstance(self.value, str) or not self.value:
                 raise SpecError(
-                    "un libellé (kind=\"object\") doit être une chaîne non vide, "
-                    f"reçu {self.value!r}."
+                    "a label (kind=\"object\") must be a non-empty string, "
+                    f"got {self.value!r}."
                 )
             if self.unit:
                 raise SpecError(
-                    f"unité {self.unit!r} sur un libellé {self.value!r} : "
-                    "un libellé n'a pas d'unité."
+                    f"unit {self.unit!r} on a label {self.value!r}: "
+                    "a label has no unit."
                 )
 
     @property
     def has_source(self):
-        """La provenance est-elle renseignée ? (nom obligatoire, lien facultatif)"""
+        """Is the provenance filled in? (name mandatory, link optional)"""
         return bool(self.source_name and self.source_name.strip())
 
     def as_dict(self):
-        """Forme sérialisable, pour le bloc `sources` du JSON de résultats."""
+        """Serializable form, for the `sources` block of the results JSON."""
         return {
             "value": self.value,
             "unit": self.unit,
@@ -167,136 +167,137 @@ class Traced:
         }
 
 
-# --- Fabriques : le niveau de confiance vient du MODE d'obtention -----------
-# Passer par ces fabriques évite la faute la plus courante : annoncer "high"
-# sur une valeur inférée. Le nom de la fabrique dit ce qui s'est passé.
+# --- Factories: the confidence level comes from the MODE of obtaining -------
+# Going through these factories avoids the most common mistake: claiming
+# "high" on an inferred value. The factory name says what happened.
 
 def measured(value, unit, source_name, source_url=None, comment=None):
-    """Valeur COLLECTÉE : mesure directe (HAR, API, en-tête de réponse)."""
+    """COLLECTED value: direct measurement (HAR, API, response header)."""
     return Traced(value, unit, source_name, source_url, "high", comment)
 
 
 def estimated(value, unit, source_name, source_url=None, comment=None):
-    """Valeur INFÉRÉE à partir d'une donnée collectée (calcul, pondération)."""
+    """INFERRED value from a collected datum (calculation, weighting)."""
     return Traced(value, unit, source_name, source_url, "medium", comment)
 
 
 def assumed(value, unit, source_name, source_url=None, comment=None):
-    """Valeur SUPPOSÉE : hypothèse assumée, dont le comment doit dire pourquoi."""
+    """ASSUMED value: hypothesis whose comment must say why."""
     return Traced(value, unit, source_name, source_url, "low", comment)
 
 
 def library_default(value, unit, comment=None, source_url=None):
-    """Valeur par défaut de la LIBRAIRIE e-footprint. Provenance : la librairie."""
-    return Traced(value, unit, "défaut e-footprint", source_url,
+    """Default value of the e-footprint LIBRARY. Provenance: the library."""
+    return Traced(value, unit, "e-footprint default", source_url,
                   "default_efootprint", comment)
 
 
 def script_default(value, unit, comment=None):
-    """Valeur par défaut de NOS scripts. À ne jamais confondre avec la précédente :
-    la confondre revient à faire endosser nos choix par l'outil."""
-    return Traced(value, unit, "défaut du script d'audit", None,
+    """Default value of OUR scripts. Never to be confused with the previous
+    one: confusing them amounts to making the tool endorse our choices."""
+    return Traced(value, unit, "audit script default", None,
                   "default_script", comment)
 
 
 def unjustified(value, unit, comment=None):
-    """Valeur précisée à la main sans justification vérifiable : choix ACTIF,
-    donc à afficher comme tel, mais non vérifié."""
-    return Traced(value, unit, "précisé à la main, sans justification", None,
+    """Value set by hand without verifiable justification: an ACTIVE choice,
+    so displayed as such, but unverified."""
+    return Traced(value, unit, "set manually, without justification", None,
                   "unjustified", comment)
 
 
-# Variantes "libellé" des trois fabriques utiles pour un champ catégoriel
-# (fournisseur, type d'instance, pays, type de serveur).
+# "Label" variants of the three useful factories for a categorical field
+# (provider, instance type, country, server type).
 
 def measured_label(value, source_name, source_url=None, comment=None):
-    """Libellé COLLECTÉ (ex. fournisseur déduit d'un en-tête de réponse)."""
+    """COLLECTED label (e.g. provider inferred from a response header)."""
     return Traced(value, None, source_name, source_url, "high", comment, "object")
 
 
 def estimated_label(value, source_name, source_url=None, comment=None):
-    """Libellé INFÉRÉ (ex. pays déduit d'une adresse IP)."""
+    """INFERRED label (e.g. country inferred from an IP address)."""
     return Traced(value, None, source_name, source_url, "medium", comment, "object")
 
 
 def assumed_label(value, source_name, source_url=None, comment=None):
-    """Libellé SUPPOSÉ, dont le comment doit dire sur quoi repose l'hypothèse."""
+    """ASSUMED label, whose comment must say what the hypothesis rests on."""
     return Traced(value, None, source_name, source_url, "low", comment, "object")
 
 
 def script_default_label(value, comment=None):
-    """Libellé par défaut de NOS scripts (ex. type d'instance faute de mieux)."""
-    return Traced(value, None, "défaut du script d'audit", None,
+    """Label default of OUR scripts (e.g. instance type when nothing better)."""
+    return Traced(value, None, "audit script default", None,
                   "default_script", comment, "object")
 
 
 # ---------------------------------------------------------------------------
-# Garde-fou des champs critiques
+# Guard-rail on critical fields
 # ---------------------------------------------------------------------------
 
 def require_traced(value, owner, field_name, *, kind=None, critical=False):
-    """Vérifie qu'un champ est bien un `Traced` exploitable.
+    """Checks that a field is a usable `Traced`.
 
-    `critical=True` exige en plus une PROVENANCE. Les champs critiques sont ceux
-    qui pilotent directement un chiffre publié : temps utilisateur, poids
-    transféré, type d'instance. Sur ceux-là, une valeur sans provenance est
-    refusée à la construction.
+    `critical=True` additionally requires a PROVENANCE. Critical fields are
+    the ones that directly drive a published number: user time, transferred
+    weight, instance type. On those, a value without provenance is refused
+    at construction.
 
-    Retourne la valeur (ou None si le champ est absent et non critique).
+    Returns the value (or None if the field is absent and not critical).
     """
     if value is None:
         if critical:
             raise SpecError(
-                f"{owner} : le champ critique \"{field_name}\" est absent. "
-                "Il pilote un chiffre publié, il ne peut pas être deviné."
+                f"{owner}: the critical field \"{field_name}\" is absent. "
+                "It drives a published number, it cannot be guessed."
             )
         return None
     if not isinstance(value, Traced):
         raise SpecError(
-            f"{owner} : \"{field_name}\" doit être un Traced, reçu "
-            f"{type(value).__name__} ({value!r}). Une valeur nue n'est pas "
-            "acceptée : la provenance et la valeur sont le même objet."
+            f"{owner}: \"{field_name}\" must be a Traced, got "
+            f"{type(value).__name__} ({value!r}). A bare value is not "
+            "accepted: the provenance and the value are the same object."
         )
     if kind and value.kind != kind:
         raise SpecError(
-            f"{owner} : \"{field_name}\" attend kind=\"{kind}\", "
-            f"reçu kind=\"{value.kind}\"."
+            f"{owner}: \"{field_name}\" expects kind=\"{kind}\", "
+            f"got kind=\"{value.kind}\"."
         )
     if critical and not value.has_source:
         raise SpecError(
-            f"{owner} : \"{field_name}\" vaut {value.value!r} sans provenance. "
-            "C'est un champ critique : renseigner source_name. Nommer un défaut "
-            "du script est une provenance acceptable ; ne rien nommer non."
+            f"{owner}: \"{field_name}\" is {value.value!r} without provenance. "
+            "This is a critical field: fill in source_name. Naming a script "
+            "default is an acceptable provenance; naming nothing is not."
         )
     return value
 
 
 def _require_key(value, owner, field_name):
-    """Une clé doit être une chaîne non vide : elle sert d'identité dans les
-    index et dans les messages d'erreur."""
+    """A key must be a non-empty string: it serves as identity in the indexes
+    and in error messages."""
     if not isinstance(value, str) or not value.strip():
-        raise SpecError(f"{owner} : \"{field_name}\" doit être une clé texte "
-                        f"non vide, reçu {value!r}.")
+        raise SpecError(f"{owner}: \"{field_name}\" must be a non-empty text "
+                        f"key, got {value!r}.")
     return value
 
 
 # ---------------------------------------------------------------------------
-# Preuve : ce que les données du site disent d'une infrastructure
+# Evidence: what the site data says about an infrastructure
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Evidence:
-    """Ce que le HAR permet d'affirmer sur une infrastructure, et rien de plus.
+    """What the HAR allows us to assert about an infrastructure, and nothing
+    more.
 
-    Sert deux usages : justifier dans le rapport pourquoi tel serveur a été
-    modélisé, et permettre à `compose()` de reconnaître que deux fragments
-    parlent de la même machine.
+    Serves two purposes: justifying in the report why such-and-such server
+    was modeled, and letting `compose()` recognize that two fragments talk
+    about the same machine.
 
-    `cache_header_seen` est distingué de `cache_hit_ratio` à None parce que les
-    deux situations ne se ressemblent pas : aucun en-tête de cache observé est
-    une INFORMATION sur l'hébergement, alors qu'un ratio incalculable est une
-    absence de mesure. Confondre les deux fait croire à une détection réussie
-    là où il n'y a rien.
+    `cache_header_seen` is distinguished from `cache_hit_ratio` being None
+    because the two situations do not look alike: no cache header observed is
+    INFORMATION about the hosting, whereas an uncomputable ratio is an
+    absence of measurement. Confusing the two makes a failed detection look
+    like a successful one.
     """
 
     hosts: Tuple[str, ...] = ()
@@ -313,13 +314,12 @@ class Evidence:
 
     @property
     def identity(self):
-        """Signature d'infrastructure, pour comparer deux Evidence.
+        """Infrastructure signature, to compare two Evidence objects.
 
-        Volontairement les HÔTES ET les IP ensemble, en ensembles complets. Une
-        IP partagée ne suffit PAS à conclure à une infrastructure commune : un
-        cas réel de validation présente deux sous-domaines distincts derrière
-        une même adresse. Exiger l'égalité des deux ensembles évite de fusionner
-        deux serveurs sur un indice trop faible.
+        Deliberately HOSTS AND IPs together, as full sets. A shared IP is NOT
+        enough to conclude a common infrastructure: a real validation case
+        shows two distinct subdomains behind the same address. Requiring both
+        sets to be equal avoids merging two servers on too weak a clue.
         """
         return (frozenset(self.hosts), frozenset(self.ips))
 
@@ -337,18 +337,18 @@ class Evidence:
 
 @dataclass(frozen=True)
 class ThirdPartyHost:
-    """Un hôte tiers observé dans le HAR, compté en RÉSEAU SEULEMENT.
+    """A third-party host observed in the HAR, counted on the NETWORK ONLY.
 
-    Décision de modélisation : les octets des tiers sont comptés (ils traversent
-    le réseau et l'appareil du visiteur), mais leurs SERVEURS ne le sont pas.
-    Aucune source publique ne donne de g CO2e par requête pour un CDN ou un
-    service de police de caractères ; un chiffre y serait inventé.
+    Modeling decision: third-party bytes are counted (they cross the network
+    and the visitor's device), but their SERVERS are not. No public source
+    gives g CO2e per request for a CDN or a font service; a number there
+    would be invented.
 
-    Cette structure existe pour que le rapport puisse le DIRE avec des nombres
-    propres au site analysé. La formulation compte : ce n'est pas "les tiers ont
-    été oubliés", c'est "leur trafic est compté, pas leurs machines". Et
-    l'ampleur de cet angle mort varie fortement d'un site à l'autre, donc elle
-    ne peut pas être annoncée en pourcentage universel.
+    This structure exists so the report can SAY it with numbers specific to
+    the analyzed site. The wording matters: it is not "third parties were
+    forgotten", it is "their traffic is counted, not their machines". And
+    the size of this blind spot varies greatly from one site to another, so
+    it cannot be announced as a universal percentage.
     """
 
     host: str
@@ -374,19 +374,20 @@ class ThirdPartyHost:
 
 @dataclass(frozen=True)
 class ExternalApiSpec:
-    """Un appel à un modèle d'IA générative tiers (OpenAI, Anthropic...), à la
-    différence d'un `ThirdPartyHost` : ici une source publique DONNE une
-    empreinte par appel (bibliothèque EcoLogits, déjà installée avec
-    e-footprint), donc la compter en réseau seulement sous-estimerait le calcul
-    lui-même. Distinct d'un `ThirdPartyHost` (CDN, police de caractères) pour
-    qui aucune source publique de ce genre n'existe (cf. sa docstring).
+    """A call to a third-party generative AI model (OpenAI, Anthropic...), as
+    opposed to a `ThirdPartyHost`: here a public source DOES give a footprint
+    per call (the EcoLogits library, already installed with e-footprint), so
+    counting it on the network only would under-count the calculation itself.
+    Distinct from a `ThirdPartyHost` (CDN, font service) for which no such
+    public source exists (cf. its docstring).
 
-    `provider`/`model_name` doivent être reconnus par le catalogue EcoLogits
-    (ex. "anthropic" / "claude-sonnet-4-5") : c'est `build.py` qui vérifie,
-    cette dataclasse reste zéro import e-footprint.
-    `output_tokens` pilote le calcul : plus de mots générés, plus d'énergie et
-    de calcul consommés. `request_count_per_step` est le nombre d'appels que
-    déclenche l'étape qui le porte (ex. plusieurs tours de conversation).
+    `provider`/`model_name` must be recognized by the EcoLogits catalog
+    (e.g. "anthropic" / "claude-sonnet-4-5"): it is `build.py` that checks,
+    this dataclass stays zero e-footprint imports.
+    `output_tokens` drives the calculation: the more tokens generated, the
+    more energy and compute consumed. `request_count_per_step` is the number
+    of calls triggered by the step carrying it (e.g. several conversation
+    turns).
     """
 
     provider: str
@@ -403,32 +404,32 @@ class ExternalApiSpec:
         if isinstance(self.request_count_per_step, bool) \
                 or not isinstance(self.request_count_per_step, Real) \
                 or self.request_count_per_step <= 0:
-            raise SpecError(f"{owner} : \"request_count_per_step\" doit être un "
-                            f"nombre strictement positif, reçu "
+            raise SpecError(f"{owner}: \"request_count_per_step\" must be a "
+                            f"strictly positive number, got "
                             f"{self.request_count_per_step!r}.")
         object.__setattr__(self, "request_count_per_step", float(self.request_count_per_step))
 
 
 # ---------------------------------------------------------------------------
-# Serveur
+# Server
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ServerSpec:
-    """Une infrastructure 1st-party distincte.
+    """A distinct 1st-party infrastructure.
 
-    Un serveur par infrastructure réellement distincte, jamais d'agrégation de
-    complaisance. Deux raisons : agréger prête au serveur principal une charge
-    qu'il ne porte pas, et surtout agréger rend le poste INVISIBLE, donc non
-    isolable comme levier de réduction. Un service d'analytique qui pèse peu en
-    octets mais concentre beaucoup de requêtes disparaîtrait dans un job de page
-    unique.
+    One server per genuinely distinct infrastructure, never a convenience
+    aggregation. Two reasons: aggregating lends the primary server a load it
+    does not carry, and above all aggregating makes the item INVISIBLE, hence
+    not isolable as a reduction lever. An analytics service that weighs few
+    bytes but concentrates many requests would disappear into a single-page
+    job.
 
-    `provider` et `instance_type` ne valent que pour un serveur de cloud public
-    modélisé par la voie Boavizta. Un serveur générique utilise à la place
-    `power`, `carbon_footprint_fabrication` et `pue`. Les deux jeux sont
-    facultatifs ici : c'est le constructeur du modèle qui exigera l'un ou
-    l'autre, parce que lui seul sait quelle classe e-footprint il instancie.
+    `provider` and `instance_type` only matter for a public-cloud server
+    modeled via the Boavizta path. A generic server uses `power`,
+    `carbon_footprint_fabrication` and `pue` instead. Both sets are optional
+    here: it is the model builder that will require one or the other,
+    because it alone knows which e-footprint class it instantiates.
     """
 
     key: str
@@ -456,9 +457,9 @@ class ServerSpec:
 
         for name in ("server_type", "country", "provider"):
             require_traced(getattr(self, name), owner, name, kind="object")
-        # Le type d'instance est CRITIQUE : il détermine à lui seul la puissance
-        # et l'empreinte de fabrication attribuées. Un t3.medium posé sans
-        # justification devient, dans le rapport, une caractéristique du site.
+        # The instance type is CRITICAL: it alone determines the power and the
+        # manufacturing footprint attributed. A t3.medium dropped without
+        # justification becomes, in the report, a characteristic of the site.
         require_traced(self.instance_type, owner, "instance_type", kind="object",
                        critical=self.instance_type is not None)
         for name in ("carbon_intensity", "storage_gb", "base_ram", "base_compute",
@@ -466,28 +467,29 @@ class ServerSpec:
             require_traced(getattr(self, name), owner, name, kind="value")
 
         if self.evidence is not None and not isinstance(self.evidence, Evidence):
-            raise SpecError(f"{owner} : \"evidence\" doit être un Evidence, "
-                            f"reçu {type(self.evidence).__name__}.")
+            raise SpecError(f"{owner}: \"evidence\" must be an Evidence, "
+                            f"got {type(self.evidence).__name__}.")
 
 
 # ---------------------------------------------------------------------------
-# Traitement (job)
+# Job
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class JobSpec:
-    """Un échange réseau attribué à un serveur.
+    """A network exchange attributed to a server.
 
-    `data_transferred` est le poids TRANSFÉRÉ (compressé, tel qu'il circule),
-    pas le poids décompressé : c'est le trafic réel qui pilote l'énergie réseau.
-    Le poids décompressé reste un repère utile pour le rapport, mais il n'entre
-    pas dans le calcul.
+    `data_transferred` is the TRANSFERRED weight (compressed, as it travels),
+    not the decompressed weight: it is the real traffic that drives network
+    energy. The decompressed weight remains a useful reference for the
+    report, but it does not enter the calculation.
 
-    `external_api` porte un `ExternalApiSpec` si ce traitement appelle un
-    modèle d'IA générative tiers (OpenAI, Anthropic...) dont l'empreinte est
-    calculée via EcoLogits (cf. sa docstring), EN PLUS du `data_transferred`
-    habituel : le trafic réseau du prompt/réponse et le calcul du modèle chez
-    le fournisseur sont deux grandeurs distinctes, elles se cumulent.
+    `external_api` carries an `ExternalApiSpec` if this job calls a
+    third-party generative AI model (OpenAI, Anthropic...) whose footprint is
+    computed via EcoLogits (cf. its docstring), IN ADDITION to the usual
+    `data_transferred`: the network traffic of the prompt/response and the
+    model's computation at the provider are two distinct quantities, they
+    add up.
     """
 
     key: str
@@ -508,37 +510,38 @@ class JobSpec:
         _require_key(self.label, owner, "label")
         object.__setattr__(self, "notes", tuple(self.notes))
 
-        # Le poids transféré est CRITIQUE : c'est l'entrée principale du calcul.
+        # The transferred weight is CRITICAL: it is the main input of the
+        # calculation.
         require_traced(self.data_transferred, owner, "data_transferred",
                        kind="value", critical=True)
         for name in ("request_duration", "compute_needed", "ram_needed", "data_stored"):
             require_traced(getattr(self, name), owner, name, kind="value")
 
         if self.external_api is not None and not isinstance(self.external_api, ExternalApiSpec):
-            raise SpecError(f"{owner} : \"external_api\" doit être un "
-                            f"ExternalApiSpec, reçu {type(self.external_api).__name__}.")
+            raise SpecError(f"{owner}: \"external_api\" must be an "
+                            f"ExternalApiSpec, got {type(self.external_api).__name__}.")
 
 
 # ---------------------------------------------------------------------------
-# Étape de parcours
+# Journey step
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class StepSpec:
-    """Une étape du parcours utilisateur, avec les traitements qu'elle déclenche.
+    """A user-journey step, with the jobs it triggers.
 
-    `jobs` associe une clé de traitement à un POIDS : le nombre de fois que ce
-    traitement s'exécute pendant l'étape. Un poids, pas un booléen, parce qu'une
-    étape peut relancer plusieurs fois le même appel.
+    `jobs` maps a job key to a WEIGHT: the number of times this job runs
+    during the step. A weight, not a boolean, because a step can trigger the
+    same call several times.
 
-    `intention` est le regroupement métier utilisé pour la PRÉSENTATION
-    (s'informer, contacter, candidater...). Le calcul reste au niveau de
-    l'étape ; l'intention n'est qu'une agrégation des résultats, ce qui garantit
-    que les totaux se conservent.
+    `intention` is the business grouping used for PRESENTATION (to get
+    informed, to contact, to apply...). The calculation stays at step
+    level; the intention is only an aggregation of results, which guarantees
+    totals are preserved.
 
-    `words` et `images` servent à estimer le temps de lecture. Sur une page
-    rendue côté client, le comptage tombe à zéro ; ce repli doit rester VISIBLE
-    dans la confiance du Traced, jamais silencieux.
+    `words` and `images` serve to estimate reading time. On a
+    client-rendered page, the count drops to zero; this fallback must stay
+    VISIBLE in the Traced's confidence, never silent.
     """
 
     key: str
@@ -558,51 +561,52 @@ class StepSpec:
         _require_key(self.label, owner, "label")
         object.__setattr__(self, "notes", tuple(self.notes))
 
-        # Le temps utilisateur est CRITIQUE : il pilote l'empreinte de
-        # l'appareil du visiteur, qui pèse lourd dans le total. Une durée posée
-        # sans provenance est le genre de chiffre qu'on croit mesuré.
+        # The user time is CRITICAL: it drives the footprint of the visitor's
+        # device, which weighs heavily in the total. A duration dropped without
+        # provenance is the kind of number that gets believed to be measured.
         require_traced(self.user_time, owner, "user_time", kind="value", critical=True)
         for name in ("words", "images"):
             require_traced(getattr(self, name), owner, name, kind="value")
 
         if not isinstance(self.jobs, Mapping):
-            raise SpecError(f"{owner} : \"jobs\" doit associer une clé de "
-                            f"traitement à un nombre d'exécutions, reçu "
+            raise SpecError(f"{owner}: \"jobs\" must map a job key to a "
+                            f"number of executions, got "
                             f"{type(self.jobs).__name__}.")
         cleaned = {}
         for job_key, weight in self.jobs.items():
-            _require_key(job_key, owner, "jobs (clé)")
+            _require_key(job_key, owner, "jobs (key)")
             if isinstance(weight, bool) or not isinstance(weight, Real):
-                raise SpecError(f"{owner} : le poids du traitement "
-                                f"\"{job_key}\" doit être un nombre, reçu "
+                raise SpecError(f"{owner}: the weight of job "
+                                f"\"{job_key}\" must be a number, got "
                                 f"{weight!r}.")
             if weight <= 0:
-                raise SpecError(f"{owner} : le poids du traitement "
-                                f"\"{job_key}\" vaut {weight}. Un traitement "
-                                "qui ne s'exécute pas doit être retiré de "
-                                "l'étape, pas mis à zéro : à zéro il reste "
-                                "listé dans le modèle et laisse croire qu'il "
-                                "est compté.")
+                raise SpecError(f"{owner}: the weight of job "
+                                f"\"{job_key}\" is {weight}. A job "
+                                "that does not run must be removed from "
+                                "the step, not set to zero: at zero it stays "
+                                "listed in the model and suggests it is "
+                                "counted.")
             cleaned[job_key] = float(weight)
         object.__setattr__(self, "jobs", cleaned)
 
         if isinstance(self.times_per_journey, bool) \
                 or not isinstance(self.times_per_journey, Real) \
                 or self.times_per_journey <= 0:
-            raise SpecError(f"{owner} : \"times_per_journey\" doit être un "
-                            f"nombre strictement positif, reçu "
+            raise SpecError(f"{owner}: \"times_per_journey\" must be a "
+                            f"strictly positive number, got "
                             f"{self.times_per_journey!r}.")
         object.__setattr__(self, "times_per_journey", float(self.times_per_journey))
 
 
 # ---------------------------------------------------------------------------
-# Parcours
+# Journey
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class JourneySpec:
-    """Un enchaînement d'étapes. L'ordre est conservé : il porte du sens pour la
-    lecture du rapport, même si le calcul ne dépend pas de l'ordre."""
+    """A sequence of steps. The order is preserved: it carries meaning for
+    reading the report, even though the calculation does not depend on the
+    order."""
 
     key: str
     label: str
@@ -616,14 +620,14 @@ class JourneySpec:
         object.__setattr__(self, "steps", tuple(self.steps))
         object.__setattr__(self, "notes", tuple(self.notes))
         for step_key in self.steps:
-            _require_key(step_key, owner, "steps (élément)")
+            _require_key(step_key, owner, "steps (element)")
         if len(set(self.steps)) != len(self.steps):
-            # Répéter une étape est légitime, mais s'exprime par
-            # times_per_journey. Deux entrées identiques dans la liste rendent
-            # le comptage ambigu à la lecture du modèle.
-            raise SpecError(f"{owner} : une étape apparaît deux fois dans "
-                            "\"steps\". Pour une étape répétée, utiliser "
-                            "times_per_journey sur le StepSpec.")
+            # Repeating a step is legitimate, but is expressed through
+            # times_per_journey. Two identical entries in the list make the
+            # count ambiguous when reading the model.
+            raise SpecError(f"{owner}: a step appears twice in "
+                            "\"steps\". For a repeated step, use "
+                            "times_per_journey on the StepSpec.")
 
 
 # ---------------------------------------------------------------------------
@@ -632,18 +636,18 @@ class JourneySpec:
 
 @dataclass(frozen=True)
 class AudienceSpec:
-    """Le volume et la composition du trafic.
+    """The volume and composition of the traffic.
 
-    Les fractions d'appareils et de réseaux sont séparées parce qu'elles
-    donneront deux motifs d'usage distincts. La librairie e-footprint ne pondère
-    PAS l'usage entre plusieurs appareils d'une même liste : y mettre téléphone
-    et ordinateur ensemble facture la totalité du trafic sur CHACUN. Deux motifs
-    aux volumes proportionnels sont le seul montage correct.
+    Device and network fractions are separated because they will give two
+    distinct usage patterns. The e-footprint library does NOT weight usage
+    across several devices of the same list: putting phone and computer
+    together bills the whole traffic on EACH. Two patterns with proportional
+    volumes are the only correct setup.
 
-    `visits_per_year` n'est pas un champ critique au sens du garde-fou, et c'est
-    délibéré : les données d'audience manquent pour les petits sites et les
-    intranets. Le modèle doit rester utilisable sans elles, avec un défaut
-    affiché comme tel.
+    `visits_per_year` is not a critical field in the guard-rail sense, and
+    that is deliberate: audience data is missing for small sites and
+    intranets. The model must stay usable without it, with a default shown
+    as such.
     """
 
     key: str
@@ -658,8 +662,8 @@ class AudienceSpec:
     journey_key: Optional[str] = None
     notes: Tuple[str, ...] = ()
 
-    # Les fractions doivent sommer à 1. Tolérance étroite : elle absorbe un
-    # arrondi de sérialisation, pas une répartition bancale.
+    # The fractions must sum to 1. Tight tolerance: it absorbs a
+    # serialization rounding, not a lopsided split.
     FRACTION_TOLERANCE = 1e-6
 
     def __post_init__(self):
@@ -686,53 +690,53 @@ class AudienceSpec:
             _require_key(self.journey_key, owner, "journey_key")
 
     def _check_pair(self, owner, name_a, traced_a, name_b, traced_b):
-        """Refuse une répartition qui ne somme pas à 1, et refuse aussi une
-        moitié de répartition.
+        """Refuses a split that does not sum to 1, and also refuses half a
+        split.
 
-        Pas de renormalisation automatique : compléter en silence la fraction
-        manquante fabrique une donnée d'audience que personne n'a mesurée.
+        No automatic renormalization: silently completing the missing
+        fraction would fabricate an audience datum nobody measured.
         """
         if (traced_a is None) != (traced_b is None):
             missing = name_b if traced_a is not None else name_a
             raise SpecError(
-                f"{owner} : \"{missing}\" manque alors que l'autre part de la "
-                "répartition est fournie. Le complément n'est pas déduit "
-                "automatiquement : ce serait inventer une donnée d'audience."
+                f"{owner}: \"{missing}\" is missing while the other part of "
+                "the split is provided. The complement is not deduced "
+                "automatically: that would invent an audience datum."
             )
         if traced_a is None:
             return
         total = traced_a.value + traced_b.value
         if abs(total - 1.0) > self.FRACTION_TOLERANCE:
             raise SpecError(
-                f"{owner} : \"{name_a}\" ({traced_a.value}) et \"{name_b}\" "
-                f"({traced_b.value}) somment à {total}, pas à 1. Une "
-                "répartition incomplète sous-compte le trafic ; une "
-                "répartition excédentaire le surcompte."
+                f"{owner}: \"{name_a}\" ({traced_a.value}) and \"{name_b}\" "
+                f"({traced_b.value}) sum to {total}, not to 1. An "
+                "incomplete split under-counts the traffic; an "
+                "excessive split over-counts it."
             )
 
 
 # ---------------------------------------------------------------------------
-# Le site : le contrat de la bibliothèque
+# The site: the library's contract
 # ---------------------------------------------------------------------------
 
-# Version du contrat de spécification. À incrémenter dès qu'un champ change de
-# SENS (un ajout de champ facultatif n'est pas un changement de sens).
+# Specification contract version. Increment as soon as a field changes
+# MEANING (adding an optional field is not a change of meaning).
 SCHEMA_VERSION = "1.0"
 
 
 @dataclass(frozen=True)
 class SiteSpec:
-    """La description complète d'un service, prête à être construite.
+    """The complete description of a service, ready to be built.
 
-    C'est le SEUL contrat de la bibliothèque : elle ne connaît ni le format HAR
-    ni le fichier de données d'environnement. Un adaptateur les traduit en
-    SiteSpec, ce qui permettra plus tard de modéliser un service à partir d'un
-    schéma d'architecture ou d'un entretien technique, sans capture réseau.
+    It is the ONLY contract of the library: it knows neither the HAR format
+    nor the environment-data file. An adapter translates them into SiteSpec,
+    which will later allow modeling a service from an architecture diagram
+    or a technical interview, without a network capture.
 
-    Les collections sont des tuples : une spécification est immuable, et une
-    transformation (un archétype) en retourne une nouvelle plutôt que de
-    modifier celle qu'on lui passe. Sans quoi appliquer deux archétypes au même
-    site produirait un résultat dépendant de l'ordre des appels.
+    The collections are tuples: a specification is immutable, and a
+    transformation (an archetype) returns a new one rather than modifying the
+    one it is given. Otherwise applying two archetypes to the same site would
+    produce a result depending on the order of the calls.
     """
 
     name: str
@@ -755,20 +759,21 @@ class SiteSpec:
             for item in items:
                 if not isinstance(item, expected):
                     raise SpecError(
-                        f"SiteSpec[{self.name}] : \"{attr}\" attend des "
-                        f"{expected.__name__}, reçu "
+                        f"SiteSpec[{self.name}]: \"{attr}\" expects "
+                        f"{expected.__name__} items, got "
                         f"{type(item).__name__}.")
             object.__setattr__(self, attr, items)
         object.__setattr__(self, "archetypes", tuple(self.archetypes))
         object.__setattr__(self, "notes", tuple(self.notes))
 
         if self.audience is not None and not isinstance(self.audience, AudienceSpec):
-            raise SpecError(f"SiteSpec[{self.name}] : \"audience\" doit être un "
-                            f"AudienceSpec, reçu {type(self.audience).__name__}.")
+            raise SpecError(f"SiteSpec[{self.name}]: \"audience\" must be an "
+                            f"AudienceSpec, got {type(self.audience).__name__}.")
 
-    # --- Index par clé : indispensable en aval -----------------------------
-    # Sans ces index, les résultats d'attribution reviennent indexés par objet
-    # e-footprint et on ne sait plus à quelle intention métier les rattacher.
+    # --- Index by key: essential downstream --------------------------------
+    # Without these indexes, attribution results come back indexed by
+    # e-footprint object and there is no way to attach them to the business
+    # intention that produced them.
 
     def server_by_key(self, key):
         return _index(self.servers)[key]
@@ -800,6 +805,6 @@ class SiteSpec:
 
 
 def _index(items):
-    """Index clé -> élément. Les doublons sont impossibles à ce stade :
-    `compose()` et `validate_spec()` les refusent en amont."""
+    """Index key -> element. Duplicates are impossible at this stage:
+    `compose()` and `validate_spec()` reject them upstream."""
     return {item.key: item for item in items}

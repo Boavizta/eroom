@@ -1,68 +1,68 @@
 ---
 name: diagrammes-analyse-parcours
 description: >
-  Génère ou met à jour les diagrammes PlantUML du projet analyse-parcours.
-  Registre de tous les diagrammes existants, leur source de vérité et les
-  commandes de régénération. Invoquer quand un fichier source change ou
-  quand un nouveau diagramme doit être créé.
+  Generates or updates the PlantUML diagrams of the analyse-parcours project.
+  Registry of all existing diagrams, their source of truth and the
+  regeneration commands. Invoke when a source file changes or
+  when a new diagram must be created.
 triggers:
-  - "diagramme analyse-parcours"
-  - "diagramme séquence analyse"
-  - "diagramme eroom"
-  - "schéma workflow parcours"
-  - "mets à jour les diagrammes"
-  - "régénère les diagrammes"
+  - "analyse-parcours diagram"
+  - "analyse sequence diagram"
+  - "eroom diagram"
+  - "journey workflow diagram"
+  - "update the diagrams"
+  - "regenerate the diagrams"
   - "/diagrammes-analyse-parcours"
 version: 1.0.0
 ---
 
-# Skill : Diagrammes — Analyse de parcours web
+# Skill: Diagrams — Web journey analysis
 
-## Registre des diagrammes
+## Diagram registry
 
-| Diagramme | Fichiers source (`.puml`) | Fichiers produits | Source de vérité | Régénérer si... |
-|-----------|--------------------------|-------------------|------------------|-----------------|
-| Vue générale (macro, par thématique) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthèse de 7 blocs (Capture manuelle, Collecte, Jugement auto EOF, Impact CO2e, Rapport - première génération, Questionnaire EOF, Rapport - régénération) : pas de source unique, c'est un résumé volontairement macro. Le bloc Capture manuelle (HAR puis Coverage, séquentiel, une seule colonne) précède Collecte : c'est l'étape humaine hors skill, avant tout automatisme — détaillée dans [`capturer-har-et-coverage.md`](../analyse-parcours/docs/capturer-har-et-coverage.md), référencée dans le diagramme par un marqueur `[réf]` (titre du bloc + 3e ligne de la légende ; pas d'icône dessinée ici, ce diagramme est généré par `plantuml`, pas construit à la main). Depuis le 2026-09-18, la légende est un unique bloc `legend top right`/`endlegend` (un seul rectangle bordé, comme dans `analyse-parcours-vue-generale-horizontal-light.svg`) et non plus 3 notes séparées : piège rencontré, `<back:#couleur>` sur du texte vide ou des espaces (y compris des `&nbsp;`/NBSP Unicode) ne produit AUCUNE pastille visible, PlantUML les élague avant le rendu — il faut des caractères de remplissage non-blancs colorés dans la MÊME couleur que le fond (`<back:#ECECF2><color:#ECECF2>XXXXXX</color></back>`) pour obtenir une pastille pleine et invisible en texte. Rapport apparaît deux fois (avant et après le questionnaire) pour montrer les deux passes ; Impact CO2e est positionné avant la première génération car ses données, une fois calculées, alimentent la prochaine génération de rapport, pas un ajout final isolé. Légende à 2 couleurs (fond gris pâle `#ECECF2` = automatique, fond bleu clair Octo `#9BD0DD` = action humaine requise) sur les blocs Capture manuelle, Impact CO2e et Questionnaire EOF | l'un des diagrammes détaillés ci-dessous change de thématique (nouvelle étape majeure, fusion/scission d'un bloc), la procédure de capture manuelle change, ou la règle de précédence des provenances change (`processus/manifeste-lots.json::regle_de_precedence`) |
-| Vue générale (macro, horizontal, 2 colonnes) | `analyse-parcours-vue-generale-horizontal-light.puml` (texte de référence uniquement, ne pilote pas le rendu) | `analyse-parcours-vue-generale-horizontal-light.svg` (**construit à la main, ne JAMAIS régénérer via `plantuml -tsvg`** — PlantUML ne sait pas produire cette mise en page, cf. commentaire en tête du `.svg`) + `.pdf` + `.jpg` + `.pptx` | Le `.svg` lui-même est la source de vérité de la mise en page (2 colonnes de 440px chacune, largeur mesurée au pixel sur la ligne de texte la plus longue — `magick -threshold -trim` sur le rendu réel, pas une estimation, cf. commentaire en tête du `.svg` — le 2026-09-18, police corps 14px / titres 16px, connecteur en U à coins arrondis flush avec les blocs, bloc Capture manuelle en tête en une seule colonne HAR puis Coverage, légende en haut à droite — occupe l'espace mort au-dessus de Rapport, qui n'est donc plus aligné avec Collecte, le connecteur entre par le côté gauche de Rapport plutôt que par le haut) ; le `.puml` ne sert qu'à garder le texte en synchronisation avec les autres diagrammes de ce projet. Contenu du bloc Capture manuelle détaillé dans [`capturer-har-et-coverage.md`](../analyse-parcours/docs/capturer-har-et-coverage.md), référencé DANS le `.svg` depuis le 2026-09-18 par une icône livre dessinée en vectoriel (rect + spine + 2 lignes, PAS un emoji couleur — testé et confirmé : rsvg-convert rend tout emoji couleur en carré noir plein, y compris avec Apple Color Emoji explicite, et le PPTX en hériterait puisqu'il repasse par un PNG rendu par rsvg-convert) : mini marqueur à côté du titre Capture manuelle + icône pleine taille en 3e ligne de la Légende (nom du fichier + chemin relatif) | le texte change (reporter à la main dans le `.puml` ET le `.svg`), ou la mise en page change (largeurs, police, coins, flèches, légende) — puis régénérer `.pdf`/`.jpg`/`.pptx` via les procédures ci-dessous |
-| Workflow principal (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | l'un des fichiers source change (étapes, participants) |
-| DISPATCH — flux vagues (activité) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` change (vagues, dispatches) |
-| e-footprint — pipeline outils (activité) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (code réel des scripts) | l'un de ces 3 scripts change ses entrées/sorties ou ses sous-outils appelés |
-| e-footprint — topologie d'un site (composants) | GÉNÉRÉ à la demande, pas de `.puml` fixe en dépôt | variable (dépend du site/archétype demandé) | `efootprint_model/to_plantuml.py::site_to_plantuml()` (lit une `SiteSpec`) | jamais à régénérer soi-même : ce diagramme se produit en appelant `site_to_plantuml(spec)` sur la spec du moment, cf. section dédiée ci-dessous. Depuis l'Étape 25 du skill efootprint, produit AUSSI systématiquement (pas seulement à la demande ponctuelle), via `run_efootprint.py::build_topology_overview()`. Les hôtes tiers annotés d'une suspicion BDD/streaming/IA (`efootprint_model/topology_overview.py`) affichent leur note dans le label du composant. |
-| EOF — pipeline outils (activité, 2 pages) | `eof-pipeline-outils.puml` (contient 2 diagrammes : `eof-pipeline-outils` + `eof-radar-svg`) | `eof-pipeline-outils.pdf` (2 pages) | `.claude/skills/eof/scripts/build_template.py` (page 1 : récupération gviz + construction du Markdown) + `.claude/skills/eof/scripts/generate_radar_svg.py` (page 2, pipeline indépendant) | l'un des 2 scripts change ses entrées/sorties, ou la liste des `gid`/onglets de la Google Sheet source change |
-| EOF-audit — pipeline outils (activité) | `eof-audit-pipeline.puml` | `eof-audit-pipeline.pdf` | `.claude/skills/analyse-parcours/scripts/run_eof.py` + `eof_criteria_mapping.py` + les 3 extracteurs Phase 1 (`parse_html_criteria.py`, `analyze_security_headers.py`, `scan_wellknown.py`) + l'extension a11y/best-practices de `collect_cwv_pagespeed.py` | l'un de ces scripts change ses entrées/sorties, ou le nombre de critères automatisables/indices évolue (Phase 2, `eof-questionnaire`) |
-| Questionnaire EOF — séquence (3 pages) | `eof-questionnaire-sequence-p1.puml` `eof-questionnaire-sequence-p2.puml` `eof-questionnaire-sequence-p3.puml` | `eof-questionnaire-sequence.pdf` | `analyse-parcours/skill-steps/39_eof-audit.md` (page 1 : ce que l'audit lance seul) + `scripts/generate_questionnaire.py` (page 2) + `scripts/parse_questionnaire.py` et `processus/fusionner_lots.py` (page 3) | une étape du skill se met à appeler `generate_questionnaire.py` (aujourd'hui aucune ne le fait, et c'est le sujet de la page 1), le nombre de questions change (aujourd'hui 45 technique + 17 produit-usage), la provenance posée par la relecture change, ou l'axe de précédence change |
+| Diagram | Source files (`.puml`) | Produced files | Source of truth | Regenerate if... |
+|---------|--------------------------|-------------------|------------------|-----------------|
+| Overview (macro, by theme) | `analyse-parcours-vue-generale.puml` | `analyse-parcours-vue-generale.pdf` | Synthesis of 7 blocks (Manual capture, Collection, Automatic EOF judgment, CO2e impact, Report - first generation, EOF questionnaire, Report - regeneration): no single source, it is a deliberately macro summary. The Manual capture block (HAR then Coverage, sequential, a single column) precedes Collection: it is the human step outside the skill, before any automation — detailed in [`capture-har-and-coverage.md`](../analyse-parcours/docs/capture-har-and-coverage.md), referenced in the diagram by a `[ref]` marker (block title + 3rd legend line; no icon drawn here, this diagram is generated by `plantuml`, not hand-built). Since 2026-09-18, the legend is a single `legend top right`/`endlegend` block (one bordered rectangle, as in `analyse-parcours-vue-generale-horizontal-light.svg`) and no longer 3 separate notes: pitfall encountered, `<back:#color>` on empty text or spaces (including `&nbsp;`/NBSP Unicode) produces NO visible swatch, PlantUML prunes them before rendering — you need non-blank filler characters colored in the SAME color as the background (`<back:#ECECF2><color:#ECECF2>XXXXXX</color></back>`) to get a solid swatch invisible in text. Report appears twice (before and after the questionnaire) to show the two passes; CO2e impact is positioned before the first generation because its data, once calculated, feeds the next report generation, not an isolated final add-on. 2-color legend (pale grey background `#ECECF2` = automatic, Octo light blue background `#9BD0DD` = human action required) on the Manual capture, CO2e impact and EOF questionnaire blocks | one of the detailed diagrams below changes theme (new major step, block merge/split), the manual capture procedure changes, or the provenance precedence rule changes (`process/lots-manifest.json::precedence_rule`) |
+| Overview (macro, horizontal, 2 columns) | `analyse-parcours-vue-generale-horizontal-light.puml` (reference text only, does not drive the rendering) | `analyse-parcours-vue-generale-horizontal-light.svg` (**hand-built, NEVER regenerate via `plantuml -tsvg`** — PlantUML cannot produce this layout, cf. header comment of the `.svg`) + `.pdf` + `.jpg` + `.pptx` | The `.svg` itself is the source of truth for the layout (2 columns of 440px each, width measured to the pixel on the longest text line — `magick -threshold -trim` on the real render, not an estimate, cf. header comment of the `.svg` — on 2026-09-18, body font 14px / titles 16px, U-shaped connector with rounded corners flush with the blocks, Manual capture block on top in a single HAR-then-Coverage column, legend top right — occupies the dead space above Report, which is therefore no longer aligned with Collection, the connector enters Report from the left side rather than the top); the `.puml` only serves to keep the text in sync with the other diagrams of this project. Content of the Manual capture block detailed in [`capture-har-and-coverage.md`](../analyse-parcours/docs/capture-har-and-coverage.md), referenced IN the `.svg` since 2026-09-18 by a vector-drawn book icon (rect + spine + 2 lines, NOT a color emoji — tested and confirmed: rsvg-convert renders any color emoji as a solid black square, even with explicit Apple Color Emoji, and the PPTX would inherit it since it goes back through a PNG rendered by rsvg-convert): mini marker next to the Manual capture title + full-size icon on the 3rd line of the Legend (file name + relative path) | the text changes (port it by hand into BOTH the `.puml` and the `.svg`), or the layout changes (widths, font, corners, arrows, legend) — then regenerate `.pdf`/`.jpg`/`.pptx` via the procedures below |
+| Main workflow (5 pages) | `analyse-parcours-p1.puml` `analyse-parcours-p2.puml` `analyse-parcours-p3.puml` `analyse-parcours-p4.puml` `analyse-parcours-p5.puml` | `analyse-parcours-workflow.pdf` | `analyse-parcours/SKILL.md` (p1-p3) + `analyse-parcours/skill-steps/45_efootprint.md` (p4-p5) | one of the source files changes (steps, participants) |
+| DISPATCH — wave flow (activity) | `analyse-parcours-dispatch-activite.puml` | `analyse-parcours-dispatch-activite.pdf` | `skill-steps/25_dispatch-orchestration.md` | `25_dispatch-orchestration.md` changes (waves, dispatches) |
+| e-footprint — tool pipeline (activity) | `analyse-parcours-efootprint-outils.puml` | `analyse-parcours-efootprint-outils.pdf` | `collect_env_data.py` + `run_efootprint.py` + `generate_report_html.py` (real script code) | one of these 3 scripts changes its inputs/outputs or its called sub-tools |
+| e-footprint — site topology (components) | GENERATED on demand, no fixed `.puml` in the repo | variable (depends on the requested site/archetype) | `efootprint_model/to_plantuml.py::site_to_plantuml()` (reads a `SiteSpec`) | never regenerate by hand: this diagram is produced by calling `site_to_plantuml(spec)` on the current spec, cf. dedicated section below. Since Step 25 of the efootprint skill, ALSO produced systematically (not only on demand), via `run_efootprint.py::build_topology_overview()`. Third-party hosts annotated with a DB/streaming/AI suspicion (`efootprint_model/topology_overview.py`) display their note in the component label. |
+| EOF — tool pipeline (activity, 2 pages) | `eof-pipeline-outils.puml` (contains 2 diagrams: `eof-pipeline-outils` + `eof-radar-svg`) | `eof-pipeline-outils.pdf` (2 pages) | `.claude/skills/eof/scripts/build_template.py` (page 1: gviz retrieval + Markdown construction) + `.claude/skills/eof/scripts/generate_radar_svg.py` (page 2, independent pipeline) | one of the 2 scripts changes its inputs/outputs, or the list of `gid`/tabs of the source Google Sheet changes |
+| EOF-audit — tool pipeline (activity) | `eof-audit-pipeline.puml` | `eof-audit-pipeline.pdf` | `.claude/skills/analyse-parcours/scripts/run_eof.py` + `eof_criteria_mapping.py` + the 3 Phase 1 extractors (`parse_html_criteria.py`, `analyze_security_headers.py`, `scan_wellknown.py`) + the a11y/best-practices extension of `collect_cwv_pagespeed.py` | one of these scripts changes its inputs/outputs, or the number of automatable criteria/hints evolves (Phase 2, `eof-questionnaire`) |
+| EOF questionnaire — sequence (3 pages) | `eof-questionnaire-sequence-p1.puml` `eof-questionnaire-sequence-p2.puml` `eof-questionnaire-sequence-p3.puml` | `eof-questionnaire-sequence.pdf` | `analyse-parcours/skill-steps/39_eof-audit.md` (page 1: what the audit launches on its own) + `scripts/generate_questionnaire.py` (page 2) + `scripts/parse_questionnaire.py` and `process/merge_lots.py` (page 3) | a skill step starts calling `generate_questionnaire.py` (today none does, and that is the subject of page 1), the number of questions changes (today 45 technical + 17 product-usage), the provenance set by the read-back changes, or the precedence axis changes |
 
-Tous les fichiers `.puml` et les sorties se trouvent dans `documentation/diagrammes/` à la racine du projet.
+All `.puml` files and the outputs live in `documentation/diagrammes/` at the project root.
 
 -----
 
-## Procédure générale de régénération
+## General regeneration procedure
 
-Pour chaque diagramme modifié :
-1. Modifier le `.puml` dans `documentation/diagrammes/` en cohérence avec la source de vérité
-2. Générer le SVG : `plantuml -tsvg <fichier>.puml`
-3. Convertir en PDF via `rsvg-convert`
-4. Générer aussi le JPG léger (voir "JPG léger" ci-dessous) — systématique, pas seulement à la demande
-5. Si ce diagramme a un `.pptx` (cf. colonne "Fichiers produits" du registre), le régénérer aussi (voir "PPTX" ci-dessous) — sinon il reste périmé silencieusement
-6. Vérifier + ouvrir
+For each modified diagram:
+1. Edit the `.puml` in `documentation/diagrammes/` consistently with the source of truth
+2. Generate the SVG: `plantuml -tsvg <file>.puml`
+3. Convert to PDF via `rsvg-convert`
+4. Also generate the lightweight JPG (see "Lightweight JPG" below) — systematic, not only on demand
+5. If this diagram has a `.pptx` (cf. "Produced files" column of the registry), regenerate it too (see "PPTX" below) — otherwise it stays silently stale
+6. Check + open
 
-**Ne jamais générer directement en PNG ou PDF depuis plantuml.** Toujours passer par SVG (vecteur) puis `rsvg-convert` pour le PDF.
+**Never generate directly to PNG or PDF from plantuml.** Always go through SVG (vector) then `rsvg-convert` for the PDF.
 
-### JPG léger (systématique après chaque régénération de SVG)
+### Lightweight JPG (systematic after each SVG regeneration)
 
-Chaque `.svg` de ce dossier a une version `.jpg` légère à côté (même nom, 800px de
-large, qualité 85) — pour partage/insertion dans un doc ou un slide sans le poids
-du PDF/SVG. À régénérer après CHAQUE modification d'un `.svg` (y compris pour un
-diagramme construit à la main, comme `analyse-parcours-vue-generale-horizontal-light.svg`).
+Each `.svg` in this directory has a lightweight `.jpg` version next to it (same name, 800px
+wide, quality 85) — for sharing/insertion into a doc or a slide without the weight
+of the PDF/SVG. To regenerate after EACH modification of an `.svg` (including for a
+hand-built diagram, like `analyse-parcours-vue-generale-horizontal-light.svg`).
 
 ```bash
-f=<nom-sans-extension>
+f=<name-without-extension>
 rsvg-convert -b white -w 800 documentation/diagrammes/$f.svg -o /tmp/$f.png \
   && magick /tmp/$f.png -quality 85 documentation/diagrammes/$f.jpg \
   && rm /tmp/$f.png
 ```
 
-Pour tout régénérer d'un coup (ex. après un changement de convention) :
+To regenerate everything at once (ex. after a convention change):
 
 ```bash
 cd documentation/diagrammes
@@ -74,74 +74,74 @@ for f in *.svg; do
 done
 ```
 
-### PPTX (uniquement pour les diagrammes qui en ont besoin, ex. vue générale horizontal-light)
+### PPTX (only for the diagrams that need it, ex. overview horizontal-light)
 
-Certains diagrammes (aujourd'hui : `analyse-parcours-vue-generale-horizontal-light`)
-ont aussi une version `.pptx`, pour insertion dans une présentation. Ce `.pptx` a
-été créé une première fois (2026-09-16) **manuellement** hors du repo (export
-SVG → PowerPoint), sans procédure de régénération — un piège identifié le
-2026-09-18 : toute future modification du `.svg` laissait le `.pptx` périmé sans
-que personne ne s'en rende compte.
+Some diagrams (today: `analyse-parcours-vue-generale-horizontal-light`)
+also have a `.pptx` version, for insertion into a presentation. This `.pptx` was
+created a first time (2026-09-16) **manually** outside the repo (SVG → PowerPoint
+export), without a regeneration procedure — a pitfall identified on
+2026-09-18: any future modification of the `.svg` left the `.pptx` stale without
+anyone noticing.
 
-Depuis, la régénération est scriptée par
-`.claude/skills/diagrammes-analyse-parcours/scripts/svg_to_pptx.sh` :
+Since then, regeneration is scripted by
+`.claude/skills/diagrammes-analyse-parcours/scripts/svg_to_pptx.sh`:
 
 ```bash
 .claude/skills/diagrammes-analyse-parcours/scripts/svg_to_pptx.sh documentation/diagrammes/<f>.svg
 ```
 
-Le script rend le SVG en PNG haute résolution (`rsvg-convert`), fabrique un `.odp`
-minimal à la main (une diapositive, l'image en plein cadre, format 16:9 standard
-PowerPoint) puis le convertit en `.pptx` via `soffice --headless` (LibreOffice,
-déjà installé — `/opt/homebrew/bin/soffice`). Détour nécessaire : LibreOffice n'a
-pas de filtre d'export direct SVG/PNG → PPTX (ces formats s'ouvrent comme des
-documents Draw, qui ne savent exporter qu'en formats Draw) ; il sait en revanche
-très bien convertir un document de présentation (ODP) vers PPTX.
+The script renders the SVG to a high-resolution PNG (`rsvg-convert`), builds a
+minimal `.odp` by hand (one slide, the image full-frame, standard 16:9
+PowerPoint format) then converts it to `.pptx` via `soffice --headless` (LibreOffice,
+already installed — `/opt/homebrew/bin/soffice`). Detour needed: LibreOffice has
+no direct SVG/PNG → PPTX export filter (these formats open as Draw
+documents, which can only export to Draw formats); it does however convert a
+presentation document (ODP) to PPTX very well.
 
-**Limite à connaître :** le diagramme est incrusté en image dans la diapositive
-(comme dans le PDF/JPG), pas en formes vectorielles éditables dans PowerPoint —
-cohérent avec le fait que le `.svg` lui-même est construit à la main, pas généré
-depuis des formes structurées.
+**Limit to know:** the diagram is embedded as an image in the slide
+(as in the PDF/JPG), not as editable vector shapes in PowerPoint —
+consistent with the fact that the `.svg` itself is hand-built, not generated
+from structured shapes.
 
-**Piège rencontré à l'écriture du script :** `awk` respecte la locale système pour
-le séparateur décimal. Sur ce Mac (locale FR), `awk '{printf "%.3f", ...}'` sans
-précaution produit `19,538` (virgule) au lieu de `19.538` (point) — une dimension
-ODF invalide qui fait retomber LibreOffice sur une hauteur de diapositive quasi
-nulle (l'image apparaît alors juste vide/blanche). Toujours forcer
-`LC_NUMERIC=C awk ...` pour les calculs de dimensions destinés à du XML.
+**Pitfall encountered when writing the script:** `awk` respects the system locale for
+the decimal separator. On this Mac (FR locale), `awk '{printf "%.3f", ...}'` without
+precaution produces `19,538` (comma) instead of `19.538` (point) — an invalid
+ODF dimension that makes LibreOffice fall back to a near-zero slide height
+(the image then appears just empty/white). Always force
+`LC_NUMERIC=C awk ...` for dimension calculations destined to XML.
 
 -----
 
-## Diagramme 1 — Workflow principal (séquence)
+## Diagram 1 — Main workflow (sequence)
 
-**Source de vérité :** `analyse-parcours/SKILL.md` (pages 1-3, Étapes 10 à 40) +
-`analyse-parcours/skill-steps/45_efootprint.md` (pages 4-5, Étapes 10 à 50 du skill /efootprint).
+**Source of truth:** `analyse-parcours/SKILL.md` (pages 1-3, Steps 10 to 40) +
+`analyse-parcours/skill-steps/45_efootprint.md` (pages 4-5, Steps 10 to 50 of the /efootprint skill).
 
-Le workflow assemble le parcours de base (p1-p3) ET le module e-footprint optionnel
-(p4-p5). Les titres portent la numérotation globale « Page X/5 ».
+The workflow assembles the base journey (p1-p3) AND the optional e-footprint
+module (p4-p5). The titles carry the global numbering « Page X/5 ».
 
-### Structure des 5 fichiers
+### Structure of the 5 files
 
-| Fichier | Participants | Étapes couvertes |
+| File | Participants | Steps covered |
 |---------|--------------|-----------------|
-| `analyse-parcours-p1.puml` | U, C, FS | Étapes 10+15 — Localisation + Capture sessionId |
-| `analyse-parcours-p2.puml` | U, C, SA, EI, FS | Étapes 25+35 — DISPATCH + EcoIndex |
-| `analyse-parcours-p3.puml` | U, C, GR, FS | Étape 40 — CWV Lighthouse + Rapport HTML |
-| `analyse-parcours-p4.puml` | U, C, CED, SW, IP, CR, DT, FS | e-footprint Étapes 10+20 — Collecte (SimilarWeb, CrUX+correction iOS/macOS, ipinfo, detect_tech) |
-| `analyse-parcours-p5.puml` | U, C, REF, GR, FS | e-footprint Étapes 30+40+50 — Questions, calcul, synthèse, enrichissement rapport |
+| `analyse-parcours-p1.puml` | U, C, FS | Steps 10+15 — Location + sessionId capture |
+| `analyse-parcours-p2.puml` | U, C, SA, EI, FS | Steps 25+35 — DISPATCH + EcoIndex |
+| `analyse-parcours-p3.puml` | U, C, GR, FS | Step 40 — CWV Lighthouse + HTML report |
+| `analyse-parcours-p4.puml` | U, C, CED, SW, IP, CR, DT, FS | e-footprint Steps 10+20 — Collection (SimilarWeb, CrUX+iOS/macOS correction, ipinfo, detect_tech) |
+| `analyse-parcours-p5.puml` | U, C, REF, GR, FS | e-footprint Steps 30+40+50 — Questions, calculation, summary, report enrichment |
 
-Découpage en fichiers séparés : chaque page n'affiche que les participants actifs
-(la technique `newpage` dans un mono-fichier ne réduit pas les colonnes). Les pages
-p4-p5 sont OPTIONNELLES (skill `/efootprint`) mais incluses dans le PDF assemblé.
+Split into separate files: each page only shows the active participants
+(the `newpage` technique in a mono-file does not reduce the columns). Pages
+p4-p5 are OPTIONAL (skill `/efootprint`) but included in the assembled PDF.
 
-### Commandes
+### Commands
 
 ```bash
 plantuml -tsvg documentation/diagrammes/analyse-parcours-p1.puml \
-         documentation/diagrammes/analyse-parcours-p2.puml \
-         documentation/diagrammes/analyse-parcours-p3.puml \
-         documentation/diagrammes/analyse-parcours-p4.puml \
-         documentation/diagrammes/analyse-parcours-p5.puml
+          documentation/diagrammes/analyse-parcours-p2.puml \
+          documentation/diagrammes/analyse-parcours-p3.puml \
+          documentation/diagrammes/analyse-parcours-p4.puml \
+          documentation/diagrammes/analyse-parcours-p5.puml
 rsvg-convert -f pdf -o documentation/diagrammes/analyse-parcours-workflow.pdf \
   documentation/diagrammes/analyse-parcours-p1.svg \
   documentation/diagrammes/analyse-parcours-p2.svg \
@@ -152,11 +152,11 @@ ls -lh documentation/diagrammes/analyse-parcours-workflow.pdf
 open documentation/diagrammes/analyse-parcours-workflow.pdf
 ```
 
-### Contenu de référence — analyse-parcours-p1.puml
+### Reference content — analyse-parcours-p1.puml
 
 ```plantuml
 @startuml analyse-parcours-p1
-title Workflow Analyse de parcours web — Page 1/3 : Étapes 10+15 Localisation + SessionId
+title Web journey analysis workflow — Page 1/5 : Step 10 File location
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -179,59 +179,59 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 10 — Localisation des fichiers ==
+== Step 10 — File location ==
 
-U -> C : /analyse-parcours <dossier> ou <fichier.har> [coverage.json ...]
-C -> C : Extraire chemin(s) du prompt
+U -> C : /analyse-parcours <dir> or <file.har> [coverage.json ...]
+C -> C : Extract path(s) from the prompt
 
-alt Dossier fourni
-  C -> FS : Lister contenu
-  FS -> C : Fichiers trouvés
-  C -> C : Identifier .har + Coverage-*.json + cwv.json (optionnel)
-  alt Plusieurs .har trouvés
-    C -> U : Lequel utiliser ?
-    U -> C : Choix
+alt Directory provided
+  C -> FS : List contents
+  FS -> C : Files found
+  C -> C : Identify .har + Coverage-*.json + cwv.json (optional)
+  alt Several .har found
+    C -> U : Which one to use?
+    U -> C : Choice
   end
-else Fichiers directs fournis
-  C -> FS : Vérifier existence de chaque fichier
-  FS -> C : OK / erreur
-else Aucun argument
-  C -> U : Quel dossier ou fichiers HAR/Coverage analyser ?
-  U -> C : Chemin(s)
+else Direct files provided
+  C -> FS : Check existence of each file
+  FS -> C : OK / error
+else No argument
+  C -> U : Which directory or HAR/Coverage files to analyze?
+  U -> C : Path(s)
 end
 
-C -> U : Synthèse fichiers identifiés :\n- HAR : <nom> ([N] Ko)\n- Coverage : [N] fichier(s)\n- cwv.json : présent / absent
+C -> U : Summary of identified files:\n- HAR: <name> ([N] KB)\n- Coverage: [N] file(s)\n- cwv.json: present / absent
 
 note over C, FS
-  Sécurité HAR :
-  Ne jamais afficher credentials ni tokens en clair.
-  Masquer : {"password":"***"}, token=****...abc
-  Tronquer les UIDs : uid=8116...92
+  HAR security:
+  Never display credentials or tokens in clear.
+  Mask: {"password":"***"}, token=****...abc
+  Truncate UIDs: uid=8116...92
 end note
 
-== Étape 15 — Capture sessionId (silencieux) ==
+== Step 15 — sessionId capture (silent) ==
 
 C -> FS : mkdir -p <HAR_DIR>/analyse-interne-agent
 C -> FS : cp ~/.claude/.current_session_id\nanalyse-interne-agent/.session_id
 
 note over C, FS
-  Utilisé par patch-audit-cost.sh (Étape 40)
-  pour calculer le coût exact de la session
-  au lieu d'une estimation par fenêtre temporelle.
+  Used by patch-audit-cost.sh (Step 40)
+  to compute the exact cost of the session
+  instead of an estimate per time window.
 end note
 
 @enduml
 ```
 
-### Contenu de référence — analyse-parcours-p2.puml
+### Reference content — analyse-parcours-p2.puml
 
 ```plantuml
 @startuml analyse-parcours-p2
-title Workflow Analyse de parcours web — Page 2/3 : DISPATCH + EcoIndex
+title Web journey analysis workflow — Page 2/5 : DISPATCH + EcoIndex
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -254,69 +254,71 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
-participant "Sous-agents\n(HAR / Coverage)" as SA #C8E6C9
+participant "Sub-agents\n(HAR / Coverage)" as SA #C8E6C9
 participant "har_metrics.py" as EI #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 25 — Détection capacités DISPATCH ==
+== Step 25 — DISPATCH capability detection ==
 
-C -> C : Sous-agents disponibles ?\n(Claude Code -> OUI, autres -> séquentiel)
+C -> C : Sub-agents available?\n(Claude Code -> YES, others -> sequential)
 
-== Wave 1 — Analyse HAR + Coverage (en parallèle) ==
+== Wave 1 — HAR + Coverage analysis (in parallel) ==
 
 par
-  C -> SA : :::dispatch analyse-har\n(20_analyse-har.md)
-  SA -> FS : Lire .har\n(par lots si > 5 Mo)
-  SA -> SA : 20a — trafic (requêtes, domaines,\ncodes HTTP, volume)
-  SA -> SA : 20b — performance (cache,\ndoublons, ressources bloquantes)
+  C -> SA : :::dispatch analyze-har\n(20_har-analysis.md)
+  SA -> FS : Read .har\n(in batches if > 5 MB)
+  SA -> SA : 20a — traffic (requests, domains,\nHTTP codes, volume)
+  SA -> SA : 20b — performance (cache,\nduplicates, blocking resources)
   SA -> FS : har-analysis.json
 else
-  C -> SA : :::dispatch analyse-coverage\n(30_analyse-coverage.md)
-  SA -> FS : Lire Coverage-*.json
-  SA -> SA : Détecter format A ou B
-  SA -> SA : Métriques JS/CSS par page\n(total, inutilisé, %)
-  SA -> SA : Synthèse multi-pages + outliers
+  C -> SA : :::dispatch analyze-coverage\n(30_coverage-analysis.md)
+  SA -> FS : Read Coverage-*.json
+  SA -> SA : Detect format A or B
+  SA -> SA : JS/CSS metrics per page\n(total, unused, %)
+  SA -> SA : Multi-page summary + outliers
   SA -> FS : coverage-analysis.json
 end
 
 note over C, SA
-  Mode plateforme :
-  Claude Code -> sous-agents natifs (fenêtres contexte isolées)
-  Autres plateformes -> exécution séquentielle inline
-  Résultat disque identique dans les deux cas
+  Platform mode:
+  Claude Code -> native sub-agents (isolated context windows)
+  Other platforms -> sequential inline execution
+  Disk result identical in both cases
 end note
 
 == Merge Wave 1 ==
 
-C -> FS : Lire har-analysis.json
-FS -> C : Données trafic réseau
-C -> FS : Lire coverage-analysis.json
-FS -> C : Données code mort JS/CSS
+C -> FS : Read har-analysis.json
+FS -> C : Network traffic data
+C -> FS : Read coverage-analysis.json
+FS -> C : Dead JS/CSS code data
 
-== Étape 35 — Calcul EcoIndex (contexte principal) ==
+== Step 35 — EcoIndex calculation (main context) ==
 
 C -> EI : python3 har_metrics.py <har> [cwv.json]
-EI -> EI : Extraire DOM HTML depuis\nresponse.content.text
-EI -> EI : Compter requêtes + poids\npar page (pageref)
-EI -> C : Tableau : score/grade/req/Ko/DOM\npar page + onLoad
+EI -> EI : Extract HTML DOM from\nresponse.content.text
+EI -> EI : Count requests + weight\nper page (pageref)
+EI -> C : Table: score/grade/req/KB/DOM\nper page + onLoad
 
 note over C, EI
-  Limites :
-  - DOM=0 si HAR sans corps HTML\n    (response.content.text absent)
-  - SPA : DOM = état initial seulement\n    (pas après hydratation JS)
-  Ces cas sont documentés dans le rapport.
+  Limits:
+  - DOM=0 if HAR without HTML body
+    (response.content.text absent)
+  - SPA: DOM = initial state only
+    (not after JS hydration)
+  These cases are documented in the report.
 end note
 
 @enduml
 ```
 
-### Contenu de référence — analyse-parcours-p3.puml
+### Reference content — analyse-parcours-p3.puml
 
 ```plantuml
 @startuml analyse-parcours-p3
-title Workflow Analyse de parcours web — Page 3/3 : Rapport HTML
+title Web journey analysis workflow — Page 3/5 : HTML report
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -339,50 +341,50 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
 participant "generate_report_html.py" as GR #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 40 — Rapport HTML ==
+== Step 40 — HTML report ==
 
-C -> GR : python3 generate_report_html.py <dossier-audit>
-GR -> FS : Lire .har
-FS -> GR : Trafic réseau brut
-GR -> FS : Lire coverage-analysis.json
-FS -> GR : Métriques code mort JS/CSS
-GR -> FS : Lire cwv.json (si présent)
-FS -> GR : LCP / INP / CLS par page
+C -> GR : python3 generate_report_html.py <audit-dir>
+GR -> FS : Read .har
+FS -> GR : Raw network traffic
+GR -> FS : Read coverage-analysis.json
+FS -> GR : Dead JS/CSS code metrics
+GR -> FS : Read cwv.json (if present)
+FS -> GR : LCP / INP / CLS per page
 
 note over GR, FS
-  Sections du rapport (dans l'ordre) :
-  1. En-tête : date, domaines, nb pages, fichiers source
-  2. Tableau de bord EcoIndex (grade A-G, score, req, Ko, DOM)
-  3. Trafic réseau (KPIs, domaines, codes HTTP, top 10, doublons)
-  4. Code mort (jauges JS/CSS par page, top 8 fichiers)
-  5. Core Web Vitals (si cwv.json — LCP/INP/CLS avec seuils Google)
-  6. Recommandations priorisées (P1 rouge / P2 orange / P3 vert)
-  Si cwv.json absent : LCP affiche onLoad HAR avec note explicite.
+  Report sections (in order):
+  1. Header: date, domains, page count, source files
+  2. EcoIndex dashboard (grade A-G, score, req, KB, DOM)
+  3. Network traffic (KPIs, domains, HTTP codes, top 10, duplicates)
+  4. Dead code (JS/CSS gauges per page, top 8 files)
+  5. Core Web Vitals (if cwv.json — LCP/INP/CLS with Google thresholds)
+  6. Prioritized recommendations (P1 red / P2 orange / P3 green)
+  If cwv.json absent: LCP shows HAR onLoad with an explicit note.
 end note
 
-GR -> C : rapport-parcours-YYYY-MM-DD.html
-C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
+GR -> C : journey-report-YYYY-MM-DD.html
+C -> U : Report delivered:\n<audit-dir>/journey-report-YYYY-MM-DD.html
 
 @enduml
 ```
 
-### Contenu de référence — analyse-parcours-p4.puml
+### Reference content — analyse-parcours-p4.puml
 
-**Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 10 et 20, y compris 20b/20c/20e
-SimilarWeb, correction CrUX iOS/macOS) + `collect_env_data.py` (flux réel, défauts,
-providers) + `detect_tech.py`. Points à revérifier si cette étape change : défaut mix
-60 % mobile / 40 % desktop (pas 100 % desktop), providers supportés
-`aws / gcp / azure / scaleway / ovh`, `schema_version` d'`env-data.json`, appel
-SimilarWeb automatique intégré à `collect_env_data.py`.
+**Source of truth:** `analyse-parcours/skill-steps/45_efootprint.md` (Steps 10 and 20, including 20b/20c/20e
+SimilarWeb, CrUX iOS/macOS correction) + `collect_env_data.py` (real flow, defaults,
+providers) + `detect_tech.py`. Points to re-check if this step changes: default mix
+60 % mobile / 40 % desktop (not 100 % desktop), supported providers
+`aws / gcp / azure / scaleway / ovh`, `schema_version` of `env-data.json`, automatic
+SimilarWeb call integrated into `collect_env_data.py`.
 
 ```plantuml
 @startuml analyse-parcours-p4
-title Workflow Analyse de parcours web — Page 4/5 : e-footprint collecte (optionnel)
+title Web journey analysis workflow — Page 4/5 : e-footprint collection (optional)
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -405,109 +407,108 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill /efootprint)" as C #82C1DD
 participant "collect_env_data.py" as CED #DBDDE5
 participant "API SimilarWeb\n(similarweb_api.py)" as SW #C8E6C9
 participant "API ipinfo.io" as IP #C8E6C9
 participant "CrUX Data" as CR #C8E6C9
 participant "detect_tech.py" as DT #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
 note over U, FS
-  Étape OPTIONNELLE — lancée si l'utilisateur invoque /efootprint après un
-  rapport d'analyse de parcours. But : enrichir le rapport HTML d'une section
-  CO2e (fabrication + énergie). Toute valeur produite est une ESTIMATION
-  HYPOTHÉTIQUE (rappelée au démarrage, sur chaque paramètre, dans les résultats).
-  Une seule commande : collect_env_data.py appelle lui-même SimilarWeb et detect_tech.
+  OPTIONAL step — launched if the user invokes /efootprint after a
+  journey analysis report. Goal: enrich the HTML report with a
+  CO2e section (manufacturing + energy). Every produced value is a
+  HYPOTHETICAL ESTIMATE (recalled at startup, on each parameter, in the results).
+  A single command: collect_env_data.py itself calls SimilarWeb and detect_tech.
 end note
 
-== Étape 10 — Localisation du source_dir ==
+== Step 10 — source_dir location ==
 
 U -> C : /efootprint <source_dir>
-C -> C : Résoudre source_dir\n(argument, contexte parcours,\n.har visible, ou demande)
-C -> FS : Vérifier présence .har ou env-data.json
+C -> C : Resolve source_dir\n(argument, journey context,\n.har visible, or request)
+C -> FS : Check presence of .har or env-data.json
 
-== Étape 20 — Collecte env-data.json ==
+== Step 20 — env-data.json collection ==
 
-alt env-data.json absent, ou option refresh
+alt env-data.json absent, or refresh option
   C -> CED : python3 collect_env_data.py <source_dir>
 
-  CED -> FS : [1/3] Lire .har
-  FS -> CED : requêtes, poids, durée,\nIP serveur principale
-  CED -> CED : Poids par type + part tierce\n(mesure directe HAR)
+  CED -> FS : [1/3] Read .har
+  FS -> CED : requests, weight, duration,\nmain server IP
+  CED -> CED : Weight per type + third-party share\n(direct HAR measurement)
 
   CED -> CR : [2/3] CrUX (form_factors)
-  CR -> CED : mix desktop / mobile / tablet
+  CR -> CED : desktop / mobile / tablet mix
 
   note over CED, CR
-    Correction CrUX (Chrome only) SYMÉTRIQUE :
-    - tablette rattachée au mobile
-    - mobile regonflé de l'absence d'iOS,
-      desktop de l'absence de macOS/Safari,
-      puis renormalisation
-    Défaut si CrUX absent : 60 % mobile / 40 % desktop
+    SYMMETRICAL CrUX correction (Chrome only):
+    - tablet attached to mobile
+    - mobile re-inflated by the absence of iOS,
+      desktop by the absence of macOS/Safari,
+      then renormalization
+    Default if CrUX absent: 60 % mobile / 40 % desktop
   end note
 
   CED -> IP : [3/3] GET /json/<IP>
-  IP -> CED : pays, org, intensité carbone
+  IP -> CED : country, org, carbon intensity
 
   note over CED, IP
-    Provider détecté depuis org :
+    Provider detected from org:
     aws / gcp / azure / scaleway / ovh
-    Défaut si échec ipinfo : pays FR
+    Default if ipinfo fails: country FR
   end note
 
   CED -> DT : detect_from_har(.har)
-  DT -> CED : stack technique (CDN, hébergeur,\nserveur web, framework, analytics...)
+  DT -> CED : tech stack (CDN, host,\nweb server, framework, analytics...)
 
-  alt Bloc audience ou traffic manquant (pas de saisie audience manuelle)
-    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domaine>
+  alt Audience or traffic block missing (no manual audience input)
+    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domain>
     SW -> CED : TopCountryShares\n+ EstimatedMonthlyVisits
-    CED -> CED : Mix pays -> pondère iOS/macOS\nVisites/mois -> annualisées
-  else API bloquée (captcha / WAF) ou domaine non suivi
+    CED -> CED : Country mix -> weighs iOS/macOS\nMonthly visits -> annualized
+  else API blocked (captcha / WAF) or domain not tracked
     note over CED, SW
-      Repli : récupération assistée (Étape 20d)
-      - dictée en chat, ou capture d'écran déposée
-      Dernier recours : défaut FR 100 % + 100 000 visites/an
+      Fallback: assisted retrieval (Step 20d)
+      - dictated in chat, or screenshot dropped
+      Last resort: default FR 100 % + 100 000 visits/year
     end note
   end
 
   CED -> FS : env-data.json (schema_version 1.5)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
-else Cache existant (option refresh non passée)
-  CED -> FS : Relire env-data.json existant
-  FS -> CED : Données précédentes (inchangées)
+else Existing cache (refresh option not passed)
+  CED -> FS : Re-read existing env-data.json
+  FS -> CED : Previous data (unchanged)
 end
 
-C -> U : Résumé collecte :\n- poids page + part tierce\n- pays / provider + intensité carbone\n- mix appareils (corrigé iOS/macOS)\n- mix pays + trafic (SimilarWeb)\n- stack technique détectée
+C -> U : Collection summary:\n- page weight + third-party share\n- country / provider + carbon intensity\n- device mix (corrected iOS/macOS)\n- country mix + traffic (SimilarWeb)\n- detected tech stack
 
 note over U, C
-  Priorité des sources (mix pays ET trafic) :
-  1. Analytics client (options audience / visits)
-  2. API interne SimilarWeb (voie principale, automatique)
-  3. Récupération assistée (captcha / WAF)
-  4. Défaut FR 100 % + 100 000 visites/an (avec avertissement)
-  Suite du calcul : page 5/5.
+  Source priority (country mix AND traffic):
+  1. Client analytics (options audience / visits)
+  2. Internal SimilarWeb API (main path, automatic)
+  3. Assisted retrieval (captcha / WAF)
+  4. Default FR 100 % + 100 000 visits/year (with warning)
+  Rest of the calculation: page 5/5.
 end note
 
 @enduml
 ```
 
-### Contenu de référence — analyse-parcours-p5.puml
+### Reference content — analyse-parcours-p5.puml
 
-**Source de vérité :** `analyse-parcours/skill-steps/45_efootprint.md` (Étapes 30, 40, 50) + `run_efootprint.py`
-(modèle Boavizta, schéma `efootprint-synthese-python.json`, et `run_recommendation_scenarios()` pour
-`efootprint-recommendations-gains.json`) + `generate_report_html.py` (section CO2e, blocs
-"Gain CO2e estimé" / "Gain EcoIndex & LCP estimé", annexe F/G). Points à revérifier si le code
-change : structure d'`efootprint-synthese-python.json` (bloc `traffic`, `totals` avec dicts
-`fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year`, gros bloc `hypotheses`), position de
-la section (entre CWV et Annexes), trafic réutilisé depuis le bloc `traffic` s'il est déjà résolu,
-lettrage des sous-sections de l'annexe Méthodologie (actuellement A à H, cf. Diagramme 3 pour le
-détail du chantier EcoIndex/LCP par palier).
+**Source of truth:** `analyse-parcours/skill-steps/45_efootprint.md` (Steps 30, 40, 50) + `run_efootprint.py`
+(Boavizta model, `efootprint-python-summary.json` schema, and `run_recommendation_scenarios()` for
+`efootprint-recommendations-gains.json`) + `generate_report_html.py` (CO2e section, "Estimated CO2e gain" / "Estimated EcoIndex & LCP gain" blocks, appendix F/G). Points to re-check if the code
+changes: structure of `efootprint-python-summary.json` (`traffic` block, `totals` with
+`fabrication_kg_co2e_per_year` / `energy_kg_co2e_per_year` dicts, big `hypotheses` block), position of
+the section (between CWV and Appendices), traffic reused from the `traffic` block if already resolved,
+lettering of the Methodology appendix sub-sections (currently A to H, cf. Diagram 3 for the
+detail of the EcoIndex/LCP gain by tier).
 
 ```plantuml
 @startuml analyse-parcours-p5
-title Workflow Analyse de parcours web — Page 5/5 : e-footprint calcul + rapport (optionnel)
+title Web journey analysis workflow — Page 5/5 : e-footprint calculation + report (optional)
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -530,109 +531,114 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill /efootprint)" as C #82C1DD
 participant "run_efootprint.py" as REF #DBDDE5
 participant "generate_report_html.py" as GR #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
 note over U, FS
-  Suite de la page 4/5 : env-data.json est prêt. On demande les hypothèses non
-  auto-détectables, on calcule, on synthétise, on enrichit le rapport HTML.
-  Rappel : toute valeur reste une ESTIMATION HYPOTHÉTIQUE.
+  Rest of page 4/5: env-data.json is ready. We ask for the non
+  auto-detectable hypotheses, we calculate, we summarize, we enrich the HTML report.
+  Reminder: every value remains a HYPOTHETICAL ESTIMATE.
 end note
 
-== Étape 30 — Paramètres utilisateur ==
+== Step 30 — User parameters ==
 
-C -> C : Trafic déjà résolu (bloc traffic\nSimilarWeb ou analytics client) ?
+C -> C : Traffic already resolved (traffic block\nSimilarWeb or client analytics) ?
 
-alt Trafic déjà résolu (page 4)
-  note over C : Ne pas reposer la question :\nréutiliser le volume résolu à l'Étape 20c.
-else Aucune source de trafic
-  C -> U : AskUserQuestion — trafic annuel\n(10k / 100k / 500k / 1M, ou libre)
-  U -> C : Trafic retenu (option visits)
+alt Traffic already resolved (page 4)
+  note over C : Do not ask the question again:\nreuse the volume resolved at Step 20c.
+else No traffic source
+  C -> U : AskUserQuestion — annual traffic\n(10k / 100k / 500k / 1M, or free)
+  U -> C : Traffic retained (option visits)
 end
 
-alt Provider cloud supporté détecté\n(aws / gcp / azure / scaleway / ovh)
-  C -> U : AskUserQuestion — taille d'instance\n(ex. AWS : t3.medium défaut, t3.large, m5.large...)
-  U -> C : Instance retenue (option instance)
-else Provider inconnu ou non supporté
-  note over C : Pas de question :\nrun_efootprint bascule sur Server générique.
+alt Supported cloud provider detected\n(aws / gcp / azure / scaleway / ovh)
+  C -> U : AskUserQuestion — instance size\n(ex. AWS: t3.medium default, t3.large, m5.large...)
+  U -> C : Instance retained (option instance)
+else Unknown or unsupported provider
+  note over C : No question:\nrun_efootprint switches to generic Server.
 end
 
 note over C, U
-  Toujours rappeler qu'il s'agit d'hypothèses.
-  Poids, durée, mix appareils, pays : imposés par env-data.json
-  (pour les changer, éditer env-data.json puis relancer).
+  Always remind that these are hypotheses.
+  Weight, duration, device mix, country: imposed by env-data.json
+  (to change them, edit env-data.json then rerun).
 end note
 
-== Étape 40 — Calcul e-footprint ==
+== Step 40 — e-footprint calculation ==
 
 C -> REF : python3 run_efootprint.py <source_dir>\n[option visits N] [option instance TYPE]
-REF -> FS : Lire env-data.json
-FS -> REF : Données environnement
+REF -> FS : Read env-data.json
+FS -> REF : Environment data
 
-REF -> REF : Construire modèle Boavizta :\n- Devices (2 profils : mobile / desktop)\n- Network (mobile -> réseau mobile, desktop -> wifi)\n- Server (instance cloud ou générique)\n- Storage (hypothèse 50 GB)
+REF -> REF : Build Boavizta model:\n- Devices (2 profiles: mobile / desktop)
+- Network (mobile -> mobile network, desktop -> wifi)
+- Server (cloud instance or generic)
+- Storage (50 GB hypothesis)
 
-REF -> REF : Calcul impact :\n- Fabrication (dict par poste)\n- Énergie (dict par poste)\n- Total kg/an + g/visite
+REF -> REF : Impact calculation:\n- Manufacturing (dict per item)
+- Energy (dict per item)
+- Total kg/year + g/visit
 
-REF -> FS : efootprint-boavizta-model.json\n(modèle complet sérialisé)
-REF -> FS : efootprint-synthese-python.json\n(totaux + hypothèses, format léger)
+REF -> FS : efootprint-boavizta-model.json\n(full serialized model)
+REF -> FS : efootprint-python-summary.json\n(totals + hypotheses, lightweight format)
 
 note over REF, FS
-  efootprint-synthese-python.json (extrait) :
+  efootprint-python-summary.json (extract):
   {
     "visits_per_year": ...,
     "traffic": {source, source_url, snapshot, confidence},
     "totals": {
       "total_kg_co2e_per_year": ...,
       "per_visit_g_co2e": ...,
-      "fabrication_kg_co2e_per_year": {poste: kg},
-      "energy_kg_co2e_per_year": {poste: kg}
+      "fabrication_kg_co2e_per_year": {item: kg},
+      "energy_kg_co2e_per_year": {item: kg}
     },
     "hypotheses": {
       page_weight_kb, request_duration_ms,
       weight_by_type_bytes, third_party_share,
       country, carbon_intensity_g_kwh, provider, instance_type,
-      phone_fraction / desktop_fraction (corrigé iOS/macOS),
+      phone_fraction / desktop_fraction (corrected iOS/macOS),
       audience_mix + source, device_scenarios,
-      + niveau de confiance par champ
+      + confidence level per field
     }
   }
 end note
 
-REF -> REF : Automatique — Scénarios de recommandations\n(recommendations.py) : recalcul RÉEL du modèle\npour 3 paliers cumulés (prio1 / prio1+2 / prio1+2+3)
-REF -> FS : efootprint-scenario-{palier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
+REF -> REF : Automatic — Recommendation scenarios\n(recommendations.py): REAL recalculation of the model\nfor 3 cumulative tiers (prio1 / prio1+2 / prio1+2+3)
+REF -> FS : efootprint-scenario-{tier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
 
 note over REF, FS
-  Aucune question posée à l'utilisateur pour cette étape :
-  entièrement automatique, à partir des mêmes seuils
-  prio1/prio2/prio3 déjà utilisés par les recommandations
-  qualitatives du rapport (JS/CSS mort, doublons, Brotli).
+  No question asked to the user for this step:
+  fully automatic, from the same thresholds
+  prio1/prio2/prio3 already used by the qualitative
+  recommendations of the report (dead JS/CSS, duplicates, Brotli).
 end note
 
-REF -> C : stdout : tableau hypothèses\n+ résultats CO2e bruts
+REF -> C : stdout: hypotheses table\n+ raw CO2e results
 
-== Étape 50 — Synthèse et enrichissement rapport ==
+== Step 50 — Summary and report enrichment ==
 
-C -> U : Synthèse (3 lignes) :\n- ~{total} kg CO2e/an\n- ~{per_visit} g CO2e/visite\n- Poste dominant : devices / server / network / storage
+C -> U : Summary (3 lines):\n- ~{total} kg CO2e/year\n- ~{per_visit} g CO2e/visit\n- Dominant item: devices / server / network / storage
 
-C -> U : AskUserQuestion — et ensuite ?\n- Relancer avec d'autres hypothèses\n- Recollecte (option refresh)\n- Régénérer le rapport HTML\n- Terminer
+C -> U : AskUserQuestion — and then?\n- Rerun with other hypotheses\n- Recollect (option refresh)\n- Regenerate the HTML report\n- Finish
 
-alt Régénérer le rapport HTML
-  C -> GR : python3 generate_report_html.py <dossier-audit>
-  GR -> FS : Lire efootprint-synthese-python.json\n(+ har, coverage, cwv, tech_stack)
-  FS -> GR : Données rapport
-  GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
-  GR -> GR : Recommandations -> bloc "Gain CO2e estimé"\n+ bloc "Gain EcoIndex & LCP estimé"\n(si efootprint-recommendations-gains.json présent)
-  GR -> FS : rapport-parcours-YYYY-MM-DD.html
-  GR -> C : Chemin rapport
-  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A à H,\ndont F. Recommandations et G. EcoIndex/LCP)
+alt Regenerate the HTML report
+  C -> GR : python3 generate_report_html.py <audit-dir>
+  GR -> FS : Read efootprint-python-summary.json\n(+ har, coverage, cwv, tech_stack)
+  FS -> GR : Report data
+  GR -> GR : Insert section "Environmental\nimpact (CO2e)"\nbetween CWV and Appendices
+  GR -> GR : Recommendations -> block "Estimated CO2e gain"\n+ block "Estimated EcoIndex & LCP gain"\n(if efootprint-recommendations-gains.json present)
+  GR -> FS : journey-report-YYYY-MM-DD.html
+  GR -> C : Report path
+  C -> U : Enriched report delivered\n(CO2e KPIs, manufacturing/energy breakdown,\nmethodology appendix A to H,\nincluding F. Recommendations and G. EcoIndex/LCP)
 end
 
 note over U, C
-  Boucle humain-dans-la-boucle : aucune itération automatique.
-  Section CO2e omise si efootprint-synthese-python.json absent (rapport rétro-compatible).
+  Human-in-the-loop loop: no automatic iteration.
+  CO2e section omitted if efootprint-python-summary.json absent (backward-compatible report).
 end note
 
 @enduml
@@ -640,29 +646,29 @@ end note
 
 -----
 
-## Diagramme 2 — DISPATCH (flux vagues d'analyse)
+## Diagram 2 — DISPATCH (analysis wave flow)
 
-**Source de vérité :** `skill-steps/25_dispatch-orchestration.md`
+**Source of truth:** `skill-steps/25_dispatch-orchestration.md`
 
 ### Description
 
-Diagramme d'activité (syntaxe beta PlantUML) avec `fork` / `fork again` / `end fork`.
-Représente le flux vertical des vagues avec les branches parallèles.
-Mono-fichier, une seule page.
+Activity diagram (PlantUML beta syntax) with `fork` / `fork again` / `end fork`.
+Represents the vertical flow of the waves with the parallel branches.
+Mono-file, a single page.
 
 ### Structure
 
 ```
-Wave 0  — Localisation (contexte principal)
-Wave 1  — HAR + Coverage + CWV + env-data + Sécurité en parallèle (5 sous-agents)
-Wave 2  — Extracteurs HTML/CSS + well-known en parallèle (2 sous-agents,
-          dépendance DURE sur env-data.json produit en Wave 1)
-Merge   — lecture des 7 fichiers Wave 1/2 (2 obligatoires, 5 best-effort)
-Suite   — Étape 35 EcoIndex + Étape 39 EOF (run_eof.py) + Étape 40 Rapport HTML
-          (contexte principal, séquentiel, hors dispatch)
+Wave 0  — Location (main context)
+Wave 1  — HAR + Coverage + CWV + env-data + Security in parallel (5 sub-agents)
+Wave 2  — HTML/CSS + well-known extractors in parallel (2 sub-agents,
+          HARD dependency on env-data.json produced in Wave 1)
+Merge   — reading of the 7 Wave 1/2 files (2 mandatory, 5 best-effort)
+Rest    — Step 35 EcoIndex + Step 39 EOF (run_eof.py) + Step 40 HTML report
+          (main context, sequential, outside dispatch)
 ```
 
-### Commandes
+### Commands
 
 ```bash
 plantuml -tsvg documentation/diagrammes/analyse-parcours-dispatch-activite.puml
@@ -672,11 +678,11 @@ ls -lh documentation/diagrammes/analyse-parcours-dispatch-activite.pdf
 open documentation/diagrammes/analyse-parcours-dispatch-activite.pdf
 ```
 
-### Contenu de référence — analyse-parcours-dispatch-activite.puml
+### Reference content — analyse-parcours-dispatch-activite.puml
 
 ```plantuml
 @startuml analyse-parcours-dispatch-activite
-title Mécanisme DISPATCH — Flux des vagues d'analyse de parcours
+title DISPATCH mechanism — Flow of the journey analysis waves
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -693,58 +699,58 @@ skinparam NoteBorderColor #9BD0DD
 skinparam PartitionBackgroundColor #ECECF2
 skinparam PartitionBorderColor #5BA1BC
 
-|#E0F0F4| Contexte principal |
+|#E0F0F4| Main context |
 start
 
-:SKILL.md -> lit 25_dispatch-orchestration.md;
+:SKILL.md -> reads 25_dispatch-orchestration.md;
 
 note right
-  Détection plateforme :
-  - Claude Code -> sous-agents isolés (parallèle)
-  - Autres -> exécution séquentielle inline
+  Platform detection:
+  - Claude Code -> isolated sub-agents (parallel)
+  - Others -> sequential inline execution
 end note
 
-partition "**Wave 0 — Localisation** (contexte principal)" {
-  :Lire args : dossier ou fichiers directs;
-  :Identifier .har + Coverage-*.json + cwv.json (optionnel);
-  :Vérifier existence + taille HAR\n(lecture sélective si > 5 Mo);
+partition "**Wave 0 — Location** (main context)" {
+  :Read args: directory or direct files;
+  :Identify .har + Coverage-*.json + cwv.json (optional);
+  :Check HAR existence + size\n(selective reading if > 5 MB);
 }
 
 note right #C8E6C9
-  ✅ Wave 0 terminée — fichiers prêts
-  Les dispatches suivants lisent les fichiers disque.
+  ✅ Wave 0 done — files ready
+  The following dispatches read the disk files.
 end note
 
-partition "**Wave 1 — HAR + Coverage + CWV + env-data + Sécurité** (5 sous-agents en parallèle)" {
+partition "**Wave 1 — HAR + Coverage + CWV + env-data + Security** (5 sub-agents in parallel)" {
   fork
-    :Dispatch analyse-har
-    (20_analyse-har.md)
-    20a — trafic (requêtes, domaines,
-    codes HTTP, volume Mo)
+    :Dispatch analyze-har
+    (20_har-analysis.md)
+    20a — traffic (requests, domains,
+    HTTP codes, volume MB)
     20b — performance (cache,
-    doublons, ressources bloquantes)
+    duplicates, blocking resources)
     -> har-analysis.json;
   fork again
-    :Dispatch analyse-coverage
-    (30_analyse-coverage.md)
-    Format A ou B détecté
-    Métriques JS/CSS par page
-    (total Ko, inutilisé Ko, %)
-    Top 5 JS + Top 3 CSS inutilisés
-    Synthèse multi-pages + outliers
+    :Dispatch analyze-coverage
+    (30_coverage-analysis.md)
+    Format A or B detected
+    JS/CSS metrics per page
+    (total KB, unused KB, %)
+    Top 5 unused JS + Top 3 unused CSS
+    Multi-page summary + outliers
     -> coverage-analysis.json;
   fork again
-    :Dispatch collecte-cwv
+    :Dispatch collect-cwv
     (37_lighthouse.md)
     collect_cwv_pagespeed.py --strategy both
     -> cwv.json;
   fork again
-    :Dispatch collecte-env-data
-    (45_efootprint.md, Étape 20)
+    :Dispatch collect-env-data
+    (45_efootprint.md, Step 20)
     collect_env_data.py
     -> env-data.json;
   fork again
-    :Dispatch extracteur-security-headers
+    :Dispatch extractor-security-headers
     (39_eof-audit.md)
     analyze_security_headers.py
     -> security-headers-analysis.json;
@@ -752,64 +758,64 @@ partition "**Wave 1 — HAR + Coverage + CWV + env-data + Sécurité** (5 sous-a
 }
 
 note right
-  Condition de réussite :
-  har-analysis.json et coverage-analysis.json
-  obligatoires (avertissement bloquant si absents).
+  Success condition:
+  har-analysis.json and coverage-analysis.json
+  mandatory (blocking warning if absent).
   cwv.json / env-data.json / security-headers-analysis.json
-  best-effort (dégradation DOUCE vérifiée en code,
-  jamais un crash). Sinon : relancer le dispatch une fois.
+  best-effort (SOFT degradation verified in code,
+  never a crash). Otherwise: retry the dispatch once.
 end note
 
-partition "**Wave 2 — Extracteurs EOF dépendants d'env-data.json** (2 sous-agents en parallèle)" {
+partition "**Wave 2 — EOF extractors depending on env-data.json** (2 sub-agents in parallel)" {
   fork
-    :Dispatch extracteur-html-css
-    depends_on="collecte-env-data"
+    :Dispatch extractor-html-css
+    depends_on="collect-env-data"
     parse_html_criteria.py
     -> html-css-criteria.json;
   fork again
-    :Dispatch extracteur-wellknown
-    depends_on="collecte-env-data"
+    :Dispatch extractor-wellknown
+    depends_on="collect-env-data"
     scan_wellknown.py
     -> wellknown-scan.json;
   end fork
 }
 
 note right #FFECB3
-  Dépendance DURE (pas une dégradation) : les deux
-  scripts font sys.exit(1) si env-data.json est absent.
-  Ne pas dispatcher avant confirmation d'env-data.json
-  sur disque (Wave 1 terminée).
+  HARD DEPENDENCY (not a degradation): both
+  scripts sys.exit(1) if env-data.json is absent.
+  Do not dispatch before confirming env-data.json
+  on disk (Wave 1 done).
 end note
 
-partition "**Merge + suite** (contexte principal)" {
-  :Lire har-analysis.json + coverage-analysis.json
+partition "**Merge + rest** (main context)" {
+  :Read har-analysis.json + coverage-analysis.json
   (+ cwv.json/env-data.json/security-headers-analysis.json/
-  html-css-criteria.json/wellknown-scan.json en best-effort);
-  :Étape 35 — har_metrics.py
-  Calcul score/grade A-G par page
-  (formule officielle cnumr/ecoindex);
+  html-css-criteria.json/wellknown-scan.json in best-effort);
+  :Step 35 — har_metrics.py
+  Score/grade A-G per page calculation
+  (official cnumr/ecoindex formula);
 
   note right
-    Limites :
-    DOM=0 si HAR sans corps HTML
-    SPA : DOM = état initial seulement
-    -> documenté dans le rapport
+    Limits:
+    DOM=0 if HAR without HTML body
+    SPA: DOM = initial state only
+    -> documented in the report
   end note
 
-  :Étape 39 — run_eof.py puis
-  processus/fusionner_lots.py
-  (fusionne les critères automatiques avec un
-  questionnaire déjà relu, si présent)
+  :Step 39 — run_eof.py then
+  process/merge_lots.py
+  (merges the automatic criteria with an
+  already read-back questionnaire, if present)
   -> eof-audit-results.json;
 
-  :Étape 40 — generate_report_html.py
-  Sections : EcoIndex, Trafic réseau,
-  Code mort, CWV (si cwv.json),
-  Potentiel d'optimisation EOF (si eof-audit-results.json)
-  Recommandations P1/P2/P3
-  -> rapport-parcours-YYYY-MM-DD.html;
+  :Step 40 — generate_report_html.py
+  Sections: EcoIndex, Network traffic,
+  Dead code, CWV (if cwv.json),
+  EOF optimization potential (if eof-audit-results.json)
+  Recommendations P1/P2/P3
+  -> journey-report-YYYY-MM-DD.html;
 
-  :livrer chemin rapport à l'utilisateur;
+  :deliver the report path to the user;
 }
 
 stop
@@ -819,52 +825,53 @@ stop
 
 -----
 
-## Diagramme 3 — e-footprint (pipeline outils CO2e)
+## Diagram 3 — e-footprint (CO2e tool pipeline)
 
-**Source de vérité :** le code réel des scripts (pas de doc markdown intermédiaire,
-car les entrées/sorties précises — noms de champs JSON, sous-outils appelés — ne
-sont fiables qu'en lisant le code) :
-- `analyse-parcours/scripts/collect_env_data.py` (orchestrateur collecte : HAR,
-  API CrUX, ipinfo.io, `detect_tech.py`, `similarweb_api.py`)
-- `analyse-parcours/scripts/run_efootprint.py` (orchestrateur calcul : librairie
-  e-footprint/Boavizta, et `run_recommendation_scenarios()` pour les paliers)
-- `analyse-parcours/scripts/efootprint_model/recommendations.py` (calcul des
-  réductions par recommandation et des 3 scénarios cumulés)
+**Source of truth:** the real code of the scripts (no intermediate markdown doc,
+because precise inputs/outputs — JSON field names, called sub-tools — are only
+reliable by reading the code):
+- `analyse-parcours/scripts/collect_env_data.py` (collection orchestrator: HAR,
+  CrUX API, ipinfo.io, `detect_tech.py`, `similarweb_api.py`)
+- `analyse-parcours/scripts/run_efootprint.py` (calculation orchestrator: e-footprint/Boavizta
+  library, and `run_recommendation_scenarios()` for the tiers)
+- `analyse-parcours/scripts/efootprint_model/recommendations.py` (calculation of the
+  reductions per recommendation and of the 3 cumulative scenarios)
 - `analyse-parcours/scripts/har_metrics.py` (`ecoindex_score`/`ecoindex_grade`/
-  `lcp_delta_s`, appelées par `generate_report_html.py` pour le Bloc 4)
-- `analyse-parcours/scripts/generate_report_html.py` (restitution section CO2e
-  + blocs de gain CO2e/EcoIndex/LCP)
+  `lcp_delta_s`, called by `generate_report_html.py` for Block 4)
+- `analyse-parcours/scripts/generate_report_html.py` (CO2e section rendering
+  + CO2e/EcoIndex/LCP gain blocks)
 
 ### Description
 
-Diagramme d'activité (PlantUML) en 5 blocs séquentiels verticaux (format A4
-portrait) : outils de collecte -> données récoltées (env-data.json) -> calcul
-e-footprint/Boavizta (scénario de référence) -> scénarios de recommandations
-(3 paliers cumulés) -> restitution. Une étape de départ séparée représente la
-capture manuelle Chrome DevTools (source du .har et du Coverage-*.json).
+Activity diagram (PlantUML) in 5 sequential vertical blocks (A4
+portrait format): collection tools -> collected data (env-data.json) -> e-footprint/Boavizta
+calculation (reference scenario) -> recommendation scenarios
+(3 cumulative tiers) -> reporting. A separate start step represents the
+manual Chrome DevTools capture (source of the .har and the Coverage-*.json).
 
-Le Bloc 1 liste les 5 sous-outils de `collect_env_data.py` dans leur ordre
-d'exécution réel, avec une note explicite : ils sont **séquentiels**, pas en
-parallèle (contrairement au DISPATCH HAR/Coverage du diagramme 1, qui utilise
-de vrais sous-agents concurrents). Vérifié en lisant le code, pas supposé.
-Les notes de paramètres CLI (Blocs 2 et 3) sont volontairement compactes (une
-ligne, noms de flags seulement, sans description).
+Block 1 lists the 5 sub-tools of `collect_env_data.py` in their real execution
+order, with an explicit note: they are **sequential**, not in
+parallel (unlike the HAR/Coverage DISPATCH of diagram 1, which uses
+real concurrent sub-agents). Verified by reading the code, not assumed.
 
-Le Bloc 3bis (ajouté lors du chantier "gain CO2e puis EcoIndex/LCP par palier
-de recommandations") recalcule RÉELLEMENT le modèle Boavizta pour 3 paliers
-cumulés (prio1 / prio1+2 / prio1+2+3), à partir des mêmes seuils que les
-recommandations qualitatives déjà affichées dans le rapport (JS/CSS mort,
-doublons, Brotli). Le poids décompressé des doublons exclut les revalidations
-HTTP 304 (leur contenu n'est jamais retéléchargé). Le Bloc 4 lit le fichier de
-gains résultant et rend deux blocs synthétiques (Gain CO2e, Gain EcoIndex &
-LCP) plus deux sous-sections d'annexe (F, G) — omis ou en repli "non
-disponible" si le fichier est absent ou d'un schéma antérieur à ce chantier.
+The CLI parameter notes (Blocks 2 and 3) are deliberately compact (one
+line, flag names only, no description).
 
-Différence avec le diagramme 1 (workflow séquence, pages 4-5) : celui-ci se
-concentre sur les **outils et leurs contrats de données** (paramètres CLI, champs
-JSON en entrée/sortie), pas sur l'échange de messages entre l'utilisateur et Claude.
+Block 3bis (added during the job "CO2e gain then EcoIndex/LCP by recommendation
+tier") REALLY recalculates the Boavizta model for 3 cumulative
+tiers (prio1 / prio1+2 / prio1+2+3), from the same thresholds as the
+qualitative recommendations already displayed in the report (dead
+JS/CSS, duplicates, Brotli). The decompressed weight of duplicates excludes
+HTTP 304 revalidations (their content is never re-downloaded). Block 4 reads the
+resulting gains file and renders two synthetic blocks (CO2e gain, EcoIndex &
+LCP) plus two appendix sub-sections (F, G) — omitted or in "not
+available" fallback if the file is absent or from a schema older than this job.
 
-### Commandes
+Difference from diagram 1 (sequence workflow, pages 4-5): this one
+focuses on the **tools and their data contracts** (CLI parameters, JSON
+fields in input/output), not on the message exchange between the user and Claude.
+
+### Commands
 
 ```bash
 plantuml -tsvg documentation/diagrammes/analyse-parcours-efootprint-outils.puml
@@ -874,100 +881,99 @@ ls -lh documentation/diagrammes/analyse-parcours-efootprint-outils.pdf
 open documentation/diagrammes/analyse-parcours-efootprint-outils.pdf
 ```
 
-### Pièges rencontrés à la génération
+### Pitfalls encountered at generation
 
-- Un point-virgule `;` à l'intérieur du texte d'un label d'activité multi-lignes
-  est interprété par PlantUML comme la fin du nœud d'activité et casse le
-  parsing plus loin dans le fichier (erreur reportée sur une ligne ultérieure,
-  pas sur le `;` lui-même). Éviter tout `;` dans le corps d'un label `:texte;`
-  — utiliser une virgule à la place.
-- Un flag CLI écrit avec son double-tiret dans un label ou une note (ex.
-  `--audience`, `--visits`) est interprété par PlantUML (syntaxe creole) comme
-  un marqueur de texte barré, à partir du `--` jusqu'au prochain `,` ou `;`.
-  Écrire les noms de flags sans le préfixe `--` dans les notes (ex. `audience`,
-  `visits`) pour éviter ce rendu barré.
-- Rester cohérent sur le vocabulaire employé dans les labels (ex. toujours
-  "parsing", jamais mélanger avec "parse"/"parsé") — les incohérences de terme
-  entre blocs sautent aux yeux sur un diagramme court.
+- A semicolon `;` inside the text of a multi-line activity label
+  is interpreted by PlantUML as the end of the activity node and breaks
+  the parsing further down in the file (error reported on a later line,
+  not on the `;` itself). Avoid any `;` in the body of a `:text;` label
+  — use a comma instead.
+- A CLI flag written with its double dash in a label or a note (ex.
+  `--audience`, `--visits`) is interpreted by PlantUML (creole syntax) as
+  a strikethrough marker, from the `--` to the next `,` or `;`.
+  Write flag names without the `--` prefix in notes (ex. `audience`,
+  `visits`) to avoid that rendering.
+- Stay consistent on the vocabulary used in labels (ex. always
+  "parsing", never mix with "parse"/"parsed") — term inconsistencies
+  between blocks jump out on a short diagram.
 
 -----
 
-## Diagramme 4 — e-footprint (topologie technique d'un site, composants)
+## Diagram 4 — e-footprint (technical topology of a site, components)
 
-**Source de vérité :** `efootprint_model/to_plantuml.py::site_to_plantuml()`. Différence
-fondamentale avec les diagrammes 1 à 3 : ceux-là décrivent le CODE des scripts (toujours les
-mêmes participants, un seul `.puml` par diagramme, régénéré quand le code change). Celui-ci
-décrit une DONNÉE (une `SiteSpec` particulière : le site audité, ou un archétype, ou une
-composition) : il n'existe pas de `.puml` fixe à maintenir en dépôt, chaque appel produit un
-diagramme différent selon la spec qu'on lui donne.
+**Source of truth:** `efootprint_model/to_plantuml.py::site_to_plantuml()`. Fundamental
+difference with diagrams 1 to 3: those describe the CODE of the scripts (always the
+same participants, one `.puml` per diagram, regenerated when the code changes). This one
+describes a DATUM (a particular `SiteSpec`: the audited site, or an archetype, or a
+composition): there is no fixed `.puml` to maintain in the repo, each call produces a
+different diagram depending on the spec given to it.
 
 ### Description
 
-Diagramme de composants (pas de séquence, pas d'activité) : QUI existe et QUI parle à QUI,
-jamais l'ordre des étapes du parcours utilisateur (ça reste le rôle des pages 4-5 du
-diagramme 1). Contenu, par package :
-- **Serveurs 1st-party** : un composant `database` par `ServerSpec` de la spec.
-- **Traitements** : un composant `component` par `JobSpec` SANS appel IA, relié à son
-  serveur (`-down->`).
-- **Appels IA générative** : un composant `cloud` par `JobSpec` qui porte un
-  `ExternalApiSpec` (cf. Lot 7, calcul réel via EcoLogits), avec le provider/modèle affiché
-  dans le label. Séparé des traitements réseau habituels : ce n'est pas la même nature de
-  coût (cf. handoff du 10/08/2026, section 2.4 sur le contraste CDN/tiers vs IA).
-- **Hôtes tiers (réseau seulement)** : un composant `cloud` par `ThirdPartyHost`, si la spec
-  en porte.
+Component diagram (not a sequence, not an activity): WHO exists and WHO talks to WHOM,
+never the order of the user journey steps (that remains the role of pages 4-5 of
+diagram 1). Content, per package:
+- **1st-party servers**: one `database` component per `ServerSpec` of the spec.
+- **Processing**: one `component` per `JobSpec` WITHOUT an AI call, linked to its
+  server (`-down->`).
+- **Generative AI calls**: one `cloud` component per `JobSpec` that carries an
+  `ExternalApiSpec` (cf. Lot 7, real calculation via EcoLogits), with the provider/model displayed
+  in the label. Separate from the usual network calls: it is not the same nature of
+  cost (cf. the 10/08/2026 handoff, section 2.4 on the CDN/third-party vs AI contrast).
+- **Third-party hosts (network only)**: one `cloud` component per `ThirdPartyHost`, if the spec
+  has any.
 
-### Utilisation
+### Usage
 
 ```python
 import sys
 sys.path.insert(0, ".claude/skills/analyse-parcours/scripts")
 from efootprint_model.to_plantuml import site_to_plantuml
 
-# Depuis une spec réelle (from_har.py) ou un archétype (archetypes/*.py) :
+# From a real spec (from_har.py) or an archetype (archetypes/*.py):
 puml_text = site_to_plantuml(spec)
 open("mon_diagramme.puml", "w").write(puml_text)
 ```
 
 ```bash
-plantuml -tsvg mon_diagramme.puml
-rsvg-convert -f pdf -o mon_diagramme.pdf mon_diagramme.svg
+plantuml -tsvg my_diagram.puml
+rsvg-convert -f pdf -o my_diagram.pdf my_diagram.svg
 ```
 
-### Piège rencontré à la génération
+### Pitfall encountered at generation
 
-`@startuml <id>` PILOTE LE NOM DU FICHIER produit par `plantuml` quand aucun `-o` explicite
-n'est passé. Un titre de site avec espaces/accents/parenthèses (nom réel d'un domaine, ou
-nom d'archétype avec préfixe fictif) donnerait un nom de fichier fragile selon la
-plateforme. `to_plantuml.py` sépare donc l'IDENTIFIANT technique (`@startuml <id>`, ASCII
-strict, dérivé du nom du site) du TITRE AFFICHÉ (ligne `title`, accents et espaces
-conservés) : c'est l'identifiant, pas le titre, qui détermine le nom du fichier de sortie.
+`@startuml <id>` DRIVES THE NAME OF THE FILE produced by `plantuml` when no explicit `-o`
+is passed. A site title with spaces/accents/parentheses (real domain name, or
+archetype name with a fictitious prefix) would give a platform-fragile file name.
+`to_plantuml.py` therefore separates the technical IDENTIFIER (`@startuml <id>`, strict
+ASCII, derived from the site name) from the DISPLAYED TITLE (`title` line, accents and
+spaces preserved): it is the identifier, not the title, that determines the output file name.
 
 -----
 
-## Diagramme 5 — EOF (pipeline outils, 2 pages)
+## Diagram 5 — EOF (tool pipeline, 2 pages)
 
-**Source de vérité :** `.claude/skills/eof/scripts/build_template.py` (page 1) et
-`.claude/skills/eof/scripts/generate_radar_svg.py` (page 2) — code réel des scripts,
-comme le diagramme 3 (pas de doc markdown intermédiaire pour les entrées/sorties
-précises).
+**Source of truth:** `.claude/skills/eof/scripts/build_template.py` (page 1) and
+`.claude/skills/eof/scripts/generate_radar_svg.py` (page 2) — real script code,
+like diagram 3 (no intermediate markdown doc for precise inputs/outputs).
 
 ### Description
 
-Skill séparé de `analyse-parcours` (référentiel EOF-V.1.1, EROOM Optimization
-Framework). Deux pipelines représentés dans UN SEUL fichier `.puml` contenant 2
-diagrammes d'activité (2 blocs `@startuml`/`@enduml`) :
+Separate skill from `analyse-parcours` (EOF-V.1.1 reference, EROOM Optimization
+Framework). Two pipelines represented in ONE `.puml` file containing 2
+activity diagrams (2 `@startuml`/`@enduml` blocks):
 
-- **Page 1 (`eof-pipeline-outils`)** : récupération des 9 onglets de la Google
-  Sheet source via l'API `gviz` (un `gid` par onglet — les exports CSV/XLSX
-  classiques échouent, redirection à jeton à usage unique), puis construction du
-  template Markdown vierge par `build_template.py` (3 formats d'évaluation
-  différents selon l'onglet : échelle 1-5, menu à 5 choix, menu à 3 choix propre
-  à "Facilité de changement").
-- **Page 2 (`eof-radar-svg`)** : `generate_radar_svg.py`, INDÉPENDANT de la page 1
-  (ne consomme pas sa sortie) — calcule un radar SVG par trigonométrie pure,
-  sans bibliothèque de graphique.
+- **Page 1 (`eof-pipeline-outils`)**: retrieval of the 9 tabs of the source Google
+  Sheet via the `gviz` API (one `gid` per tab — classic CSV/XLSX exports
+  fail, redirect to a single-use token), then construction of the blank Markdown
+  template by `build_template.py` (3 different evaluation
+  formats depending on the tab: 1-5 scale, 5-choice menu, 3-choice menu specific
+  to "Ease of change").
+- **Page 2 (`eof-radar-svg`)**: `generate_radar_svg.py`, INDEPENDENT of page 1
+  (does not consume its output) — computes an SVG radar by pure trigonameetry,
+  without a chart library.
 
-### Commandes
+### Commands
 
 ```bash
 plantuml -tsvg documentation/diagrammes/eof-pipeline-outils.puml
@@ -978,45 +984,45 @@ ls -lh documentation/diagrammes/eof-pipeline-outils.pdf
 open documentation/diagrammes/eof-pipeline-outils.pdf
 ```
 
-### Piège rencontré à la vérification
+### Pitfall encountered at verification
 
-Un rendu PNG rapide via `rsvg-convert -w <largeur> fichier.svg -o fichier.png` (sans
-option de fond) affiche un fond NOIR même quand le `.puml` porte
-`skinparam backgroundColor #FFFFFF` : PlantUML écrit ce blanc comme un style CSS
-(`style="...background:#FFFFFF;"`) sur la balise `<svg>` racine, que `rsvg-convert`
-ignore par défaut en conversion PNG (zones transparentes rendues noires). Le SVG et
-le PDF finaux sont corrects (vérifié en ouvrant le vrai PDF) — pour une vérification
-PNG fidèle, forcer le fond explicitement : `rsvg-convert -b white ...`.
+A quick PNG render via `rsvg-convert -w <width> file.svg -o file.png` (without
+background option) shows a BLACK background even when the `.puml` carries
+`skinparam backgroundColor #FFFFFF`: PlantUML writes this white as a CSS style
+(`style="...background:#FFFFFF;"`) on the root `<svg>` tag, which `rsvg-convert`
+ignores by default in PNG conversion (transparent areas rendered black). The final SVG and
+PDF are correct (verified by opening the real PDF) — for a faithful
+PNG check, force the background explicitly: `rsvg-convert -b white ...`.
 
 -----
 
-## Diagramme 6 — EOF-audit (pipeline outils, étape de `analyse-parcours`)
+## Diagram 6 — EOF-audit (tool pipeline, a step of `analyse-parcours`)
 
-**Source de vérité :** `.claude/skills/analyse-parcours/scripts/run_eof.py` +
-`eof_criteria_mapping.py` + les 3 extracteurs Phase 1 (`parse_html_criteria.py`,
-`analyze_security_headers.py`, `scan_wellknown.py`) + l'extension
-accessibility/best-practices de `collect_cwv_pagespeed.py` — code réel des
-scripts, comme les diagrammes 3 et 5.
+**Source of truth:** `.claude/skills/analyse-parcours/scripts/run_eof.py` +
+`eof_criteria_mapping.py` + the 3 Phase 1 extractors (`parse_html_criteria.py`,
+`analyze_security_headers.py`, `scan_wellknown.py`) + the
+accessibility/best-practices extension of `collect_cwv_pagespeed.py` — real script
+code, like diagrams 3 and 5.
 
 ### Description
 
-Distinct du diagramme 5 (skill `eof` : fabrication du template vierge depuis la
-Google Sheet) : celui-ci représente l'**étape `eof-audit`** de `analyse-parcours`,
-qui remplit ce template pour un site audité précis, à partir des données déjà
-collectées (HAR, Coverage, e-footprint, CWV) et de 3 extracteurs ajoutés en
-Phase 1 (2026-09-03, plan `eof-questionnaire`) :
+Distinct from diagram 5 (skill `eof`: fabrication of the blank template from the
+Google Sheet): this one represents the **`eof-audit` step** of `analyse-parcours`,
+which fills this template for a specific audited site, from the data already
+collected (HAR, Coverage, e-footprint, CWV) and 3 extractors added in
+Phase 1 (2026-09-03, plan `eof-questionnaire`):
 
-- `parse_html_criteria.py` : re-fetch live des pages déjà auditées (le `.har`
-  capturé ne contient pas les corps de réponse HTML/CSS).
-- `analyze_security_headers.py` : score sécurité local depuis les en-têtes déjà
-  présents dans le `.har`.
-- `scan_wellknown.py` : fetch direct de 3 fichiers publics standards du domaine.
+- `parse_html_criteria.py`: live re-fetch of the already audited pages (the captured `.har`
+  does not contain the HTML/CSS response bodies).
+- `analyze_security_headers.py`: local security score from the headers already
+  present in the `.har`.
+- `scan_wellknown.py`: direct fetch of 3 standard public files of the domain.
 
-Résultat : 7 critères détaillés automatisables (était 4) + 11 indices "partiel"
-(était 6), sur les 54 du référentiel — 36 restent "je ne sais pas" (questions
-organisationnelles/produit, hors de portée de toute donnée technique d'audit).
+Result: 7 detailed automatable criteria (was 4) + 11 "partial" hints
+(was 6), out of the 54 of the reference — 36 remain "I don't know" (organizational/product
+questions, out of reach of any technical audit datum).
 
-### Commandes
+### Commands
 
 ```bash
 plantuml -tsvg documentation/diagrammes/eof-audit-pipeline.puml
@@ -1027,23 +1033,23 @@ open documentation/diagrammes/eof-audit-pipeline.pdf
 
 -----
 
-## Palette de couleurs OCTO
+## OCTO color palette
 
-| Nom           | Hex       | Usage                                  |
+| Name          | Hex       | Usage                                  |
 |---------------|-----------|----------------------------------------|
-| OctoDark      | `#1C2856` | Titre, texte FontColor                 |
-| OctoWhite     | `#FFFFFF` | Fond général                           |
-| OctoLightGrey | `#DBDDE5` | Scripts Python (ecoindex, generate)    |
-| OctoPaleGrey  | `#ECECF2` | Fond groupes / partitions              |
-| OctoPaleBlue  | `#E0F0F4` | Participants par défaut                |
-| OctoLightBlue | `#9BD0DD` | dossier-audit (database)              |
-| OctoBlue      | `#82C1DD` | Utilisateur, Claude                    |
-| OctoDarkBlue  | `#5BA1BC` | Flèches, bordures, lifelines           |
-| OctoDarkGrey  | `#67708E` | (non utilisé ici)                      |
-| OctoGrey      | `#888FA8` | Notes secondaires                      |
-| (extra)       | `#C8E6C9` | Sous-agents DISPATCH (vert pâle)       |
+| OctoDark      | `#1C2856` | Title, FontColor text                  |
+| OctoWhite     | `#FFFFFF` | General background                     |
+| OctoLightGrey | `#DBDDE5` | Python scripts (ecoindex, generate)    |
+| OctoPaleGrey  | `#ECECF2` | Group / partition backgrounds          |
+| OctoPaleBlue  | `#E0F0F4` | Default participants                   |
+| OctoLightBlue | `#9BD0DD` | audit-dir (database)                   |
+| OctoBlue      | `#82C1DD` | User, Claude                           |
+| OctoDarkBlue  | `#5BA1BC` | Arrows, borders, lifelines             |
+| OctoDarkGrey  | `#67708E` | (not used here)                        |
+| OctoGrey      | `#888FA8` | Secondary notes                        |
+| (extra)       | `#C8E6C9` | DISPATCH sub-agents (pale green)       |
 
-### Skinparam obligatoire
+### Mandatory skinparam
 
 ```plantuml
 skinparam backgroundColor #FFFFFF
@@ -1070,11 +1076,11 @@ skinparam responseMessageBelowArrow true
 
 -----
 
-## Règles rédactionnelles
+## Writing rules
 
-- Conserver les accents français (é, è, ê, à, ç...).
-- Labels de messages courts (< 60 caractères si possible).
-- `alt` / `loop` / `note` / `partition` en français.
-- **Interdire les doubles tirets `--` dans les labels.** PlantUML interprète `--texte--`
-  comme du texte barré. Utiliser un seul tiret `-`.
-  Vérifier : `grep "\-\-" documentation/diagrammes/*.puml` doit retourner 0 occurrence dans les lignes `-> ... :`.
+- Labels in English (no French accents).
+- Short message labels (< 60 characters if possible).
+- `alt` / `loop` / `note` / `partition` in English.
+- **Forbid double dashes `--` in labels.** PlantUML interprets `--text--`
+  as strikethrough. Use a single dash `-`.
+  Check: `grep "\-\-" documentation/diagrammes/*.puml` must return 0 occurrences in the `-> ... :` lines.

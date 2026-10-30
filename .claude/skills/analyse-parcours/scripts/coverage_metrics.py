@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-Analyse des fichiers Coverage Chrome DevTools — produit coverage-analysis.json.
+Analysis of Chrome DevTools Coverage files — produces coverage-analysis.json.
 
-Remplace le calcul à la main de l'étape 30. Deux raisons :
+Replaces the manual computation of step 30. Two reasons:
 
-1. L'extension se lit sur le CHEMIN, jamais sur l'URL entière. Une URL versionnée
-   (dsfr.min.css?version=39.2.0) ne se termine pas par son extension. Un test
-   naïf `url.endswith(".css")` la classe en "autre", elle disparaît des agrégats
-   JS/CSS, et une page dont TOUTES les URLs sont versionnées est publiée à zéro.
-2. Le libellé de page vient de l'URL du document réellement chargé, pas du rang
-   du fichier dans l'ordre alphabétique.
+1. The extension is read from the PATH, never from the full URL. A versioned
+   URL (dsfr.min.css?version=39.2.0) does not end with its extension. A naive
+   `url.endswith(".css")` test classifies it as "other", it disappears from the
+   JS/CSS aggregates, and a page whose URLs are ALL versioned is published at
+   zero.
+2. The page label comes from the URL of the document actually loaded, not from
+   the file's rank in alphabetical order.
 
-Usage :
-  python3 coverage_metrics.py <dossier-source> [--output coverage-analysis.json]
-  python3 coverage_metrics.py <dossier-source> --check    # compare sans écrire
+Usage:
+  python3 coverage_metrics.py <source-dir> [--output coverage-analysis.json]
+  python3 coverage_metrics.py <source-dir> --check    # compare without writing
 """
 
 import argparse
@@ -24,18 +25,18 @@ from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
-# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage).
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"  # genericite: ok - declaration de la constante
+# Optional subfolder where raw captures (HAR, Coverage) are stored.
+RAW_DATA_DIR = "raw-data-potentially-sensitive"  # genericity: ok - constant declaration
 
-# Extensions d'asset : une URL qui en porte une n'est pas une URL de page.
+# Asset extensions: a URL carrying one is not a page URL.
 ASSET_EXTS = re.compile(
     r'\.(js|mjs|css|webp|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|otf|eot|json|map)$',
     re.I,
 )
 
-# Bibliothèques tierces reconnaissables, avec leur rôle. Le rôle fait partie du
-# libellé : "Swetrix" seul n'apprend rien à qui lit le rapport.
-KNOWN_LIBRARIES = {                     # genericite: ok-debut - table explicite de tiers
+# Recognizable third-party libraries, with their role. The role is part of the
+# label: "Swetrix" alone tells the report reader nothing.
+KNOWN_LIBRARIES = {                     # genericity: ok-start - explicit third-party table
     "swetrix":            "Swetrix (analytics)",
     "google-analytics":   "Google Analytics",
     "googletagmanager":   "Google Tag Manager",
@@ -46,9 +47,9 @@ KNOWN_LIBRARIES = {                     # genericite: ok-debut - table explicite
     "kameleoon":          "Kameleoon (A/B testing)",
     "abtasty":            "AB Tasty (A/B testing)",
     "optimizely":         "Optimizely (A/B testing)",
-    "orejime":            "Orejime (gestionnaire de consentement cookies)",
-    "tarteaucitron":      "Tarteaucitron (gestionnaire de consentement cookies)",
-    "didomi":             "Didomi (gestionnaire de consentement cookies)",
+    "orejime":            "Orejime (cookie consent manager)",
+    "tarteaucitron":      "Tarteaucitron (cookie consent manager)",
+    "didomi":             "Didomi (cookie consent manager)",
     "fonts.googleapis":   "Google Fonts",
     "fonts.gstatic":      "Google Fonts",
     "tolk.ai":            "Tolk.ai (chatbot)",
@@ -58,22 +59,22 @@ KNOWN_LIBRARIES = {                     # genericite: ok-debut - table explicite
     "recaptcha":          "reCAPTCHA (Google)",
     "hcaptcha":           "hCaptcha",
     "liveidentity":       "LiveIdentity (CAPTCHA)",
-    "dsfr":               "DSFR (Design Système de l'État)",
-    "bootstrap":          "Bootstrap (framework UI)",
-    "tailwind":           "Tailwind (framework UI)",
+    "dsfr":               "DSFR (French State Design System)",
+    "bootstrap":          "Bootstrap (UI framework)",
+    "tailwind":           "Tailwind (UI framework)",
     "jquery-ui":          "jQuery UI",
     "jquery":             "jQuery",
     "react":              "React",
     "vue":                "Vue.js",
-}                                       # genericite: ok-fin
+}                                       # genericity: ok-end
 
 
 def classify(url):
-    """Type d'une ressource Coverage, déduit du CHEMIN de l'URL.
+    """Type of a Coverage resource, deduced from the URL PATH.
 
-    Les entrées Coverage ne portent pas de mimeType (clés : url, ranges, text),
-    l'extension est donc le seul signal disponible. La query et le fragment sont
-    retirés avant le test, sinon toute URL versionnée est mal classée.
+    Coverage entries carry no mimeType (keys: url, ranges, text),
+    so the extension is the only available signal. Query and fragment are
+    stripped before the test, otherwise any versioned URL is misclassified.
     """
     path = urlparse(url).path
     if path.endswith((".js", ".mjs")):
@@ -84,39 +85,40 @@ def classify(url):
 
 
 def read_entries(cov_path):
-    """Lit un fichier Coverage. Deux formats selon la version de DevTools :
-    tableau direct, ou objet enveloppé sous la clé "entries".
+    """Reads a Coverage file. Two formats depending on the DevTools version:
+    direct array, or an object wrapped under the "entries" key.
 
-    Retourne (entries, mesure) : `entries` est la liste (ou None en cas
-    d'échec), `mesure` suit la convention d'état de mesure (statut/cible/
-    detail). Ne lève jamais : un fichier illisible ou un format non reconnu
-    est renvoyé comme un échec de mesure, jamais comme une exception qui
-    interromprait l'analyse des autres fichiers Coverage du dossier.
+    Returns (entries, measurement): `entries` is the list (or None on
+    failure), `measurement` follows the measurement-state convention
+    (status/target/detail). Never raises: an unreadable file or an
+    unrecognized format is returned as a measurement failure, never as an
+    exception that would interrupt the analysis of the other Coverage files
+    in the folder.
     """
-    cible = str(cov_path)
+    target = str(cov_path)
     try:
         with open(cov_path, encoding="utf-8") as f:
             data = json.load(f)
     except OSError as e:
-        return None, {"statut": "echec_lecture", "cible": cible, "detail": f"fichier illisible : {e}"}
+        return None, {"status": "read_error", "target": target, "detail": f"unreadable file: {e}"}
     except json.JSONDecodeError as e:
-        return None, {"statut": "echec_lecture", "cible": cible, "detail": f"JSON invalide : {e}"}
+        return None, {"status": "read_error", "target": target, "detail": f"invalid JSON: {e}"}
 
     if isinstance(data, list):
-        return data, {"statut": "ok", "cible": cible, "detail": None}
+        return data, {"status": "ok", "target": target, "detail": None}
     if isinstance(data, dict) and isinstance(data.get("entries"), list):
-        return data["entries"], {"statut": "ok", "cible": cible, "detail": None}
+        return data["entries"], {"status": "ok", "target": target, "detail": None}
 
     return None, {
-        "statut": "echec_analyse",
-        "cible": cible,
-        "detail": f'format Coverage non reconnu (attendu un tableau ou une clé "entries"), '
-                  f"trouvé : {type(data).__name__}",
+        "status": "analysis_error",
+        "target": target,
+        "detail": f'unrecognized Coverage format (expected an array or an "entries" key), '
+                  f"found: {type(data).__name__}",
     }
 
 
 def measure(entries):
-    """Mesure une page : (liste de ressources, agrégats par type)."""
+    """Measures a page: (list of resources, aggregates by type)."""
     resources = []
     for item in entries:
         url = item.get("url", "")
@@ -146,11 +148,11 @@ def aggregate(resources, rtype):
 
 
 def page_label(entries, har_documents):
-    """URL de la page chargée, corroborée par le HAR quand c'est possible.
+    """URL of the loaded page, corroborated by the HAR when possible.
 
-    Le HAR dit lesquelles de ces URLs ont réellement été servies en text/html.
-    Sans lui, une URL technique (jeton anti-CSRF, endpoint de messages) peut
-    passer pour la page : elle n'a pas d'extension d'asset et arrive en premier.
+    The HAR tells which of these URLs were actually served as text/html.
+    Without it, a technical URL (anti-CSRF token, message endpoint) can
+    pass for the page: it has no asset extension and comes first.
     """
     candidates = []
     domains = Counter()
@@ -169,17 +171,17 @@ def page_label(entries, har_documents):
         if not ASSET_EXTS.search(urlparse(url).path):
             candidates.append(url)
 
-    # Priorité au candidat que le HAR déclare comme document HTML.
+    # Priority to the candidate the HAR declares as an HTML document.
     for url in candidates:
         if url.split("?")[0] in har_documents:
-            return url, "document HTML confirmé par le HAR"
+            return url, "HTML document confirmed by the HAR"
     if candidates:
-        return candidates[0], "URL sans extension d'asset (non confirmée par le HAR)"
-    return "", "aucune URL de page identifiable"
+        return candidates[0], "URL without asset extension (not confirmed by the HAR)"
+    return "", "no identifiable page URL"
 
 
 def har_document_urls(source_dir):
-    """URLs servies en text/html d'après le HAR, s'il est trouvable."""
+    """URLs served as text/html according to the HAR, if findable."""
     har_files = (sorted(source_dir.glob("*.har"))
                  or sorted((source_dir / RAW_DATA_DIR).glob("*.har")))
     if not har_files:
@@ -211,13 +213,13 @@ def find_coverage_files(source_dir):
             or sorted((source_dir / RAW_DATA_DIR).glob("*coverage*.json")))
 
 
-def analyse(source_dir):
+def analyze(source_dir):
     source_dir = Path(source_dir)
     cov_files = [c for c in find_coverage_files(source_dir)
                  if c.name != "coverage-analysis.json"]
     if not cov_files:
         raise FileNotFoundError(
-            f"Aucun fichier Coverage-*.json dans {source_dir} ni dans "
+            f"No Coverage-*.json file in {source_dir} nor in "
             f"{source_dir / RAW_DATA_DIR}."
         )
 
@@ -225,16 +227,16 @@ def analyse(source_dir):
 
     pages, all_resources = [], []
     for i, cf in enumerate(cov_files, 1):
-        entries, mesure = read_entries(cf)
+        entries, measurement = read_entries(cf)
         if entries is None:
-            # Fichier illisible ou format non reconnu : la page reste dans le
-            # rapport (pas d'échec silencieux qui la ferait disparaître), avec
-            # des agrégats à zéro et un bloc mesure qui dit pourquoi.
+            # Unreadable file or unrecognized format: the page stays in the
+            # report (no silent failure that would make it disappear), with
+            # zero aggregates and a measurement block that says why.
             pages.append({
                 "name": f"Page {i}",
                 "source_file": cf.name,
                 "url": "",
-                "url_provenance": "lecture du fichier Coverage impossible",
+                "url_provenance": "Coverage file read failed",
                 "js_total_kb": 0.0,
                 "js_unused_kb": 0.0,
                 "js_unused_pct": 0.0,
@@ -245,7 +247,7 @@ def analyse(source_dir):
                 "no_js_no_css": False,
                 "top_js_unused": [],
                 "top_css_unused": [],
-                "mesure": mesure,
+                "measurement": measurement,
             })
             continue
 
@@ -254,9 +256,9 @@ def analyse(source_dir):
         url, provenance = page_label(entries, har_docs)
 
         js, css = aggregate(resources, "javascript"), aggregate(resources, "css")
-        # Un fichier Coverage non vide qui ne produit aucun octet JS/CSS est un
-        # signe de mauvaise classification, pas une page sans code. On le dit.
-        anomaly = (bool(entries) and js["total_kb"] == 0 and css["total_kb"] == 0)
+        # A non-empty Coverage file that produces no JS/CSS byte at all is a
+        # sign of misclassification, not of a codeless page. Say it.
+        anamealy = (bool(entries) and js["total_kb"] == 0 and css["total_kb"] == 0)
 
         pages.append({
             "name": f"Page {i}",
@@ -270,7 +272,7 @@ def analyse(source_dir):
             "css_unused_kb": css["unused_kb"],
             "css_unused_pct": css["unused_pct"],
             "resources_count": len(resources),
-            "no_js_no_css": anomaly,
+            "no_js_no_css": anamealy,
             "top_js_unused": [
                 {"url": r["url"], "unused_kb": round(r["unused_bytes"] / 1024, 1)}
                 for r in sorted((r for r in resources if r["type"] == "javascript"),
@@ -281,12 +283,12 @@ def analyse(source_dir):
                 for r in sorted((r for r in resources if r["type"] == "css"),
                                 key=lambda r: -r["unused_bytes"])[:3]
             ],
-            "mesure": mesure,
+            "measurement": measurement,
         })
 
     js_all, css_all = aggregate(all_resources, "javascript"), aggregate(all_resources, "css")
 
-    # Outlier : page dont le code total dépasse 2x la médiane.
+    # Outlier: page whose total code exceeds 2x the median.
     weights = sorted(p["js_total_kb"] + p["css_total_kb"] for p in pages)
     n = len(weights)
     median = weights[n // 2] if n % 2 else (weights[n // 2 - 1] + weights[n // 2]) / 2
@@ -310,58 +312,62 @@ def analyse(source_dir):
     }
 
 
+# Backward-compatible alias: run_efootprint.py still calls `analyse` until it is translated.
+analyse = analyze
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source_dir", type=Path)
     ap.add_argument("--output", type=Path,
-                    help="chemin de sortie (défaut : <source_dir>/audit/"  # genericite: ok - convention de rangement du skill, aucun site nommé
+                    help="output path (default: <source_dir>/audit/"  # genericity: ok - skill storage convention, no site named
                          "coverage-analysis.json)")
     ap.add_argument("--check", action="store_true",
-                    help="compare à la sortie existante sans rien écrire")
+                    help="compare against the existing output without writing anything")
     args = ap.parse_args(argv)
 
-    result = analyse(args.source_dir)
+    result = analyze(args.source_dir)
 
     out = args.output or (args.source_dir / "audit" / "coverage-analysis.json")
     s = result["summary"]
 
-    har_note = (f" — HAR de référence : {s['har_reference']}" if s["har_reference"]
-                else " — aucun HAR trouvé, libellés non corroborés")
-    print(f"Coverage : {s['pages_count']} fichier(s){har_note}")
+    har_note = (f" — reference HAR: {s['har_reference']}" if s["har_reference"]
+                else " — no HAR found, labels not corroborated")
+    print(f"Coverage: {s['pages_count']} file(s){har_note}")
     for p in result["pages"]:
-        flag = "  [!] aucun JS ni CSS" if p["no_js_no_css"] else ""
-        print(f"  {p['name']}  JS {p['js_total_kb']:9.1f} Ko "
-              f"(non utilisé {p['js_unused_kb']:8.1f})   "
-              f"CSS {p['css_total_kb']:8.1f} Ko "
-              f"(non utilisé {p['css_unused_kb']:8.1f}){flag}")
-        print(f"          {p['url'] or '(page non identifiée)'}")
-    print(f"  TOTAL    JS {s['total_js_kb']:9.1f} Ko "
-          f"(non utilisé {s['total_js_unused_kb']:8.1f}, {s['total_js_unused_pct']}%)   "
-          f"CSS {s['total_css_kb']:8.1f} Ko "
-          f"(non utilisé {s['total_css_unused_kb']:8.1f}, {s['total_css_unused_pct']}%)")
+        flag = "  [!] no JS and no CSS" if p["no_js_no_css"] else ""
+        print(f"  {p['name']}  JS {p['js_total_kb']:9.1f} KB "
+              f"(unused {p['js_unused_kb']:8.1f})   "
+              f"CSS {p['css_total_kb']:8.1f} KB "
+              f"(unused {p['css_unused_kb']:8.1f}){flag}")
+        print(f"          {p['url'] or '(page not identified)'}")
+    print(f"  TOTAL    JS {s['total_js_kb']:9.1f} KB "
+          f"(unused {s['total_js_unused_kb']:8.1f}, {s['total_js_unused_pct']}%)   "
+          f"CSS {s['total_css_kb']:8.1f} KB "
+          f"(unused {s['total_css_unused_kb']:8.1f}, {s['total_css_unused_pct']}%)")
 
     if args.check:
         if not out.exists():
-            print(f"\n[check] {out} absent, rien à comparer.")
+            print(f"\n[check] {out} absent, nothing to compare.")
             return 0
         with open(out, encoding="utf-8") as f:
             old = json.load(f)
         o = old.get("summary", {})
-        print("\n[check] écarts avec la sortie existante :")
+        print("\n[check] differences vs the existing output:")
         diffs = 0
         for key in ("total_js_kb", "total_js_unused_kb", "total_css_kb", "total_css_unused_kb"):
             before, after = o.get(key), s[key]
             if before != after:
                 diffs += 1
                 print(f"  {key} : {before} -> {after}")
-        print("  aucun écart." if not diffs else f"  {diffs} écart(s).")
+        print("  no differences." if not diffs else f"  {diffs} difference(s).")
         return 1 if diffs else 0
 
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=1, ensure_ascii=False)
-    print(f"\ncoverage-analysis.json écrit — {out}")
+    print(f"\ncoverage-analysis.json written — {out}")
     return 0
 
 

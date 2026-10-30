@@ -1,40 +1,39 @@
 #!/usr/bin/env python3
 """
-Construction du modèle e-footprint depuis une spécification déclarative.
+Building the e-footprint model from a declarative specification.
 
-SEUL MODULE DE LA BIBLIOTHÈQUE QUI IMPORTE E-FOOTPRINT
+THE ONLY MODULE OF THE LIBRARY THAT IMPORTS E-FOOTPRINT
 -------------------------------------------------------
-`spec.py` et `compose.py` restent du Python pur, testables sans la librairie
-installée. Ce fichier est le point où cette propriété s'arrête : il a besoin
-d'e-footprint pour s'importer. `efootprint_model/__init__.py` ne le réexporte
-donc jamais (cf. son garde-fou, contrôlé par check_efootprint_spec.py).
+`spec.py` and `compose.py` stay pure Python, testable without the library
+installed. This file is where that property stops: it needs e-footprint to
+import. `efootprint_model/__init__.py` therefore never re-exports it (cf.
+its guard-rail, checked by check_efootprint_spec.py).
 
-ORDRE D'INSTANCIATION IMPOSÉ
-----------------------------
+IMPOSED INSTANTIATION ORDER
+---------------------------
 Storage -> Server -> Job -> Step -> Journey -> UsagePattern -> System.
-Chaque classe e-footprint référence la précédente ; le respecter évite d'avoir
-à reconstruire un objet après coup (un ModelingObject ne se mute pas
-proprement une fois lié à un System, cf. handoff du 05/08/2026).
+Each e-footprint class references the previous one; respecting this avoids
+having to rebuild an object after the fact (a ModelingObject does not mutate
+cleanly once linked to a System, cf. handoff of 05/08/2026).
 
-CE QUE `build_system()` NE FAIT PAS
-------------------------------------
-Il ne choisit aucune valeur : chaque grandeur vient d'un `Traced` de la
-spécification, ou du défaut de la LIBRAIRIE (jamais d'un défaut inventé ici).
-Un champ structurellement indispensable à e-footprint mais absent de la
-spécification (pays de l'audience, volume de trafic, jeu de champs serveur
-incomplet) fait échouer la construction avec un message explicite, plutôt que
-de deviner.
+WHAT `build_system()` DOES NOT DO
+----------------------------------
+It chooses no value: every quantity comes from a `Traced` of the
+specification, or from the LIBRARY's default (never from a default invented
+here). A structurally indispensable field for e-footprint but absent from
+the specification (audience country, traffic volume, incomplete server field
+set) fails the build with an explicit message, rather than being guessed.
 """
 
 from dataclasses import dataclass, field
 
 from .spec import SiteSpec, SpecError
 
-# Les 3 niveaux de confiance reconnus par e-footprint, à ne pas confondre avec
-# nos 7 niveaux (CONFIDENCE_LEVELS), plus fins et déjà tracés dans la spec.
-# Cette table ne fait que renseigner poliment le champ `confidence` interne
-# d'e-footprint ; elle n'influence aucun calcul, et la traçabilité complète du
-# rapport vient de la spec (collect_sources()), pas d'ici.
+# The 3 confidence levels recognized by e-footprint, not to be confused with
+# our 7 levels (CONFIDENCE_LEVELS), finer and already traced in the spec.
+# This table only politely fills e-footprint's internal `confidence` field;
+# it influences no calculation, and the report's full traceability comes
+# from the spec (collect_sources()), not from here.
 _EFOOTPRINT_CONFIDENCE = {"high": "high", "medium": "medium", "low": "low"}
 
 
@@ -43,8 +42,8 @@ def _efootprint_confidence(traced):
 
 
 def _get_source(source_cache, name, url):
-    """Un seul objet Source par (nom, url) : deux Traced qui partagent une
-    provenance ne doivent pas en fabriquer deux instances distinctes."""
+    """A single Source object per (name, url): two Traced sharing a
+    provenance must not create two distinct instances."""
     from efootprint.abstract_modeling_classes.explainable_object_base_class import Source
 
     key = (name, url)
@@ -54,11 +53,11 @@ def _get_source(source_cache, name, url):
 
 
 def to_source_value(traced, source_cache):
-    """Traced -> SourceValue (kind="value") ou SourceObject (kind="object").
+    """Traced -> SourceValue (kind="value") or SourceObject (kind="object").
 
-    SEUL point de passage de la bibliothèque vers les classes source
-    d'e-footprint. Le kind a été tranché en Python pur dès `spec.py` :
-    ce module n'a pas à redeviner SourceValue vs SourceObject.
+    The ONLY passage point from the library to e-footprint's source classes.
+    The kind was decided in pure Python back in `spec.py`: this module does
+    not have to guess SourceValue vs SourceObject again.
     """
     from efootprint.abstract_modeling_classes.source_objects import SourceObject, SourceValue
     from efootprint.constants.units import u
@@ -78,24 +77,24 @@ def to_source_value(traced, source_cache):
 
 
 def _map_country(name):
-    """Nom e-footprint du pays -> instance Country.
+    """e-footprint country name -> Country instance.
 
-    Lève plutôt que de retomber sur un pays par défaut : un pays inconnu de
-    la librairie qui passerait en silence ferait porter au rapport une
-    intensité carbone qui n'est pas celle demandée.
+    Raises rather than falling back to a default country: a country unknown
+    to the library that passed silently would make the report carry a carbon
+    intensity that is not the requested one.
     """
     from efootprint.constants.countries import Countries
 
     if hasattr(Countries, name):
         return getattr(Countries, name)()
     raise SpecError(
-        f"pays inconnu de la librairie e-footprint : {name!r}. "
-        f"Valeurs attendues : un attribut de efootprint.constants.countries.Countries."
+        f"country unknown to the e-footprint library: {name!r}. "
+        f"Expected values: an attribute of efootprint.constants.countries.Countries."
     )
 
 
 # ---------------------------------------------------------------------------
-# Serveur + stockage
+# Server + storage
 # ---------------------------------------------------------------------------
 
 def _build_storage(server_spec, source_cache):
@@ -104,17 +103,17 @@ def _build_storage(server_spec, source_cache):
     kwargs = {}
     if server_spec.storage_gb is not None:
         kwargs["base_storage_need"] = to_source_value(server_spec.storage_gb, source_cache)
-    return Storage.from_defaults(f"Stockage {server_spec.label}", **kwargs)
+    return Storage.from_defaults(f"Storage {server_spec.label}", **kwargs)
 
 
 def _build_server(server_spec, source_cache):
-    """Construit le Storage puis le Server, dans cet ordre imposé.
+    """Builds the Storage then the Server, in this imposed order.
 
-    Deux jeux de champs mutuellement exclusifs, comme documenté dans
-    `ServerSpec` : cloud public (provider + instance_type, voie Boavizta) ou
-    générique (power + carbon_footprint_fabrication + pue). Ni l'un ni
-    l'autre complet -> la spécification ne dit pas assez pour choisir une
-    classe e-footprint, ce qui doit arrêter la construction, pas la deviner.
+    Two mutually exclusive field sets, as documented in `ServerSpec`:
+    public cloud (provider + instance_type, Boavizta path) or generic
+    (power + carbon_footprint_fabrication + pue). Neither complete -> the
+    specification does not say enough to choose an e-footprint class, which
+    must stop the build, not be guessed.
     """
     storage = _build_storage(server_spec, source_cache)
 
@@ -153,37 +152,39 @@ def _build_server(server_spec, source_cache):
             **common,
         )
     raise SpecError(
-        f"ServerSpec[{server_spec.key}] : ni le jeu cloud (provider + instance_type) "
-        "ni le jeu générique (power + carbon_footprint_fabrication + pue) ne sont "
-        "complets. Impossible de savoir quelle classe e-footprint instancier."
+        f"ServerSpec[{server_spec.key}]: neither the cloud set (provider + "
+        "instance_type) nor the generic set (power + "
+        "carbon_footprint_fabrication + pue) is complete. Impossible to know "
+        "which e-footprint class to instantiate."
     )
 
 
 # ---------------------------------------------------------------------------
-# Traitements et étapes
+# Jobs and steps
 # ---------------------------------------------------------------------------
 
 def _build_external_api(external_api_spec, label, source_cache):
-    """Construit l'appel IA générative EN PLUS du Job réseau habituel (jamais à
-    sa place) : `_build_job()` reste responsable du data_transferred/
-    request_duration, ce module ajoute le calcul EcoLogits séparément.
+    """Builds the generative AI call IN ADDITION to the usual network Job
+    (never in its place): `_build_job()` stays responsible for
+    data_transferred/request_duration, this module adds the EcoLogits
+    calculation separately.
 
-    Provider/model_name passent en SourceObject bruts, jamais via
-    `to_source_value()` : EcoLogits valide lui-même leur existence dans son
-    catalogue (`_get_model_or_raise()`), une mauvaise valeur doit échouer à la
-    construction avec le message de la librairie, pas être avalée en amont.
+    Provider/model_name go as raw SourceObjects, never through
+    `to_source_value()`: EcoLogits itself validates their existence in its
+    catalog (`_get_model_or_raise()`), a wrong value must fail the build with
+    the library's message, not be swallowed upstream.
     """
     from efootprint.builders.external_apis.ecologits.ecologits_external_api import (
         EcoLogitsGenAIExternalAPI, EcoLogitsGenAIExternalAPIJob)
     from efootprint.abstract_modeling_classes.source_objects import SourceObject
 
     api = EcoLogitsGenAIExternalAPI.from_defaults(
-        f"{label} (IA générative)",
+        f"{label} (generative AI)",
         provider=SourceObject(external_api_spec.provider),
         model_name=SourceObject(external_api_spec.model_name),
     )
     job = EcoLogitsGenAIExternalAPIJob.from_defaults(
-        f"Appel IA {label}",
+        f"AI call {label}",
         external_api=api,
         output_token_count=to_source_value(external_api_spec.output_tokens, source_cache),
     )
@@ -194,12 +195,12 @@ def _build_job(job_spec, servers_by_key, source_cache):
     from efootprint.core.usage.job import Job
 
     if job_spec.server_key not in servers_by_key:
-        # validate_spec() l'aurait déjà refusé plus tôt : filet de second rang,
-        # utile seulement si build_system() est appelé sur une spec qui n'est
-        # pas passée par require_calculable().
+        # validate_spec() would already have refused it earlier: second-rank
+        # net, only useful if build_system() is called on a spec that did not
+        # go through require_calculable().
         raise SpecError(
-            f"JobSpec[{job_spec.key}] : serveur \"{job_spec.server_key}\" absent "
-            "des serveurs construits."
+            f"JobSpec[{job_spec.key}]: server \"{job_spec.server_key}\" absent "
+            "from the built servers."
         )
 
     kwargs = {}
@@ -232,12 +233,12 @@ def _build_step(step_spec, jobs_by_key, source_cache):
     for job_key, weight in step_spec.jobs.items():
         if job_key not in jobs_by_key:
             raise SpecError(
-                f"StepSpec[{step_spec.key}] : traitement \"{job_key}\" absent "
-                "des traitements construits."
+                f"StepSpec[{step_spec.key}]: job \"{job_key}\" absent "
+                "from the built jobs."
             )
-        # `_build_job()` renvoie un tuple (job réseau, éventuellement job IA
-        # EcoLogits) : les deux comptent au même poids, l'étape les déclenche
-        # ensemble, jamais l'un sans l'autre.
+        # `_build_job()` returns a tuple (network job, possibly an EcoLogits
+        # AI job): both count at the same weight, the step triggers them
+        # together, never one without the other.
         for built_job in jobs_by_key[job_key]:
             jobs[built_job] = weight
 
@@ -249,15 +250,15 @@ def _build_step(step_spec, jobs_by_key, source_cache):
 
 
 # ---------------------------------------------------------------------------
-# Parcours et motifs d'usage
+# Journey and usage patterns
 # ---------------------------------------------------------------------------
 
-# Device/réseau associés à chaque branche du mix appareils. Convention du
-# script historique (run_efootprint.py) : le mobile est modélisé sur réseau
-# mobile, le desktop sur wifi. `wifi_fraction`/`mobile_fraction` d'AudienceSpec
-# restent informatifs pour l'instant, comme dans le calcul actuel : les
-# généraliser en un vrai croisement 2x2 est un sujet de lot ultérieur, pas de
-# celui-ci (la non-régression exige de reproduire le comportement actuel).
+# Device/network paired with each branch of the device mix. Convention of the
+# historical script (run_efootprint.py): mobile is modeled on a mobile
+# network, desktop on wifi. `wifi_fraction`/`mobile_fraction` of AudienceSpec
+# stay informational for now, as in the current calculation: generalizing
+# them into a real 2x2 cross is a later-lot topic, not this one (the
+# non-regression requires reproducing the current behavior).
 _DEVICE_MIX = ("phone_fraction", "desktop_fraction")
 
 
@@ -270,33 +271,33 @@ def _build_usage_patterns(spec, journey, servers_by_key, source_cache):
 
     audience = spec.audience
     if audience is None:
-        raise SpecError(f"SiteSpec[{spec.name}] : aucune audience, impossible de "
-                        "construire un motif d'usage. Passer par require_calculable() "
-                        "avant build_system() pour un refus plus lisible.")
+        raise SpecError(f"SiteSpec[{spec.name}]: no audience, impossible to "
+                        "build a usage pattern. Go through require_calculable() "
+                        "before build_system() for a more readable refusal.")
     if audience.visits_per_year is None:
         raise SpecError(
-            f"AudienceSpec[{audience.key}] : \"visits_per_year\" absent. "
-            "Une audience sans volume ne peut pas alimenter un motif d'usage : "
-            "renseigner le trafic, même approximatif et signalé comme tel."
+            f"AudienceSpec[{audience.key}]: \"visits_per_year\" absent. "
+            "An audience without a volume cannot feed a usage pattern: "
+            "fill in the traffic, even approximate and flagged as such."
         )
     if audience.country is None:
         raise SpecError(
-            f"AudienceSpec[{audience.key}] : \"country\" absent. Un motif d'usage "
-            "e-footprint exige un pays (il pilote l'intensité carbone locale des "
-            "appareils du visiteur)."
+            f"AudienceSpec[{audience.key}]: \"country\" absent. An e-footprint "
+            "usage pattern requires a country (it drives the local carbon "
+            "intensity of the visitor's devices)."
         )
     if audience.phone_fraction is None or audience.desktop_fraction is None:
         raise SpecError(
-            f"AudienceSpec[{audience.key}] : le mix appareils (phone_fraction/"
-            "desktop_fraction) est requis pour construire les motifs d'usage. "
-            "Un mix absent n'a pas de repli générique : quel appareil "
-            "représenterait l'audience ?"
+            f"AudienceSpec[{audience.key}]: the device mix (phone_fraction/"
+            "desktop_fraction) is required to build the usage patterns. "
+            "A missing mix has no generic fallback: which device would "
+            "represent the audience?"
         )
 
     country = _map_country(audience.country.value)
     visits = audience.visits_per_year.value
     visits_mobile = round(visits * audience.phone_fraction.value)
-    visits_desktop = visits - visits_mobile  # garantit la somme = visits
+    visits_desktop = visits - visits_mobile  # guarantees the sum = visits
 
     def _hourly_volume(volume):
         return ExplainableHourlyQuantitiesFromFormInputs({
@@ -317,7 +318,7 @@ def _build_usage_patterns(spec, journey, servers_by_key, source_cache):
         if volume <= 0:
             continue
         patterns.append(UsagePattern(
-            f"Visiteurs {label} ({volume:,} visites/an)".replace(",", " "),
+            f"Visitors {label} ({volume:,} visits/year)".replace(",", " "),
             journey,
             [device],
             network,
@@ -328,31 +329,31 @@ def _build_usage_patterns(spec, journey, servers_by_key, source_cache):
 
 
 # ---------------------------------------------------------------------------
-# Assemblage complet
+# Full assembly
 # ---------------------------------------------------------------------------
 
 @dataclass
 class BuiltModel:
-    """Le modèle construit, avec les index nécessaires à l'attribution.
+    """The built model, with the indexes needed for attribution.
 
-    Sans `servers_by_key`/`jobs_by_key`/`steps_by_key`, les résultats
-    d'attribution reviendraient indexés par objet e-footprint, sans moyen de
-    les rattacher à l'intention métier qui les a produits.
+    Without `servers_by_key`/`jobs_by_key`/`steps_by_key`, attribution
+    results would come back indexed by e-footprint object, with no way to
+    attach them to the business intention that produced them.
     """
 
     spec: SiteSpec
-    system: "System"  # noqa: F821 - annotation textuelle, e-footprint non importé au chargement du module
+    system: "System"  # noqa: F821 - textual annotation, e-footprint not imported at module load
     servers_by_key: dict = field(default_factory=dict)
     jobs_by_key: dict = field(default_factory=dict)
     steps_by_key: dict = field(default_factory=dict)
 
 
 def build_system(spec, *, accepted_reserves=()):
-    """Construit un System e-footprint depuis une SiteSpec.
+    """Builds an e-footprint System from a SiteSpec.
 
-    Appelle `require_calculable()` en premier : construire un modèle depuis
-    une spécification qui a des réserves non assumées produirait un chiffre
-    faux sans le dire. `accepted_reserves` se transmet tel quel.
+    Calls `require_calculable()` first: building a model from a specification
+    that has unassumed reserves would produce a false number without saying
+    so. `accepted_reserves` is passed through as-is.
     """
     from .compose import require_calculable
     from efootprint.core.system import System
@@ -370,17 +371,17 @@ def build_system(spec, *, accepted_reserves=()):
     journey_key = audience.journey_key if audience.journey_key else _sole_journey_key(spec)
     journey_spec = spec.journey_by_key(journey_key)
 
-    # Un seul UsageJourney, PARTAGÉ entre les motifs mobile et desktop : vérifié
-    # possible (handoff du 05/08/2026), et c'est la seule façon de ne pas
-    # dupliquer le graphe. L'ordre des étapes du parcours doit être préservé
-    # (il porte le délai cumulé entre étapes) : construit par itération sur
-    # `journey_spec.steps`, jamais via un dict non ordonné.
+    # A single UsageJourney, SHARED between the mobile and desktop patterns:
+    # verified possible (handoff of 05/08/2026), and the only way not to
+    # duplicate the graph. The journey's step order must be preserved (it
+    # carries the cumulative delay between steps): built by iterating over
+    # `journey_spec.steps`, never via an unordered dict.
     uj_steps = {steps_by_key[step_key]: journey_spec_step(spec, step_key).times_per_journey
                 for step_key in journey_spec.steps}
     journey = UsageJourney(journey_spec.label, uj_steps=uj_steps)
 
     usage_patterns = _build_usage_patterns(spec, journey, servers_by_key, source_cache)
-    system = System(f"Estimation CO2e : {spec.name}", usage_patterns, edge_usage_patterns=[])
+    system = System(f"CO2e estimate: {spec.name}", usage_patterns, edge_usage_patterns=[])
 
     return BuiltModel(spec=spec, system=system, servers_by_key=servers_by_key,
                       jobs_by_key=jobs_by_key, steps_by_key=steps_by_key)
@@ -391,36 +392,35 @@ def journey_spec_step(spec, step_key):
 
 
 def _sole_journey_key(spec):
-    """Le parcours à utiliser quand l'audience n'en désigne aucun explicitement.
+    """The journey to use when the audience does not designate one explicitly.
 
-    N'accepte que le cas sans ambiguïté (un seul parcours déclaré) : deviner
-    parmi plusieurs parcours inventerait une donnée d'audience que personne
-    n'a mesurée.
+    Only accepts the unambiguous case (a single declared journey): guessing
+    among several journeys would invent an audience datum nobody measured.
     """
     if len(spec.journeys) == 1:
         return spec.journeys[0].key
     raise SpecError(
-        f"SiteSpec[{spec.name}] : l'audience ne désigne aucun parcours "
-        f"(journey_key) et {len(spec.journeys)} parcours sont déclarés. "
-        "Renseigner AudienceSpec.journey_key pour lever l'ambiguïté."
+        f"SiteSpec[{spec.name}]: the audience designates no journey "
+        f"(journey_key) and {len(spec.journeys)} journeys are declared. "
+        "Fill in AudienceSpec.journey_key to lift the ambiguity."
     )
 
 
 # ---------------------------------------------------------------------------
-# Extraction propre des résultats (sans regex)
+# Clean result extraction (no regex)
 # ---------------------------------------------------------------------------
 
 def fabrication_kg(built):
-    """Empreinte de fabrication par catégorie, en kg CO2e/an, lue directement
-    sur les grandeurs e-footprint (magnitude convertie), jamais par regex sur
-    une représentation texte."""
+    """Manufacturing footprint per category, in kg CO2e/year, read directly
+    from the e-footprint quantities (converted magnitude), never by regex on
+    a text representation."""
     from efootprint.constants.units import u
     return {category: value.value.to(u.kg).magnitude
             for category, value in built.system.total_fabrication_footprint_sum_over_period.items()}
 
 
 def energy_kg(built):
-    """Empreinte d'énergie par catégorie, en kg CO2e/an. Même principe que
+    """Energy footprint per category, in kg CO2e/year. Same principle as
     `fabrication_kg()`."""
     from efootprint.constants.units import u
     return {category: value.value.to(u.kg).magnitude
@@ -428,36 +428,37 @@ def energy_kg(built):
 
 
 def total_kg(built):
-    """Total CO2e/an, somme des deux catégories ci-dessus."""
+    """Total CO2e/year, sum of the two categories above."""
     fab = fabrication_kg(built)
     energy = energy_kg(built)
     return sum(fab.values()) + sum(energy.values())
 
 
 def step_impact_shares(built):
-    """Répartition PROPORTIONNELLE (pas un recalcul indépendant par étape) de
-    l'empreinte Devices et Network par étape du parcours, pour donner un
-    repère de contribution relative sans rejouer le modèle N fois.
+    """PROPORTIONAL distribution (not an independent recalculation per step)
+    of the Devices and Network footprint per journey step, to give a
+    relative contribution reference without replaying the model N times.
 
-    MÉTHODE, VOLONTAIREMENT SIMPLE ET À NOMMER COMME TELLE DANS LE RAPPORT :
-    - Devices (fabrication + énergie) réparti au prorata du temps utilisateur
-      pondéré (`user_time * times_per_journey`) de chaque étape : c'est le
-      temps passé par le visiteur qui pilote la consommation de SON appareil.
-    - Network (énergie) réparti au prorata du poids transféré pondéré (somme
-      des jobs rattachés à l'étape, poids du job × times_per_journey de
-      l'étape) : c'est le volume transféré qui pilote l'énergie réseau.
-    - Servers / Storage / ExternalAPIs : NON répartis ici. Un serveur ou un
-      stockage est un coût d'infra qui ne se découpe pas proprement par étape
-      (il tourne pour TOUT le parcours) ; un appel IA générative a déjà une
-      attribution exacte via son propre job (ExternalApiSpec), pas besoin
-      d'une répartition approchée. Ces postes restent uniquement dans les
-      totaux globaux du site.
+    METHOD, DELIBERATELY SIMPLE AND TO BE NAMED AS SUCH IN THE REPORT:
+    - Devices (fabrication + energy) distributed pro rata to each step's
+      weighted user time (`user_time * times_per_journey`): it is the time
+      spent by the visitor that drives the consumption of THEIR device.
+    - Network (energy) distributed pro rata to the weighted transferred
+      weight (sum of the jobs attached to the step, job weight × the step's
+      times_per_journey): it is the transferred volume that drives network
+      energy.
+    - Servers / Storage / ExternalAPIs: NOT distributed here. A server or a
+      storage is an infra cost that does not slice cleanly by step (it runs
+      for the WHOLE journey); a generative AI call already has an exact
+      attribution via its own job (ExternalApiSpec), no need for an
+      approximate distribution. These items stay only in the site's global
+      totals.
 
-    Retourne {step_key: {"device_kg", "network_kg", "total_kg",
-    "pct_of_grand_total"}}. `pct_of_grand_total` est rapporté au TOTAL CO2e/an
-    du site (tous postes, fabrication + énergie), pas seulement à
-    Devices+Network : une étape ne pèse jamais 100 % du total réel, même si
-    elle concentre tout le Devices/Network réparti ici.
+    Returns {step_key: {"device_kg", "network_kg", "total_kg",
+    "pct_of_grand_total"}}. `pct_of_grand_total` is relative to the site's
+    TOTAL CO2e/year (all items, fabrication + energy), not only to
+    Devices+Network: a step never weighs 100% of the real total, even if it
+    concentrates all the Devices/Network distributed here.
     """
     from efootprint.constants.units import u
 
@@ -501,26 +502,26 @@ def step_impact_shares(built):
 
 
 def consistency_report(built, tolerance_kg=1e-3, relative_tolerance=1e-6):
-    """Vérifie que notre somme par catégorie retombe sur la somme PAR OBJET
-    que la librairie calcule (`fabrication_footprint_sum_over_period` /
-    `energy_footprint_sum_over_period`), objet par objet plutôt que par
-    catégorie agrégée.
+    """Checks that our sum by category lands back on the sum PER OBJECT that
+    the library computes (`fabrication_footprint_sum_over_period` /
+    `energy_footprint_sum_over_period`), object by object rather than by
+    aggregated category.
 
-    Ce n'est pas une preuve que le CHIFFRE est juste : c'est une preuve que
-    notre lecture par catégorie n'a PERDU ni DOUBLÉ aucune contribution en
-    route. Un écart ici signale un bug d'extraction, pas un désaccord de
-    modélisation.
+    This is not proof that the NUMBER is right: it is proof that our
+    category-wise reading neither LOST nor DOUBLED any contribution along the
+    way. A discrepancy here signals an extraction bug, not a modeling
+    disagreement.
 
-    NE PAS comparer à `system.total_footprint` : cet attribut arrondit à 4
-    décimales CHAQUE HEURE avant de sommer 8760 valeurs (bien vu en pratique :
-    170,82 kg contre 170,904 kg ici), un artefact de précision de la
-    librairie, pas un désaccord sur le modèle.
+    DO NOT compare to `system.total_footprint`: that attribute rounds to 4
+    decimals EACH HOUR before summing 8760 values (seen in practice: 170.82
+    kg vs 170.904 kg here), a library precision artifact, not a disagreement
+    about the model.
 
-    Tolérance ABSOLUE et RELATIVE : un modèle à plus d'objets (plusieurs
-    serveurs/jobs) accumule davantage d'arrondis flottants sans qu'il y ait
-    de bug (mesuré : 0,0026 kg d'écart sur un total de 14 481 kg à 3 serveurs,
-    soit 1,8e-7 en relatif — largement sous tolerance_kg en absolu mais visible
-    si on ne regardait que l'absolu sur un total nettement plus petit).
+    ABSOLUTE and RELATIVE tolerance: a model with more objects (several
+    servers/jobs) accumulates more floating-point roundings without any bug
+    (measured: 0.0026 kg of difference on a 14,481 kg total with 3 servers,
+    i.e. 1.8e-7 relative — well under tolerance_kg in absolute terms but
+    visible if only the absolute were watched on a clearly smaller total).
     """
     from efootprint.constants.units import u
 

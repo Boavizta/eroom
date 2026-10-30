@@ -1,0 +1,1398 @@
+{
+  "criteria": [
+    {
+      "id": "1.1",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is there a low tech way exist to achieve this action ?",
+      "explanation": "If there's already a way to do it, does a digital way add value to the user ?",
+      "method": "The criterion is validated if:\nThe team has identified a simpler non-digital or existing solution and demonstrated that the digital version clearly adds value compared to it (time saved, accessibility, reduced material impact).",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.2",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Are the target users, with there business needs, typical devices and ergonomy expectations, well known ?",
+      "explanation": "The product may not be well designed if the target users are not well known, or better, involved in the projet. For instance, the user journeys might be cumbersome or the compatibility strategy might be inadequate.",
+      "method": "The criterion is validated if:\nUser needs and contexts are documented through personas, interviews, usage analytics, and typical devices are well known and considered in the design.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.3",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Are the new features updates mandatory for all devices, with no relation to their operating system or browser ?",
+      "explanation": "New features makes the application heavier. On older devices, users may prefer to keep the product simpler, with better performances and less resources used.",
+      "method": "The criterion is validated if:\nTests show that the update does not degrade performance on older or modest devices, and the product offers optional or lighter modes when needed.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.4",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Does the design include custom made components instead of native ones ?",
+      "explanation": "System components (buttons, menu, forms, ...) are almost always more efficient than custom made ones. Not to mention accessible and compatible.",
+      "method": "The criterion is validated if:\nNative components are preferred or justified; custom components are used only when necessary and show equal or better performance and accessibility than native ones.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.5",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is there animations, videos, sounds, maps (…) that are played automatically ?",
+      "explanation": "Playing this type of content without any user action is annoying and uses resources like bandwidth and gpu.",
+      "method": "The criterion is validated if:\nNo media is launched without user action, or auto-play is technically required and optimised (lightweight, muted by default, user-controlled).",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.6",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is it possible to adapt the resources used by the application to the user's hardware configuration ?",
+      "explanation": "Not everyone has a device capable of running computationally intensive content (like multimedia content, etc.).\nWhat happens if a user tries to run computationally intensive content on an inappropriate device? In this case, ideally, the service should not be blocking and should perform basic functions.",
+      "method": "The criterion is validated if:\nThe application detects limited hardware conditions and automatically switches to lighter behaviours (reduced quality, simplified rendering, disabled heavy processes).",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.7",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Are all features useful, usable and used ?",
+      "explanation": "Simplifying the product by removing unused features will result in less resources used.",
+      "method": "The criterion is validated if:\nUsage data (analytics, logs, feedback) shows that each feature is actually used and provides clear value, and unused or redundant features are identified and removed to reduce resource consumption.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.8",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is the application support poor on the oldest devices targeted ?",
+      "explanation": "Most of the impacts of digital services are on the client devices side. Not pushing these devices to obsolescence by breaking compatibility is very important.",
+      "method": "The criterion is validated if:\nThe application runs correctly on the oldest devices in the target group, without forcing unnecessary upgrades or causing performance issues that accelerate obsolescence.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.9",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is a high bandwidth network required to use the application ?",
+      "explanation": "Requiring high bandwidth means that there's a lot resource use. It indicates that some optimisations are possible to reduce the number and/or the size of requets.",
+      "method": "The criterion is validated if:\nThe application remains usable on low-bandwidth connections, with optimised requests, reduced media sizes, caching strategies or a lightweight mode.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.10",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Does the product uses UX dark patterns that increase resource use ?",
+      "explanation": "UX dark patterns includes infinite scroll, prechecked subscriptions, making unsuscribtion difficult, etc.",
+      "method": "The criterion is validated if:\nNo dark patterns are present, and the design avoids mechanisms like infinite scroll, forced autoplay, or hidden unsubscribe flows that artificially increase page loads and data usage.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.11",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is it possible to change default values (number of elements displayed, quality, refresh frequency, ...) to reduce resource use ?",
+      "explanation": "Users usually don't change the default values. Setting more sober default may result in less resources used.",
+      "method": "The criterion is validated if:\nDefault values are set to sober, resource-efficient options, and users can easily adjust parameters (quality, display count, frequency) toward more demanding modes only if needed.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.12",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is there a lot of tracking on the product ?",
+      "explanation": "Analytics and marketing tracking tools are often responsible of more than a third of the requests on websites. Limiting the number of tools and partner would result in less resources use and improve privacy.",
+      "method": "The criterion is validated if:\nTracking is strictly limited to what is necessary, the number of trackers/tools is minimised, and each tracking request is justified. Removing unnecessary trackers reduces network load and improves privacy.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.13",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Are the main user jouneys optimised to be smooth and efficient ?",
+      "explanation": "Having efficient user journeys with few screens reduces resources use and improves user satisfaction and productivity.",
+      "method": "The criterion is validated if:\nThe main workflows require a minimal number of steps/screens, with no redundant navigation, improving efficiency and reducing the number of server or client requests.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.14",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Are the main screens light and well designed ?",
+      "explanation": "The most used screens must be light in terms of displayed information and media to reduce resources use.",
+      "method": "The criterion is validated if:\nThe most frequently used screens contain only necessary information, use lightweight media, and avoid heavy scripts or components that increase rendering cost.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.15",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Is the service frequently used?",
+      "explanation": "A service that is rarely used but continuously running may represent unnecessary environmental impact.\nConversely, a service used frequently justifies its resource consumption.\nUnderstanding usage frequency helps evaluate whether the service should remain as-is, be simplified, be partially decommissioned, or switch to on-demand execution.",
+      "method": "The criterion is validated if the service shows regular, meaningful usage aligned with its resource footprint.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "1.16",
+      "pillar": "🛖 1 — Product",
+      "criterion": "Volume (number of users)",
+      "explanation": "Knowing the number of active users helps contextualise the environmental impact and determine whether the service’s scale matches its actual audience.\nA large infrastructure serving a small population may indicate overprovisioning, while high usage may fully justify the allocated resources.",
+      "method": "The criterion is validated if the product’s user volume justifies its resource usage and architecture.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "2.1",
+      "pillar": "🗺️ 2 — Architecture",
+      "criterion": "Does the product uses greedy technologies ?",
+      "explanation": "If the products uses heavy technologes like generative IA or blockchain, it may be possible to replace it or use more efficient implementations",
+      "method": "The criterion is validated if the project's technical stack does not include heavy parts (like  LLM or proof based blockchain) that can be replaced with lighter alternatives.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "2.2",
+      "pillar": "🗺️ 2 — Architecture",
+      "criterion": "There is no compatibility strategy",
+      "explanation": "The service should be compatible with all devices it's users may have to avoid pushing theses devices to obsolescence.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the service is not compatible with all it's targeted devices or the list of targeted devices is not known.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "2.3",
+      "pillar": "🗺️ 2 — Architecture",
+      "criterion": "Is it possible to optimise the components separation and communication ?",
+      "explanation": "The architecture choices may allow an efficient scaling strategy that reduces ressources use, but also lead to some overhead if the components separation et coupling is not well optimised.",
+      "method": "An improvement potential exists if components depend too much on each other or if their communication creates slowdowns, errors, or unnecessary complexity.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "2.4",
+      "pillar": "🗺️ 2 — Architecture",
+      "criterion": "Can the peak load be smoothed over a time scale ?",
+      "explanation": "Moving tasks in time using batching or message brokers allow to smooth the load and have a lighter infrastructure, since the peak load is lower.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\nthe application has peak loads and the tasks do not need to be executed right away (not pages displayed for instance)",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "2.5",
+      "pillar": "🗺️ 2 — Architecture",
+      "criterion": "Is there heavy computations or requests which results can be cached ?",
+      "explanation": "If within the system some heavy computations and requests returns the same results several times, it may be possible to cache them. This will save resources and improve performance.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the application does some heavy computations, the result of which is used several times.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.1",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Can the invoice be reduced ?",
+      "explanation": "Deploying a FinOps/GreenOps strategy will allow the product to use less resources.\nAlmost all FinOps practices (localise underused components, use spot instances, adjust components sizes, use managed services, …) allow the reduction of resources use and consequently of environnemental impacts. A strategy aiming a reduction of environnemental impacts is called GreenOps.",
+      "method": "The strength is confirmed if a strategy is in place, otherwise an improvement potential exists.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.2",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "There is no environnement impact tracking in place.",
+      "explanation": "Monitoring Carbon Emission and the Carbon Intensity? Do you know the PUE,WUE of your datacenter? Are you considering moving to greener locations?",
+      "method": "The strength is confirmed if a stisfying monitoring is in place, otherwise an improvement potential exists.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.3",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Is the service hosted in a region where the electricity mix has a high impact ?",
+      "explanation": "The local electrity mix mix very important : choosing the right region has a drastic effect on the impacts of the usage of the service.",
+      "method": "An improvement potential exists if the service is not hosted in France (or another country with a low impact electricity mix)",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.4",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Can the infrastructure be mutualized ?",
+      "explanation": "Using mutualized hosting (though VM, containers, managed services, *aaS) allow the reduction of resource use since it's shared with other products.",
+      "method": "An improvement potential exists if failed if the project's infrastructure is not, or not entirely, mutualised.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.5",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Are the deployment components (VM, server, containers) oversized ?",
+      "explanation": "Use observability tools/methodologies to check the VM/servers load (CPU/RAM). It should be at least 70%.",
+      "method": "An improvement potential exists if some components have a load (CPU or RAM) below 70%.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.6",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Can elasticity/scalability tools and strategies be deployed to reduce the infrastructure size ?",
+      "explanation": "With tools like cron jobs, orchestrators, containers, or functions as a service, it is possible to adjust the number of components deployed. \nSo if the load is low, the number of components is low.",
+      "method": "An improvement potential exists if the project does not use controlled  (i.e., not in open bar mode, but with reasonable limit) elasticity tools and the load is not constant.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.7",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Are all the environnements always on ?",
+      "explanation": "Environnements that are not used (for instance non produciton ones at night or weekends) can be swicthed off.",
+      "method": "An improvement potential exists if the product has running environnements that are not used for some significant amount of time (like night or weekends)",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.8",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Are the test environnements as big as the production ones ?",
+      "explanation": "It's usually not necessary to have as many components (VM, containers) in tests environnements, except for load testing.",
+      "method": "An improvement potential exists if some tests environnements are as big as the production ones.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.1",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Are deletion and archiving mechanisms implemented?",
+      "explanation": "Without automated deletion or archiving, data accumulates unnecessarily and increases storage usage. Retention rules and archiving policies limit data growth and reduce environmental impact.",
+      "method": "The criterion is validated if automatic deletion and archiving mechanisms exist and are effectively applied.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.2",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Are the best practices for database in place ?",
+      "explanation": "An unoptimised database requires more CPU, memory or I/O to deliver the same level of service, which increases energy consumption. Proper indexing, good data modelling and regular maintenance help reduce unnecessary resource usage.",
+      "method": "The criterion is validated if a strategy is applied to optimise the database’s performance.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.3",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Does the product use the right database/storage technologies for the right usages ?",
+      "explanation": "If the product storage needs are large, it may be beneficial to specialize the storage technologies : \n- PG/MYSQL/Oracle/SQLServer or object relation\n- MongoDB for document oriented.\n- Columnar db for analytics.\n- Specialized database (vector, times series).",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the projects has some specific storage needs that would be better saved by another storage system, and the volume is significant (> hundreds of go).",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.4",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Are the tests databases as big as the production ones ?",
+      "explanation": "Usually it's not necessary to have as much data in tests environnements than in production.",
+      "method": "An improvement potential exists if some tests databases are as big as the production ones.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.5",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Is there data duplications ?",
+      "explanation": "If data is duplicated and this is not part of product strategy as High Availability, this usually indicates an optimisation opportunity, except when the duplication results from intentional performance-driven denormalisation.",
+      "method": "The criterion is validated if the team has identified duplicated data and determined whether it is justified or not.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "4.6",
+      "pillar": "💾 4 — Storage and data",
+      "criterion": "Is there data that is very seldom used in the service, and that could be moved to cold storage?",
+      "explanation": "Data that is rarely accessed can be moved to a more energy-efficient but slower storage tier (“cold storage”).\nFor example, transactions older than three months in a banking service can be removed from the main database and archived.\nThe user can still retrieve them, but through a slower process, which is acceptable given their infrequent use.\nFor example: SSD got a 2x to 3x higher embodied carbon impact.",
+      "method": "The criterion is validated if data that is rarely accessed has already been moved to an appropriate cold or tiered storage.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.1",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Is there statical analysis tools in place, revealing potential efficiency improvements  ?",
+      "explanation": "Static analysis helps identify performance and efficiency issues.\nStatic analysis also helps improve quality, making product modification easier.",
+      "method": "Improvement is identified if the statical analysis tools in place have revealed potentiel efficiency improvements.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.2",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Has a campaign of load or stress tests revealed efficiency problems ?",
+      "explanation": "If a load or stress test campaign has revealed efficiency problems, it may be possible to improve the product.",
+      "method": "Improvement is identified if a campaign of load or stress tests revealed efficiency problems",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.3",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Have any areas for improvement in terms of performance/efficiency been identified by the team and put in the backlog?",
+      "explanation": "Improvement is identified if the team has indentified efficicency improvements.",
+      "method": "The criterion is validated if in the tasks identified by the team (issues, tickets, etc.) points for improving performance/efficiency are present.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.4",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Are the performance metrics poor ?",
+      "explanation": "Poor performance implies an optimisation potential. Performance metrics include latency, requests per seconds, Core Web Vitals, etc.",
+      "method": "Improvement is identified if the performance metrics do not match the ambition of the project (for example, more thant 2s to display a web page)",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.5",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Are the most critical use cases (most used user journeys) optimized ?",
+      "explanation": "The most used user journeys are critical to the overall resources used by the application. Applying optimisations on these code path will likely result in good results.",
+      "method": "Improvement is identified if no study has been done to improve the performance/efficiency of the most used code paths.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.6",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Is the technical stack (Java, JS, python, php, ...) not up to date ?",
+      "explanation": "Updating the tools (like the Java Virtual Machine) allow almost free performance and efficiency improvements.",
+      "method": "Improvement is identified if the technical base of the project is not up to date to the last LTS at least.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.7",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Can the components be tuned to improve efficiency ?",
+      "explanation": "Tuning components (like the  Java Virtual Machine) allow performance an efficiency improvements",
+      "method": "Improvement is identified if no study has been done to check if the efficicency of the deployed components could be improved by modifying their configuration.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.8",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Are the dependencies of the project up to date ?",
+      "explanation": "Updating the project dependencies (like the the Spring Framwork in java) may allow performance and efficiency improvements.",
+      "method": "Improvement is identified if the project's main dependencies are not up to date to the last stable release.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "5.9",
+      "pillar": "👨‍💻 5 — Algorithms & code",
+      "criterion": "Is there compatibility problems identified for targeted devices ?",
+      "explanation": "The service should be compatible with all devices it's users may have to avoid pushing theses devices to obsolescence.",
+      "method": "Improvement is identified if the team has identified compatibility problems.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "6.1",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there an efficient observability system in place for the product ?",
+      "explanation": "Without a minimum of knowledge about the runtime behaviour of the product, it's difficult to identify optimisations. No monitoring implies low optimisatin potential.",
+      "method": "The criterion is validated if observability tools are in place.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.2",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there code reviews and/or pair programming in place ?",
+      "explanation": "Code reviews and pair programmaing enforce minimum shared knowledge about the code base and minimum quality.",
+      "method": "The criterion is validated if code reviews and pair programming are performed on most of the project's code.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.3",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there an effective CI/CD in place ?",
+      "explanation": "The presence of a CI/CD is a good indicator of how easy it will be to work on the application with confidence.",
+      "method": "The criterion is validated if the projects is regularily built and tested automatically via a CI/CD tool.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.4",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there non regression tests in place (unit tests, integration tests, end to end tests) ?",
+      "explanation": "The presence of non regression tests allow the programmers to change the software while beeing confident in the absence of problems indeuced by their work.",
+      "method": "The criterion is validated if the project has a large set of automated tests, covering the most important parts of the code base.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.5",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there a strong decloupling between business domain & technical integration ?",
+      "explanation": "Decoupling practives like dependency injection or Hexagonal/Clean/Onion Architecture allow more effective and ambitious technical changes.\nit's 'D' (Dependency Inversion) from 5 Solid principles",
+      "method": "The criterion is validated if it is possible to change technical aspects of the product without modifying the functionnal code.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.6",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there metrics to follow the software quality ?",
+      "explanation": "Like code coverage, cyclomatic complexity, number of issues, number of delivery problems, number of rollbacks, change lead time, deployment frequency, change fail percentage, failed deployment recovery time",
+      "method": "The criterion is validated if there are software quality metrics in place.",
+      "impact_level": "Decisive",
+      "max_potential": 2.0,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.7",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there an extensive documentation ?",
+      "explanation": "The presence of a relevant documentation allow more ambitious changes.",
+      "method": "The criterion is validated if the project has a clear, usable documentation.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.8",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Is there duplicated code in the application ?",
+      "explanation": "Duplicated code can be removed to simplify the products maintenance.",
+      "method": "The criterion is validated if there is no unjustified duplicated code in the project.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.9",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Does the team have sufficient autonomy to deploy the tools it needs to observe, measure or optimise the system?",
+      "explanation": "Ease of change increases when teams can rely on the tools they need to monitor performance, measure impact, or analyse behaviour.\nThis autonomy may come from the ability to install custom tools, or from relying on comprehensive built-in tooling provided by the platform.\nWhat matters is not where the infrastructure is hosted, but whether the team can instrument it effectively to support optimisation.",
+      "method": "The criterion is validated if the team can use or deploy the tools it needs to observe, measure and optimise the system.",
+      "impact_level": "Moderate",
+      "max_potential": 1.0,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    },
+    {
+      "id": "6.10",
+      "pillar": "🛠 6 — Ease of change",
+      "criterion": "Do main components got high availability constraints?",
+      "explanation": "High availability requirements can reduce the team’s ability to modify, migrate or optimise components.\nServices that must maintain strict uptime leave fewer opportunities for maintenance windows, architectural changes or resource optimisation.\nUnderstanding these constraints helps assess how easily the system can evolve toward lower environmental impact.",
+      "method": "The criterion is validated if the system’s availability constraints still allow the team to modify or optimise components without major difficulty.",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "🟢 Easy to change",
+        "🟡 Moderate effort",
+        "🔴 Hard to change"
+      ],
+      "evaluation_coefficient_options": {
+        "🟢 Easy to change": 0,
+        "🟡 Moderate effort": 0.5,
+        "🔴 Hard to change": 1
+      }
+    }
+  ],
+  "quick_diagnostic": [
+    {
+      "id": "0.1",
+      "criterion": "Would it have a high impact if the digital service were to disapear ?",
+      "screens": [
+        "1 - No or negligible impact",
+        "2 - Limited impact on a small group of users or processes",
+        "3 - Moderate impact but workarounds exist",
+        "4 - Significant impact on core activities",
+        "5 - Critical impact (operations blocked, major business or SI risk)"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.2",
+      "criterion": "Are there redondant features or duplicate applications among the system ?",
+      "screens": [
+        "1 - Something very similar already exists elsewhere (same feature or same code).",
+        "2 - Part of it already exists elsewhere.",
+        "3 - Small similarities exist, but nothing major.",
+        "4 - Almost no similarity with other products or code.",
+        "5 - Completely unique; nothing similar exists."
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.3",
+      "criterion": "Do main components got high availability constraints?",
+      "screens": [
+        "1 - 7/7 24/24 - 99.99% - International coverage",
+        "2 - 7/7 24/24 - 99%",
+        "3 - Some SLA.",
+        "4 - 5/7 8/24 - No SLA - No DRP",
+        "5 - No SLA/SLO"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.4",
+      "criterion": "Dependencies: How many technical links to other systems are in place?",
+      "screens": [
+        "1 - The product is not connected to any other systems",
+        "2 - The product is connected to a few of the other systems",
+        "3 - The product is connected to some other systems and the connection is important (business value and/or technical coupling)",
+        "4 - The product is connected to many of the other systems",
+        "5 - The product is connected to most of the other systems in the IS (eg : authentication and authorization)"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.5",
+      "criterion": "Is the source code of the project fully or partially available to the team?",
+      "screens": [
+        "1 - The source code is fully available (open source or fully accessible to the organization)",
+        "2 - The source code is mainly available (code accessible internally, but not to the public).",
+        "3 - The source code is partially available (some components or modules are accessible).",
+        "4 - Access is restricted to a very small group or the supplier only.",
+        "5 - No, the source code is not available / I don't know."
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.6",
+      "criterion": "Are skills available to update the service?",
+      "screens": [
+        "1 - The team is well versed in the functional and technical design of the projet and can work confidently",
+        "2 - The team knows most of the project and can work on it with caution",
+        "3 - The knowledge about the project is poor",
+        "4 - Some people know a bit about the project",
+        "5 - No one knows the project"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.7",
+      "criterion": "Is it possible to simplify the architecture?",
+      "screens": [
+        "1 - Very Complex / I don't know",
+        "2 - Complex",
+        "3 - Medium",
+        "4 - Simple",
+        "5 - Very simple"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.8",
+      "criterion": "Is the infrastructure (number and size of the compenents like VM and containers) very large ?",
+      "screens": [
+        "1 - One of the largest infrastructures in the organisation",
+        "2 - Larger than most services",
+        "3- Comparable to the organisational average",
+        "4- Smaller than most services",
+        "5- Very small (e.g. a few VMs or containers)"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.9",
+      "criterion": "Is an important volume of data stored?",
+      "screens": [
+        "1 - The product has among the largest data storage volumes in the IS / I don't know",
+        "2 - The product stores a large volume of data in the IS compared to most systems",
+        "3 - The product stores an average amount of data compared to the rest of the IS",
+        "4 - The product stores a limited amount of data",
+        "5 - The product stores very little data"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.10",
+      "criterion": "Is there a high functional complexity?",
+      "screens": [
+        "1 - Very Complex / I don't know",
+        "2 - Complex",
+        "3 - Medium",
+        "4 - Simple",
+        "5 - light"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.11",
+      "criterion": "Are user journeys smooth, intuitive, and free of UX/UI friction that could be improved?",
+      "screens": [
+        "1 - The UX/UI is very poor, users complain and/or there are items in the backlog to change it / I don't know",
+        "2 - The UX/UI shows recurring friction points or usability issues",
+        "3 - The UX/UI is functional but a few aspects could be improved",
+        "4 - The UX/UI is clear and pleasant to use, only minor improvements identified",
+        "5 - The UX/UI is well polished, user-tested, and provides a smooth, consistent experience"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.12",
+      "criterion": "Is the product compatible with the oldest hardware of the target fleet and provides a seamless experience on them?",
+      "screens": [
+        "1 - Incompatible or unknown",
+        "2 - Compatible but with significant degradation (irritating or frustrating for the user)",
+        "3 - Compatible and usable but not comfortable (noticeable slowness)",
+        "4 - Compatible and mostly smooth (minor slowdowns)",
+        "5 - Compatible and seamless (comfortable and responsive even on older hardware)"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.13",
+      "criterion": "Does the product backlog contain performance issues and improvements?",
+      "screens": [
+        "1 - In the backlog & recurring discussion",
+        "3 - A few improvements are possible",
+        "5 - No performance problem identified"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.14",
+      "criterion": "Are the main features optimised and efficient?",
+      "screens": [
+        "1 - Not optimized enough / don’t know",
+        "2 - Some main features are inefficient or redundant",
+        "3 - The main features are functional but show room for optimisation",
+        "4 - Most main features are well implemented and perform efficiently",
+        "5 - All main features are fully efficient, streamlined, and regularly reviewed for optimisation"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.15",
+      "criterion": "Is there a policy for data deletion and archiving?",
+      "screens": [
+        "1 - No policy / don’t know",
+        "2 - Informal or ad-hoc deletion and archiving practices",
+        "3 - A policy exists but is not consistently applied",
+        "4 - A clear policy is in place and partially automated",
+        "5 - A strict, applied, and regularly audited policy for data deletion and archiving"
+      ],
+      "impact_level": "Decisive"
+    },
+    {
+      "id": "0.16",
+      "criterion": "Is the service hosted in a country with an impactful electricity mix? (location based)",
+      "screens": [
+        "1 - > 750 gCO2e / kWh",
+        "2- < 500 gCO2e / kWh",
+        "3- < 300 gCO2e / kWh",
+        "4- < 200 gCO2e / kWh",
+        "5- < 100 gCO2e / kWh"
+      ],
+      "impact_level": "Decisive"
+    }
+  ]
+}

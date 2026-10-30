@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p3
-title Workflow Analyse de parcours web — Page 3/5 : Core Web Vitals + Rapport HTML
+title Web journey analysis workflow — Page 3/5 : Core Web Vitals + HTML report
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,66 +22,66 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
 participant "collect_cwv_pagespeed.py" as CW #C8E6C9
 participant "run_lighthouse.sh" as LH #C8E6C9
 participant "generate_report_html.py" as GR #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 37 — Core Web Vitals ==
+== Step 37 — Core Web Vitals ==
 
-alt cwv.json déjà présent
-  C -> C : [Étape 37] cwv.json présent - collecte CWV skippée
-else GOOGLE_API_KEY disponible (voie prioritaire)
-  C -> CW : python3 collect_cwv_pagespeed.py <dossier-audit>
-  CW -> CW : PageSpeed Insights API\n(CrUX terrain + Lighthouse lab, par page)
+alt cwv.json already present
+  C -> C : [Step 37] cwv.json present - CWV collection skipped
+else GOOGLE_API_KEY available (priority path)
+  C -> CW : python3 collect_cwv_pagespeed.py <audit-dir>
+  CW -> CW : PageSpeed Insights API\n(CrUX field + Lighthouse lab, per page)
   CW -> FS : cwv.json {lcp, inp, cls, source: "pagespeed/crux"}
-  FS -> C : cwv.json généré
-else GOOGLE_API_KEY absent (repli)
-  C -> LH : bash run_lighthouse.sh <dossier-audit>
-  LH -> FS : Extraire URLs depuis .har\n(log.pages[].title, dédupliqué)
-  LH -> LH : npx lighthouse <url> par page\n(mode lab, simulation réseau)
-  LH -> FS : cwv.json {lcp, inp, cls par page}
-  FS -> C : cwv.json généré
+  FS -> C : cwv.json generated
+else GOOGLE_API_KEY absent (fallback)
+  C -> LH : bash run_lighthouse.sh <audit-dir>
+  LH -> FS : Extract URLs from .har\n(log.pages[].title, deduplicated)
+  LH -> LH : npx lighthouse <url> per page\n(lab mode, network simulation)
+  LH -> FS : cwv.json {lcp, inp, cls per page}
+  FS -> C : cwv.json generated
   note over LH
-    Si Lighthouse indisponible :
-    warning + rapport sans CWV (onLoad du HAR utilisé comme proxy du LCP).
-    Relance : "relance Lighthouse".
+    If Lighthouse unavailable:
+    warning + report without CWV (HAR onLoad used as LCP proxy).
+    Relaunch: "rerun Lighthouse".
   end note
 end
 
-== Étape 40 — Rapport HTML ==
+== Step 40 — HTML report ==
 
-C -> GR : python3 generate_report_html.py <dossier-audit>
-GR -> FS : Lire .har
-FS -> GR : Trafic réseau brut
-GR -> FS : Lire coverage-analysis.json
-FS -> GR : Métriques code mort JS/CSS
-GR -> FS : Lire cwv.json (si présent)
-FS -> GR : LCP / INP / CLS par page
-GR -> FS : Lire efootprint-synthese-python.json (si présent)
-FS -> GR : Totaux CO2e + hypothèses
-GR -> FS : Lire eof-audit-results.json + eof-radar-<domaine>.svg (si présents)
-FS -> GR : Réponses EOF (mesuré + questionnaire fusionné\npar fusionner_lots.py) + radar 6 dimensions
+C -> GR : python3 generate_report_html.py <audit-dir>
+GR -> FS : Read .har
+FS -> GR : Raw network traffic
+GR -> FS : Read coverage-analysis.json
+FS -> GR : Dead JS/CSS code metrics
+GR -> FS : Read cwv.json (if present)
+FS -> GR : LCP / INP / CLS per page
+GR -> FS : Read efootprint-python-summary.json (if present)
+FS -> GR : CO2e totals + hypotheses
+GR -> FS : Read eof-audit-results.json + eof-radar-<domain>.svg (if present)
+FS -> GR : EOF answers (measured + questionnaire merged\nby merge_lots.py) + 6-dimension radar
 
 note over GR, FS
-  Sections du rapport (dans l'ordre) :
-  1. En-tête : date, domaines, nb pages, fichiers source
-  2. Recommandations priorisées (P1 rouge / P2 orange / P3 vert)
-  3. Bonnes pratiques GreenIT
-  4. Core Web Vitals (si cwv.json - LCP/INP/CLS avec seuils Google)
-  5. Impact environnemental CO2e (si efootprint-synthese-python.json - skill /efootprint)
-  6. Potentiel d'optimisation EOF (si eof-audit-results.json - radar 6 dimensions,
-     réponses "mesuré" + questionnaire fusionné par fusionner_lots.py)
-  7. Annexes : Tableau de bord EcoIndex, Trafic réseau, Code mort, CWV détaillé
-  Si cwv.json absent : LCP affiche onLoad HAR avec note explicite.
-  Section CO2e omise si efootprint-synthese-python.json absent.
-  Section EOF omise si eof-audit-results.json absent (run_eof.py pas encore lancé).
+  Report sections (in order):
+  1. Header: date, domains, page count, source files
+  2. Prioritized recommendations (P1 red / P2 orange / P3 green)
+  3. GreenIT best practices
+  4. Core Web Vitals (if cwv.json - LCP/INP/CLS with Google thresholds)
+  5. CO2e environmental impact (if efootprint-python-summary.json - skill /efootprint)
+  6. EOF optimization potential (if eof-audit-results.json - 6-dimension radar,
+     "measured" answers + questionnaire merged by merge_lots.py)
+  7. Appendices: EcoIndex dashboard, Network traffic, Dead code, detailed CWV
+  If cwv.json absent: LCP shows HAR onLoad with an explicit note.
+  CO2e section omitted if efootprint-python-summary.json absent.
+  EOF section omitted if eof-audit-results.json absent (run_eof.py not run yet).
 end note
 
-GR -> GR : check_valeurs_rapport.py (interne, non bloquant)\ndétecte les valeurs mal substituées (None%, NaN, {{...}})
-GR -> C : rapport-parcours-YYYY-MM-DD.html
-C -> U : Rapport livré :\n<dossier-audit>/rapport-parcours-YYYY-MM-DD.html
+GR -> GR : check_report_values.py (internal, non-blocking)\ndetects badly substituted values (None%, NaN, {{...}})
+GR -> C : journey-report-YYYY-MM-DD.html
+C -> U : Report delivered:\n<audit-dir>/journey-report-YYYY-MM-DD.html
 
 @enduml

@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
-# Génère cwv.json depuis Lighthouse CLI pour un dossier d'audit.
-# Usage : run_lighthouse.sh <dossier-audit> [url-page1 url-page2 ...]
-#   Sans URLs : extrait automatiquement toutes les URLs uniques du .har dans <dossier-audit>.
-# Sortie : <dossier-audit>/cwv.json (format attendu par generate_report_html.py)
+# Generates cwv.json from the Lighthouse CLI for an audit folder.
+# Usage: run_lighthouse.sh <audit-dir> [url-page1 url-page2 ...]
+#   Without URLs: automatically extracts all unique URLs from the .har in <audit-dir>.
+# Output: <audit-dir>/cwv.json (format expected by generate_report_html.py)
 #
-# Prérequis : Node.js installé.
-# Utilise en priorité l'install locale (node_modules/.bin/lighthouse).
-# Sinon bascule sur npx (version non fixée).
-# Pour fixer la version : npm install --prefix <dossier-scripts>/
+# Prerequisite: Node.js installed.
+# Prefers the local install (node_modules/.bin/lighthouse).
+# Otherwise falls back to npx (unpinned version).
+# To pin the version: npm install --prefix <scripts-dir>/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_BIN="${SCRIPT_DIR}/node_modules/.bin/lighthouse"
 
-AUDIT_DIR="${1:?Usage: $0 <dossier-audit> [url-page1 url-page2 ...]}"
+AUDIT_DIR="${1:?Usage: $0 <audit-dir> [url-page1 url-page2 ...]}"
 shift
 URLS=("$@")
 
-# Auto-extraction des URLs depuis le HAR si aucune URL fournie
+# Auto-extract URLs from the HAR if none provided
 if [[ ${#URLS[@]} -eq 0 ]]; then
     HAR_FILE=$(find "$AUDIT_DIR" -maxdepth 1 -name "*.har" | head -1)
     if [[ -z "$HAR_FILE" ]]; then
         HAR_FILE=$(find "$AUDIT_DIR/.." -maxdepth 1 -name "*.har" | head -1)
     fi
     if [[ -z "$HAR_FILE" ]]; then
-        echo "Erreur : aucun fichier .har dans $AUDIT_DIR ni dans $(dirname "$AUDIT_DIR") et aucune URL fournie." >&2
+        echo "Error: no .har file in $AUDIT_DIR nor in $(dirname "$AUDIT_DIR") and no URL provided." >&2
         exit 1
     fi
-    echo "[ Lighthouse ] Extraction automatique des URLs depuis $(basename "$HAR_FILE")..."
+    echo "[ Lighthouse ] Automatic URL extraction from $(basename "$HAR_FILE")..."
     mapfile -t URLS < <(python3 - "$HAR_FILE" <<'PYEOF'
 import json, sys
 with open(sys.argv[1]) as f:
@@ -42,31 +42,31 @@ for p in har["log"]["pages"]:
 PYEOF
 )
     if [[ ${#URLS[@]} -eq 0 ]]; then
-        echo "Erreur : aucune URL extraite du HAR." >&2
+        echo "Error: no URL extracted from the HAR." >&2
         exit 1
     fi
-    echo "[ Lighthouse ] ${#URLS[@]} URL(s) extraite(s) du HAR."
+    echo "[ Lighthouse ] ${#URLS[@]} URL(s) extracted from the HAR."
 fi
 
-# Sélection du binaire Lighthouse
+# Select the Lighthouse binary
 if [[ -x "$LOCAL_BIN" ]]; then
     LH_VERSION=$("$LOCAL_BIN" --version 2>/dev/null || echo "?")
-    echo "[ Lighthouse ] version ${LH_VERSION} (install locale)"
+    echo "[ Lighthouse ] version ${LH_VERSION} (local install)"
     LH_CMD="$LOCAL_BIN"
 elif command -v npx >/dev/null 2>&1; then
-    echo "[ Lighthouse ] install locale absente - utilisation de npx (version non fixée)"
-    echo "  Pour fixer la version : npm install --prefix ${SCRIPT_DIR}"
+    echo "[ Lighthouse ] local install missing - using npx (unpinned version)"
+    echo "  To pin the version: npm install --prefix ${SCRIPT_DIR}"
     LH_CMD="npx --yes lighthouse@latest"
 else
-    echo "Erreur : ni install locale ni npx disponibles." >&2
-    echo "  Installe Node.js : https://nodejs.org" >&2
+    echo "Error: neither local install nor npx available." >&2
+    echo "  Install Node.js: https://nodejs.org" >&2
     exit 1
 fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "[ Lighthouse ] $((${#URLS[@]})) page(s) à analyser..."
+echo "[ Lighthouse ] $((${#URLS[@]})) page(s) to analyze..."
 
 JSON_ENTRIES=""
 PAGE_NUM=0
@@ -85,14 +85,14 @@ for URL in "${URLS[@]}"; do
         --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
         --only-categories=performance \
         --quiet 2>/dev/null || {
-        echo "     Avertissement : Lighthouse a échoué pour ${URL}, page ignorée." >&2
+        echo "     Warning: Lighthouse failed for ${URL}, page skipped." >&2
         continue
     }
 
-    # Extraire LCP, INP, CLS depuis le JSON Lighthouse
-    # largest-contentful-paint : numericValue en ms -> convertir en s
-    # interaction-to-next-paint (Lighthouse 11+) : numericValue en ms
-    # cumulative-layout-shift : numericValue (score décimal)
+    # Extract LCP, INP, CLS from the Lighthouse JSON
+    # largest-contentful-paint: numericValue in ms -> convert to s
+    # interaction-to-next-paint (Lighthouse 11+): numericValue in ms
+    # cumulative-layout-shift: numericValue (decimal score)
     LCP=$(python3 - "$LH_OUT" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -133,11 +133,11 @@ PYEOF
 done
 
 if [[ -z "$JSON_ENTRIES" ]]; then
-    echo "Erreur : aucune page analysée avec succès." >&2
+    echo "Error: no page analyzed successfully." >&2
     exit 1
 fi
 
 CWV_PATH="${AUDIT_DIR}/cwv.json"
 printf "[\n%s\n]\n" "$JSON_ENTRIES" > "$CWV_PATH"
 
-echo "[ Lighthouse ] cwv.json écrit : ${CWV_PATH}"
+echo "[ Lighthouse ] cwv.json written: ${CWV_PATH}"

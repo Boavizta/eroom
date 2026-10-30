@@ -1,22 +1,22 @@
 #!/bin/bash
-# Convertit un diagramme .svg en un .pptx a une seule diapositive (image plein cadre).
+# Converts a .svg diagram into a single-slide .pptx (full-frame image).
 #
-# Pourquoi ce detour (SVG -> PNG -> ODP fabrique a la main -> PPTX via LibreOffice) :
-# LibreOffice headless n'a pas de filtre d'export direct SVG/PNG -> PPTX (le SVG et le
-# PNG s'ouvrent comme des documents Draw, qui ne savent exporter qu'en formats Draw).
-# En revanche il convertit tres bien un document de PRESENTATION (ODP) vers PPTX. On
-# fabrique donc un .odp minimal (une page, une image plein cadre) puis on le convertit.
+# Why this detour (SVG -> PNG -> hand-built ODP -> PPTX via LibreOffice):
+# LibreOffice headless has no direct SVG/PNG -> PPTX export filter (SVG and
+# PNG open as Draw documents, which can only export to Draw formats).
+# However it converts very well a PRESENTATION document (ODP) to PPTX. So we
+# build a minimal .odp (one slide, one full-frame image) then convert it.
 #
-# Limite connue : le diagramme est incruste en IMAGE (comme le PDF/JPG), pas en formes
-# vectorielles editables. Pour un PPTX avec des formes modifiables dans PowerPoint/Keynote,
-# il faut repasser par un export manuel depuis un outil de dessin - ce script sert a
-# eviter que le fichier reste bloque sur un unique export manuel non reproductible.
+# Known limitation: the diagram is embedded as an IMAGE (like in the PDF/JPG), not as
+# editable vector shapes. For a PPTX with shapes editable in PowerPoint/Keynote,
+# go back through a manual export from a drawing tool — this script exists to
+# avoid the file staying stuck on a single non-reproducible manual export.
 #
-# Usage : svg_to_pptx.sh <fichier.svg> [largeur_png_px]
+# Usage: svg_to_pptx.sh <file.svg> [png_width_px]
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-  echo "Usage : $0 <fichier.svg> [largeur_png_px]" >&2
+  echo "Usage: $0 <file.svg> [png_width_px]" >&2
   exit 1
 fi
 
@@ -24,7 +24,7 @@ SVG="$1"
 PNG_WIDTH="${2:-1920}"
 
 if [ ! -f "$SVG" ]; then
-  echo "Fichier introuvable : $SVG" >&2
+  echo "File not found: $SVG" >&2
   exit 1
 fi
 
@@ -36,9 +36,9 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 PNG="$WORK_DIR/image1.png"
 rsvg-convert -b white -w "$PNG_WIDTH" "$SVG" -o "$PNG"
 
-# Largeur de diapositive fixee au standard PowerPoint 16:9 (33.867cm = 13.333in) ;
-# la hauteur se deduit du ratio reel du PNG pour un remplissage plein cadre sans
-# deformation ni bande vide.
+# Slide width fixed to the PowerPoint 16:9 standard (33.867cm = 13.333in) ;
+# the height is deduced from the real ratio of the PNG for a full-frame fill without
+# distortion nor empty band.
 read -r PX_W PX_H <<< "$(magick identify -format "%w %h" "$PNG")"
 PAGE_W_CM="33.867"
 PAGE_H_CM="$(LC_NUMERIC=C awk -v w="$PAGE_W_CM" -v pw="$PX_W" -v ph="$PX_H" 'BEGIN { printf "%.3f", w * ph / pw }')"
@@ -52,36 +52,36 @@ printf 'application/vnd.oasis.opendocument.presentation' > "$ODP_DIR/mimetype"
 cat > "$ODP_DIR/META-INF/manifest.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
- <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.presentation"/>
- <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
- <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
- <manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>
- <manifest:file-entry manifest:full-path="Pictures/image1.png" manifest:media-type="image/png"/>
+  <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.presentation"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+  <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
+  <manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>
+  <manifest:file-entry manifest:full-path="Pictures/image1.png" manifest:media-type="image/png"/>
 </manifest:manifest>
 EOF
 
 cat > "$ODP_DIR/meta.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.2">
- <office:meta/>
+  <office:meta/>
 </office:document-meta>
 EOF
 
 cat > "$ODP_DIR/styles.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
- xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
- xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
- office:version="1.2">
- <office:styles/>
- <office:automatic-styles>
-  <style:page-layout style:name="PL1">
-   <style:page-layout-properties fo:page-width="${PAGE_W_CM}cm" fo:page-height="${PAGE_H_CM}cm" style:print-orientation="landscape"/>
-  </style:page-layout>
- </office:automatic-styles>
- <office:master-styles>
-  <style:master-page style:name="Default" style:page-layout-name="PL1"/>
- </office:master-styles>
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  office:version="1.2">
+  <office:styles/>
+  <office:automatic-styles>
+   <style:page-layout style:name="PL1">
+    <style:page-layout-properties fo:page-width="${PAGE_W_CM}cm" fo:page-height="${PAGE_H_CM}cm" style:print-orientation="landscape"/>
+   </style:page-layout>
+  </office:automatic-styles>
+  <office:master-styles>
+   <style:master-page style:name="Default" style:page-layout-name="PL1"/>
+  </office:master-styles>
 </office:document-styles>
 EOF
 
@@ -94,21 +94,21 @@ cat > "$ODP_DIR/content.xml" <<EOF
   xmlns:xlink="http://www.w3.org/1999/xlink"
   xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
   office:version="1.2">
- <office:automatic-styles>
-  <style:style style:name="gr1" style:family="graphic">
-   <style:graphic-properties draw:stroke="none" draw:fill="none" style:mirror="none"/>
-  </style:style>
-  <style:style style:name="Pg1" style:family="drawing-page"/>
- </office:automatic-styles>
- <office:body>
-  <office:presentation>
-   <draw:page draw:name="page1" draw:style-name="Pg1" draw:master-page-name="Default">
-    <draw:frame draw:style-name="gr1" draw:layer="layout" svg:width="${PAGE_W_CM}cm" svg:height="${PAGE_H_CM}cm" svg:x="0cm" svg:y="0cm">
-     <draw:image xlink:href="Pictures/image1.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>
-    </draw:frame>
-   </draw:page>
-  </office:presentation>
- </office:body>
+  <office:automatic-styles>
+   <style:style style:name="gr1" style:family="graphic">
+    <style:graphic-properties draw:stroke="none" draw:fill="none" style:mirror="none"/>
+   </style:style>
+   <style:style style:name="Pg1" style:family="drawing-page"/>
+  </office:automatic-styles>
+  <office:body>
+   <office:presentation>
+    <draw:page draw:name="page1" draw:style-name="Pg1" draw:master-page-name="Default">
+     <draw:frame draw:style-name="gr1" draw:layer="layout" svg:width="${PAGE_W_CM}cm" svg:height="${PAGE_H_CM}cm" svg:x="0cm" svg:y="0cm">
+      <draw:image xlink:href="Pictures/image1.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>
+     </draw:frame>
+    </draw:page>
+   </office:presentation>
+  </office:body>
 </office:document-content>
 EOF
 
@@ -118,4 +118,4 @@ ODP_FILE="$WORK_DIR/$BASE.odp"
 soffice --headless --convert-to pptx --outdir "$WORK_DIR" "$ODP_FILE" >/dev/null
 
 mv "$WORK_DIR/$BASE.pptx" "$OUT_DIR/$BASE.pptx"
-echo "OK : $OUT_DIR/$BASE.pptx"
+echo "OK: $OUT_DIR/$BASE.pptx"

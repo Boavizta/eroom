@@ -1,5 +1,5 @@
 @startuml eof-questionnaire-sequence-p3
-title Questionnaire EOF - Page 3/3 : relire, fusionner, refaire le rapport
+title EOF questionnaire - Page 3/3 : read back, merge, redo the report
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,69 +22,69 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Auditeur" as U #82C1DD
+actor "Auditor" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
 participant "parse_questionnaire.py" as PQ #DBDDE5
-participant "fusionner_lots.py" as FL #DBDDE5
+participant "merge_lots.py" as FL #DBDDE5
 participant "generate_report_html.py" as GR #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
-== Relire les cases cochées ==
+== Read back the ticked boxes ==
 
-U -> C : Demander la relecture
-C -> PQ : python3 parse_questionnaire.py <dossier-audit>
-PQ -> FS : Lire questionnaire-eof.md rempli
-FS -> PQ : Cases cochées
-PQ -> PQ : Se repérer sur les commentaires HTML,\njamais sur un numéro de ligne
-PQ -> FS : lots/relecture-questionnaire.json\n+ un bloc mesure disant si le fichier était là
+U -> C : Request the read-back
+C -> PQ : python3 parse_questionnaire.py <audit-dir>
+PQ -> FS : Read the filled-in questionnaire-eof.md
+FS -> PQ : Ticked boxes
+PQ -> PQ : Navigate on the HTML comments,\nnever on a line number
+PQ -> FS : lots/questionnaire-review.json\n+ a measurement block saying whether the file was there
 
 note over PQ, FS
-  Provenance posée sur ces réponses : "precise",
-  c'est-à-dire une case cochée par le service audité,
-  sans preuve apportée.
-  Une case "Je ne sais pas" ne devient jamais une
-  réponse : elle reste un simple commentaire.
+  Provenance set on these answers: "stated",
+  i.e. a box ticked by the audited service,
+  without attached proof.
+  An "I don't know" box never becomes an
+  answer: it stays a simple comment.
 end note
 
-== Fusionner le mesuré et le déclaré ==
+== Merge the measured and the declared ==
 
-C -> FL : python3 fusionner_lots.py <dossier-audit>
-FL -> FS : Lire tous les lots/*.json
-FS -> FL : Jugement automatique\n+ relecture questionnaire
-FL -> FL : Appliquer la précédence :\ncollecte > estime > precise > declare > suppose
+C -> FL : python3 merge_lots.py <audit-dir>
+FL -> FS : Read all lots/*.json
+FS -> FL : Automatic judgment\n+ questionnaire read-back
+FL -> FL : Apply the precedence:\ncollected > estimated > stated > declared > assumed
 
 note over FL, FS
-  Ce que la précédence garantit :
-  une valeur que nous avons mesurée nous-mêmes ne peut
-  jamais être écrasée par une déclaration.
-  Mais une case cochée par le client passe AVANT une
-  déduction que nous ferions depuis un indice faible :
-  le client connaît son équipe, nous devinons.
+  What the precedence guarantees:
+  a value we measured ourselves can
+  never be overwritten by a declaration.
+  But a box ticked by the client comes BEFORE a
+  deduction we would make from a weak signal:
+  the client knows their team, we guess.
 end note
 
-alt Deux lots se contredisent à provenance égale
-  FL -> C : Refus de fusionner, sortie en erreur
-else Divergence entre provenances différentes
-  FL -> FS : La provenance la plus haute gagne,\nl'écart est consigné dans le contexte
+alt Two lots contradict at equal provenance
+  FL -> C : Refuse to merge, error exit
+else Divergence between different provenances
+  FL -> FS : The highest provenance wins,\nthe discrepancy is recorded in the context
 end
 
-FL -> FS : eof-audit-results.json\n(réécrit : mesuré + déclaré)
-FL -> FS : eof-radar-<domaine>.svg\n(régénéré, 2 couches)
+FL -> FS : eof-audit-results.json\n(rewritten: measured + declared)
+FL -> FS : eof-radar-<domain>.svg\n(regenerated, 2 layers)
 
-== Refaire le rapport ==
+== Redo the report ==
 
-C -> GR : python3 generate_report_html.py <dossier-audit>
-GR -> FS : Lire eof-audit-results.json\n+ le radar régénéré
-GR -> FS : rapport-parcours-AAAA-MM-JJ.html
-C -> U : Rapport enrichi des réponses\nde l'équipe du service audité
+C -> GR : python3 generate_report_html.py <audit-dir>
+GR -> FS : Read eof-audit-results.json\n+ the regenerated radar
+GR -> FS : journey-report-YYYY-MM-DD.html
+C -> U : Report enriched with the answers\nof the audited service's team
 
 note over U, FS
-  PIÈGE. LE PIÈGE DE MANIPULATION À CONNAÎTRE.
-  run_eof.py réécrit eof-audit-results.json sans relire
-  les lots. Le relancer seul fait donc disparaître du
-  rapport toutes les réponses du questionnaire, en
-  silence. Il faut toujours relancer fusionner_lots.py
-  derrière run_eof.py.
+  TRAP. THE MANIPULATION TRAP TO KNOW.
+  run_eof.py rewrites eof-audit-results.json without re-reading
+  the lots. Rerunning it alone therefore makes all the
+  questionnaire answers disappear from the
+  report, silently. Always rerun merge_lots.py
+  after run_eof.py.
 end note
 
 @enduml

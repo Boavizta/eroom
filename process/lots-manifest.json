@@ -1,0 +1,455 @@
+{
+  "version": 1,
+  "label": "Manifest of the lots of the EOF audit process",
+  "purpose": "Describe the breakdown of the audit work into independent lots, as machine-readable data, so that the orchestrator can be replaced without rewriting the process. No mechanism specific to a particular harness appears here: a lot is executed by a script, by any LLM agent, or by a human.",
+  "reference": ".claude/skills/eof/docs/EOF-V.1.1 (EROOM Optimization Framework) - Template - English/eof-reference.json",
+  "lot_output_schema": "process/lot-output-schema.json",
+  "conventions": {
+    "audit_dir": "audits/<domain>",
+    "lot_output": "audits/<domain>/lots/<lot_id>.json",
+    "provenance_precedence": ["collected", "estimated", "stated", "declared", "assumed"],
+    "precedence_rule": "A higher provenance can never be overwritten by a lower one. In case of divergence between two provenances on the same criterion, the criterion comes out with the discrepancy made explicit in the context, and the provenances remain distinguishable up to the radar. The 'stated' provenance (box ticked by the client without attached proof) is placed above 'declared' (public declaration found, e.g. T&Cs): the client knows their team and their technical reality directly, whereas a public declaration is sometimes generic or dated, written without technical verification. The 'assumed' provenance designates a deduction from a weak signal: it is placed last in precedence because a box ticked by the client without proof (stated) is worth more - the client knows their team, while we guess from a signal that often talks about something else.",
+    "disjoint_ownership": "Owning a criterion means having the right to put an answer on it. Each criterion of the reference belongs to exactly one judgment lot: two lots therefore cannot contradict each other, and the lot execution order does not influence the result. The validation script refuses a manifest where a criterion is owned by two lots, or by none.",
+    "context_contribution": "Contributing a context is NOT owning. A lot may write a context on a criterion it does not own: that is material for the owning lot, not a verdict. A lot that sets an answer on a criterion it does not own must be refused at merge time. This is what distinguishes automatable criteria, settled by script, from merely partial criteria, where the script only provides a hint and leaves the verdict to the dimension lot.",
+    "residual_ownership": "A residual-ownership lot owns no criterion exclusively: it may answer on any criterion still without a verdict after the owning lots. Its answer is kept if no owning lot set an answer. In case of divergence with an owning lot, the owning lot's answer is kept (highest precedence provenance), the divergence field goes to true, and the context records the discrepancy between the provenances. One residual lot per provenance only: otherwise the read order would influence the result. Provenance precedence remains the only arbitration rule.",
+    "no_data": "The absence of a signal is data, never a worst-case default. A lot that finds nothing writes an entry without an answer, with a context saying what was searched.",
+    "replay": "Every lot is replayable alone and idempotent: overwriting its output file then rerunning the merge is enough, without redoing the other lots."
+  },
+  "waves": [
+    {
+      "id": "0-collection",
+      "label": "Evidence collection, broken down by source",
+      "default_executor": "script",
+      "note": "No LLM. The same probe feeds criteria of several dimensions: collection is therefore shared upstream, and not redone by each judgment lot."
+    },
+    {
+      "id": "1-automatic-judgment",
+      "label": "Deterministic judgment of automatable criteria",
+      "default_executor": "script"
+    },
+    {
+      "id": "2-gate-judgment",
+      "label": "Quick diagnostic and ease of change, before the go/no-go gate",
+      "default_executor": "llm"
+    },
+    {
+      "id": "3-dimension-judgment",
+      "label": "Detailed judgment of dimensions 1 to 5",
+      "default_executor": "llm"
+    },
+    {
+      "id": "4-questionnaire",
+      "label": "Generation then re-reading of the check-list questionnaire",
+      "default_executor": "script"
+    },
+    {
+      "id": "5-consolidation",
+      "label": "Merging and production of deliverables",
+      "default_executor": "script"
+    }
+  ],
+  "lots": [
+    {
+      "id": "collect-har-coverage",
+      "wave": "0-collection",
+      "label": "HAR, code coverage, headers, HTML/CSS criteria",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/analyze_har.py",
+        ".claude/skills/analyse-parcours/scripts/har_metrics.py",
+        ".claude/skills/analyse-parcours/scripts/coverage_metrics.py",
+        ".claude/skills/analyse-parcours/scripts/analyze_security_headers.py",
+        ".claude/skills/analyse-parcours/scripts/parse_html_criteria.py"
+      ],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": [],
+      "inputs": ["audits/<domain>/raw-data-potentially-sensitive/"],
+      "data_outputs": [
+        "audits/<domain>/audit/har-analysis.json",
+        "audits/<domain>/audit/coverage-analysis.json",
+        "audits/<domain>/security-headers-analysis.json",
+        "audits/<domain>/html-css-criteria.json"
+      ],
+      "lot_output": null,
+      "allowed_provenances": ["collected"],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "human_prerequisite": "The HAR capture must have been made AFTER accepting the cookie consent, otherwise the real trackers are absent and the measurement is only a floor.",
+      "note": "Collection lot: it produces data, not verdicts, hence no lot output file in the schema format."
+    },
+    {
+      "id": "collect-network-osint",
+      "wave": "0-collection",
+      "label": "DNS, TLS, certificate transparency logs, well-known endpoints",
+      "executor": "script",
+      "state": "partially_written",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/scan_wellknown.py"
+      ],
+      "scripts_to_write": [
+        "DNS probe (TXT, MX, NS, A): count the technical links to other systems",
+        "probe of accepted TLS versions: verify that encryption was really negotiated, never trust the SSL-Session block that openssl prints even when the handshake fails",
+        "certificate transparency log probe: inventory of environments without ever contacting the audited domain",
+        "non-production subdomain probe: candidates from transparency logs, validation by content signature and never by HTTP code, with a control probe on an absurd name to detect a wildcard DNS"
+      ],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": [],
+      "inputs": ["audits/<domain>/env-data.json"],
+      "data_outputs": [
+        "audits/<domain>/wellknown-scan.json",
+        "audits/<domain>/reseau-osint.json"
+      ],
+      "lot_output": null,
+      "allowed_provenances": ["collected"],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "note": "Isolated from the other collection lots because its network dependencies are external and flaky: an unavailable certificate log service must not force replaying the HAR capture."
+    },
+    {
+      "id": "collect-public-pages",
+      "wave": "0-collection",
+      "label": "Pages published by the audited organization",
+      "executor": "script",
+      "state": "to_write",
+      "scripts": [],
+      "scripts_to_write": [
+        "a single probe parameterized by a catalog of candidate URL families: accessibility, eco-design, data protection, legal notices, cookie management, sitemap, extra-financial report"
+      ],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": [],
+      "inputs": [],
+      "data_outputs": [
+        "audits/<domain>/public-pages/",
+        "audits/<domain>/public-pages/inventaire.json"
+      ],
+      "lot_output": null,
+      "allowed_provenances": ["declared"],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "constraint": "Mandatory signature check against the home page (size and title): a site can answer 200 with its home page on any non-existent URL. A 200 code therefore proves nothing.",
+      "note": "A single parameterized probe, not one per family: the verification schema is identical, only the URL catalog changes."
+    },
+    {
+      "id": "collect-external-metrics",
+      "wave": "0-collection",
+      "label": "Environment, traffic, performance measured by third parties",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/collect_env_data.py",
+        ".claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py",
+        ".claude/skills/analyse-parcours/scripts/detect_tech.py",
+        ".claude/skills/analyse-parcours/scripts/similarweb_api.py"
+      ],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": ["collect-har-coverage"],
+      "inputs": ["audits/<domain>/raw-data-potentially-sensitive/"],
+      "data_outputs": [
+        "audits/<domain>/env-data.json",
+        "audits/<domain>/cwv.json"
+      ],
+      "lot_output": null,
+      "allowed_provenances": ["collected"],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "constraint": "API keys live in the environment file at the project root, never in the manifest nor in a prompt.",
+      "note": "Behind a content delivery network, the observed IP address is a point of presence close to the auditor and not the origin of the service: the deduced country then carries a degraded confidence and an explanatory note."
+    },
+    {
+      "id": "automatic-judgment",
+      "wave": "1-automatic-judgment",
+      "label": "Deterministic verdicts and hints",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [".claude/skills/analyse-parcours/scripts/run_eof.py"],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": [
+        "collect-har-coverage",
+        "collect-network-osint",
+        "collect-external-metrics"
+      ],
+      "inputs": ["audits/<domain>/"],
+      "data_outputs": ["audits/<domain>/eof-audit-results.json"],
+      "lot_output": "audits/<domain>/lots/automatic-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared", "assumed"],
+      "owned_criteria": {
+        "source": ".claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py",
+        "rule": "the criteria whose mapping-table category is declared automatable, and only those: these are the criteria a script settles"
+      },
+      "allowed_contexts": {
+        "source": ".claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py",
+        "rule": "the partial-category criteria: the script writes a context there, never an answer, and the verdict stays with the dimension lot"
+      },
+      "replayable_alone": true,
+      "note": "A partial-category hint does not count in the covered potential: it is context for the judgment, not a verdict. Never present the addition of hints as a coverage gain."
+    },
+    {
+      "id": "quick-diagnostic-judgment",
+      "wave": "2-gate-judgment",
+      "label": "Quick diagnostic, 16 questions all decisive",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/quick-diagnostic-judgment.md",
+      "depends_on": ["automatic-judgment", "collect-public-pages"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json",
+        "audits/<domain>/env-data.json"
+      ],
+      "lot_output": "audits/<domain>/lots/quick-diagnostic-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "0.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line, never the content of the produced file",
+      "note": "Goes first because it feeds the go/no-go gate."
+    },
+    {
+      "id": "dimension-6-judgment",
+      "wave": "2-gate-judgment",
+      "label": "Dimension 6, ease of change",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["automatic-judgment", "collect-network-osint"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/reseau-osint.json",
+        "audits/<domain>/public-pages/inventaire.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-6-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "6.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line",
+      "note": "Second entry of the gate: if the diagnostic is bad and change is hard, the detailed audit has no purpose."
+    },
+    {
+      "id": "go-no-go-gate",
+      "wave": "2-gate-judgment",
+      "label": "Decision to continue the detailed audit",
+      "executor": "human",
+      "state": "to_write",
+      "type": "gate",
+      "scripts_to_write": [
+        "a script that prints the state of the 16 quick-diagnostic questions, that of the dimension-6 criteria, and the covered potential: it does not arbitrate, it shows"
+      ],
+      "depends_on": ["quick-diagnostic-judgment", "dimension-6-judgment"],
+      "inputs": [
+        "audits/<domain>/lots/quick-diagnostic-judgment.json",
+        "audits/<domain>/lots/dimension-6-judgment.json"
+      ],
+      "lot_output": null,
+      "allowed_provenances": [],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "decision": "Continue to wave 3, or stop the audit and deliver the diagnostic alone.",
+      "note": "No numeric threshold: stopping an audit is a mission judgment, and a threshold invented on a single test service would be wrong elsewhere."
+    },
+    {
+      "id": "dimension-1-judgment",
+      "wave": "3-dimension-judgment",
+      "label": "Dimension 1, product",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["go-no-go-gate"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json",
+        "audits/<domain>/audit/har-analysis.json",
+        "audits/<domain>/env-data.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-1-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "1.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line"
+    },
+    {
+      "id": "dimension-2-judgment",
+      "wave": "3-dimension-judgment",
+      "label": "Dimension 2",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["go-no-go-gate"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json",
+        "audits/<domain>/audit/har-analysis.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-2-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "2.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line"
+    },
+    {
+      "id": "dimension-3-judgment",
+      "wave": "3-dimension-judgment",
+      "label": "Dimension 3",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["go-no-go-gate"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json",
+        "audits/<domain>/reseau-osint.json",
+        "audits/<domain>/env-data.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-3-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "3.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line",
+      "note": "The reference numbering for dimension 3 is continuous from 3.1 to 3.8: 8 criteria, no gap."
+    },
+    {
+      "id": "dimension-4-judgment",
+      "wave": "3-dimension-judgment",
+      "label": "Dimension 4",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["go-no-go-gate"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-4-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "4.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line"
+    },
+    {
+      "id": "dimension-5-judgment",
+      "wave": "3-dimension-judgment",
+      "label": "Dimension 5",
+      "executor": "llm",
+      "state": "to_write",
+      "prompt": "process/prompts/jugement-dimension.md",
+      "depends_on": ["go-no-go-gate"],
+      "inputs": [
+        "audits/<domain>/lots/automatic-judgment.json",
+        "audits/<domain>/public-pages/inventaire.json",
+        "audits/<domain>/cwv.json",
+        "audits/<domain>/audit/har-analysis.json"
+      ],
+      "lot_output": "audits/<domain>/lots/dimension-5-judgment.json",
+      "allowed_provenances": ["collected", "estimated", "declared"],
+      "owned_criteria": {"id_prefix": "5.", "except_lots": ["automatic-judgment"]},
+      "replayable_alone": true,
+      "expected_output": "a single confirmation line"
+    },
+    {
+      "id": "questionnaire-generation",
+      "wave": "4-questionnaire",
+      "label": "Emission of the file to tick, on the real residual",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/generate_questionnaire.py",
+        ".claude/skills/analyse-parcours/scripts/questionnaire-blocs.json",
+        ".claude/skills/analyse-parcours/scripts/validate_questionnaire_blocks.py"
+      ],
+      "depends_on": [
+        "dimension-1-judgment",
+        "dimension-2-judgment",
+        "dimension-3-judgment",
+        "dimension-4-judgment",
+        "dimension-5-judgment"
+      ],
+      "inputs": ["audits/<domain>/eof-audit-results.json"],
+      "data_outputs": [
+        "audits/<domain>/questionnaire-eof.md"
+      ],
+      "lot_output": null,
+      "allowed_provenances": [],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "constraint": "The questionnaire is generated, never written by hand: automatic coverage differs from one service to another, so a frozen questionnaire would be wrong for the next service. The design work goes into the question-block library and the ordering rules, not into a deliverable.",
+      "note": "A single file to tick, ordered to allow the gate decision before everything is filled in. The split into two separate files (business and technical) was abandoned."
+    },
+    {
+      "id": "questionnaire-review",
+      "wave": "4-questionnaire",
+      "label": "Reading of the ticked answers",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [".claude/skills/analyse-parcours/scripts/parse_questionnaire.py"],
+      "depends_on": ["questionnaire-generation"],
+      "inputs": [
+        "audits/<domain>/questionnaire-eof.md"
+      ],
+      "lot_output": "audits/<domain>/lots/questionnaire-review.json",
+      "allowed_provenances": ["stated"],
+      "owned_criteria": {
+        "residual": true,
+        "rule": "no criterion of its own: this lot may answer on any criterion still without a verdict after the previous waves, and its answer never prevails over that of an owning lot"
+      },
+      "replayable_alone": true,
+      "human_prerequisite": "The files must have been filled in by the audited service.",
+      "note": "An empty box stays empty: no default answer, no worst case."
+    },
+    {
+      "id": "merge",
+      "wave": "5-consolidation",
+      "label": "Merging of the lots by provenance precedence",
+      "executor": "script",
+      "state": "existing",
+      "scripts": ["process/merge_lots.py"],
+      "depends_on": [
+        "automatic-judgment",
+        "quick-diagnostic-judgment",
+        "dimension-6-judgment",
+        "dimension-1-judgment",
+        "dimension-2-judgment",
+        "dimension-3-judgment",
+        "dimension-4-judgment",
+        "dimension-5-judgment",
+        "questionnaire-review"
+      ],
+      "inputs": ["audits/<domain>/lots/"],
+      "data_outputs": ["audits/<domain>/eof-audit-results.json"],
+      "lot_output": null,
+      "allowed_provenances": [],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "constraint": "No LLM in the aggregation loop. Each lot file is validated against the schema before merging: a non-conforming output is refused and rerun, never merged. An absent lot leaves its criteria without an answer, it does not invent them. The max_potential, the dimension and the label of each criterion come from the reference, never from a lot file.",
+      "note": "Replaying a lot means overwriting its file then rerunning the merge."
+    },
+    {
+      "id": "deliverables",
+      "wave": "5-consolidation",
+      "label": "Filled grid, two-layer radar, completeness gauge",
+      "executor": "script",
+      "state": "existing",
+      "scripts": [
+        ".claude/skills/analyse-parcours/scripts/generate_report_html.py",
+        ".claude/skills/eof/scripts/generate_radar_svg.py"
+      ],
+      "scripts_to_write": [],
+      "arguments": null,
+      "verified_arguments": false,
+      "depends_on": ["merge"],
+      "inputs": ["audits/<domain>/eof-audit-results.json"],
+      "data_outputs": [
+        "audits/<domain>/eof-filled.md",
+        "audits/<domain>/eof-radar-<domain>.svg"
+      ],
+      "lot_output": null,
+      "allowed_provenances": [],
+      "owned_criteria": null,
+      "replayable_alone": true,
+      "constraint": "The five provenances remain distinguishable on the radar: the two layers separate the origin (solid layer for collected, estimated and assumed, which all come from us; hatched layer for declared and stated, which the audited service answered itself) and a count line under the figure gives the detail of the five. No invented number, no default value for a criterion without an answer: the completeness gauge says what is missing instead of filling it, and a dimension without any answer is marked 'no answer', never 0%."
+    }
+  ]
+}
