@@ -1,82 +1,82 @@
-# Étape 39 - Potentiel d'optimisation (référentiel EOF)
+# Step 39 - Optimization potential (EOF framework)
 
-## Vue d'ensemble
+## Overview
 
-Cette étape remplit automatiquement ce qui peut l'être du référentiel
-EOF-V.1.1 (EROOM Optimization Framework, Boavizta) pour le site audité, à
-partir des données déjà collectées. Elle s'appuie sur :
+This step automatically fills what can be filled of the
+EOF-V.1.1 framework (EROOM Optimization Framework, Boavizta) for the audited site,
+from the data already collected. It relies on:
 
-- `eof-referentiel.json` : produit par le skill `.claude/skills/eof/`
-  (54 critères détaillés sur 6 dimensions + 16 questions de
-  0-Diagnostic rapide), **jamais régénéré depuis cette étape**
-- `.claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py` : table
-  de correspondance critère → champ de donnée → règle → confidence
-- `.claude/skills/analyse-parcours/scripts/run_eof.py` : évalue chaque
-  critère, calcule les scores par dimension, génère le radar
-- Trois extracteurs Phase 1 (2026-09-03, plan `eof-questionnaire`), désormais
-  produits **automatiquement** par l'orchestration DISPATCH de l'étape 25
-  (`skill-steps/25_dispatch-orchestration.md`) — plus besoin de les lancer
-  manuellement avant `run_eof.py` :
-  - `parse_html_criteria.py <source_dir>` (Wave 2, bloc `extracteur-html-css`,
-    dépend de `env-data.json`) — re-fetch live des pages déjà auditées (le
-    `.har` capturé ne contient pas les corps HTML/CSS) : écrit
+- `eof-reference.json`: produced by the `.claude/skills/eof/` skill
+  (54 detailed criteria over 6 dimensions + 16 questions from the
+  0-Quick diagnostic), **never regenerated from this step**
+- `.claude/skills/analyse-parcours/scripts/eof_criteria_mapping.py`: mapping table
+  criterion → data field → rule → confidence
+- `.claude/skills/analyse-parcours/scripts/run_eof.py`: evaluates each
+  criterion, computes the scores per dimension, generates the radar
+- Three Phase 1 extractors (2026-09-03, plan `eof-questionnaire`), now
+  produced **automatically** by the DISPATCH orchestration of step 25
+  (`skill-steps/25_dispatch-orchestration.md`) — no need to launch them
+  manually before `run_eof.py`:
+  - `parse_html_criteria.py <source_dir>` (Wave 2, block `extractor-html-css`,
+    depends on `env-data.json`) — live re-fetch of the already audited pages (the
+    captured `.har` does not contain the HTML/CSS bodies): writes
     `html-css-criteria.json`
-  - `analyze_security_headers.py <source_dir>` (Wave 1, bloc
-    `extracteur-security-headers`) — score sécurité local depuis les
-    en-têtes déjà dans le `.har` : écrit `security-headers-analysis.json`
-  - `scan_wellknown.py <source_dir>` (Wave 2, bloc `extracteur-wellknown`,
-    dépend de `env-data.json`) — fetch direct security.txt/robots.txt/
-    sitemap.xml : écrit `wellknown-scan.json`
-  Pour un relancement manuel isolé, les commandes CLI restent les mêmes
-  (voir `25_dispatch-orchestration.md` pour le détail des dépendances).
-- `collect_cwv_pagespeed.py` étendu (mêmes appels API PageSpeed Insights,
-  catégories accessibility + best-practices en plus de performance) :
-  ajoute `accessibility_score_pct` / `best_practices_score_pct` dans
-  `cwv.json`. Le bloc `collecte-cwv` de la Wave 1 appelle désormais
-  directement cette variante étendue (`--strategy both`) dès le premier
-  passage — la note "relancer avec --strategy both" ne concerne plus que les
-  audits **déjà existants**, générés avant cette bascule.
+  - `analyze_security_headers.py <source_dir>` (Wave 1, block
+    `extractor-security-headers`) — local security score from the
+    headers already in the `.har`: writes `security-headers-analysis.json`
+  - `scan_wellknown.py <source_dir>` (Wave 2, block `extractor-wellknown`,
+    depends on `env-data.json`) — direct fetch of security.txt/robots.txt/
+    sitemap.xml: writes `wellknown-scan.json`
+  For an isolated manual re-run, the CLI commands remain the same
+  (see `25_dispatch-orchestration.md` for the dependency details).
+- Extended `collect_cwv_pagespeed.py` (same PageSpeed Insights API calls,
+  accessibility + best-practices categories in addition to performance):
+  adds `accessibility_score_pct` / `best_practices_score_pct` to
+  `cwv.json`. The Wave 1 block `collect-cwv` now calls
+  this extended variant (`--strategy both`) directly from the first
+  pass — the note "re-run with --strategy both" now only concerns
+  **existing** audits, generated before this switch.
 
-**Cette étape ne lit JAMAIS la Google Sheet ni le Markdown humain du skill
-`eof`** — découplage voulu (cf. `tmp/handoff.md`, plan d'architecture) pour
-qu'une resynchronisation du référentiel ne puisse jamais casser la
-comparabilité entre deux audits faits à des dates différentes.
-
------
-
-## AVERTISSEMENT OBLIGATOIRE
-
-Sur les 54 critères détaillés, une reconnaissance manuelle (2026-09-03) a
-montré que seuls **4 sont automatisables** (case cochée) et **6 partiels**
-(indice contextuel affiché en annexe, jamais une réponse validée). Les
-**44 autres restent "je ne sais pas"** par construction : ce sont des
-questions organisationnelles ou produit (revues de code, tests,
-documentation, connaissance des utilisateurs cibles...) qu'aucune donnée
-technique d'audit ne peut renseigner.
-
-Ce rappel doit apparaître :
-- dans le résumé affiché à l'utilisatrice après l'exécution
-- dans le bandeau d'avertissement de la section rapport (déjà géré par
-  `_section_eof()`, ne pas le retirer)
-
-Les 16 questions de 🏦 0-Diagnostic rapide ne sont **jamais** remplies
-automatiquement (échelle 1 à 5 différente, décision explicite du
-2026-09-03) : elles apparaissent en aperçu seulement, avant le radar des 6
-dimensions détaillées.
+**This step NEVER reads the Google Sheet nor the human-readable Markdown of the
+`eof` skill** — deliberate decoupling (cf. `tmp/handoff.md`, architecture plan) so
+that a re-synchronization of the framework can never break
+comparability between two audits done at different dates.
 
 -----
 
-## Déclenchement
+## MANDATORY WARNING
 
-**Automatique**, pas une commande à taper : après les Waves 1 + 2 de
-l'Étape 25 (au minimum `har-analysis.json` + `coverage-analysis.json`
-présents, les autres fichiers de Wave 1/2 en best-effort), avant l'Étape 40
-(Rapport HTML) — pour que le premier rapport généré contienne déjà cette
-section. Si `eof-referentiel.json` est absent (skill `eof` jamais lancé),
-sauter silencieusement cette étape et continuer vers l'Étape 40 sans section
-EOF (rapport rétrocompatible).
+Out of the 54 detailed criteria, a manual review (2026-09-03)
+showed that only **4 are automatable** (checkbox ticked) and **6 partial**
+(contextual indicator shown in the appendix, never a validated answer). The
+**44 others remain "I don't know"** by construction: they are
+organizational or product questions (code reviews, tests,
+documentation, knowledge of target users...) that no
+technical audit data can inform.
 
-Relançable à tout moment (ex. après une nouvelle collecte de données) :
+This reminder must appear:
+- in the summary displayed to the user after execution
+- in the warning banner of the report section (already handled by
+  `_section_eof()`, do not remove it)
+
+The 16 questions of 🏦 0-Quick diagnostic are **never** filled
+automatically (different 1-to-5 scale, explicit decision of
+2026-09-03): they appear as a preview only, before the radar of the 6
+detailed dimensions.
+
+-----
+
+## Triggering
+
+**Automatic**, not a command to type: after Waves 1 + 2 of
+Step 25 (at minimum `har-analysis.json` + `coverage-analysis.json`
+present, the other Wave 1/2 files best-effort), before Step 40
+(HTML report) — so that the first generated report already contains this
+section. If `eof-reference.json` is absent (skill `eof` never run),
+silently skip this step and continue to Step 40 without an EOF section
+(backward-compatible report).
+
+Re-runnable at any time (e.g. after a new data collection):
 
 ```bash
 python3 .claude/skills/analyse-parcours/scripts/run_eof.py <source_dir>
@@ -84,51 +84,51 @@ python3 .claude/skills/analyse-parcours/scripts/run_eof.py <source_dir>
 
 -----
 
-## Exécution
+## Execution
 
-1. Vérifier la présence de
-   `.claude/skills/eof/docs/EOF-V.1.1 (EROOM Optimization Framework) - Template - Français/eof-referentiel.json`.
-   Absent -> signaler "référentiel EOF non trouvé, lancer le skill `eof` si
-   une section EOF est souhaitée dans le rapport" et sauter l'étape.
-2. Lancer `run_eof.py <source_dir>` (source_dir = dossier de l'audit,
-   contenant `env-data.json`/`cwv.json`, avec son sous-dossier `audit/`
-   pour `har-analysis.json`/`coverage-analysis.json`).
-3. Le script écrit dans `<source_dir>/` :
-   - `eof-audit-results.json` - résumé léger, consommé par
+1. Check the presence of
+   `.claude/skills/eof/docs/EOF-V.1.1 (EROOM Optimization Framework) - Template - English/eof-reference.json`.
+   Absent -> report "EOF framework not found, run the `eof` skill if
+   an EOF section is wanted in the report" and skip the step.
+2. Run `run_eof.py <source_dir>` (source_dir = the audit folder,
+   containing `env-data.json`/`cwv.json`, with its `audit/` subfolder
+   for `har-analysis.json`/`coverage-analysis.json`).
+3. The script writes into `<source_dir>/`:
+   - `eof-audit-results.json` - light summary, consumed by
      `generate_report_html.py::_section_eof()`
-   - `eof-rempli.md` - référentiel complet lisible (réponse ou "je ne sais
-     pas", confidence, source, pour les 54 + aperçu des 16 de Diagnostic
-     rapide)
-   - `eof-radar-<domaine>.svg` - radar des 6 dimensions (une dimension sans
-     aucune réponse s'affiche "N/A", jamais un faux 0 %)
-4. Afficher le résumé stdout du script (nombre de critères répondus
-   automatiquement / 54, potentiel d'optimisation global).
+   - `eof-filled.md` - complete readable framework (answer or "I don't
+     know", confidence, source, for the 54 + preview of the 16 of the Quick
+     diagnostic)
+   - `eof-radar-<domain>.svg` - radar of the 6 dimensions (a dimension with
+     no answer at all displays "N/A", never a fake 0%)
+4. Display the script's stdout summary (number of criteria answered
+   automatically / 54, overall optimization potential).
 
 -----
 
-## Intégration rapport HTML
+## HTML report integration
 
-`generate_report_html.py` détecte automatiquement `eof-audit-results.json`
-et `eof-radar-*.svg` (dans `audit_dir` ou son parent) et insère une section
-"Potentiel d'optimisation (référentiel EOF)" entre "Impact environnemental
-(CO2e)" et "Annexes". Si `eof-audit-results.json` est absent, la section est
-simplement omise.
+`generate_report_html.py` automatically detects `eof-audit-results.json`
+and `eof-radar-*.svg` (in `audit_dir` or its parent) and inserts a section
+"Optimization potential (EOF framework)" between "Environmental impact
+(CO2e)" and "Appendices". If `eof-audit-results.json` is absent, the section is
+simply omitted.
 
-Contenu de la section :
-- Bandeau d'avertissement (ratio réel de couverture automatique)
-- Aperçu 🏦 0-Diagnostic rapide (16 questions, jamais rempli, placé AVANT le
+Section content:
+- Warning banner (real automatic coverage ratio)
+- Preview 🏦 0-Quick diagnostic (16 questions, never filled, placed BEFORE the
   radar)
-- KPI : critères répondus / 54, potentiel d'optimisation global (moyenne
-  pondérée, sur les réponses réelles uniquement)
-- Radar des 6 dimensions détaillées
-- Table des scores par dimension
+- KPI: criteria answered / 54, overall optimization potential (weighted
+  average, over real answers only)
+- Radar of the 6 detailed dimensions
+- Table of scores per dimension
 
-Une **annexe** ("Détail des 54 critères EOF", dans la section Méthodologie
-& hypothèses) trace critère par critère : réponse ou "je ne sais pas",
-niveau de confiance (badges `_confidence_badge()`, mêmes codes que le reste
-du rapport), source/donnée exploitée.
+An **appendix** ("Detail of the 54 EOF criteria", in the Methodology
+& hypotheses section) traces criterion by criterion: answer or "I don't know",
+confidence level (badges `_confidence_badge()`, same codes as the rest
+of the report), source/data used.
 
-Régénération après changement de données :
+Regeneration after a data change:
 ```bash
 python3 .claude/skills/analyse-parcours/scripts/run_eof.py <source_dir>
 python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <source_dir>/audit
@@ -136,25 +136,25 @@ python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <source_
 
 -----
 
-## Ce qui reste explicitement HORS de cette étape
+## What remains explicitly OUTSIDE this step
 
-- Étendre l'automatisation aux critères "aucune donnée" : nature
-  organisationnelle/produit, pas un défaut technique à corriger.
-- Remplir automatiquement 🏦 0-Diagnostic rapide : décision explicite de ne
-  pas le faire (échelle différente, jamais de donnée assez fiable).
-- Modifier `eof-referentiel.json` ou la Google Sheet depuis cette étape :
-  strictement réservé au skill `eof`, à la demande explicite seulement.
+- Extending automation to "no data" criteria: organizational/product
+  nature, not a technical defect to fix.
+- Automatically filling 🏦 0-Quick diagnostic: explicit decision not to
+  do it (different scale, never reliable enough data).
+- Modifying `eof-reference.json` or the Google Sheet from this step:
+  strictly reserved for the `eof` skill, on explicit request only.
 
 -----
 
-## Décisions clés (référence)
+## Key decisions (reference)
 
-- Découplage total avec le skill `eof` : cette étape ne lit que
-  `eof-referentiel.json`, jamais la Sheet ni le Markdown humain.
-- Table de correspondance générique (`eof_criteria_mapping.py`),
-  réutilisable pour tout site audité — pas limitée à octo.com.
-- Politique stricte anti-fabrication : "automatisable" peut cocher une
-  case, "partiel" affiche seulement un indice en annexe (jamais coché),
-  l'absence de la table = toujours "je ne sais pas".
-- Radar : une dimension sans réponse affiche "N/A", jamais un faux 0 %
-  (0 % signifierait "point fort partout", pas "inconnu").
+- Total decoupling from the `eof` skill: this step only reads
+  `eof-reference.json`, never the Sheet nor the human-readable Markdown.
+- Generic mapping table (`eof_criteria_mapping.py`),
+  reusable for any audited site — not limited to octo.com.
+- Strict anti-fabrication policy: "automatable" may tick a
+  checkbox, "partial" only shows an indicator in the appendix (never ticked),
+  absence from the table = always "I don't know".
+- Radar: a dimension without an answer displays "N/A", never a fake 0%
+  (0% would mean "strength everywhere", not "unknown").

@@ -1,149 +1,149 @@
-# Étape 39b — Questionnaire EOF (génération et relecture)
+# Step 39b — EOF questionnaire (generation and review)
 
-> Source : skill-steps/39b_questionnaire-eof.md. Retour : SKILL.md étape 40.
+> Source: skill-steps/39b_questionnaire-eof.md. Return: SKILL.md step 40.
 
-## Vue d'ensemble
+## Overview
 
-Sur les 54 critères détaillés du référentiel EOF-V.1.1, l'Étape 39 (`run_eof.py`)
-n'en tranche qu'une petite partie automatiquement. Le **résidu** (critères sans
-réponse, ou répondus "🤔 À évaluer" / "⌛️ Évaluation en cours") peut être posé
-sous forme de questions à cocher par le service audité. Deux scripts déjà
-écrits et testés font ce travail :
+Out of the 54 detailed criteria of the EOF-V.1.1 framework, Step 39 (`run_eof.py`)
+only decides a small part automatically. The **residual** (criteria without
+an answer, or answered "🤔 To be assessed" / "⌛️ Assessment in progress") can be asked
+as checkbox questions to the audited service. Two scripts already
+written and tested do this work:
 
-- `generate_questionnaire.py` : lit `eof-audit-results.json` (Étape 39) et
-  `questionnaire-blocs.json`, produit un fichier Markdown unique
-  `questionnaire-eof.md` contenant les seules questions encore utiles, triées
-  par rendement décroissant (les blocs qui débloquent le plus de critères
-  passent en premier).
-- `parse_questionnaire.py` : lit `questionnaire-eof.md` une fois REMPLI par le
-  service audité, écrit `lots/relecture-questionnaire.json` (contrat de sortie
-  de lot standard, provenance `"precise"`).
+- `generate_questionnaire.py`: reads `eof-audit-results.json` (Step 39) and
+  `questionnaire-blocs.json`, produces a single Markdown file
+  `questionnaire-eof.md` containing only the still-useful questions, sorted
+  by decreasing yield (the blocks that unlock the most criteria
+  come first).
+- `parse_questionnaire.py`: reads `questionnaire-eof.md` once FILLED IN by the
+  audited service, writes `lots/questionnaire-review.json` (standard lot output
+  contract, provenance `"stated"`).
 
-Cette étape correspond à la vague `4-questionnaire` de
-`processus/manifeste-lots.json` (lots `generation-questionnaire` et
-`relecture-questionnaire`), mais ne documente que les deux scripts existants,
-pas la reconstruction du pipeline multi-lots complet (cf. "Ce qui reste
-explicitement HORS de cette étape").
+This step corresponds to wave `4-questionnaire` of
+`process/lots-manifest.json` (lots `questionnaire-generation` and
+`questionnaire-review`), but documents only the two existing scripts,
+not the reconstruction of the full multi-lot pipeline (cf. "What remains
+explicitly OUTSIDE this step").
 
 -----
 
-## AVERTISSEMENT OBLIGATOIRE
+## MANDATORY WARNING
 
-Jamais de questionnaire vierge dans `audits/`. `generate_questionnaire.py`
-refuse par défaut d'écrire dans un chemin
-contenant `audits` (sortie 2, message d'erreur explicite). Raison : un
-questionnaire généré est vierge, toutes ses cases restent à cocher ; s'il
-atterrit dans `audits/<domaine>/`, il peut être renvoyé au client comme s'il
-était à jour alors qu'il ne contient aucune réponse.
+Never a blank questionnaire in `audits/`. `generate_questionnaire.py`
+refuses by default to write to a path
+containing `audits` (exit code 2, explicit error message). Reason: a
+generated questionnaire is blank, all its checkboxes remain to be ticked; if it
+lands in `audits/<domain>/`, it can be sent back to the client as if it
+were up to date when it contains no answer at all.
 
-- **Génération de travail (systématique)** : sortir vers `/tmp`, jamais vers
+- **Working generation (systematic)**: output to `/tmp`, never to
   `audits/`.
-- **`--dans-le-dossier-audit`** : réservé au moment où le questionnaire va
-  effectivement être transmis au client dans la foulée. Ne pas l'utiliser
-  "pour voir" ou par habitude.
+- **`--in-audit-dir`**: reserved for the moment when the questionnaire is
+  actually being sent to the client right away. Do not use it
+  "to see" or out of habit.
 
 -----
 
-## Déclenchement
+## Triggering
 
-Étape **manuelle**, pas automatique comme l'Étape 39 : c'est une décision de
-mission (le questionnaire part-il maintenant vers le service audité ?), pas
-un calcul qui doit se refaire à chaque analyse. Se place après l'Étape 39
-(il faut qu'`eof-audit-results.json` existe), avant ou en parallèle de
-l'Étape 40 (le rapport).
+**Manual** step, not automatic like Step 39: it is a
+mission decision (is the questionnaire going to the audited service now?), not
+a calculation that must be redone at each analysis. Placed after Step 39
+(`eof-audit-results.json` must exist), before or in parallel with
+Step 40 (the report).
 
 -----
 
-## Génération
+## Generation
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <dossier-audit> --output-dir /tmp/questionnaire-<domaine>
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <audit-dir> --output-dir /tmp/questionnaire-<domain>
 ```
 
-- `<dossier-audit>` = le dossier contenant `eof-audit-results.json` (celui de
-  l'Étape 39, ex. `audits/<domaine>/`).
-- Sortie : `/tmp/questionnaire-<domaine>/questionnaire-eof.md`, un seul
-  fichier, pas un découpage produit/technique (voir note manifeste plus bas).
-- Si le résidu est vide (Étape 39 a déjà tout couvert), le script n'écrit
-  rien et affiche `Aucun bloc à afficher (résidu vide)` : ce n'est pas une
-  erreur.
-- Relire le fichier généré avant tout envoi : rien ne garantit automatiquement
-  qu'il est adapté au contexte de la mission.
+- `<audit-dir>` = the folder containing `eof-audit-results.json` (that of
+  Step 39, e.g. `audits/<domain>/`).
+- Output: `/tmp/questionnaire-<domain>/questionnaire-eof.md`, a single
+  file, not a product/technical split (see manifest note below).
+- If the residual is empty (Step 39 already covered everything), the script
+  writes nothing and displays `No block to display (empty residual)`: this is not
+  an error.
+- Re-read the generated file before any sending: nothing automatically guarantees
+  that it fits the mission context.
 
-Pour l'envoi effectif au service audité, régénérer directement dans le
-dossier d'audit :
+For the actual sending to the audited service, regenerate directly in the
+audit folder:
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <dossier-audit> --dans-le-dossier-audit
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <audit-dir> --in-audit-dir
 ```
 
-Les contrôles de non-régression : `generate_questionnaire.py --autotest`
-(15 cas).
+Non-regression checks: `generate_questionnaire.py --autotest`
+(15 cases).
 
 -----
 
-## Relecture (une fois le questionnaire revenu rempli)
+## Review (once the questionnaire comes back filled in)
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <dossier-audit>
+python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <audit-dir>
 ```
 
-- Prérequis humain : `<dossier-audit>/questionnaire-eof.md` doit être la
-  version **remplie** par le service audité (pas la version vierge produite
-  sous `/tmp`).
-- Écrit `<dossier-audit>/lots/relecture-questionnaire.json`.
-- Une case laissée vide reste vide : aucune réponse par défaut, aucun pire
-  cas. Un bloc sans exactement une case cochée ne verse rien.
+- Human prerequisite: `<audit-dir>/questionnaire-eof.md` must be the
+  **filled-in** version from the audited service (not the blank version produced
+  under `/tmp`).
+- Writes `<audit-dir>/lots/questionnaire-review.json`.
+- A checkbox left empty stays empty: no default answer, no worst
+  case. A block without exactly one checkbox ticked contributes nothing.
 
-Les contrôles de non-régression : `parse_questionnaire.py --autotest`
-(7 cas).
+Non-regression checks: `parse_questionnaire.py --autotest`
+(7 cases).
 
 -----
 
-## AVERTISSEMENT
+## WARNING
 
-Ne jamais relancer `run_eof.py` seul après une relecture de questionnaire.
-`run_eof.py` (Étape 39) réécrit `eof-audit-results.json` uniquement depuis les
-données automatiques : il ne relit **jamais** `lots/relecture-questionnaire.json`.
-Le relancer seul après une relecture de questionnaire efface donc en silence
-les réponses déjà versées.
+Never re-run `run_eof.py` alone after a questionnaire review.
+`run_eof.py` (Step 39) rewrites `eof-audit-results.json` only from
+automatic data: it **never** re-reads `lots/questionnaire-review.json`.
+Re-running it alone after a questionnaire review therefore silently erases
+the answers already contributed.
 
-La fusion des lots (dont `relecture-questionnaire.json`) dans
-`eof-audit-results.json` est le rôle de `processus/fusionner_lots.py` :
+Merging the lots (including `questionnaire-review.json`) into
+`eof-audit-results.json` is the role of `process/merge_lots.py`:
 
 ```bash
-python3 processus/fusionner_lots.py <dossier-audit>
+python3 process/merge_lots.py <audit-dir>
 ```
 
-Puis régénérer le rapport (Étape 40) pour refléter les nouvelles réponses.
+Then regenerate the report (Step 40) to reflect the new answers.
 
 -----
 
-## Ce qui reste explicitement HORS de cette étape
+## What remains explicitly OUTSIDE this step
 
-- Câbler les lots LLM de jugement (`jugement-diagnostic-rapide`,
-  `jugement-dimension-1` à `jugement-dimension-6`, `porte-go-no-go`) : tous
-  `"etat": "a_ecrire"` dans `processus/manifeste-lots.json`, ce ne sont pas
-  (encore) des étapes scriptées de ce skill.
-- Automatiser la fusion (`fusionner_lots.py`) ou la régénération du rapport
-  après relecture : rappelées ci-dessus comme suite logique, pas déclenchées
-  automatiquement par `parse_questionnaire.py`.
-- Concevoir un nouveau processus : les deux scripts documentés ici existent
-  déjà et sont testés (`--autotest`), cette étape ne fait que dire quand et
-  comment les lancer.
+- Wiring the LLM judgment lots (`quick-diagnostic-judgment`,
+  `dimension-1-judgment` to `dimension-6-judgment`, `go-no-go-gate`): all
+  `"state": "to_write"` in `process/lots-manifest.json`, they are not
+  (yet) scripted steps of this skill.
+- Automating the merge (`merge_lots.py`) or the report regeneration
+  after review: mentioned above as the logical next step, not triggered
+  automatically by `parse_questionnaire.py`.
+- Designing a new process: the two scripts documented here already exist
+  and are tested (`--autotest`), this step only says when and
+  how to run them.
 
 -----
 
-## Décisions clés (référence)
+## Key decisions (reference)
 
-- Un seul fichier `questionnaire-eof.md`, jamais un découpage
-  produit/technique : décision explicite (l'ancien découpage en deux fichiers
-  envoyait 3 destinataires sur 4 dans les deux fichiers à la fois). Note :
-  `processus/manifeste-lots.json` (lots `generation-questionnaire` et
-  `relecture-questionnaire`) mentionne encore `questionnaire-produit-usage.md`
-  et `questionnaire-technique.md` : décalage connu avec le code actuel, non
-  corrigé par cette étape (cf. rapport de chantier).
-- Le questionnaire est **généré**, jamais rédigé à la main : la couverture
-  automatique diffère d'un service à l'autre, un questionnaire figé serait
-  faux au service suivant.
-- Une case vide reste vide : aucune réponse par défaut, aucun pire cas.
+- A single `questionnaire-eof.md` file, never a
+  product/technical split: explicit decision (the old two-file split
+  sent 3 recipients out of 4 into both files at once). Note:
+  `process/lots-manifest.json` (lots `questionnaire-generation` and
+  `questionnaire-review`) still mentions `questionnaire-produit-usage.md`
+  and `questionnaire-technique.md`: known drift with the current code, not
+  corrected by this step (cf. workstream report).
+- The questionnaire is **generated**, never hand-written: the
+  automatic coverage differs from one service to another, a fixed questionnaire would
+  be wrong for the next service.
+- An empty checkbox stays empty: no default answer, no worst case.

@@ -1,52 +1,51 @@
 #!/usr/bin/env python3
 """
-Fourchettes infrastructure et usage, calculées à partir d'une SiteSpec déjà
-composée (typiquement produite par `from_har.spec_from_env_data()`).
+Infrastructure and usage ranges, computed from an already-composed SiteSpec
+(typically produced by `from_har.spec_from_env_data()`).
 
-CE QUE CE MODULE FAIT ET NE FAIT PAS
+WHAT THIS MODULE DOES AND DOES NOT DO
 -------------------------------------
-Il ne calcule PAS un troisième chiffre : il rejoue le MÊME modèle avec une
-seule hypothèse changée à la fois, et lit le total avec `build_system()` /
-`total_kg()` (cf. build.py). Chaque fourchette isole une incertitude RÉELLE,
-jamais un cumul au pire (cf. mémoire persistante "fourchettes non cumulées") :
-les deux fourchettes ne s'additionnent jamais entre elles, et le rapport doit
-dire pourquoi.
+It does NOT compute a third number: it replays the SAME model with a single
+hypothesis changed at a time, and reads the total with `build_system()` /
+`total_kg()` (cf. build.py). Each range isolates a REAL uncertainty, never a
+worst-case pile-up (cf. persistent memory "non-cumulative ranges"): the two
+ranges are never added together, and the report must say why.
 
-POURQUOI SEULEMENT DEUX AXES, ET PAS QUATRE COMME AU 06/08/2026
-------------------------------------------------------------------
-Le plan initial du 06/08/2026 bornait aussi le nombre de serveurs 1st-party et
-le stockage. Les deux ont cessé d'être des hypothèses à trancher depuis :
-  - le nombre de serveurs est désormais DÉTECTÉ depuis le HAR
-    (`from_har.detect_infrastructures()`, Lot 3) : c'est une mesure, plus un
-    choix à arbitrer ;
-  - le stockage est documenté comme une LIMITE binaire du modèle (cf. handoff
-    du 06/08/2026, section C.3 : sous 1 To, e-footprint n'a aucune
-    résolution), pas une fourchette exploitable.
+WHY ONLY TWO AXES, AND NOT FOUR AS ON 06/08/2026
+-------------------------------------------------
+The initial plan of 06/08/2026 also bounded the number of 1st-party servers
+and the storage. Both stopped being hypotheses to arbitrate since then:
+  - the number of servers is now DETECTED from the HAR
+    (`from_har.detect_infrastructures()`, Lot 3): it is a measurement, no
+    longer a choice to arbitrate;
+  - storage is documented as a binary LIMIT of the model (cf. handoff of
+    06/08/2026, section C.3: below 1 TB, e-footprint has no resolution), not
+    a usable range.
 
-Restent deux VRAIES incertitudes, chacune bornée par ce que la bibliothèque
-calcule déjà ailleurs, jamais par un chiffre inventé ici :
-  - le mode de dimensionnement du serveur (serverless <-> autoscaling) : le
-    HAR ne dit pas comment le site est réellement hébergé ;
-  - le temps utilisateur (Nielsen recalé <-> Nielsen BRUT) : le recalage
-    dépend d'une mesure SimilarWeb qui peut manquer, ou d'un facteur mesuré
-    sur un site qui peut être faux pour telle page précise (cf.
-    temps_utilisateur.py).
+Two REAL uncertainties remain, each bounded by what the library already
+computes elsewhere, never by a number invented here:
+  - the server sizing mode (serverless <-> autoscaling): the HAR does not
+    say how the site is actually hosted;
+  - the user time (recalibrated Nielsen <-> RAW Nielsen): the recalibration
+    depends on a SimilarWeb measurement that may be missing, or on a factor
+    measured on a site that may be wrong for such-and-such a precise page
+    (cf. user_time.py).
 
-IMPORT DE build.py, PAS D'e-footprint DIRECTEMENT
----------------------------------------------------
-Ce fichier ne contient aucun `import efootprint` : il délègue tout calcul à
-`build.py` (le seul module qui a besoin de la librairie). C'est pourquoi il
-n'a pas besoin d'être exempté du contrôle `check_no_efootprint_import()` de
-check_efootprint_spec.py, ni réexporté par `__init__.py` (même raison que
-build.py, cf. sa docstring : `import efootprint_model` doit rester possible
-sans la librairie installée).
+IMPORT OF build.py, NOT OF e-footprint DIRECTLY
+-----------------------------------------------
+This file contains no `import efootprint`: it delegates all calculation to
+`build.py` (the only module that needs the library). That is why it does not
+need to be exempted from the `check_no_efootprint_import()` check of
+check_efootprint_spec.py, nor re-exported by `__init__.py` (same reason as
+build.py, cf. its docstring: `import efootprint_model` must stay possible
+without the library installed).
 """
 
 from dataclasses import replace
 
 from .build import build_system, total_kg
 from .spec import script_default_label
-from .temps_utilisateur import step_user_time
+from .user_time import step_user_time
 
 
 def _variant_total_kg(spec):
@@ -54,21 +53,21 @@ def _variant_total_kg(spec):
 
 
 def infra_range_kg(spec):
-    """Fourchette infrastructure : mode de dimensionnement du serveur.
+    """Infrastructure range: server sizing mode.
 
-    Rejoue le modèle en imposant "serverless" puis "autoscaling" à TOUS les
-    serveurs du site : l'incertitude porte sur l'hébergement réel, qui est une
-    décision unique pour le site, pas serveur par serveur. Retourne
-    (bas, haut) en kg CO2e/an, toujours bas <= haut.
+    Replays the model forcing "serverless" then "autoscaling" on ALL the
+    site's servers: the uncertainty is about the real hosting, which is a
+    single decision for the site, not server by server. Returns
+    (low, high) in kg CO2e/year, always low <= high.
     """
     totals = []
     for server_type in ("serverless", "autoscaling"):
         servers = tuple(
             replace(server, server_type=script_default_label(
                 server_type,
-                "variante de fourchette infra : mode de dimensionnement forcé à "
-                f"\"{server_type}\" pour mesurer sa sensibilité (cf. ranges.py). "
-                "N'est jamais le mode réellement utilisé pour l'estimation centrale."))
+                "infra range variant: sizing mode forced to "
+                f"\"{server_type}\" to measure its sensitivity (cf. ranges.py). "
+                "Never the mode actually used for the central estimate."))
             for server in spec.servers
         )
         totals.append(_variant_total_kg(replace(spec, servers=servers)))
@@ -76,20 +75,19 @@ def infra_range_kg(spec):
 
 
 def usage_range_kg(spec):
-    """Fourchette usage : temps de lecture Nielsen, recalé ou BRUT.
+    """Usage range: Nielsen reading time, recalibrated or RAW.
 
-    La borne basse est le total ACTUEL de la spec (temps recalé quand un
-    recalage est possible, cf. temps_utilisateur.py — c'est aussi
-    l'estimation centrale publiée). La borne haute force le temps Nielsen
-    BRUT (sans recalage) sur toutes les étapes dont le comptage de mots est
-    connu ; les étapes sans comptage de mots (repli Lot 3) ne varient pas,
-    cette incertitude ne les concerne pas.
+    The low bound is the spec's CURRENT total (recalibrated time when a
+    recalibration is possible, cf. user_time.py — this is also the published
+    central estimate). The high bound forces the RAW Nielsen time (without
+    recalibration) on all steps whose word count is known; steps without a
+    word count (Lot 3 fallback) do not vary, this uncertainty does not
+    concern them.
 
-    Si aucune étape n'a de recalage disponible (ex. cas ANTS, SimilarWeb ne
-    couvre pas le domaine), la borne haute est identique à la basse : le
-    temps BRUT est déjà ce qui est utilisé, il n'y a alors rien à encadrer.
-    Ce n'est pas un bug, c'est une fourchette qui se referme faute
-    d'incertitude à montrer.
+    If no step has a recalibration available (e.g. ANTS case, SimilarWeb
+    does not cover the domain), the high bound is identical to the low one:
+    the RAW time is already what is used, there is then nothing to bound.
+    That is not a bug, it is a range closing for lack of uncertainty to show.
     """
     current_total = _variant_total_kg(spec)
 
@@ -104,10 +102,10 @@ def usage_range_kg(spec):
 
 
 def footprint_ranges_kg(spec):
-    """Les deux fourchettes en un seul appel, plus l'estimation centrale.
+    """The two ranges in a single call, plus the central estimate.
 
-    Ne les cumule JAMAIS entre elles (cf. docstring du module) : le rapport
-    doit les présenter séparément, avec l'explication de pourquoi.
+    NEVER add them together (cf. module docstring): the report must present
+    them separately, with the explanation of why.
     """
     return {
         "central_kg": _variant_total_kg(spec),

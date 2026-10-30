@@ -1,33 +1,33 @@
 # Changelog — Agent EROOM
 
-Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les dates correspondent aux commits qui font évoluer le champ `version:` dans `.claude/skills/analyse-parcours/SKILL.md` (source de vérité de la version affichée dans le footer des rapports générés).
+Format inspired by [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Dates correspond to the commits that change the `version:` field in `.claude/skills/analyse-parcours/SKILL.md` (source of truth for the version displayed in the footer of generated reports).
 
-## [1.2.1] - 2026-09-21 — Stabilisation
+## [1.2.1] - 2026-09-21 — Stabilization
 
-Pas de nouvelle fonctionnalité majeure : ce point de version consolide le référentiel EOF et le pipeline d'audit après l'extension du 1.2.0.
+No new major feature: this version point consolidates the EOF framework and the audit pipeline after the 1.2.0 extension.
 
-- Questionnaire EOF consolidé en un seul fichier, couvrant les 70 critères du référentiel, doublons de questions retirés
-- Fiabilisation des sondes : distinction entre un échec de sonde et une absence réelle chez le service audité, correction du décodage base64 EcoIndex, dégradation de la confiance sur le pays serveur quand un CDN est détecté
-- Corrections d'affichage du rapport et du radar EOF (valeurs "None"/"N/A", inversion de précédence precise/declare, hachure limitée à la marge d'incertitude)
-- Ajout du gain CO2e et du gain EcoIndex/LCP par palier de recommandations (prio 1 / 1+2 / 1+2+3)
-- Extension du dispatch parallèle (Core Web Vitals, env-data, sécurité, extracteurs EOF) et correction d'un masquage silencieux des échecs de mesure CWV
-- Nettoyage et complément du README (licences des projets/services tiers) et des diagrammes
+- EOF questionnaire consolidated into a single file, covering the 70 criteria of the framework, duplicate questions removed
+- Probe reliability: distinction between a probe failure and a real absence at the audited service, correction of the EcoIndex base64 decoding, confidence degradation on the server country when a CDN is detected
+- Report and EOF radar display fixes ("None"/"N/A" values, precise/declared precedence inversion, hatching limited to the uncertainty margin)
+- Addition of the CO2e gain and the EcoIndex/LCP gain per recommendation tier (prio 1 / 1+2 / 1+2+3)
+- Extension of the parallel dispatch (Core Web Vitals, env-data, security, EOF extractors) and correction of a silent masking of CWV measurement failures
+- README cleanup and additions (licenses of third-party projects/services) and diagrams
 
 ## [1.2.0] - 2026-09-03
 
-- Extension de l'automatisation de la Phase 1 du référentiel EOF (4 → 7 critères automatisables, 6 → 11 indices)
-- Dernières sondes OSINT / boîte noire : lecture des pages publiques déclarées par l'organisation auditée (RSE, éco-conception), introduction du niveau de provenance "declare"
-- Introduction du référentiel EOF (EROOM Optimization Framework) la veille (2026-09-02) : skill dédié, template vierge, radar SVG
+- Extension of Phase 1 automation of the EOF framework (4 → 7 automatable criteria, 6 → 11 indices)
+- Latest OSINT / black-box probes: reading the public pages declared by the audited organization (CSR, eco-design), introduction of the "declared" provenance level
+- Introduction of the EOF framework (EROOM Optimization Framework) the day before (2026-09-02): dedicated skill, blank template, SVG radar
 
 ## [1.1.0] - 2026-07-30
 
-- Fusion du skill "efootprint" (jusque-là autonome) dans "analyse-parcours" : plus de skill séparé, intégré comme étape (`skill-steps/45_efootprint.md`)
+- Merge of the "efootprint" skill (until then standalone) into "analyse-parcours": no more separate skill, integrated as a step (`skill-steps/45_efootprint.md`)
 
 ## [1.0.2] - 2026-07-13
 
-- Renommage de l'outil en "Agent EROOM" dans le footer des rapports générés
-- Introduction d'e-footprint (calcul de l'empreinte environnementale du site audité, bibliothèque Boavizta) le 2026-07-27, sous cette version
+- Renaming of the tool to "Agent EROOM" in the footer of generated reports
+- Introduction of e-footprint (calculation of the environmental footprint of the audited site, Boavizta library) on 2026-07-27, under this version
 
 ## [1.0.0] - 2026-07-08
 
-- Création initiale du skill analyse-parcours
+- Initial creation of the analyse-parcours skill

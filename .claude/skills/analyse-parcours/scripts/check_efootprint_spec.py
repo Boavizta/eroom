@@ -1,39 +1,39 @@
 #!/usr/bin/env python3
 """
-Filet de sécurité du refactoring e-footprint : contrôle des GARDE-FOUS de la
-bibliothèque de spécification.
+Safety net for the e-footprint refactoring: check of the GUARDRAILS of the
+specification library.
 
-POURQUOI CE SCRIPT EXISTE
+WHY THIS SCRIPT EXISTS
 -------------------------
-`efootprint_model/` repose entièrement sur des refus : une valeur sans
-provenance est refusée, une clé qui renvoie dans le vide est refusée, une
-collision de clés est refusée. Ces refus sont la seule chose qui empêche un
-chiffre non tracé d'atterrir dans un rapport.
+`efootprint_model/` rests entirely on refusals: a value without
+provenance is refused, a key pointing to nothing is refused, a
+key collision is refused. These refusals are the only thing preventing an
+untraced number from landing in a report.
 
-Or un garde-fou cassé ne se remarque pas. Il ne produit aucune erreur : il
-laisse simplement passer. Un contrôle qui ne vérifie que le chemin normal
-resterait vert même si tous les refus avaient disparu.
+But a broken guardrail goes unnoticed. It produces no error: it
+simply lets things through. A check that only verifies the happy path
+would stay green even if all refusals had disappeared.
 
-Ce script vérifie donc les DEUX sens :
-  - une spécification correcte se construit (chemin normal) ;
-  - chaque faute prévue est bien REFUSÉE (chemin d'échec).
+This script therefore checks BOTH directions:
+  - a correct spec builds (happy path) ;
+  - each expected fault is REFUSED (failure path).
 
-Le second est le seul qui prouve quelque chose.
+The second is the only one that proves something.
 
-CE QU'IL NE FAIT PAS
+WHAT IT DOES NOT DO
 --------------------
-Il ne vérifie aucun chiffre de CO2e : la bibliothèque testée ici n'en calcule
-aucun, elle décrit. La non-régression numérique est le travail de
+It checks no CO2e figure: the library tested here computes none, it
+describes. Numeric non-regression is the job of
 `check_efootprint_contract.py`.
 
-Il ne prouve pas la généricité : c'est `check_genericite.py`, et surtout
-l'exécution sur un second site réel.
+It does not prove genericity: that is `check_genericite.py`, and above all
+running on a second real site.
 
-Usage :
+Usage:
     python3 check_efootprint_spec.py
     python3 check_efootprint_spec.py --verbose
 
-Code de sortie : 0 si tous les garde-fous répondent, 1 sinon.
+Exit code: 0 if all guardrails respond, 1 otherwise.
 """
 
 import argparse
@@ -44,7 +44,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from efootprint_model import (  # noqa: E402  (après ajustement de sys.path)
+from efootprint_model import (  # noqa: E402  (after sys.path adjustment)
     RESERVE_CODES,
     AudienceSpec,
     Evidence,
@@ -82,7 +82,7 @@ from efootprint_model.spec import (  # noqa: E402
     measured_label,
     script_default_label,
 )
-from efootprint_model.temps_utilisateur import (  # noqa: E402
+from efootprint_model.user_time import (  # noqa: E402
     is_within_nielsen_domain,
     nielsen_raw_seconds,
     recalibration_factor,
@@ -90,13 +90,13 @@ from efootprint_model.temps_utilisateur import (  # noqa: E402
 )
 
 # ---------------------------------------------------------------------------
-# Journal des contrôles
+# Check log
 # ---------------------------------------------------------------------------
 
 
 class Journal:
-    """Accumule les résultats. Aucun contrôle n'interrompt les suivants : un
-    rapport complet vaut mieux qu'un premier échec isolé."""
+    """Accumulates the results. No check interrupts the following ones: a
+    complete report is worth more than a first isolated failure."""
 
     def __init__(self, verbose=False):
         self.verbose = verbose
@@ -110,26 +110,26 @@ class Journal:
 
     def fail(self, label, detail):
         self.failures.append((label, detail))
-        print(f"  [ÉCHEC]  {label}")
+        print(f"  [FAIL]   {label}")
         print(f"           {detail}")
 
     def expect_ok(self, label, thunk):
-        """Le chemin normal : la construction doit RÉUSSIR."""
+        """The happy path: the construction must SUCCEED."""
         try:
             result = thunk()
         except Exception as exc:  # noqa: BLE001 - on rapporte, on ne masque pas
-            self.fail(label, f"a levé {type(exc).__name__} : {exc}")
+            self.fail(label, f"raised {type(exc).__name__}: {exc}")
             return None
         self.ok(label)
         return result
 
     def expect_refused(self, label, thunk, expect_in_message=None):
-        """Le chemin d'échec : la construction doit être REFUSÉE par SpecError.
+        """The failure path: the construction must be REFUSED by SpecError.
 
-        `expect_in_message` vérifie que le message ORIENTE vers la cause. Un
-        refus au bon endroit avec un message incompréhensible fait perdre le
-        bénéfice du garde-fou : la personne qui le rencontre ne sait pas quoi
-        corriger.
+        `expect_in_message` checks that the message POINTS TO the cause. A
+        refusal in the right place with an incomprehensible message loses the
+        benefit of the guardrail: the person who hits it does not know what
+        to fix.
         """
         try:
             thunk()
@@ -137,56 +137,56 @@ class Journal:
             message = str(exc)
             if expect_in_message and expect_in_message not in message:
                 self.fail(label,
-                          f"refusé (correct) mais le message ne mentionne pas "
-                          f"{expect_in_message!r} : {message}")
+                          f"refused (correct) but the message does not mention "
+                          f"{expect_in_message!r}: {message}")
                 return
             self.ok(label)
             return
         except Exception as exc:  # noqa: BLE001
             self.fail(label,
-                      f"refusé par {type(exc).__name__} au lieu de SpecError : "
-                      f"{exc}. Les refus de la bibliothèque doivent être "
-                      "reconnaissables par leur type.")
+                      f"refused by {type(exc).__name__} instead of SpecError: "
+                      f"{exc}. The library's refusals must be "
+                      "recognizable by their type.")
             return
-        self.fail(label, "ACCEPTÉ alors que ce cas doit être refusé. "
-                         "Le garde-fou ne protège plus rien.")
+        self.fail(label, "ACCEPTED although this case must be refused. "
+                         "The guardrail no longer protects anything.")
 
     def expect_equal(self, label, actual, expected):
         if actual == expected:
             self.ok(label)
         else:
-            self.fail(label, f"attendu {expected!r}, obtenu {actual!r}")
+            self.fail(label, f"expected {expected!r}, got {actual!r}")
 
     def expect_true(self, label, condition, detail=""):
         if condition:
             self.ok(label)
         else:
-            self.fail(label, detail or "condition fausse")
+            self.fail(label, detail or "condition false")
 
 
 # ---------------------------------------------------------------------------
-# Jeu de données de contrôle
+# Control dataset
 # ---------------------------------------------------------------------------
-# Valeurs FICTIVES et volontairement rondes, sans rapport avec un site réel. Ce
-# script n'est pas un cas d'audit : y recopier des mesures ferait de lui la
-# porte d'entrée exacte que `check_genericite.py` cherche à fermer.
+# FICTITIOUS and deliberately round values, unrelated to any real site. This
+# script is not an audit case: copying measurements into it would make it the
+# exact entry point that `check_genericite.py` tries to close.
 
-SRC = "jeu de contrôle"
+SRC = "control dataset"
 
 
 def sample_server(key="web", **overrides):
     fields = dict(
         key=key,
-        label="Serveur applicatif",
+        label="Application server",
         server_type=script_default_label("autoscaling",
-                                        "mode de dimensionnement par défaut"),
-        country=estimated_label("FRANCE", SRC, comment="déduit d'une adresse IP"),
+                                        "default sizing mode"),
+        country=estimated_label("France", SRC, comment="inferred from an IP address"),
         carbon_intensity=measured(50.0, "g/kWh", SRC),
-        provider=measured_label("fournisseur-a", SRC),
+        provider=measured_label("provider-a", SRC),
         instance_type=script_default_label("instance-standard",
-                                          "faute d'information sur l'hébergement"),
-        storage_gb=script_default(20.0, "GB_stored", "ordre de grandeur assumé"),
-        evidence=Evidence(hosts=("hote-principal",), ips=("10.0.0.1",),
+                                          "missing hosting information"),
+        storage_gb=script_default(20.0, "GB_stored", "assumed order of magnitude"),
+        evidence=Evidence(hosts=("main-host",), ips=("10.0.0.1",),
                           request_count=200, transferred_bytes=900_000,
                           cache_hit_ratio=0.5, cache_header_seen=True),
     )
@@ -198,11 +198,11 @@ def sample_job(key="page", server_key="web", **overrides):
     fields = dict(
         key=key,
         server_key=server_key,
-        label="Chargement d'une page",
+        label="Loading a page",
         data_transferred=measured(500.0, "kB", SRC),
         request_duration=measured(400.0, "ms", SRC),
         compute_needed=script_default(0.05, "cpu_core",
-                                      "CPU serveur indéductible d'une capture réseau"),
+                                      "server CPU not inferable from a network capture"),
         ram_needed=script_default(50.0, "MB_ram"),
         data_stored=script_default(0.0, "kB_stored"),
     )
@@ -210,13 +210,13 @@ def sample_job(key="page", server_key="web", **overrides):
     return JobSpec(**fields)
 
 
-def sample_step(key="accueil", jobs=None, **overrides):
+def sample_step(key="home", jobs=None, **overrides):
     fields = dict(
         key=key,
-        label="Consulter l'accueil",
-        intention="s'informer",
+        label="View the homepage",
+        intention="to get information",
         user_time=estimated(30.0, "s", SRC,
-                            comment="modèle de temps de lecture, pas une mesure"),
+                            comment="reading-time model, not a measurement"),
         jobs=jobs if jobs is not None else {"page": 1},
         words=measured(200.0, "dimensionless", SRC),
     )
@@ -226,16 +226,16 @@ def sample_step(key="accueil", jobs=None, **overrides):
 
 def sample_audience(**overrides):
     fields = dict(
-        key="visiteurs",
-        label="Visiteurs annuels",
+        key="visitors",
+        label="Annual visitors",
         visits_per_year=estimated(10_000.0, "dimensionless", SRC),
         phone_fraction=measured(0.5, "dimensionless", SRC),
         desktop_fraction=measured(0.5, "dimensionless", SRC),
         wifi_fraction=assumed(0.5, "dimensionless", SRC,
-                              comment="répartition supposée, non mesurée"),
+                              comment="assumed split, not measured"),
         mobile_fraction=assumed(0.5, "dimensionless", SRC,
-                                comment="répartition supposée, non mesurée"),
-        journey_key="visite",
+                                comment="assumed split, not measured"),
+        journey_key="visit",
     )
     fields.update(overrides)
     return AudienceSpec(**fields)
@@ -243,11 +243,11 @@ def sample_audience(**overrides):
 
 def sample_site(**overrides):
     fields = dict(
-        name="site-de-controle",
+        name="control-site",
         servers=(sample_server(),),
         jobs=(sample_job(),),
         steps=(sample_step(),),
-        journeys=(JourneySpec("visite", "Visite simple", ("accueil",)),),
+        journeys=(JourneySpec("visit", "Simple visit", ("home",)),),
         audience=sample_audience(),
     )
     fields.update(overrides)
@@ -255,683 +255,683 @@ def sample_site(**overrides):
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : Traced
+# Checks: Traced
 # ---------------------------------------------------------------------------
 
 def check_traced(journal):
-    print("Traced — la provenance voyage avec la valeur")
+    print("Traced — provenance travels with the value")
 
-    journal.expect_ok("une grandeur avec unité et source se construit",
+    journal.expect_ok("a quantity with unit and source builds",
                       lambda: measured(1.5, "kB", SRC))
-    journal.expect_ok("un libellé sans unité se construit",
+    journal.expect_ok("a label without unit builds",
                       lambda: measured_label("fournisseur-a", SRC))
 
     journal.expect_refused(
-        "un niveau de confiance inventé est refusé",
-        lambda: Traced(1.0, "kB", SRC, confidence="tres-sur"),
-        "niveau de confiance inconnu")
+        "an invented confidence level is refused",
+        lambda: Traced(1.0, "kB", SRC, confidence="very-sure"),
+        "unknown confidence level")
     journal.expect_refused(
-        "une grandeur sans unité est refusée",
+        "a quantity without unit is refused",
         lambda: Traced(1.0, None, SRC),
-        "unité manquante")
+        "missing unit")
     journal.expect_refused(
-        "un texte présenté comme grandeur est refusé",
-        lambda: Traced("beaucoup", "kB", SRC),
-        "doit être un nombre")
+        "a text presented as a quantity is refused",
+        lambda: Traced("plenty", "kB", SRC),
+        "must be a number")
     journal.expect_refused(
-        "un libellé avec unité est refusé",
+        "a label with unit is refused",
         lambda: Traced("fournisseur-a", "kB", SRC, kind="object"),
-        "n'a pas d'unité")
+        "has no unit")
     journal.expect_refused(
-        "une nature de valeur inconnue est refusée",
-        lambda: Traced(1.0, "kB", SRC, kind="quantite"),
-        "nature de valeur inconnue")
+        "an unknown value kind is refused",
+        lambda: Traced(1.0, "kB", SRC, kind="quantity"),
+        "unknown value kind")
 
-    # Un booléen est un entier en Python : sans contrôle explicite, True
-    # passerait pour la valeur 1 et se convertirait en « 1 kB ».
+    # A boolean is an int in Python: without an explicit check, True
+    # would pass for the value 1 and be converted to "1 kB".
     journal.expect_refused(
-        "un booléen n'est pas accepté comme grandeur",
+        "a boolean is not accepted as a quantity",
         lambda: Traced(True, "kB", SRC),
-        "doit être un nombre")
+        "must be a number")
 
-    # Le vocabulaire de confiance doit rester celui du rapport, sinon le badge
-    # affiche la chaîne brute au lieu du libellé coloré.
+    # The confidence vocabulary must stay that of the report, otherwise the badge
+    # displays the raw string instead of the colored label.
     from efootprint_model import CONFIDENCE_LEVELS
     journal.expect_equal(
-        "les 7 niveaux de confiance du rapport sont exactement ceux de la lib",
+        "the 7 confidence levels of the report are exactly those of the lib",
         CONFIDENCE_LEVELS,
         ("high", "medium", "low", "default", "default_efootprint",
          "default_script", "unjustified"))
 
-    journal.expect_true("has_source distingue une source vide d'une source réelle",
+    journal.expect_true("has_source distinguishes an empty source from a real one",
                         not Traced(1.0, "kB", "   ").has_source
                         and measured(1.0, "kB", SRC).has_source)
 
-    # Les fabriques doivent poser le bon niveau : c'est tout leur intérêt.
-    journal.expect_equal("measured() pose \"high\"",
+    # The factories must set the right level: that is their whole point.
+    journal.expect_equal("measured() sets \"high\"",
                          measured(1.0, "kB", SRC).confidence, "high")
-    journal.expect_equal("estimated() pose \"medium\"",
+    journal.expect_equal("estimated() sets \"medium\"",
                          estimated(1.0, "kB", SRC).confidence, "medium")
-    journal.expect_equal("assumed() pose \"low\"",
+    journal.expect_equal("assumed() sets \"low\"",
                          assumed(1.0, "kB", SRC).confidence, "low")
-    journal.expect_equal("script_default() pose \"default_script\"",
+    journal.expect_equal("script_default() sets \"default_script\"",
                          script_default(1.0, "kB").confidence, "default_script")
     journal.expect_true(
-        "script_default() nomme le script comme source, pas e-footprint",
+        "script_default() names the script as source, not e-footprint",
         "script" in (script_default(1.0, "kB").source_name or ""),
-        "un défaut du script annoncé comme défaut de la librairie ferait "
-        "endosser nos choix par l'outil")
+        "a script default announced as a library default would make "
+        "the tool endorse our choices")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : champs critiques
+# Checks: critical fields
 # ---------------------------------------------------------------------------
 
 def check_critical_fields(journal):
-    print("Champs critiques — échec bruyant plutôt que chiffre non tracé")
+    print("Critical fields — loud failure rather than an untraced number")
 
     journal.expect_refused(
-        "un poids transféré absent est refusé",
+        "a missing transferred weight is refused",
         lambda: sample_job(data_transferred=None),
         "data_transferred")
     journal.expect_refused(
-        "un poids transféré sans provenance est refusé",
+        "a transferred weight without provenance is refused",
         lambda: sample_job(data_transferred=Traced(500.0, "kB")),
-        "sans provenance")
+        "without provenance")
     journal.expect_refused(
-        "un temps utilisateur absent est refusé",
+        "a missing user time is refused",
         lambda: sample_step(user_time=None),
         "user_time")
     journal.expect_refused(
-        "un temps utilisateur sans provenance est refusé",
+        "a user time without provenance is refused",
         lambda: sample_step(user_time=Traced(30.0, "s")),
-        "sans provenance")
+        "without provenance")
     journal.expect_refused(
-        "un type d'instance sans provenance est refusé",
+        "an instance type without provenance is refused",
         lambda: sample_server(instance_type=Traced("instance-x", kind="object")),
-        "sans provenance")
+        "without provenance")
 
-    # Un champ NON critique se passe de provenance : la bibliothèque doit rester
-    # utilisable là où la donnée manque légitimement, sans forcer à inventer.
+    # A NON-critical field gets away without provenance: the library must stay
+    # usable where data legitimately lacks, without forcing to invent.
     journal.expect_ok(
-        "un champ non critique sans provenance reste accepté",
+        "a non-critical field without provenance stays accepted",
         lambda: sample_server(storage_gb=Traced(20.0, "GB_stored")))
 
-    # Un serveur sans type d'instance est valide : c'est le cas d'un serveur
-    # générique, hors cloud public. Le constructeur du modèle exigera l'un ou
-    # l'autre jeu de champs, la spécification n'a pas à trancher.
-    journal.expect_ok("un serveur sans type d'instance reste accepté",
+    # A server without instance type is valid: that is the case of a
+    # generic server, outside public cloud. The model builder will require one or
+    # the other field set, the spec does not have to decide.
+    journal.expect_ok("a server without instance type stays accepted",
                       lambda: sample_server(instance_type=None))
 
     journal.expect_refused(
-        "une valeur nue à la place d'un Traced est refusée",
+        "a bare value in place of a Traced is refused",
         lambda: sample_job(request_duration=400.0),
-        "doit être un Traced")
+        "must be a Traced")
     journal.expect_refused(
-        "un libellé à la place d'une grandeur est refusé",
-        lambda: sample_job(data_transferred=measured_label("lourd", SRC)),
+        "a label in place of a quantity is refused",
+        lambda: sample_job(data_transferred=measured_label("heavy", SRC)),
         "kind")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : structures
+# Checks: structures
 # ---------------------------------------------------------------------------
 
 def check_structures(journal):
-    print("Structures — refus des états incohérents")
+    print("Structures — rejection of inconsistent states")
 
-    journal.expect_ok("un site complet se construit", sample_site)
+    journal.expect_ok("a complete site builds", sample_site)
 
-    journal.expect_refused("une clé vide est refusée",
-                           lambda: sample_job(key="  "), "clé texte non vide")
+    journal.expect_refused("an empty key is refused",
+                           lambda: sample_job(key="  "), "non-empty text key")
 
     journal.expect_refused(
-        "un poids de traitement nul est refusé",
+        "a null processing weight is refused",
         lambda: sample_step(jobs={"page": 0}),
-        "doit être retiré")
+        "must be removed")
     journal.expect_refused(
-        "un poids de traitement négatif est refusé",
+        "a negative processing weight is refused",
         lambda: sample_step(jobs={"page": -1}),
-        "vaut -1")
-    journal.expect_ok("un poids fractionnaire est accepté",
+        "is -1")
+    journal.expect_ok("a fractional weight is accepted",
                       lambda: sample_step(jobs={"page": 0.5}))
     journal.expect_refused(
-        "un times_per_journey nul est refusé",
+        "a null times_per_journey is refused",
         lambda: sample_step(times_per_journey=0),
-        "strictement positif")
+        "strictly positive")
 
     journal.expect_refused(
-        "une étape répétée dans la liste d'un parcours est refusée",
-        lambda: JourneySpec("visite", "Visite", ("accueil", "accueil")),
+        "a step repeated in a journey's list is refused",
+        lambda: JourneySpec("visit", "Visit", ("home", "home")),
         "times_per_journey")
 
     journal.expect_refused(
-        "une répartition d'appareils qui ne somme pas à 1 est refusée",
+        "a device split that does not sum to 1 is refused",
         lambda: sample_audience(phone_fraction=measured(0.5, "dimensionless", SRC),
                                 desktop_fraction=measured(0.3, "dimensionless", SRC)),
-        "somment à")
+        "sum to")
     journal.expect_refused(
-        "une demi-répartition est refusée plutôt que complétée en silence",
+        "a half-split is refused rather than silently completed",
         lambda: sample_audience(desktop_fraction=None),
-        "n'est pas déduit")
+        "not deduced")
     journal.expect_ok(
-        "une audience sans répartition d'appareils du tout est acceptée",
+        "an audience with no device split at all is accepted",
         lambda: sample_audience(phone_fraction=None, desktop_fraction=None))
     journal.expect_ok(
-        "une audience sans volume de visites est acceptée (petits sites, intranets)",
+        "an audience without visit volume is accepted (small sites, intranets)",
         lambda: sample_audience(visits_per_year=None))
 
     journal.expect_refused(
-        "un élément du mauvais type dans une collection est refusé",
+        "an element of the wrong type in a collection is refused",
         lambda: sample_site(jobs=(sample_step(),)),
-        "attend des JobSpec")
+        "expects JobSpec")
 
-    journal.expect_refused("un hôte tiers sans nom est refusé",
+    journal.expect_refused("a third-party host without a name is refused",
                            lambda: ThirdPartyHost(""), "host")
 
-    # Deux situations distinctes qu'il serait tentant de confondre : aucun
-    # en-tête de cache observé est une information sur l'hébergement ; un ratio
-    # incalculable est une absence de mesure.
+    # Two distinct situations that would be tempting to confuse: no
+    # cache header observed is information about the hosting; an
+    # incalculable ratio is an absence of measurement.
     silent = Evidence(hosts=("a",), cache_header_seen=False)
     journal.expect_true(
-        "absence d'en-tête de cache et ratio inconnu restent distinguables",
+        "missing cache header and unknown ratio stay distinguishable",
         silent.cache_hit_ratio is None and silent.cache_header_seen is False)
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : appel IA générative (ExternalApiSpec, Lot 7)
+# Checks: generative AI call (ExternalApiSpec, Lot 7)
 # ---------------------------------------------------------------------------
 
 def check_external_api(journal):
-    print("IA générative — ExternalApiSpec refuse ce qu'EcoLogits ne peut pas chiffrer")
+    print("Generative AI — ExternalApiSpec rejects what EcoLogits cannot quantify")
 
     journal.expect_ok(
-        "un ExternalApiSpec complet se construit",
+        "a complete ExternalApiSpec builds",
         lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
                                 output_tokens=measured(300.0, "dimensionless", SRC)))
 
     journal.expect_refused(
-        "un provider vide est refusé",
+        "an empty provider is refused",
         lambda: ExternalApiSpec(provider="", model_name="claude-sonnet-4-5",
                                 output_tokens=measured(300.0, "dimensionless", SRC)),
         "provider")
     journal.expect_refused(
-        "un model_name vide est refusé",
+        "an empty model_name is refused",
         lambda: ExternalApiSpec(provider="anthropic", model_name="",
                                 output_tokens=measured(300.0, "dimensionless", SRC)),
         "model_name")
     journal.expect_refused(
-        "output_tokens absent est refusé : champ critique, pilote le calcul EcoLogits",
+        "missing output_tokens is refused: critical field, drives the EcoLogits calculation",
         lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
                                 output_tokens=None),
         "output_tokens")
     journal.expect_refused(
-        "output_tokens sans provenance est refusé",
+        "output_tokens without provenance is refused",
         lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
                                 output_tokens=Traced(300.0, "dimensionless")),
         "provenance")
     journal.expect_refused(
-        "request_count_per_step nul est refusé",
+        "a null request_count_per_step is refused",
         lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
                                 output_tokens=measured(300.0, "dimensionless", SRC),
                                 request_count_per_step=0),
-        "strictement positif")
+        "strictly positive")
     journal.expect_refused(
-        "request_count_per_step négatif est refusé",
+        "a negative request_count_per_step is refused",
         lambda: ExternalApiSpec(provider="anthropic", model_name="claude-sonnet-4-5",
                                 output_tokens=measured(300.0, "dimensionless", SRC),
                                 request_count_per_step=-1),
-        "strictement positif")
+        "strictly positive")
 
     journal.expect_ok(
-        "un JobSpec avec external_api complet se construit",
+        "a JobSpec with a complete external_api builds",
         lambda: sample_job(
             external_api=ExternalApiSpec(
                 provider="anthropic", model_name="claude-sonnet-4-5",
                 output_tokens=measured(300.0, "dimensionless", SRC))))
     journal.expect_refused(
-        "un external_api du mauvais type est refusé (pas un simple nom)",
+        "an external_api of the wrong type is refused (not a bare name)",
         lambda: sample_job(external_api="anthropic"),
         "ExternalApiSpec")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : validation croisée des clés
+# Checks: cross-key validation
 # ---------------------------------------------------------------------------
 
 def check_validation(journal):
-    print("Validation croisée — aucune clé ne renvoie dans le vide")
+    print("Cross-validation — no key points to nothing")
 
-    journal.expect_ok("un site cohérent passe la validation",
+    journal.expect_ok("a consistent site passes validation",
                       lambda: validate_spec(sample_site()))
 
     journal.expect_refused(
-        "un traitement attribué à un serveur inexistant est refusé",
-        lambda: validate_spec(sample_site(jobs=(sample_job(server_key="fantome"),))),
-        "qui n'existe pas")
+        "a job attributed to a nonexistent server is refused",
+        lambda: validate_spec(sample_site(jobs=(sample_job(server_key="ghost"),))),
+        "does not exist")
     journal.expect_refused(
-        "une étape déclenchant un traitement inexistant est refusée",
-        lambda: validate_spec(sample_site(steps=(sample_step(jobs={"fantome": 1}),))),
-        "qui n'existe pas")
+        "a step triggering a nonexistent job is refused",
+        lambda: validate_spec(sample_site(steps=(sample_step(jobs={"ghost": 1}),))),
+        "does not exist")
     journal.expect_refused(
-        "un parcours passant par une étape inexistante est refusé",
+        "a journey going through a nonexistent step is refused",
         lambda: validate_spec(sample_site(
-            journeys=(JourneySpec("visite", "Visite", ("fantome",)),))),
-        "qui n'existe pas")
+            journeys=(JourneySpec("visit", "Visit", ("ghost",)),))),
+        "does not exist")
     journal.expect_refused(
-        "une audience renvoyant à un parcours inexistant est refusée",
+        "an audience pointing to a nonexistent journey is refused",
         lambda: validate_spec(sample_site(
-            audience=sample_audience(journey_key="fantome"))),
-        "qui n'existe pas")
+            audience=sample_audience(journey_key="ghost"))),
+        "does not exist")
 
-    # Une étape hors parcours n'est PAS refusée ici : décrire un site par
-    # morceaux est légitime. Le refus a lieu à l'entrée du calcul, contrôlé plus
-    # bas par check_reserves().
+    # A step outside any journey is NOT refused here: describing a site by
+    # pieces is legitimate. The refusal happens at calculation entry, checked lower
+    # by check_reserves().
     journal.expect_ok(
-        "une étape hors parcours ne bloque pas la description",
+        "a step outside any journey does not block the description",
         lambda: validate_spec(sample_site(
-            steps=(sample_step(), sample_step(key="orpheline")))))
+            steps=(sample_step(), sample_step(key="orphan")))))
 
-    # Un traitement que personne ne déclenche ne fausse aucun total : on le
-    # signale sans bloquer. Bloquer empêcherait de décrire un service dont
-    # toutes les étapes ne sont pas encore modélisées.
-    with_spare = sample_site(jobs=(sample_job(), sample_job(key="inutilise")))
-    journal.expect_ok("un traitement non déclenché ne bloque pas",
+    # A job that nothing triggers does not distort any total: it is
+    # reported without blocking. Blocking would prevent describing a service whose
+    # steps are not all modeled yet.
+    with_spare = sample_site(jobs=(sample_job(), sample_job(key="unused")))
+    journal.expect_ok("an untriggered job does not block",
                       lambda: validate_spec(with_spare))
-    journal.expect_equal("un traitement non déclenché est signalé",
-                         unused_jobs(with_spare), ("inutilise",))
+    journal.expect_equal("an untriggered job is reported",
+                         unused_jobs(with_spare), ("unused",))
 
-    journal.expect_refused("une clé de serveur en double est refusée",
+    journal.expect_refused("a duplicate server key is refused",
                            lambda: validate_spec(sample_site(
                                servers=(sample_server(), sample_server()))),
-                           "déclaré deux fois")
+                           "declared twice")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : réserves de calcul
+# Checks: calculation reserves
 # ---------------------------------------------------------------------------
 
 def check_reserves(journal):
-    print("Réserves — libre de décrire, refusé de publier un chiffre faux")
+    print("Reserves — free to describe, refused to publish a wrong number")
 
     site = sample_site()
-    journal.expect_equal("un site complet n'a aucune réserve",
+    journal.expect_equal("a complete site has no reserve",
                          calculation_reserves(site), ())
-    journal.expect_ok("un site complet passe la porte du calcul",
+    journal.expect_ok("a complete site passes the calculation gate",
                       lambda: require_calculable(site))
 
-    orphan = sample_site(steps=(sample_step(), sample_step(key="orpheline")))
-    journal.expect_equal("une étape hors parcours est détectée",
-                         orphan_steps(orphan), ("orpheline",))
+    orphan = sample_site(steps=(sample_step(), sample_step(key="orphan")))
+    journal.expect_equal("a step outside any journey is detected",
+                         orphan_steps(orphan), ("orphan",))
     journal.expect_equal(
-        "une étape hors parcours devient une réserve de calcul",
+        "a step outside any journey becomes a calculation reserve",
         [code for code, _ in calculation_reserves(orphan)],
-        ["steps_hors_parcours"])
+        ["steps_outside_journey"])
     journal.expect_refused(
-        "le calcul est refusé tant que la réserve n'est pas assumée",
+        "the calculation is refused as long as the reserve is not assumed",
         lambda: require_calculable(orphan),
-        "steps_hors_parcours")
+        "steps_outside_journey")
 
-    # Le point central du dispositif : on peut passer outre, mais seulement
-    # explicitement, et la réserve assumée est RENDUE pour être écrite au rapport.
+    # The central point of the mechanism: one can override, but only
+    # explicitly, and the assumed reserve is RETURNED to be written in the report.
     accepted = journal.expect_ok(
-        "la réserve peut être assumée explicitement",
+        "the reserve can be explicitly assumed",
         lambda: require_calculable(orphan,
-                                   accepted_reserves=("steps_hors_parcours",)))
+                                   accepted_reserves=("steps_outside_journey",)))
     journal.expect_true(
-        "une réserve assumée est rendue à l'appelant, pas avalée",
+        "an assumed reserve is returned to the caller, not swallowed",
         accepted is not None and len(accepted) == 1
-        and accepted[0][0] == "steps_hors_parcours",
-        "sans cela l'arbitrage disparaîtrait et le chiffre paraîtrait sans réserve")
+        and accepted[0][0] == "steps_outside_journey",
+        "without that the arbitration would disappear and the figure would appear without reserve")
 
     journal.expect_refused(
-        "accepter une réserve qui ne s'applique pas est refusé",
+        "accepting a reserve that does not apply is refused",
         lambda: require_calculable(site,
-                                   accepted_reserves=("steps_hors_parcours",)),
-        "ne s'appliquent pas")
+                                   accepted_reserves=("steps_outside_journey",)),
+        "do not apply")
     journal.expect_refused(
-        "un code de réserve inventé est refusé",
-        lambda: require_calculable(orphan, accepted_reserves=("peu_importe",)),
-        "ne s'appliquent pas")
+        "an invented reserve code is refused",
+        lambda: require_calculable(orphan, accepted_reserves=("whatever",)),
+        "do not apply")
 
-    # Les autres réserves : chacune rendrait le total vide ou nul.
+    # The other reserves: each would make the total empty or null.
     journal.expect_equal(
-        "un site sans parcours du tout est une réserve",
+        "a site with no journey at all is a reserve",
         [code for code, _ in calculation_reserves(
             sample_site(journeys=(), audience=sample_audience(journey_key=None)))],
-        ["aucun_parcours"])
+        ["no_journey"])
     journal.expect_true(
-        "un site sans audience est une réserve",
-        "aucune_audience" in [code for code, _ in
+        "a site without audience is a reserve",
+        "no_audience" in [code for code, _ in
                               calculation_reserves(sample_site(audience=None))])
     journal.expect_refused(
-        "une spécification vide ne peut pas produire de chiffre",
-        lambda: require_calculable(SiteSpec(name="vide")),
-        "réserve(s)")
+        "an empty spec cannot produce a figure",
+        lambda: require_calculable(SiteSpec(name="empty")),
+        "reserve(s)")
 
-    # Un traitement non déclenché ne fausse aucun total : il ne doit PAS bloquer
-    # le calcul. Confondre les deux rendrait le refus incompréhensible.
+    # An untriggered job distorts no total: it must NOT block
+    # the calculation. Confusing the two would make the refusal incomprehensible.
     journal.expect_equal(
-        "un traitement non déclenché n'est pas une réserve de calcul",
+        "an untriggered job is not a calculation reserve",
         calculation_reserves(sample_site(
-            jobs=(sample_job(), sample_job(key="inutilise")))),
+            jobs=(sample_job(), sample_job(key="unused")))),
         ())
 
-    # Le refus doit toujours laisser une porte : sinon la personne est coincée.
+    # The refusal must always leave a door open: otherwise the person is stuck.
     journal.expect_equal(
-        "chaque réserve propose au moins une issue",
+        "each reserve offers at least one remedy",
         reserves_without_arbitration(), ())
     journal.expect_true(
-        "les issues proposées commencent par corriger, et finissent par assumer",
-        arbitrations_for("steps_hors_parcours")[0].startswith("rattacher")
-        and "assum" in arbitrations_for("steps_hors_parcours")[-1],
-        "l'ordre d'affichage suggère une préférence : corriger avant d'assumer")
-    journal.expect_equal("un code inconnu ne propose aucune issue, sans erreur",
-                         arbitrations_for("inexistant"), ())
+        "the proposed remedies start by fixing, and end by assuming",
+        arbitrations_for("steps_outside_journey")[0].startswith("attach")
+        and "assum" in arbitrations_for("steps_outside_journey")[-1],
+        "the display order suggests a preference: fix before assuming")
+    journal.expect_equal("an unknown code offers no remedy, without error",
+                         arbitrations_for("nonexistent"), ())
     journal.expect_equal(
-        "les codes de réserve énumérés sont ceux réellement émis",
+        "the enumerated reserve codes are those actually emitted",
         sorted(RESERVE_CODES),
-        sorted({"steps_hors_parcours", "aucun_parcours", "aucune_etape",
-                "aucune_audience"}))
+        sorted({"steps_outside_journey", "no_journey", "no_step",
+                "no_audience"}))
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : fusion
+# Checks: compose
 # ---------------------------------------------------------------------------
 
 def check_compose(journal):
-    print("Fusion — jamais d'écrasement silencieux")
+    print("Compose — never a silent overwrite")
 
     front = SiteSpec(
-        name="site-de-controle",
+        name="control-site",
         servers=(sample_server(),),
         jobs=(sample_job(),),
         steps=(sample_step(),),
-        archetypes=("vitrine",),
+        archetypes=("showcase",),
     )
-    # Second fragment : MÊME serveur (même preuve), traitement et étape distincts.
+    # Second fragment: SAME server (same evidence), distinct job and step.
     chat = SiteSpec(
-        name="site-de-controle",
+        name="control-site",
         servers=(sample_server(provider=None,
                               base_ram=script_default(1.0, "GB_ram")),),
         jobs=(sample_job(key="conversation"),),
-        steps=(sample_step(key="dialoguer", jobs={"conversation": 3},
-                           intention="obtenir de l'aide"),),
-        archetypes=("agent-conversationnel",),
+        steps=(sample_step(key="dialogue", jobs={"conversation": 3},
+                           intention="get help"),),
+        archetypes=("conversational-agent",),
     )
 
     fused = journal.expect_ok(
-        "deux archétypes se composent",
+        "two archetypes compose",
         lambda: compose(front, chat,
-                        journeys=(JourneySpec("visite", "Visite",
-                                              ("accueil", "dialoguer")),),
+                        journeys=(JourneySpec("visit", "Visit",
+                                              ("home", "dialogue")),),
                         audience=sample_audience()))
     if fused is not None:
-        journal.expect_equal("le serveur commun est mutualisé, pas dupliqué",
+        journal.expect_equal("the common server is shared, not duplicated",
                              len(fused.servers), 1)
-        journal.expect_equal("les traitements des deux fragments sont conservés",
+        journal.expect_equal("both fragments' jobs are kept",
                              sorted(fused.job_keys), ["conversation", "page"])
-        journal.expect_equal("les archétypes appliqués sont tracés",
+        journal.expect_equal("the applied archetypes are traced",
                              fused.archetypes,
-                             ("vitrine", "agent-conversationnel"))
+                             ("showcase", "conversational-agent"))
         journal.expect_true(
-            "la fusion complète les champs absents du premier fragment",
+            "the compose fills in the fields missing from the first fragment",
             fused.servers[0].base_ram is not None
             and fused.servers[0].provider is not None,
-            "base_ram venait du second fragment, provider du premier")
+            "base_ram came from the second fragment, provider from the first")
 
-    # Deux serveurs de même clé sur des infrastructures DIFFÉRENTES : ce sont
-    # deux machines qui se disputent un nom, pas une machine décrite deux fois.
+    # Two servers with the same key on DIFFERENT infrastructures: those are
+    # two machines fighting over a name, not one machine described twice.
     other_infra = SiteSpec(
-        name="site-de-controle",
-        servers=(sample_server(evidence=Evidence(hosts=("autre-hote",),
+        name="control-site",
+        servers=(sample_server(evidence=Evidence(hosts=("other-host",),
                                                  ips=("10.0.0.2",))),),
     )
     journal.expect_refused(
-        "deux serveurs de même clé sur des infrastructures distinctes sont refusés",
+        "two servers with the same key on distinct infrastructures are refused",
         lambda: compose(front, other_infra),
-        "collision de clé")
+        "key collision")
 
-    # Sans preuve, on ne mutualise pas : deux archétypes peuvent avoir nommé
-    # leur serveur pareil par défaut sans parler de la même machine.
+    # Without evidence, we do not share: two archetypes may have named
+    # their server the same by default without talking about the same machine.
     no_evidence = SiteSpec(name="x", servers=(sample_server(evidence=None),))
     journal.expect_refused(
-        "sans preuve d'infrastructure, deux serveurs de même clé sont refusés",
+        "without infrastructure evidence, two servers with the same key are refused",
         lambda: compose(no_evidence,
                         SiteSpec(name="x", servers=(sample_server(evidence=None),))),
-        "collision de clé")
+        "key collision")
 
     journal.expect_refused(
-        "un désaccord sur un champ du même serveur est refusé",
+        "a disagreement on a field of the same server is refused",
         lambda: compose(
             front,
             SiteSpec(name="x", servers=(sample_server(
-                provider=measured_label("fournisseur-b", SRC)),))),
-        "deux valeurs")
+                provider=measured_label("provider-b", SRC)),))),
+        "two different values")
 
     journal.expect_refused(
-        "une collision de traitement est refusée",
+        "a job collision is refused",
         lambda: compose(front, SiteSpec(name="x", jobs=(sample_job(),))),
-        "collision de clé")
+        "key collision")
 
     journal.expect_refused(
-        "deux audiences différentes dans les fragments sont refusées",
+        "two different audiences in the fragments are refused",
         lambda: compose(
             SiteSpec(name="x", audience=sample_audience(journey_key=None)),
-            SiteSpec(name="x", audience=sample_audience(key="autres",
+            SiteSpec(name="x", audience=sample_audience(key="others",
                                                         journey_key=None))),
-        "un seul trafic")
+        "a single traffic")
 
-    journal.expect_refused("compose() sans rien du tout est refusé",
-                           lambda: compose(), "rien à composer")
+    journal.expect_refused("compose() with nothing at all is refused",
+                           lambda: compose(), "nothing to compose")
     journal.expect_refused(
-        "un objet qui n'est pas un SiteSpec est refusé",
+        "an object that is not a SiteSpec is refused",
         lambda: compose({"name": "x"}),
-        "attend des SiteSpec")
+        "expects SiteSpec")
 
-    # Immuabilité : appliquer une fusion ne doit pas modifier les fragments,
-    # sinon composer deux fois dans le même processus donnerait deux résultats.
-    journal.expect_equal("la fusion ne modifie pas les fragments",
+    # Immutability: applying a compose must not modify the fragments,
+    # otherwise composing twice in the same process would give two results.
+    journal.expect_equal("the compose does not modify the fragments",
                          (len(front.servers), len(front.jobs)), (1, 1))
 
     tiers = compose(
-        SiteSpec(name="x", third_party_hosts=(ThirdPartyHost("tiers-a", 5, 1000),)),
-        SiteSpec(name="x", third_party_hosts=(ThirdPartyHost("tiers-a", 5, 1000),
-                                              ThirdPartyHost("tiers-b", 2, 500))))
+        SiteSpec(name="x", third_party_hosts=(ThirdPartyHost("third-a", 5, 1000),)),
+        SiteSpec(name="x", third_party_hosts=(ThirdPartyHost("third-a", 5, 1000),
+                                              ThirdPartyHost("third-b", 2, 500))))
     journal.expect_equal(
-        "un hôte tiers vu dans deux fragments n'est pas compté deux fois",
-        sorted(h.host for h in tiers.third_party_hosts), ["tiers-a", "tiers-b"])
+        "a third-party host seen in two fragments is not counted twice",
+        sorted(h.host for h in tiers.third_party_hosts), ["third-a", "third-b"])
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôles : provenances et serveur principal
+# Checks: provenances and primary server
 # ---------------------------------------------------------------------------
 
 def check_sources_and_primary(journal):
-    print("Provenances et serveur principal")
+    print("Provenances and primary server")
 
     site = sample_site()
     sources = collect_sources(site)
-    journal.expect_true("chaque provenance porte son chemin et son champ",
+    journal.expect_true("each provenance carries its path and its field",
                         all("path" in s and "field" in s for s in sources),
-                        "sans le chemin, on ne sait pas quel paramètre vient "
-                        "de quelle source")
-    journal.expect_true("les provenances couvrent serveur, traitement, étape "
-                        "et audience",
+                        "without the path, we do not know which parameter comes "
+                        "from which source")
+    journal.expect_true("the provenances cover server, job, step "
+                        "and audience",
                         {s["path"].split(":")[0] for s in sources}
                         >= {"server", "job", "step", "audience"})
 
     counts = confidence_summary(site)
-    journal.expect_true("le résumé de confiance compte les valeurs par niveau",
+    journal.expect_true("the confidence summary counts values per level",
                         sum(counts.values()) == len(sources) and "high" in counts)
 
     journal.expect_equal(
-        "une valeur non tracée sur un champ non critique est signalée",
+        "an untraced value on a non-critical field is reported",
         len(untraced_fields(sample_site(
             servers=(sample_server(storage_gb=Traced(20.0, "GB_stored")),)))),
         1)
-    journal.expect_equal("un site entièrement tracé ne signale rien",
+    journal.expect_equal("a fully traced site reports nothing",
                          untraced_fields(site), ())
 
-    # Serveur principal : celui qui porte le plus d'octets.
-    heavy = sample_server(key="lourd", evidence=Evidence(
+    # Primary server: the one carrying the most bytes.
+    heavy = sample_server(key="heavy", evidence=Evidence(
         hosts=("h1",), ips=("10.0.0.1",), request_count=10,
         transferred_bytes=900_000))
-    light = sample_server(key="leger", evidence=Evidence(
+    light = sample_server(key="light", evidence=Evidence(
         hosts=("h2",), ips=("10.0.0.2",), request_count=500,
         transferred_bytes=2_000))
     multi = sample_site(servers=(light, heavy),
-                        jobs=(sample_job(server_key="leger"),))
+                        jobs=(sample_job(server_key="light"),))
     journal.expect_equal(
-        "le serveur principal est celui qui porte le plus d'octets",
-        primary_server(multi).key, "lourd")
+        "the primary server is the one carrying the most bytes",
+        primary_server(multi).key, "heavy")
     journal.expect_true(
-        "beaucoup de requêtes ne suffisent pas à désigner le serveur principal",
-        primary_server(multi).key != "leger",
-        "un service d'analytique concentre les requêtes sans porter le trafic")
+        "many requests are not enough to designate the primary server",
+        primary_server(multi).key != "light",
+        "an analytics service concentrates requests without carrying the traffic")
 
-    # À égalité d'octets, le choix doit être STABLE. Arbitraire est acceptable,
-    # changeant d'une exécution à l'autre ne l'est pas.
+    # On a tie in bytes, the choice must be STABLE. Arbitrary is acceptable,
+    # changing from one run to another is not.
     tie_a = sample_server(key="bbb", evidence=Evidence(hosts=("h1",),
                                                        transferred_bytes=100))
     tie_b = sample_server(key="aaa", evidence=Evidence(hosts=("h2",),
                                                        transferred_bytes=100))
     journal.expect_equal(
-        "à égalité d'octets, le départage est stable et reproductible",
+        "on a byte tie, the tie-break is stable and reproducible",
         (primary_server(sample_site(servers=(tie_a, tie_b),
                                     jobs=(sample_job(server_key="bbb"),))).key,
          primary_server(sample_site(servers=(tie_b, tie_a),
                                     jobs=(sample_job(server_key="bbb"),))).key),
         ("aaa", "aaa"))
 
-    journal.expect_true("un serveur sans preuve ne fait pas échouer le départage",
+    journal.expect_true("a server without evidence does not break the tie-break",
                         primary_server(sample_site()).key == "web")
-    journal.expect_equal("un site sans serveur retourne None, sans erreur",
+    journal.expect_equal("a site without server returns None, without error",
                          primary_server(SiteSpec(name="x")), None)
 
-    journal.expect_equal("un site à un seul serveur n'a pas de note à ajouter",
+    journal.expect_equal("a single-server site has no note to add",
                          servers_note(site), None)
     note = servers_note(multi)
     journal.expect_true(
-        "la note multi-serveurs nomme le principal et les autres",
-        note is not None and "lourd" in note and "leger" in note,
-        "sans elle, les clés au singulier laissent croire à une seule machine")
+        "the multi-server note names the primary and the others",
+        note is not None and "heavy" in note and "light" in note,
+        "without it, singular keys suggest a single machine")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Contrôle : la bibliothèque reste indépendante d'e-footprint
+# Check: the library stays independent of e-footprint
 # ---------------------------------------------------------------------------
 
-def check_nielsen_temps_utilisateur(journal):
-    print("Temps utilisateur — Nielsen recalé, jamais silencieux hors domaine")
+def check_nielsen_user_time(journal):
+    print("User time — recalibrated Nielsen, never silent outside the domain")
 
-    # Domaine de validité publié par Nielsen (30-1250 mots) : correctement
-    # reconnu aux deux bornes et à l'intérieur.
+    # Validity domain published by Nielsen (30-1250 words): correctly
+    # recognized at both bounds and inside.
     journal.expect_true(
-        "150 mots est dans le domaine Nielsen (30-1250)",
+        "150 words is within the Nielsen domain (30-1250)",
         is_within_nielsen_domain(150.0))
     journal.expect_true(
-        "30 mots (borne basse incluse) est dans le domaine Nielsen",
+        "30 words (lower bound included) is within the Nielsen domain",
         is_within_nielsen_domain(30.0))
     journal.expect_true(
-        "1250 mots (borne haute incluse) est dans le domaine Nielsen",
+        "1250 words (upper bound included) is within the Nielsen domain",
         is_within_nielsen_domain(1250.0))
     journal.expect_true(
-        "10 mots est HORS du domaine Nielsen",
+        "10 words is OUTSIDE the Nielsen domain",
         not is_within_nielsen_domain(10.0))
     journal.expect_true(
-        "2000 mots est HORS du domaine Nielsen",
+        "2000 words is OUTSIDE the Nielsen domain",
         not is_within_nielsen_domain(2000.0))
 
-    # La formule elle-même : 25 s de socle + 4,4 s par 100 mots.
+    # The formula itself: 25 s base + 4.4 s per 100 words.
     journal.expect_equal(
-        "Nielsen brut à 0 mot vaut le socle seul (25 s)",
+        "raw Nielsen at 0 words equals the base alone (25 s)",
         nielsen_raw_seconds(0.0), 25.0)
     journal.expect_equal(
-        "Nielsen brut à 100 mots vaut 25 + 4,4 s",
+        "raw Nielsen at 100 words equals 25 + 4.4 s",
         nielsen_raw_seconds(100.0), 29.4)
 
-    # Recalage : moyenne SimilarWeb / moyenne des Nielsen bruts du parcours.
-    # Deux pages à 100 et 200 mots -> Nielsen bruts 29.4 et 33.8, moyenne 31.6.
+    # Recalibration: SimilarWeb average / average of the journey's raw Nielsen values.
+    # Two pages at 100 and 200 words -> raw Nielsen 29.4 and 33.8, average 31.6.
     raws = [nielsen_raw_seconds(100.0), nielsen_raw_seconds(200.0)]
     factor = recalibration_factor(15.8, raws)
     journal.expect_true(
-        "le facteur de recalage est la mesure divisée par la moyenne des Nielsen bruts",
+        "the recalibration factor is the measurement divided by the average of raw Nielsen values",
         factor is not None and abs(factor - 0.5) < 1e-9,
-        f"attendu 0.5, obtenu {factor!r}")
+        f"expected 0.5, got {factor!r}")
 
     journal.expect_true(
-        "recalage impossible sans mesure SimilarWeb (avg_time_on_page_s=None)",
+        "recalibration impossible without a SimilarWeb measurement (avg_time_on_page_s=None)",
         recalibration_factor(None, raws) is None)
     journal.expect_true(
-        "recalage impossible sans aucune page à Nielsen connu",
+        "recalibration impossible without any page with a known Nielsen value",
         recalibration_factor(15.8, []) is None)
     journal.expect_true(
-        "recalage impossible si toutes les pages du parcours sont à None (repli Lot 3)",
+        "recalibration impossible if all journey pages are None (Lot 3 fallback)",
         recalibration_factor(15.8, [None, None]) is None)
 
-    # step_user_time() : les quatre combinaisons dégradent la confiance
-    # (jamais silencieusement) exactement quand attendu.
+    # step_user_time(): the four combinations degrade confidence
+    # (never silently) exactly when expected.
     in_domain_recalibrated = step_user_time(150.0, factor)
     journal.expect_true(
-        "page dans le domaine + recalage disponible -> confiance medium",
+        "page in domain + recalibration available -> confidence medium",
         in_domain_recalibrated is not None and in_domain_recalibrated.confidence == "medium",
-        f"confiance obtenue : {in_domain_recalibrated.confidence if in_domain_recalibrated else None!r}")
+        f"confidence obtained: {in_domain_recalibrated.confidence if in_domain_recalibrated else None!r}")
     journal.expect_true(
-        "medium : aucun motif de dégradation dans le commentaire",
-        "hors du domaine" not in in_domain_recalibrated.comment
-        and "SANS recalage" not in in_domain_recalibrated.comment)
+        "medium: no degradation reason in the comment",
+        "outside the Nielsen validity domain" not in in_domain_recalibrated.comment
+        and "WITHOUT recalibration" not in in_domain_recalibrated.comment)
 
     out_of_domain = step_user_time(10.0, factor)
     journal.expect_true(
-        "page hors domaine (10 mots) -> confiance dégradée (low)",
+        "page outside domain (10 words) -> degraded confidence (low)",
         out_of_domain is not None and out_of_domain.confidence == "low")
     journal.expect_true(
-        "le motif de sortie de domaine est ÉCRIT dans le commentaire, jamais silencieux",
-        "domaine de validité Nielsen" in out_of_domain.comment)
+        "the out-of-domain reason is WRITTEN in the comment, never silent",
+        "Nielsen validity domain" in out_of_domain.comment)
 
     no_recalage = step_user_time(150.0, None)
     journal.expect_true(
-        "aucune mesure SimilarWeb -> confiance dégradée (low), Nielsen BRUT appliqué",
+        "no SimilarWeb measurement -> degraded confidence (low), RAW Nielsen applied",
         no_recalage is not None and no_recalage.confidence == "low"
         and abs(no_recalage.value - nielsen_raw_seconds(150.0)) < 1e-9)
     journal.expect_true(
-        "le motif d'absence de recalage est ÉCRIT dans le commentaire, jamais silencieux",
-        "aucune mesure SimilarWeb" in no_recalage.comment)
+        "the missing-recalibration reason is WRITTEN in the comment, never silent",
+        "no SimilarWeb measurement" in no_recalage.comment)
 
     both_degraded = step_user_time(10.0, None)
     journal.expect_true(
-        "hors domaine ET sans recalage -> les DEUX motifs sont écrits, pas un seul",
+        "outside domain AND without recalibration -> BOTH reasons are written, not just one",
         both_degraded is not None
-        and "domaine de validité Nielsen" in both_degraded.comment
-        and "aucune mesure SimilarWeb" in both_degraded.comment)
+        and "Nielsen validity domain" in both_degraded.comment
+        and "no SimilarWeb measurement" in both_degraded.comment)
 
     journal.expect_true(
-        "aucun comptage de mots (repli Lot 3) -> pas de Traced deviné, None explicite",
+        "no word count (Lot 3 fallback) -> no guessed Traced, explicit None",
         step_user_time(None, factor) is None)
 
     journal.expect_true(
-        "le Traced produit est bien tracé (source_name renseigné) : "
-        "un temps Nielsen ne doit jamais ressembler à une mesure sans provenance",
+        "the produced Traced is properly traced (source_name set): "
+        "a Nielsen time must never look like a provenance-less measurement",
         in_domain_recalibrated.has_source)
     print()
 
 
 def check_no_efootprint_import(journal):
-    print("Indépendance — la spécification n'importe pas e-footprint")
+    print("Independence — the spec does not import e-footprint")
 
-    # build.py est l'EXCEPTION documentée : c'est le seul module dont la
-    # raison d'être est d'instancier e-footprint (cf. son en-tête). L'exempter
-    # ici par son nom, pas en l'ignorant en silence : si un second fichier
-    # se met un jour à importer e-footprint, ce contrôle doit encore le voir.
+    # build.py is the DOCUMENTED EXCEPTION: it is the only module whose
+    # purpose is to instantiate e-footprint (cf. its header). Exempting it
+    # here by name, not by ignoring it silently: if a second file
+    # starts importing e-footprint one day, this check must still see it.
     EXEMPT_FILES = {"build.py"}
 
     library = SCRIPTS_DIR / "efootprint_model"
@@ -956,49 +956,49 @@ def check_no_efootprint_import(journal):
         offenders.extend(f"{path.name}:{lineno}" for lineno in imports_here)
 
     journal.expect_true(
-        "aucun module de la spécification (hors build.py) n'importe e-footprint",
+        "no module of the spec (except build.py) imports e-footprint",
         not offenders,
-        f"importé dans {', '.join(offenders)}. La spécification doit rester "
-        "testable sans la librairie installée ; cette propriété se perd au "
-        "premier import et ne se remarque pas tant qu'elle est installée.")
+        f"imported in {', '.join(offenders)}. The spec must stay "
+        "testable without the library installed; this property is lost at the "
+        "first import and goes unnoticed as long as it is installed.")
 
     journal.expect_true(
-        "build.py importe bien e-footprint (l'exemption n'est pas devenue "
-        "obsolète en silence)",
+        "build.py does import e-footprint (the exemption did not become "
+        "obsolete silently)",
         build_py_imports_efootprint,
-        "si ce contrôle échoue, soit build.py a été vidé de son rôle, soit "
-        "l'exemption ne cible plus le bon fichier : dans les deux cas, "
-        "l'exemption doit être revue, pas laissée traîner sans objet.")
+        "if this check fails, either build.py has been emptied of its role, or "
+        "the exemption no longer targets the right file: in both cases, "
+        "the exemption must be reviewed, not left lying around without purpose.")
 
-    # Le contrôle ci-dessus est textuel. Celui-ci est réel : on vérifie que
-    # l'import du PAQUET (donc de __init__.py, spec.py, compose.py) n'a
-    # effectivement PAS chargé e-footprint. build.py n'est pas importé par
-    # __init__.py (cf. son garde-fou propre) donc reste hors de ce test.
+    # The check above is textual. This one is real: we verify that
+    # importing the PACKAGE (hence __init__.py, spec.py, compose.py) did
+    # actually NOT load e-footprint. build.py is not imported by
+    # __init__.py (cf. its own guardrail) so it stays outside this test.
     journal.expect_true(
-        "importer la spécification ne charge pas e-footprint en mémoire",
+        "importing the spec does not load e-footprint into memory",
         not any(name == "efootprint" or name.startswith("efootprint.")
                 for name in sys.modules),
-        "un import indirect suffit à rendre la bibliothèque dépendante")
+        "an indirect import is enough to make the library dependent")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Point d'entrée
+# Entry point
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Contrôle des garde-fous de efootprint_model/ : une "
-                    "spécification correcte passe, chaque faute prévue est "
-                    "refusée.")
+        description="Check of the efootprint_model/ guardrails: a "
+                    "correct spec passes, each expected fault is "
+                    "refused.")
     parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Affiche aussi les contrôles réussis.")
+                        help="Also shows the passed checks.")
     args = parser.parse_args()
 
     journal = Journal(verbose=args.verbose)
 
     print("-" * 68)
-    print("  GARDE-FOUS — efootprint_model/")
+    print("  GUARDRAILS — efootprint_model/")
     print("-" * 68)
     print()
 
@@ -1010,27 +1010,27 @@ def main():
     check_reserves(journal)
     check_compose(journal)
     check_sources_and_primary(journal)
-    check_nielsen_temps_utilisateur(journal)
+    check_nielsen_user_time(journal)
     check_no_efootprint_import(journal)
 
     total = journal.passed + len(journal.failures)
     print("-" * 68)
     if journal.failures:
-        print(f"[ÉCHEC] {len(journal.failures)} contrôle(s) sur {total} :")
+        print(f"[FAIL] {len(journal.failures)} check(s) out of {total}:")
         for label, detail in journal.failures:
             print(f"  - {label}")
             print(f"    {detail}")
         print()
-        print("Un contrôle en échec sur un REFUS attendu est le cas grave : le")
-        print("garde-fou laisse passer, donc une valeur non tracée peut atteindre")
-        print("le rapport sans que rien ne le signale.")
+        print("A failing check on an expected REFUSAL is the serious case: the")
+        print("guardrail lets things through, so an untraced value can reach")
+        print("the report without anything flagging it.")
         return 1
 
-    print(f"[SUCCÈS] {total} contrôles. Les garde-fous répondent.")
+    print(f"[SUCCESS] {total} checks. The guardrails respond.")
     print()
-    print("Rappel de portée : ce contrôle vérifie des REFUS, pas des chiffres.")
-    print("La non-régression numérique est celle de check_efootprint_contract.py,")
-    print("et la généricité ne sera prouvée que par un second site réel.")
+    print("Scope reminder: this check verifies REFUSALS, not figures.")
+    print("Numeric non-regression is check_efootprint_contract.py's job,")
+    print("and genericity will only be proven by a second real site.")
     return 0
 
 

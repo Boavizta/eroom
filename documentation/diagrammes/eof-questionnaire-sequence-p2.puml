@@ -1,5 +1,5 @@
 @startuml eof-questionnaire-sequence-p2
-title Questionnaire EOF - Page 2/3 : générer et envoyer, hors pipeline
+title EOF questionnaire - Page 2/3 : generate and send, outside the pipeline
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,81 +22,81 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Auditeur" as U #82C1DD
+actor "Auditor" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
 participant "generate_questionnaire.py" as GQ #DBDDE5
-actor "Équipe du service\naudité" as I #C8E6C9
-database "dossier-audit/" as FS #9BD0DD
+actor "Audited service\nteam" as I #C8E6C9
+database "audit-dir/" as FS #9BD0DD
 
 note over U, FS
-  ATTENTION. RIEN DE CETTE PAGE N'EST AUTOMATIQUE.
-  Aucune étape de l'audit n'appelle ce script : c'est une
-  commande à taper, après avoir lu le rapport de la page 1/3.
+  WARNING. NOTHING ON THIS PAGE IS AUTOMATIC.
+  No audit step calls this script: it is a
+  command to type, after reading the page 1/3 report.
 end note
 
-== Générer le questionnaire ==
+== Generate the questionnaire ==
 
-U -> C : Demander le questionnaire
-C -> GQ : python3 generate_questionnaire.py <dossier-audit>
-GQ -> FS : Lire eof-audit-results.json
-FS -> GQ : Critères déjà tranchés par la mesure
-GQ -> GQ : Ne garder que les critères sans réponse,\net ceux répondus "à évaluer"
-GQ -> GQ : Trier par rendement décroissant :\nles questions à plusieurs critères d'abord
-GQ -> FS : questionnaire-eof.md\n(62 questions au plus)
-GQ -> C : Le compte réel est inférieur :\nun site bien mesuré en reçoit environ 55
+U -> C : Request the questionnaire
+C -> GQ : python3 generate_questionnaire.py <audit-dir>
+GQ -> FS : Read eof-audit-results.json
+FS -> GQ : Criteria already settled by measurement
+GQ -> GQ : Keep only the criteria without an answer,\nand those answered "to be assessed"
+GQ -> GQ : Sort by decreasing yield:\nmulti-criterion questions first
+GQ -> FS : questionnaire-eof.md\n(62 questions at most)
+GQ -> C : The real count is lower:\na well-measured site gets about 55
 
 note over GQ, FS
-  UN SEUL fichier. Le découpage en deux, produit et
-  technique, a été supprimé : il ne routait rien.
-  3 destinataires sur 4 recevaient des questions dans
-  les DEUX fichiers.
+  ONE SINGLE file. The split into two, product and
+  technical, was removed: it routed nothing.
+  3 recipients out of 4 received questions in
+  BOTH files.
 
-  Chaque question dit dans son titre à qui la poser :
-  le responsable produit, l'équipe de développement,
-  la personne qui exploite l'infrastructure, celle qui
-  gère les données. C'est une indication, pas un plan de
-  classement : les rôles dépendent trop de chaque client.
+  Each question says in its title who to ask:
+  the product manager, the development team,
+  the person operating the infrastructure, the one
+  managing the data. It is an indication, not a
+  filing plan: roles depend too much on each client.
 
-  L'ordre suit le rendement : un client qui s'arrête en
-  cours de route a couvert le maximum de critères pour
-  l'effort fourni. Le rendement se calcule sur les
-  critères RESTANTS, donc un bloc dont la mesure a déjà
-  tranché une partie redescend tout seul.
+  The order follows the yield: a client who stops
+  halfway has covered the maximum number of criteria
+  for the effort provided. The yield is calculated over
+  the REMAINING criteria, so a block whose measurement
+  already settled part of it drops back on its own.
 
-  Format : cases à cocher Markdown, avec des repères
-  cachés en commentaire HTML pour que la relecture ne
-  dépende pas de la mise en page.
-  Une case "Je ne sais pas" est toujours offerte, et
-  elle ne produit jamais de réponse.
+  Format: Markdown checkboxes, with hidden
+  markers in HTML comments so that the read-back does
+  not depend on the layout.
+  An "I don't know" box is always offered, and
+  it never produces an answer.
 end note
 
-C -> U : Chemin du fichier
+C -> U : File path
 
-== Envoyer, attendre, recevoir ==
+== Send, wait, receive ==
 
-U -> I : Transmettre le fichier
+U -> I : Transmit the file
 
 note over U, I
-  ATTENTE. Le délai est asynchrone et n'est pas outillé.
-  Rien dans le code ne fixe d'échéance, ne relance
-  l'interlocuteur, ni ne suit qui a répondu quoi.
-  Le transport est libre : courriel, dépôt partagé,
-  ce que le client accepte.
+  WAITING. The delay is asynchronous and not tooling-backed.
+  Nothing in the code sets a deadline, reminds
+  the contact, or tracks who answered what.
+  The transport is free: email, shared drive,
+  whatever the client accepts.
 end note
 
-I -> I : Cocher les cases,\nchacun les questions qui le concernent
-I -> U : Renvoyer le fichier rempli
-U -> FS : Reposer le fichier rempli\ndans le dossier d'audit
+I -> I : Tick the boxes,\neach the questions that concern them
+I -> U : Send back the filled-in file
+U -> FS : Put the filled-in file back\nin the audit directory
 
 note over U, FS
-  Le fichier doit revenir sous son nom d'origine, dans le
-  dossier d'audit : c'est là que la relecture le cherche.
+  The file must come back under its original name, in the
+  audit directory: that is where the read-back looks for it.
 
-  S'il ne revient pas, la relecture le dit : elle pose un
-  état echec_lecture que le contrôle de santé des sondes
-  attrape. Un questionnaire jamais revenu ne ressemble
-  donc plus à un questionnaire rendu vide.
-  Suite : page 3/3.
+  If it does not come back, the read-back says so: it sets a
+  read_error state that the probe health check
+  catches. A questionnaire never returned therefore no
+  longer looks like an empty returned questionnaire.
+  Continued: page 3/3.
 end note
 
 @enduml

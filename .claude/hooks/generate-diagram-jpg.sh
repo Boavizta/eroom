@@ -1,16 +1,16 @@
 #!/bin/bash
-# Hook PostToolUse (matcher Bash). Apres une commande `plantuml -tsvg` qui
-# regenere un ou plusieurs diagrammes dans documentation/diagrammes/, genere
-# aussi la version JPG legere (800px de large, qualite 85, meme nom) a cote.
-# Cf. skill diagrammes-analyse-parcours, section "JPG leger".
+# PostToolUse hook (matcher Bash). After a `plantuml -tsvg` command that
+# regenerates one or more diagrams in documentation/diagrammes/, also generate
+# the lightweight JPG version (800px wide, quality 85, same name) alongside.
+# Cf. skill diagrammes-analyse-parcours, section "Lightweight JPG".
 #
-# Ne fait rien pour toute autre commande Bash (sort immediatement).
+# Does nothing for any other Bash command (exits immediately).
 
 PROJECT_DIR="/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
 
-# Filtre d'abord sur le JSON brut (pas de spawn `jq`) : la commande n'apparait
-# de toute facon que sous forme de sous-chaine du JSON, donc ce filtre grossier
-# suffit a ecarter les >99% d'appels Bash qui ne concernent pas plantuml.
+# Filter first on the raw JSON (no `jq` spawn): the command only ever appears
+# as a substring of the JSON anyway, so this coarse filter is enough to rule
+# out >99% of Bash calls that do not involve plantuml.
 input=$(cat)
 case "$input" in
   *plantuml*-tsvg*documentation/diagrammes*) ;;

@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-Phase 3 - Estimation CO2e d'un site web via e-footprint (Boavizta).
+Phase 3 - CO2e estimation of a website via e-footprint (Boavizta).
 
-IMPORTANT : Toutes les valeurs affichées sont des ESTIMATIONS HYPOTHÉTIQUES.
-Elles sont calculées à partir de données collectées automatiquement (HAR, CrUX,
-ipinfo) et de nombreuses hypothèses par défaut. Ces résultats ne constituent
-pas une mesure réelle de l'impact environnemental du site.
+IMPORTANT: ALL displayed values are HYPOTHETICAL ESTIMATES.
+They are computed from automatically collected data (HAR, CrUX,
+ipinfo) and many default assumptions. These results are NOT a real
+measurement of the website's environmental impact.
 
-Usage :
+Usage:
     python3 run_efootprint.py <source_dir>
-    python3 run_efootprint.py <source_dir> --visits 500000      # trafic annuel
-    python3 run_efootprint.py <source_dir> --instance t3.large  # instance (nom propre
-                                                                # au provider détecté)
-    python3 run_efootprint.py <source_dir> --refresh-data       # recollecte env-data.json
+    python3 run_efootprint.py <source_dir> --visits 500000      # annual traffic
+    python3 run_efootprint.py <source_dir> --instance t3.large  # instance (provider-specific
+                                                                # name)
+    python3 run_efootprint.py <source_dir> --refresh-data       # re-collect env-data.json
 
-Lit env-data.json dans source_dir (produit par collect_env_data.py).
-Écrit efootprint-boavizta-model.json dans source_dir (relançabilité) et
-efootprint-synthese-python.json (consommé par generate_report_html.py et
+Reads env-data.json in source_dir (produced by collect_env_data.py).
+Writes efootprint-boavizta-model.json in source_dir (re-runnability) and
+efootprint-python-summary.json (consumed by generate_report_html.py and
 check_efootprint_contract.py).
 
-DEPUIS LE LOT 5 : ce script délègue toute la modélisation à `efootprint_model`
-(spec_from_env_data -> build_system -> ranges), au lieu de construire un modèle
-mono-page/mono-serveur à la main. Le HAR est donc requis en plus de
-env-data.json (spec_from_env_data() en a besoin pour détecter les
-infrastructures et découper le parcours en étapes).
+SINCE LOT 5: this script delegates all modeling to `efootprint_model`
+(spec_from_env_data -> build_system -> ranges), instead of hand-building a model
+single-page/single-server by hand. The HAR is therefore required in addition to
+env-data.json (spec_from_env_data() needs it to detect
+infrastructures and split the journey into steps).
 """
 
 import argparse
@@ -49,25 +49,25 @@ from efootprint_model.recommendations import (  # noqa: E402
 from efootprint_model.sizing_report import servers_sizing  # noqa: E402
 from efootprint_model.to_plantuml import site_to_plantuml, _sanitize_alias  # noqa: E402
 from efootprint_model import topology_overview  # noqa: E402
-from efootprint_model.temps_utilisateur import (  # noqa: E402
+from efootprint_model.user_time import (  # noqa: E402
     is_within_nielsen_domain, nielsen_raw_seconds, recalibration_factor,
     NIELSEN_BASE_SECONDS, NIELSEN_SECONDS_PER_100_WORDS)
 import coverage_metrics  # noqa: E402
 
-# Module frère (même dossier) : détection des technologies (stack) par règles
-# maison sur le HAR, réutilisée pour la vue d'ensemble avant calcul (Étape 25).
-# Import guardé (le reste fonctionne si le module est absent), même pattern
-# que collect_env_data.py.
+# Sibling module (same directory): technology (stack) detection by home-grown
+# rules on the HAR, reused for the pre-calculation overview (Step 25).
+# Guarded import (the rest works if the module is absent), same pattern
+# as collect_env_data.py.
 try:
     import detect_tech
 except ImportError:
     detect_tech = None
 
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+RAW_DATA_DIR = "raw-data-potentially-sensitive"
 
 
 # ---------------------------------------------------------------------------
-# Chargement données
+# Loading data
 # ---------------------------------------------------------------------------
 
 def load_env_data(source_dir):
@@ -79,7 +79,7 @@ def load_env_data(source_dir):
 
 
 def ensure_env_data(source_dir, refresh=False):
-    """Lance collect_env_data.py si env-data.json absent ou --refresh-data."""
+    """Runs collect_env_data.py if env-data.json is missing or --refresh-data."""
     collect_script = SCRIPTS_DIR / "collect_env_data.py"
     cmd = [sys.executable, str(collect_script), str(source_dir)]
     if refresh:
@@ -87,18 +87,18 @@ def ensure_env_data(source_dir, refresh=False):
 
     env_data_path = source_dir / "env-data.json"
     if not env_data_path.exists() or refresh:
-        print("[collect] Lancement collect_env_data.py...")
+        print("[collect] Launching collect_env_data.py...")
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            print("[collect] Échec de la collecte, arrêt.")
+            print("[collect] Collection failed, stopping.")
             sys.exit(1)
 
 
 def infer_audited_domain(env_data, source_dir):
-    """Domaine audité : pages[0].url d'env-data.json, sinon le nom du dossier.
+    """Audited domain: pages[0].url of env-data.json, else the directory name.
 
-    Même ordre de priorité que `similarweb_api.infer_domain()`, sans dépendre
-    de ce module (pas d'appel réseau nécessaire ici, juste un nom de domaine).
+    Same priority order as `similarweb_api.infer_domain()`, without depending
+    on that module (no network call needed here, just a domain name).
     """
     from urllib.parse import urlparse
     pages = env_data.get("pages") or []
@@ -110,52 +110,52 @@ def infer_audited_domain(env_data, source_dir):
 
 
 def build_topology_overview(source_dir):
-    """Étape 25 (skill efootprint) : construit la vue d'ensemble (texte +
-    PlantUML) AVANT tout calcul CO2e. Ne calcule rien (pas de build_system(),
-    pas de total kg) : seulement de la lecture/présentation.
+    """Step 25 (efootprint skill): builds the overview (text +
+    PlantUML) BEFORE any CO2e calculation. Computes nothing (no build_system(),
+    no kg total): only reading/presentation.
 
-    Chaîne volontairement identique au début de main() (load_env_data ->
-    find_har -> infer_audited_domain -> spec_from_env_data), pour ne jamais
-    diverger de ce que l'Étape 40 verra réellement. Aucune dépendance sur les
-    paramètres de l'Étape 30 (visits/instance) : la spec a toujours un défaut
-    résolu (100k/an) dès l'Étape 20 (resolve_traffic() dans collect_env_data.py).
+    Deliberately the same chain as the start of main() (load_env_data ->
+    find_har -> infer_audited_domain -> spec_from_env_data), so it never
+    diverges from what Step 40 will really see. No dependency on the
+    Step 30 parameters (visits/instance): the spec always has a resolved default
+    (100k/year) as early as Step 20 (resolve_traffic() in collect_env_data.py).
 
-    Retourne (spec, overview_text, plantuml_text, warnings). Lève RuntimeError
-    (message actionnable, jamais une trace brute) si les préconditions ne sont
-    pas réunies : HAR absent, ou env-data.json sans serveur détecté.
+    Returns (spec, overview_text, plantuml_text, warnings). Raises RuntimeError
+    (actionable message, never a raw traceback) if the preconditions are sont
+    not met: HAR missing, or env-data.json with no server detected.
     """
     env_data = load_env_data(source_dir)
     if not env_data:
         raise RuntimeError(
-            f"env-data.json introuvable dans {source_dir} : lancer l'Étape 20 "
-            "(collect_env_data.py) avant de demander la vue d'ensemble.")
+            f"env-data.json not found in {source_dir}: run Step 20 "
+            "(collect_env_data.py) before asking for the overview.")
 
     har_path = find_har(source_dir)
     if not har_path:
         raise RuntimeError(
-            f"Aucun .har trouvé dans {source_dir} (ni dans {RAW_DATA_DIR}/). "
-            "La vue d'ensemble a besoin du HAR pour détecter la topologie "
-            "(serveurs, BDD/streaming/IA suspectés).")
+            f"No .har found in {source_dir} (nor in {RAW_DATA_DIR}/). "
+            "The overview needs the HAR to detect the topology "
+            "(servers, suspected DB/streaming/AI).")
 
     audited_domain = infer_audited_domain(env_data, source_dir)
 
     try:
         spec, warnings = spec_from_env_data(env_data, str(har_path), audited_domain)
     except (SpecError, ValueError) as exc:
-        # ValueError NUE : spec_from_env_data() lève ce type (pas SpecError)
-        # quand env_data["servers"] est vide (from_har.py) — piège identifié,
-        # `except SpecError` seul ne suffit pas.
+        # NEW ValueError: spec_from_env_data() raises this type (not SpecError)
+        # when env_data["servers"] is empty (from_har.py) — identified trap,
+        # `except SpecError` alone is not enough.
         raise RuntimeError(
-            f"Impossible de construire la topologie : {exc}. Relancer "
-            "l'Étape 20 (collect_env_data.py) si env-data.json est incomplet.")
+            f"Cannot build the topology: {exc}. Re-run "
+            "Step 20 (collect_env_data.py) if env-data.json is incomplete.")
 
     tech_result = detect_tech.detect_from_har(har_path) if detect_tech else None
     spec = topology_overview.annotate_third_party_hosts(spec, tech_result)
 
     text = topology_overview.overview_text(spec, tech_result)
-    # Le mix pays d'audience (SimilarWeb) vit dans env-data.json, jamais dans
-    # la SiteSpec (AudienceSpec.country_mix existe mais n'est peuplé par aucun
-    # adaptateur) : lu ici pour l'afficher dans la note d'hypothèses du diagramme.
+    # The audience country mix (SimilarWeb) lives in env-data.json, never in
+    # the SiteSpec (AudienceSpec.country_mix exists but is populated by no
+    # adapter): read here to display it in the diagram's assumptions note.
     audience_mix = (env_data.get("audience") or {}).get("mix")
     puml = site_to_plantuml(spec, title=audited_domain, audience_mix=audience_mix)
 
@@ -164,20 +164,20 @@ def build_topology_overview(source_dir):
 
 DEFAULT_VISITS_PER_YEAR = 100_000
 
-# Nom du provider tel qu'il est détecté par collect_env_data.py -> nom attendu par
-# e-footprint. Sans cette table, un provider bien détecté fait planter le calcul :
-# le script entrait dans la branche Boavizta avec "ovh", qu'e-footprint refuse
-# (il attend "ovhcloud"), et le repli "serveur générique" ne se déclenchait jamais.
-# Cas rencontré sur un site hébergé chez OVH.
+# Provider name as detected by collect_env_data.py -> name expected by
+# e-footprint. Without this table, a well-detected provider crashes the
+# calculation: the script entered the Boavizta branch with "ovh", which
+# e-footprint rejects (it expects "ovhcloud"), and the "generic server" fallback
+# never triggered. Case seen on a site hosted at OVH.
 PROVIDER_ALIASES = {"ovh": "ovhcloud"}
 
 
 def normalize_provider(detected):
-    """Nom e-footprint du provider détecté, ou None si non modélisable en cloud.
+    """e-footprint name of the detected provider, or None if not cloud-modelable.
 
-    Ne renvoie un nom que si e-footprint le connaît RÉELLEMENT : la liste est lue
-    dans la librairie, pas recopiée, pour qu'elle ne se périme pas en silence.
-    L'appelant retombe sur un serveur générique quand la réponse est None.
+    Only returns a name if e-footprint REALLY knows it: the list is read from
+    the library, not copied, so it cannot silently go stale.
+    The caller falls back to a generic server when the answer is None.
     """
     if not detected:
         return None
@@ -191,31 +191,31 @@ def normalize_provider(detected):
 
 
 def resolve_visits_override(cli_visits, spec):
-    """--visits (CLI, analytics client) est prioritaire sur le trafic déjà
-    résolu par spec_from_env_data() (bloc 'traffic' SimilarWeb, ou rien).
+    """--visits (CLI, client analytics) takes precedence over the traffic already
+    resolved by spec_from_env_data() (SimilarWeb 'traffic' block, or nothing).
 
-    Retourne une AudienceSpec, éventuellement remplacée si --visits est fourni.
-    Contrairement à l'ancien script, il n'y a plus de défaut 100 000/an ici :
-    AudienceSpec.visits_per_year n'est pas un champ critique (cf. spec.py), la
-    lib le dit déjà à la construction si besoin (build.py:241).
+    Returns an AudienceSpec, possibly replaced if --visits is provided.
+    Unlike the old script, there is no 100,000/year default here anymore:
+    AudienceSpec.visits_per_year is not a critical field (cf. spec.py), the
+    lib already says so at construction time if needed (build.py:241).
     """
     from dataclasses import replace
     from efootprint_model.spec import measured
     audience = spec.audience
     if cli_visits is None or audience is None:
         return spec
-    new_visits = measured(float(cli_visits), "dimensionless", "saisie manuelle (--visits)",
-                          comment="Trafic saisi en ligne de commande (analytics client ou "
-                                  "hypothèse explicite), prioritaire sur le bloc 'traffic'.")
+    new_visits = measured(float(cli_visits), "dimensionless", "manual entry (--visits)",
+                          comment="Traffic entered on the command line (client analytics or "
+                                  "explicit assumption), takes precedence over the 'traffic' block.")
     return replace(spec, audience=replace(audience, visits_per_year=new_visits))
 
 
 def resolve_instance_override(cli_instance, cli_instance_source, cli_instance_source_url, spec):
-    """--instance ne peut viser qu'UN SEUL serveur : chaque BoaviztaCloudServer porte
-    son propre instance_type (confirmé par la doc e-footprint, aucune notion
-    d'instance "du site"). Convention retenue : le serveur PRINCIPAL, celui qui
-    porte le plus d'octets (primary_server(), déjà utilisé pour les clés
-    singulières provider/instance_type du JSON de résultats).
+    """--instance can target ONLY ONE server: each BoaviztaCloudServer carries
+    its own instance_type (confirmed by the e-footprint doc, no notion of a
+    "site instance"). Chosen convention: the PRIMARY server, the one
+    carrying the most bytes (primary_server(), already used for the singular
+    provider/instance_type keys of the results JSON).
     """
     from dataclasses import replace
     from efootprint_model.spec import estimated_label, unjustified
@@ -225,8 +225,8 @@ def resolve_instance_override(cli_instance, cli_instance_source, cli_instance_so
 
     target = primary_server(spec)
     if target is None or target.provider is None:
-        print("  ⚠ --instance ignoré : aucun serveur cloud (provider Boavizta) "
-              "dans le modèle.")
+        print("  ⚠ --instance ignored: no cloud server (Boavizta provider) "
+              "in the model.")
         return spec, None
 
     if cli_instance_source:
@@ -235,8 +235,8 @@ def resolve_instance_override(cli_instance, cli_instance_source, cli_instance_so
     else:
         new_instance = unjustified(
             cli_instance,
-            comment="Instance précisée en ligne de commande (--instance) sans "
-                    "justification vérifiable (--instance-source absent).")
+            comment="Instance specified on the command line (--instance) without "
+                    "verifiable justification (--instance-source absent).")
 
     new_servers = tuple(
         replace(server, instance_type=new_instance) if server.key == target.key else server
@@ -246,17 +246,17 @@ def resolve_instance_override(cli_instance, cli_instance_source, cli_instance_so
 
 
 # ---------------------------------------------------------------------------
-# Affichage résumé des hypothèses
+# Printing the assumptions summary
 # ---------------------------------------------------------------------------
 
 CONFIDENCE_LABELS = {
-    "high":               "collecté  ",
-    "medium":             "estimé    ",
-    "low":                "supposé   ",
-    "default":            "défaut lib",
-    "default_efootprint": "défaut lib",
-    "default_script":     "défaut script",
-    "unjustified":        "précisé",
+    "high":               "collected ",
+    "medium":             "estimated ",
+    "low":                "assumed   ",
+    "default":            "lib default",
+    "default_efootprint": "lib default",
+    "default_script":     "script default",
+    "unjustified":        "stated",
 }
 
 
@@ -265,56 +265,56 @@ def fmt_conf(conf):
 
 
 def print_hypotheses(spec):
-    """Résumé des hypothèses lu directement sur la SiteSpec (Traced), plus
-    fidèle que l'ancien tableau (qui relisait env-data.json en parallèle du
-    calcul et pouvait diverger de ce qui est réellement utilisé)."""
+    """Summary of the assumptions read directly from the SiteSpec (Traced), more
+    faithful than the old table (which re-read env-data.json in parallel with
+    the calculation and could diverge from what is actually used)."""
     print()
     print("-" * 65)
-    print("  AVERTISSEMENT : ESTIMATION HYPOTHÉTIQUE")
-    print("  Les valeurs ci-dessous sont des hypothèses de calcul.")
-    print("  Elles ne constituent pas une mesure réelle.")
+    print("  WARNING: HYPOTHETICAL ESTIMATION")
+    print("  The values below are calculation assumptions.")
+    print("  They are not a real measurement.")
     print("-" * 65)
     print()
-    print(f"  {'Paramètre':<35} {'Valeur':<18} {'Source'}")
+    print(f"  {'Parameter':<35} {'Value':<18} {'Source'}")
     print(f"  {'-'*35} {'-'*18} {'-'*12}")
 
-    print(f"  {'Nombre de serveurs 1st-party':<35} {len(spec.servers):<18}{'détecté HAR'}")
+    print(f"  {'1st-party servers':<35} {len(spec.servers):<18}{'detected HAR'}")
     for server in spec.servers:
-        label = f"{server.key} ({server.provider.value if server.provider else 'générique'})"
+        label = f"{server.key} ({server.provider.value if server.provider else 'generic'})"
         instance = server.instance_type.value if server.instance_type else "-"
         conf = fmt_conf(server.instance_type.confidence) if server.instance_type else "-"
         print(f"    {label:<33} {instance:<18}{conf}")
 
-    steps_label = "Nombre d'étapes du parcours"
-    print(f"  {steps_label:<35} {len(spec.steps):<18}{'détecté HAR'}")
+    steps_label = "Number of journey steps"
+    print(f"  {steps_label:<35} {len(spec.steps):<18}{'detected HAR'}")
 
     audience = spec.audience
     if audience and audience.visits_per_year:
         v = audience.visits_per_year
-        print(f"  {'Trafic annuel estimé':<35} "
-              f"{int(v.value):,} visites".ljust(20) + " "
+        print(f"  {'Estimated annual traffic':<35} "
+              f"{int(v.value):,} visits".ljust(20) + " "
               f"{fmt_conf(v.confidence)}")
     else:
-        print(f"  {'Trafic annuel estimé':<35} {'non renseigné':<18}{'-'}")
+        print(f"  {'Estimated annual traffic':<35} {'not provided':<18}{'-'}")
     if audience and audience.phone_fraction:
-        print(f"  {'Mix device (phone / desktop)':<35} "
+        print(f"  {'Device mix (phone / desktop)':<35} "
               f"{audience.phone_fraction.value:.0%} / {audience.desktop_fraction.value:.0%}"
               .ljust(20) + " " + fmt_conf(audience.phone_fraction.confidence))
     print()
-    print("  Légende : collecté = API/HAR  |  estimé = inféré  |  supposé = valeur par défaut")
+    print("  Legend: collected = API/HAR  |  estimated = inferred  |  assumed = default value")
     print()
 
 
 def print_reserves(reserves):
     print()
     print("-" * 65)
-    print("  RÉSERVES DE CALCUL — la spécification ne peut pas être publiée telle quelle")
+    print("  CALCULATION RESERVES — the spec cannot be published as is")
     print("-" * 65)
     for code, message in reserves:
         print(f"\n  [{code}] {message}")
         options = arbitrations_for(code)
         if options:
-            print("  Issues possibles :")
+            print("  Possible remedies:")
             for option in options:
                 print(f"    - {option}")
     print()
@@ -328,89 +328,89 @@ def print_results(spec, built, ranges):
 
     print()
     print("-" * 65)
-    print("  RÉSULTATS — ESTIMATION HYPOTHÉTIQUE CO2e")
+    print("  RESULTS — HYPOTHETICAL CO2e ESTIMATION")
     if visits:
-        print(f"  Base : {visits:,.0f} visites/an")
+        print(f"  Base: {visits:,.0f} visits/year")
     print("-" * 65)
     print()
-    print(f"  Total annuel estimé  : ~{total:.1f} kg CO2e/an")
+    print(f"  Estimated annual total : ~{total:.1f} kg CO2e/year")
     if visits:
-        print(f"  Par visite estimée   : ~{total * 1000 / visits:.2f} g CO2e/visite")
+        print(f"  Per estimated visit    : ~{total * 1000 / visits:.2f} g CO2e/visit")
     print()
 
-    print("  Fabrication (amortie sur durée de vie) :")
+    print("  Manufacturing (amortized over lifetime):")
     for cat, kg in sorted(fab_kg.items(), key=lambda kv: -kv[1]):
         if kg > 0:
-            print(f"    {cat:<14} {kg:>8.2f} kg CO2e/an  (hypothèse)")
-    print(f"    {'TOTAL':<14} {sum(fab_kg.values()):>8.2f} kg CO2e/an")
+            print(f"    {cat:<14} {kg:>8.2f} kg CO2e/year  (assumption)")
+    print(f"    {'TOTAL':<14} {sum(fab_kg.values()):>8.2f} kg CO2e/year")
     print()
 
-    print("  Énergie (usage annuel) :")
+    print("  Energy (annual usage):")
     for cat, kg in sorted(energy_kg_.items(), key=lambda kv: -kv[1]):
         if kg > 0:
-            print(f"    {cat:<14} {kg:>8.4f} kg CO2e/an  (hypothèse)")
-    print(f"    {'TOTAL':<14} {sum(energy_kg_.values()):>8.4f} kg CO2e/an")
+            print(f"    {cat:<14} {kg:>8.4f} kg CO2e/year  (assumption)")
+    print(f"    {'TOTAL':<14} {sum(energy_kg_.values()):>8.4f} kg CO2e/year")
     print()
 
     infra_lo, infra_hi = ranges["infra_range_kg"]
     usage_lo, usage_hi = ranges["usage_range_kg"]
-    print("  Fourchettes (incertitudes non cumulées, cf. rapport) :")
-    print(f"    infra (mode de dimensionnement) : {infra_lo:.1f} - {infra_hi:.1f} kg CO2e/an")
-    print(f"    usage (temps utilisateur Nielsen) : {usage_lo:.1f} - {usage_hi:.1f} kg CO2e/an")
+    print("  Ranges (non-cumulative uncertainties, cf. report):")
+    print(f"    infra (sizing mode): {infra_lo:.1f} - {infra_hi:.1f} kg CO2e/year")
+    print(f"    usage (Nielsen user time): {usage_lo:.1f} - {usage_hi:.1f} kg CO2e/year")
     print()
 
-    print("  Ces valeurs sont des ordres de grandeur hypothétiques.")
-    print("  Pour affiner : relancer avec --visits et --instance ajustés.")
+    print("  These values are hypothetical orders of magnitude.")
+    print("  To refine: re-run with adjusted --visits and --instance.")
     print()
 
 
 # ---------------------------------------------------------------------------
-# Sérialisation
+# Serialization
 # ---------------------------------------------------------------------------
 
 def export_system_json(built, out_path):
-    """Sérialisation NATIVE e-footprint (Boavizta) d'un `built` (retour de
-    `build_system()`) vers `out_path`, via `system_to_json`. Facteur commun à
-    `save_boavizta_model()` (scénario de référence) et aux scénarios de
-    recommandations cumulatifs (`run_recommendation_scenarios()`)."""
+    """NATIVE e-footprint (Boavizta) serialization of a `built` (return of
+    `build_system()`) to `out_path`, via `system_to_json`. Common factor of
+    `save_boavizta_model()` (reference scenario) and the cumulative
+    cumulative recommendation scenarios (`run_recommendation_scenarios()`)."""
     from efootprint.api_utils.system_to_json import system_to_json
     system_to_json(built.system, save_calculated_attributes=False, output_filepath=str(out_path))
 
 
 def save_boavizta_model(built, source_dir):
-    """Écrit efootprint-boavizta-model.json : sérialisation NATIVE de la
-    bibliothèque e-footprint (Boavizta) via `system_to_json`, indépendante de
-    ce projet. Utile pour recharger le modèle dans la vraie interface web
-    e-footprint (model_builder) ou via `json_to_system`, jamais lu par
-    `generate_report_html.py` ni `check_efootprint_contract.py` (cf.
-    `save_synthese_python()` pour le format consommé par ce projet)."""
+    """Writes efootprint-boavizta-model.json: NATIVE serialization of the
+    e-footprint (Boavizta) library via `system_to_json`, independent of
+    this project. Useful to reload the model in the real e-footprint web
+    UI (model_builder) or via `json_to_system`, never read by
+    `generate_report_html.py` nor `check_efootprint_contract.py` (cf.
+    `save_python_summary()` for the format consumed by this project)."""
     out_path = source_dir / "efootprint-boavizta-model.json"
     export_system_json(built, out_path)
-    print(f"  Modèle sérialisé : {out_path}")
+    print(f"  Model serialized: {out_path}")
 
 
-def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves):
-    """Écrit efootprint-synthese-python.json : résumé applicatif propre à ce
-    projet (PAS un format e-footprint), consommé par deux scripts Python :
-    `generate_report_html.py` (alimente le rapport HTML) et
-    `check_efootprint_contract.py` (garde-fou de non-régression, comparé à
-    une baseline). Jamais destiné à être ouvert directement ni rechargé dans
-    la bibliothèque e-footprint (cf. `save_boavizta_model()` pour ça).
+def save_python_summary(spec, built, ranges, source_dir, env_data, warnings, reserves):
+    """Writes efootprint-python-summary.json: application-level summary specific to this
+    project (NOT an e-footprint format), consumed by two Python scripts:
+    `generate_report_html.py` (feeds the HTML report) and
+    `check_efootprint_contract.py` (regression guardrail, compared to
+    a baseline). Never meant to be opened directly nor reloaded into
+    the e-footprint library (cf. `save_boavizta_model()` for that).
 
-    Additif STRICT par rapport à l'ancien format (cf. handoff du 05/08/2026,
-    section F.3) : les ~60 clés `hypotheses` historiques, DOCUMENTAIRES (poids
-    par type, har_facts, mix d'audience par pays, scénarios device...),
-    restent lues depuis `env_data` comme avant, au même endroit, avec le même
-    sens — elles décrivent des mesures HAR/CrUX/SimilarWeb indépendantes du
-    modèle e-footprint. Les clés PILOTÉES PAR LE MODÈLE (provider,
-    instance_type, country, carbon_intensity, storage_gb) viennent en
-    revanche de `primary_server(spec)`, pas de `env_data["server"]` : avec
-    plusieurs infras 1st-party, ce n'est plus forcément le même serveur
-    (vérifié sur ants-permis, où `env_data["server"]` désigne un hôte
-    différent du serveur qui porte réellement le plus d'octets).
-    Le nouveau contenu (fourchettes, plusieurs serveurs, sources tracées) va
-    dans un bloc `model` de niveau 1, ignoré par le rapport actuel tant que
-    `_section_model()` n'existe pas (Lot 9).
+    STRICTLY additive vs the old format (cf. handoff of 05/08/2026,
+    section F.3): the ~60 historical, DOCUMENTARY `hypotheses` keys (weight
+    by type, har_facts, audience mix by country, device scenarios...),
+    are still read from `env_data` as before, in the same place, with the same
+    meaning — they describe HAR/CrUX/SimilarWeb measurements independent of the
+    e-footprint model. The keys DRIVEN BY THE MODEL (provider,
+    instance_type, country, carbon_intensity, storage_gb) instead come from
+    `primary_server(spec)`, not `env_data["server"]` : with
+    several 1st-party infras, it is not necessarily the same server
+    (checked on ants-permis, where `env_data["server"]` denotes a host
+    different from the server that actually carries the most bytes).
+    The new content (ranges, several servers, traced sources) goes
+    into a top-level `model` block, ignored by the current report as long as
+    `_section_model() does not exist (Lot 9).
     """
     fab_kg = fabrication_kg(built)
     energy_kg_ = energy_kg(built)
@@ -428,21 +428,21 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
     def _traced_dict(traced):
         return traced.as_dict() if traced is not None else None
 
-    # Temps de lecture (Nielsen 2008 recalé) : redérivé ici pour l'annexe, à
-    # partir des mêmes comptages de mots que spec_from_env_data() a utilisés
-    # (from_har.py::step_user_time()). Recalcul plutôt que lecture directe des
-    # Traced des étapes : ceux-ci ne portent que la valeur RECALÉE, alors que
-    # l'annexe doit aussi montrer le brut (sans recalage) pour que la personne
-    # qui lit le rapport comprenne d'où vient l'écart, cf. mémoire persistante
-    # "vérifier avant de recommander" (jamais un chiffre sans expliciter le
-    # calcul qui y mène).
+    # Reading time (Nielsen 2008 recalibrated): re-derived here for the appendix, from
+    # the same word counts that spec_from_env_data() used
+    # (from_har.py::step_user_time()). Recomputation rather than direct reading of the
+    # steps' Traced: they only carry the RECALIBRATED value, whereas
+    # the appendix must also show the raw (unrecalibrated) value so that the person
+    # reading the report understands where the gap comes from, cf. persistent memory
+    # "verify before recommending" (never a figure without explaining the
+    # calculation behind it).
     avg_time_on_page_s = (env_data.get("traffic") or {}).get("avg_time_on_page_s")
     _step_word_counts = [step.words.value for step in spec.steps if step.words]
     _nielsen_raws = [nielsen_raw_seconds(w) for w in _step_word_counts]
     _factor = recalibration_factor(avg_time_on_page_s, _nielsen_raws)
     reading_time = {
-        "formula": f"{NIELSEN_BASE_SECONDS:.0f} s + {NIELSEN_SECONDS_PER_100_WORDS:.1f} s / 100 mots",
-        "source_name": "Nielsen 2008 (nngroup.com), formule ajustée sur Weinreich et al. 2008 (ACM ToWeb)",
+        "formula": f"{NIELSEN_BASE_SECONDS:.0f} s + {NIELSEN_SECONDS_PER_100_WORDS:.1f} s / 100 words",
+        "source_name": "Nielsen 2008 (nngroup.com), formula adjusted on Weinreich et al. 2008 (ACM ToWeb)",
         "source_url": "https://www.nngroup.com/articles/how-little-do-users-read/",
         "domain_min_words": 30,
         "domain_max_words": 1250,
@@ -455,12 +455,12 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
     }
 
     traffic_env = env_data.get("traffic") or {}
-    # spec_from_env_data() ne trace pas source_url/note pour visits_per_year
-    # (from_har.py:605, mesure simple) : ils viennent du bloc 'traffic' brut
-    # d'env-data.json, sauf si --visits (CLI) a remplacé la valeur, auquel cas
-    # le Traced de la spec porte le comment "saisie manuelle" à restituer.
+    # spec_from_env_data() does not trace source_url/note for visits_per_year
+    # (from_har.py:605, simple measurement): they come from the raw 'traffic' block
+    # of env-data.json, unless --visits (CLI) replaced the value, in which case
+    # the spec's Traced carries the comment "manual entry" to be restored.
     _cli_override = bool(audience and audience.visits_per_year
-                          and audience.visits_per_year.source_name == "saisie manuelle (--visits)")
+                          and audience.visits_per_year.source_name == "manual entry (--visits)")
     results = {
         "generated_at": env_data.get("collected_at"),
         "visits_per_year": visits,
@@ -480,9 +480,9 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
             "energy_kg_co2e_per_year": {k: round(v, 4) for k, v in energy_kg_.items()},
         },
         "hypotheses": {
-            # Poids/durée/répartition : mesure directe HAR, documentaire,
-            # n'entrent pas dans le calcul multi-étapes (chaque étape a son
-            # propre JobSpec, cf. spec.py). Conservées pour l'annexe du rapport.
+            # Weight/duration/split: direct HAR measurement, documentary,
+            # do not enter the multi-step calculation (each step has its
+            # own JobSpec, cf. spec.py). Kept for the report appendix.
             "page_weight_kb": (job.get("data_transferred_bytes_real")
                                or job.get("data_transferred_bytes", 0)) // 1024,
             "confidence_page_weight": (job.get("confidence_data_transferred_real")
@@ -503,14 +503,14 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
             "confidence_breakdown": job.get("confidence_breakdown"),
             "har_facts": job.get("har_facts"),
             "confidence_har_facts": job.get("confidence_har_facts"),
-            # Serveur : PILOTÉ PAR LE MODÈLE, donc lu sur le serveur principal
-            # de la spec (celui qui porte le plus d'octets), pas sur
-            # env_data["server"].
+            # Server: DRIVEN BY THE MODEL, so read from the primary server
+            # of the spec (the one carrying the most bytes), not from
+            # env_data["server"]
             "country": main_server.country.value if main_server and main_server.country else "?",
             "confidence_country": main_server.country.confidence if main_server and main_server.country else "default",
             "carbon_intensity_g_kwh": main_server.carbon_intensity.value if main_server and main_server.carbon_intensity else None,
             "confidence_carbon_intensity": main_server.carbon_intensity.confidence if main_server and main_server.carbon_intensity else "default",
-            "provider": main_server.provider.value if main_server and main_server.provider else "inconnu",
+            "provider": main_server.provider.value if main_server and main_server.provider else "unknown",
             "confidence_provider": main_server.provider.confidence if main_server and main_server.provider else "default",
             "instance_type": main_server.instance_type.value if main_server and main_server.instance_type else None,
             "instance_type_manual": bool(main_server and main_server.instance_type
@@ -518,8 +518,8 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
             "instance_type_source": main_server.instance_type.source_name if main_server and main_server.instance_type
                                      and main_server.instance_type.confidence == "medium" else None,
             "instance_type_source_url": main_server.instance_type.source_url if main_server and main_server.instance_type else None,
-            # Mix appareils/réseau : mesure CrUX documentaire, indépendante du
-            # nombre de serveurs.
+            # Device/network mix: documentary CrUX measurement, independent of the
+            # number of servers.
             "phone_fraction": device.get("phone_fraction", 0.6),
             "desktop_fraction": device.get("desktop_fraction", 0.4),
             "confidence_device_mix": device.get("confidence", "default"),
@@ -548,8 +548,8 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
             "wifi_fraction": network.get("wifi_fraction", 0.4),
             "mobile_fraction": network.get("mobile_fraction", 0.6),
             "confidence_network_mix": network.get("confidence", "default"),
-            "network_note": "Réseau modélisé par pattern : visiteurs mobile -> réseau mobile, "
-                            "visiteurs desktop -> wifi.",
+            "network_note": "Network modeled by pattern: mobile visitors -> mobile network, "
+                            "desktop visitors -> wifi.",
             "storage_gb": main_server.storage_gb.value if main_server and main_server.storage_gb else None,
             "servers_note": servers_note(spec),
             "reading_time": reading_time,
@@ -583,11 +583,11 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
                     "user_time_confidence": step.user_time.confidence if step.user_time else "default",
                     "words": step.words.value if step.words else None,
                     "times_per_journey": step.times_per_journey,
-                    # Répartition PROPORTIONNELLE (pas une mesure indépendante
-                    # par étape) du CO2e Devices/Network déjà calculé, cf.
-                    # step_impact_shares() : donne un repère de contribution
-                    # relative pour la lecture du rapport, sans rejouer le
-                    # modèle une fois par étape.
+                    # PROPORTIONAL split (not an independent measurement
+                    # per step) of the already computed Devices/Network CO2e, cf.
+                    # step_impact_shares(): gives a relative contribution benchmark
+                    # for reading the report, without replaying the
+                    # model once per step.
                     "impact_device_kg": round(impact_shares[step.key]["device_kg"], 4),
                     "impact_network_kg": round(impact_shares[step.key]["network_kg"], 4),
                     "impact_total_kg": round(impact_shares[step.key]["total_kg"], 4),
@@ -605,112 +605,112 @@ def save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, re
             "reserves_accepted": [{"code": code, "message": message} for code, message in reserves],
             "warnings": list(warnings),
             "sizing": {
-                "note": "Diagnostic interne (Lot 6) : le trafic annuel est réparti en "
-                        "timeseries UNIFORME sur 24h, jamais sur le vrai profil horaire du "
-                        "site, ce qui MINIMISE artificiellement l'écart mesuré. Ne pas "
-                        "présenter oversizing_ratio comme une mesure du surdimensionnement "
-                        "réel d'un client. Non affiché dans le rapport HTML (décision "
-                        "reportée au Lot 9).",
+                "note": "Internal diagnostic (Lot 6): the annual traffic is spread into a "
+                        "UNIFORM timeseries over 24h, never over the site's real hourly profile, "
+                        "which artificially MINIMIZES the measured gap. Do not "
+                        "present oversizing_ratio as a measurement of the real oversizing "
+                        "of a client. Not displayed in the HTML report (decision "
+                        "deferred to Lot 9).",
                 "servers": servers_sizing(built),
             },
         },
         "sources": collect_sources(spec),
     }
 
-    out_path = source_dir / "efootprint-synthese-python.json"
+    out_path = source_dir / "efootprint-python-summary.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-    print(f"  Résultats sérialisés : {out_path}")
+    print(f"  Results serialized: {out_path}")
 
 
 # ---------------------------------------------------------------------------
-# Scénarios de recommandations (cumulatifs prio1 / prio1+2 / prio1+2+3)
+# Recommendation scenarios (cumulative prio1 / prio1+2 / prio1+2+3)
 # ---------------------------------------------------------------------------
 
-# Recommandations qualitatives du rapport HTML sans paramètre e-footprint
-# natif, ni paramètre EcoIndex/CWV chiffrable : exclues du calcul chiffré (cf.
-# justification détaillée par entrée), mais listées ici pour que le fichier
-# de gains explique explicitement ce qu'il ne chiffre pas plutôt que de le
-# passer sous silence. Couvre à la fois les exclusions CO2e (chantier
-# initial) et les exclusions EcoIndex/CWV (chantier LCP/EcoIndex).
+# Qualitative recommendations of the HTML report without a native e-footprint parameter,
+# nor a quantifiable EcoIndex/CWV parameter: excluded from the quantified calculation (cf.
+# detailed justification per entry), but listed here so that the file
+# of gains explicitly explains what it does not quantify rather than
+# passing it in silence. Covers both CO2e exclusions (initial
+# scope) and EcoIndex/CWV exclusions (LCP/EcoIndex scope).
 _EXCLUDED_RECOMMENDATIONS = [
     {
         "recommendation": "cwv",
         "tier": "prio1_2",
-        "reason": ("Aucun paramètre e-footprint natif pour LCP/INP/CLS (vérifié dans "
-                   "efootprint_model/spec.py, build.py, from_har.py) - exclu du calcul "
-                   "chiffré, garde une note qualitative de lien avec le poids de page "
-                   "dans le rapport quand pertinent."),
+        "reason": ("No native e-footprint parameter for LCP/INP/CLS (verified in "
+                   "efootprint_model/spec.py, build.py, from_har.py) - excluded from the "
+                   "quantified calculation, keeps a qualitative note linking to page weight "
+                   "in the report when relevant."),
     },
     {
         "recommendation": "ecoindex",
         "tier": "prio1_2",
-        "reason": ("Indicateur dérivé du poids de page et du nombre d'éléments, pas un "
-                   "paramètre e-footprint indépendant - le gain qu'il reflète est déjà "
-                   "compté via JS/CSS mort et doublons."),
+        "reason": ("Indicator derived from page weight and element count, not an "
+                   "independent e-footprint parameter - the gain it reflects is already "
+                   "counted via dead JS/CSS and duplicates."),
     },
     {
         "recommendation": "dom",
         "tier": "prio1_2",
-        "reason": ("Nombre d'éléments DOM, sans lien réseau direct - exclu du calcul "
-                   "chiffré, reste qualitatif."),
+        "reason": ("Number of DOM elements, no direct network link - excluded from the "
+                   "quantified calculation, stays qualitative."),
     },
     {
         "recommendation": "cdn_scripts_tiers_qualitatif",
         "tier": "prio3",
-        "reason": ("\"CDN déjà en place\"/\"Scripts tiers détectés\" sont des détections "
-                   "de présence sans seuil numérique - aucun octet ni pourcentage "
-                   "associé, exclu du calcul chiffré."),
+        "reason": ("\"CDN already in place\"/\"Third-party scripts detected\" are presence "
+                   "detections without a numeric threshold - no byte or percentage "
+                   "associated, excluded from the quantified calculation."),
     },
     {
-        "recommendation": "domaines_tiers_nombreux",
+        "recommendation": "many_third_party_domains",
         "tier": "prio3",
-        "reason": ("Le poids tiers réel par page existe (third_party_bytes) mais aucune "
-                   "cible de réduction n'est mesurée - poser un pourcentage aurait été "
-                   "une invention, exclu du calcul chiffré."),
+        "reason": ("The real third-party weight per page exists (third_party_bytes) but no "
+                   "reduction target is measured - setting a percentage would have been "
+                   "an invention, excluded from the quantified calculation."),
     },
     {
         "recommendation": "inp",
         "tier": "prio1_2",
-        "reason": ("Aucune règle publique fiable pour estimer un delta d'INP : la seule "
-                   "règle connue (~1 ms de parsing JS par Ko) date de 2018 et les moteurs "
-                   "JS ont progressé depuis - exclu de toute estimation, pas seulement du "
-                   "calcul CO2e."),
+        "reason": ("No reliable public rule to estimate an INP delta: the only "
+                   "known rule (~1 ms of JS parsing per KB) dates from 2018 and JS engines "
+                   "have improved since - excluded from any estimation, not just the "
+                   "CO2e calculation."),
     },
     {
         "recommendation": "cls",
         "tier": "prio1_2",
-        "reason": ("Le CLS dépend d'éléments qui se chargent tardivement et décalent la "
-                   "mise en page, sans rapport structurel avec une réduction de poids - "
-                   "exclu de toute estimation, pas seulement du calcul CO2e."),
+        "reason": ("CLS depends on elements that load late and shift the "
+                   "layout, with no structural link to a weight reduction - "
+                   "excluded from any estimation, not just the CO2e calculation."),
     },
 ]
 
-_HYPOTHESES_GENERALES = [
-    "Un seul levier e-footprint exploitable pour toutes les recommandations chiffrées : "
-    "JobSpec.data_transferred (poids transféré/compressé par page/Job), appliqué par "
-    "Job/serveur - pas un total site unique.",
-    "Les réductions de recommandations différentes sur le même Job ne sont pas "
-    "dédupliquées entre elles (un fichier dupliqué peut aussi contenir du code mort "
-    "compté séparément) : le cumul peut légèrement surestimer le gain réel.",
-    "Le pourcentage de code mort JS/CSS utilisé ici vient de "
-    "coverage_metrics.py::analyse(), une implémentation distincte de celle utilisée en "
-    "direct par _section_recommendations() dans le rapport (qui construit son propre "
-    "agrégat coverage_by_page depuis les Coverage-*.json bruts) - les deux mesurent la "
-    "même donnée source mais peuvent diverger légèrement sur les cas ambigus de "
-    "détection d'URL de page.",
-    "Le recalcul par palier est un VRAI recalcul du modèle e-footprint (build_system() "
-    "sur une SiteSpec modifiée), pas une simple soustraction forfaitaire - nécessaire "
-    "car le calcul n'est pas strictement linéaire.",
-    "Le site public e-footprint (model_builder) plafonne les comparaisons à 2 modèles "
-    "(MAX_SLOTS=2, vérifié dans le code de l'interface) : chaque scénario est donc "
-    "exporté en fichier individuel, sans fichier de comparaison pré-fabriqué - décision "
-    "explicite de l'utilisatrice, qui compare elle-même les fichiers si besoin sur le "
+_GENERAL_ASSUMPTIONS = [
+    "A single e-footprint lever usable for all quantified recommendations: "
+    "JobSpec.data_transferred (transferred/compressed weight per page/Job), applied by "
+    "Job/server - not a single site-wide total.",
+    "Reductions from different recommendations on the same Job are not "
+    "deduplicated against each other (a duplicated file can also contain dead code "
+    "counted separately): the cumulative total can slightly overestimate the real gain.",
+    "The dead JS/CSS percentage used here comes from "
+    "coverage_metrics.py::analyse(), an implementation distinct from the one used directly by "
+    "directly by _section_recommendations() in the report (which builds its own "
+    "coverage_by_page aggregate from the raw Coverage-*.json) - both measure the "
+    "same source data but can diverge slightly on ambiguous cases of "
+    "page URL detection.",
+    "The tier recalculation is a REAL recalculation of the e-footprint model (build_system() "
+    "on a modified SiteSpec), not a simple flat subtraction - necessary "
+    "because the calculation is not strictly linear.",
+    "The public e-footprint site (model_builder) caps comparisons at 2 models "
+    "(MAX_SLOTS=2, verified in the interface code): each scenario is therefore "
+    "exported as an individual file, without a pre-built comparison file - explicit decision "
+    "by the user, who compares the files herself if needed on the "
     "site.",
 ]
 
-# (palier apply_recommendations(), suffixe de fichier de sortie)
-_PALIERS = [
+# (tier from apply_recommendations(), output file suffix)
+_TIERS = [
     ("prio1", "prio1"),
     ("prio1_2", "prio1-2"),
     ("prio1_2_3", "prio1-2-3"),
@@ -718,31 +718,31 @@ _PALIERS = [
 
 
 def load_coverage_pages(source_dir):
-    """Pages Coverage (JS/CSS mort) pour le calcul de gain par palier, en
-    DÉGRADÉ : liste vide (pas d'erreur qui arrête le script) si aucun fichier
-    Coverage-*.json n'est trouvé - même logique que les autres données
-    optionnelles du pipeline (cf. `cwv = load_cwv(...) if cwv_path.exists()
-    else {}` et la section conditionnelle équivalente de
+    """Coverage pages (dead JS/CSS) for the per-tier gain calculation, in
+    GRADED: empty list (no stopping error) if no Coverage-*.json file
+    is found - same logic as the other optional data of the pipeline
+    (cf. `cwv = load_cwv(...) if cwv_path.exists()
+    else {}` and the equivalent conditional section of
     `generate_report_html.py`)."""
     try:
         coverage = coverage_metrics.analyse(source_dir)
     except FileNotFoundError:
-        print("  ⚠ Pas de données Coverage : JS/CSS mort exclu du calcul de gain par palier.")
+        print("  ⚠ No Coverage data: dead JS/CSS excluded from the per-tier gain calculation.")
         return []
     return coverage.get("pages") or []
 
 
 def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
-    """Calcule et exporte les 3 scénarios cumulatifs de recommandations
-    (prio1, prio1+2, prio1+2+3) à partir du scénario de référence déjà
-    calculé (`built`), puis écrit `efootprint-recommendations-gains.json`
-    (synthèse consommée par une étape ultérieure du rapport HTML).
+    """Calculates and exports the 3 cumulative recommendation scenarios
+    (prio1, prio1+2, prio1+2+3) from the already computed reference scenario
+    (`built`), then writes `efootprint-recommendations-gains.json`
+    (summary consumed by a later step of the HTML report).
 
-    Le scénario de référence (`efootprint-boavizta-model.json`, déjà écrit
-    par `save_boavizta_model()`) n'est ni recalculé ni dupliqué ici : ce
-    fichier de gains le référence par son nom actuel.
+    The reference scenario (`efootprint-boavizta-model.json`, already written
+    by `save_boavizta_model()`) is neither recomputed nor duplicated here: this
+    gains file references it by its current name.
     """
-    print("[e-footprint] Scénarios de recommandations (prio1 / prio1+2 / prio1+2+3)...")
+    print("[e-footprint] Recommendation scenarios (prio1 / prio1+2 / prio1+2+3)...")
 
     coverage_pages = load_coverage_pages(source_dir)
 
@@ -751,28 +751,28 @@ def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
     try:
         brotli = brotli_reductions(spec, env_data, har_path)
     except ImportError:
-        print("  ⚠ Bibliothèque 'brotli' absente : recommandation Brotli exclue du "
-              "calcul de gain.")
+        print("  ⚠ 'brotli' library missing: Brotli recommendation excluded from the "
+              "gain calculation.")
         brotli = []
     all_reductions = dead + dup + brotli
 
     reference_total = total_kg(built)
 
-    paliers_result = {}
-    for palier, suffixe in _PALIERS:
-        palier_spec = apply_recommendations(spec, all_reductions, palier)
-        palier_built = build_system(palier_spec)
-        palier_total = total_kg(palier_built)
+    tiers_result = {}
+    for tier, suffix in _TIERS:
+        tier_spec = apply_recommendations(spec, all_reductions, tier)
+        tier_built = build_system(tier_spec)
+        tier_total = total_kg(tier_built)
 
-        out_path = source_dir / f"efootprint-scenario-{suffixe}.e-f.json"
+        out_path = source_dir / f"efootprint-scenario-{suffix}.e-f.json"
         export_system_json(palier_built, out_path)
 
         delta = reference_total - palier_total
         delta_pct = round(delta / reference_total * 100, 2) if reference_total > 0 else None
-        print(f"  Scénario {palier} : {palier_total:.2f} kg CO2e/an "
-              f"(Δ {delta:+.2f} kg vs référence)")
+        print(f"  Scenario {tier}: {tier_total:.2f} kg CO2e/year "
+              f"(Δ {delta:+.2f} kg vs reference)")
 
-        paliers_result[palier] = {
+        tiers_result[tier] = {
             "total_kg_co2e_per_year": round(palier_total, 3),
             "delta_kg_co2e_per_year": round(delta, 3),
             "delta_pct": delta_pct,
@@ -785,7 +785,7 @@ def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
             "total_kg_co2e_per_year": round(reference_total, 3),
             "scenario_file": "efootprint-boavizta-model.json",
         },
-        "paliers": paliers_result,
+        "tiers": tiers_result,
         "reductions_detail": [
             {
                 "job_key": r.job_key,
@@ -800,59 +800,59 @@ def run_recommendation_scenarios(spec, built, env_data, har_path, source_dir):
             for r in all_reductions
         ],
         "excluded_recommendations": _EXCLUDED_RECOMMENDATIONS,
-        "hypotheses_generales": _HYPOTHESES_GENERALES,
+        "hypotheses_generales": _GENERAL_ASSUMPTIONS,
     }
 
     out_path = source_dir / "efootprint-recommendations-gains.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(gains, f, indent=2, ensure_ascii=False)
-    print(f"  Gains par palier sérialisés : {out_path}")
+    print(f"  Per-tier gains serialized: {out_path}")
 
 
 # ---------------------------------------------------------------------------
-# Point d'entrée
+# Entry point
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Estimation CO2e hypothétique via e-footprint",
-        epilog="IMPORTANT : toutes les valeurs sont des estimations hypothétiques."
+        description="Hypothetical CO2e estimation via e-footprint",
+        epilog="IMPORTANT: all values are hypothetical estimates."
     )
-    parser.add_argument("source_dir", help="Dossier source contenant env-data.json et le .har")
+    parser.add_argument("source_dir", help="Source directory containing env-data.json and the .har")
     parser.add_argument("--visits", type=int, default=None,
-                        help="Trafic annuel (analytics client). Prioritaire sur le bloc "
-                             "'traffic' SimilarWeb écrit par l'agent dans env-data.json.")
+                        help="Annual traffic (client analytics). Takes precedence over the "
+                             "SimilarWeb 'traffic' block written by the agent into env-data.json.")
     parser.add_argument("--instance", default=None,
-                        help="Type d'instance cloud pour le SERVEUR PRINCIPAL (celui qui "
-                             "porte le plus d'octets). Un serveur cloud n'a qu'un seul "
-                             "instance_type possible chez e-footprint : ce réglage ne "
-                             "s'applique jamais à plusieurs serveurs à la fois.")
+                        help="Cloud instance type for the PRIMARY server (the one that "
+                             "carries the most bytes). A cloud server has only one "
+                             "possible instance_type in e-footprint: this setting never "
+                             "applies to several servers at once.")
     parser.add_argument("--instance-source", default=None,
-                        help="Justification de --instance (ex. \"confirmé par l'équipe infra "
-                             "client, ticket #1234\"). Fait passer la confiance à 'estimé'.")
+                        help="Justification for --instance (e.g. \"confirmed by the client infra team "
+                             "ticket #1234\"). Raises confidence to 'estimated'.")
     parser.add_argument("--instance-source-url", default=None,
-                        help="Lien optionnel vers la preuve/source de --instance-source.")
+                        help="Optional link to the proof/source of --instance-source.")
     parser.add_argument("--refresh-data", action="store_true",
-                        help="Relancer collect_env_data.py avant le calcul")
+                        help="Re-run collect_env_data.py before the calculation")
     args = parser.parse_args()
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
-        print(f"Erreur : dossier introuvable : {source_dir}")
+        print(f"Error: directory not found: {source_dir}")
         sys.exit(1)
 
     ensure_env_data(source_dir, refresh=args.refresh_data)
 
     env_data = load_env_data(source_dir)
     if not env_data:
-        print(f"Erreur : env-data.json introuvable dans {source_dir}")
+        print(f"Error: env-data.json not found in {source_dir}")
         sys.exit(1)
 
     har_path = find_har(source_dir)
     if not har_path:
-        print(f"Erreur : aucun .har trouvé dans {source_dir} (ni dans "
-              f"{RAW_DATA_DIR}/). spec_from_env_data() en a besoin pour "
-              "détecter les infrastructures et découper le parcours.")
+        print(f"Error: no .har found in {source_dir} (nor in "
+              f"{RAW_DATA_DIR}/). spec_from_env_data() needs it to "
+              "detect infrastructures and split the journey.")
         sys.exit(1)
 
     audited_domain = infer_audited_domain(env_data, source_dir)
@@ -860,7 +860,7 @@ def main():
     try:
         spec, warnings = spec_from_env_data(env_data, str(har_path), audited_domain)
     except SpecError as exc:
-        print(f"Erreur de spécification : {exc}")
+        print(f"Spec error: {exc}")
         sys.exit(1)
 
     if warnings:
@@ -875,69 +875,69 @@ def main():
     reserves = calculation_reserves(spec)
     if reserves:
         print_reserves(reserves)
-        print("[e-footprint] Calcul arrêté : la spécification a des réserves non assumées.")
-        print("Corriger la spécification (cf. issues ci-dessus), puis relancer.")
+        print("[e-footprint] Calculation stopped: the spec has unassumed reserves.")
+        print("Fix the spec (cf. remedies above), then re-run.")
         sys.exit(1)
 
     print_hypotheses(spec)
 
-    print("[e-footprint] Construction du modèle (hypothétique)...")
+    print("[e-footprint] Building the model (hypothetical)...")
     try:
         built = build_system(spec)
     except SpecError as exc:
-        print(f"Erreur de construction : {exc}")
+        print(f"Build error: {exc}")
         sys.exit(1)
-    print("[e-footprint] Calcul CO2e...")
+    print("[e-footprint] CO2e calculation...")
 
-    print("[e-footprint] Calcul des fourchettes (infra/usage)...")
+    print("[e-footprint] Computing ranges (infra/usage)...")
     ranges = footprint_ranges_kg(spec)
 
     print_results(spec, built, ranges)
 
-    print("[e-footprint] Sérialisation du modèle...")
+    print("[e-footprint] Serializing the model...")
     save_boavizta_model(built, source_dir)
-    save_synthese_python(spec, built, ranges, source_dir, env_data, warnings, reserves)
+    save_python_summary(spec, built, ranges, source_dir, env_data, warnings, reserves)
 
     run_recommendation_scenarios(spec, built, env_data, har_path, source_dir)
 
-    # Régénère le .puml (Étape 25) avec la part d'impact par étape (Lot 10),
-    # connue seulement maintenant que le calcul a tourné. Le fichier écrit à
-    # l'Étape 25 (avant calcul, sans part d'impact) est donc remplacé par
-    # cette version enrichie : c'est CETTE version qui doit être compilée en
-    # SVG (`plantuml -tsvg`, cf. skill-steps/45_efootprint.md) pour le rapport
-    # final. N'écrit rien si le SiteSpec n'a pas de parcours (archétype seul).
+    # Regenerates the .puml (Step 25) with the per-step impact share (Lot 10),
+    # known only now that the calculation has run. The file written at
+    # Step 25 (before calculation, without impact share) is therefore replaced by
+    # this enriched version: it is THIS version that must be compiled to
+    # SVG (`plantuml -tsvg`, cf. skill-steps/45_efootprint.md) for the final report.
+    # Writes nothing if the SiteSpec has no journey (archetype only).
     if spec.journeys:
         shares = step_impact_shares(built)
         pct_by_step = {key: v["pct_of_grand_total"] for key, v in shares.items()}
         audience_mix = (env_data.get("audience") or {}).get("mix")
         puml = site_to_plantuml(
             spec, title=audited_domain, audience_mix=audience_mix, step_shares=pct_by_step)
-        puml_path = source_dir / f"topologie-{audited_domain}.puml"
+        puml_path = source_dir / f"topology-{audited_domain}.puml"
         puml_path.write_text(puml, encoding="utf-8")
-        print(f"  Diagramme régénéré (avec part d'impact) : {puml_path}")
-        # `@startuml <id>` pilote le nom du SVG produit par plantuml (cf.
-        # to_plantuml.py), jamais le nom du .puml en entrée : on retrouve donc
-        # ce nom via le même alias plutôt que de renommer le diagramme, pour
-        # ne pas dupliquer la logique de site_to_plantuml().
-        svg_path = source_dir / f"topologie-{audited_domain}.svg"
+        print(f"  Diagram regenerated (with impact share): {puml_path}")
+        # `@startuml <id>` drives the name of the SVG produced by plantuml (cf.
+        # to_plantuml.py), never the input .puml name: so we find that name
+        # via the same alias rather than renaming the diagram, so as
+        # not to duplicate site_to_plantuml()'s logic.
+        svg_path = source_dir / f"topology-{audited_domain}.svg"
         try:
             result = subprocess.run(
                 ["plantuml", "-tsvg", str(puml_path)], capture_output=True, text=True)
         except FileNotFoundError:
             result = None
         if result is None or result.returncode != 0:
-            print("  PlantUML introuvable ou échec de compilation : lancer "
-                  f"manuellement `plantuml -tsvg {puml_path}`, puis renommer "
-                  f"le SVG produit en {svg_path.name}.")
+            print("  PlantUML not found or compilation failed: run "
+                  f"`plantuml -tsvg {puml_path}` manually, then rename "
+                  f"the produced SVG to {svg_path.name}.")
         else:
             diagram_id = _sanitize_alias(f"site_{spec.name}")
             (source_dir / f"{diagram_id}.svg").replace(svg_path)
-            print(f"  Diagramme compilé en SVG : {svg_path}")
+            print(f"  Diagram compiled to SVG: {svg_path}")
     print()
     visits = spec.audience.visits_per_year.value if spec.audience and spec.audience.visits_per_year else 0
-    print(f"  Trafic retenu : {visits:,.0f} visites/an")
-    print("Pour relancer avec d'autres hypothèses :")
-    _target = f" (--instance vise \"{instance_target_key}\")" if instance_target_key else ""
+    print(f"  Traffic used: {visits:,.0f} visits/year")
+    print("To re-run with other assumptions:")
+    _target = f" (--instance targets \"{instance_target_key}\")" if instance_target_key else ""
     print(f"  python3 {Path(__file__).name} {source_dir} --visits 500000 "
           f"--instance <type provider>{_target}")
 

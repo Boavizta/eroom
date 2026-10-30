@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-EcoIndex utilities — formule officielle (cnumr/ecoindex_reference).
-Extraction DOM depuis HAR, métriques par page, calcul score + grade.
+EcoIndex utilities — official formula (cnumr/ecoindex_reference).
+DOM extraction from HAR, per-page metrics, score + grade computation.
 
-Usage autonome :
-  python3 ecoindex_utils.py capture.har
+Standalone usage:
+  python3 har_metrics.py capture.har
 """
 
 import base64
@@ -15,13 +15,13 @@ import re
 import sys
 from pathlib import Path
 
-# Quantiles officiels (cnumr/ecoindex_reference)
+# Official quantiles (cnumr/ecoindex_reference)
 _ECO_Q_DOM  = [0,47,75,159,233,298,358,417,476,537,603,674,753,843,949,1076,1237,1459,1801,2479,594601]
 _ECO_Q_REQ  = [0,2,15,25,34,42,49,56,63,70,78,86,95,105,117,130,147,170,205,281,3920]
 _ECO_Q_SIZE = [0,1.37,144.7,319.53,479.46,631.97,783.38,937.91,1098.62,1265.47,1448.32,1648.27,
                1876.08,2142.06,2465.37,2866.31,3401.59,4155.73,5400.08,8037.54,223212.26]
 
-# (seuil_min, lettre, rgb)
+# (min threshold, letter, rgb)
 _ECO_GRADES = [
     (80, "A", "#349A47"),
     (70, "B", "#51B84B"),
@@ -41,7 +41,7 @@ def _quantile(quantiles, value):
 
 
 def ecoindex_score(dom, req, size_ko):
-    """Retourne le score EcoIndex (0-100) depuis DOM, requêtes et poids en Ko."""
+    """Returns the EcoIndex score (0-100) from DOM, requests and weight in KB."""
     qd = _quantile(_ECO_Q_DOM,  dom)
     qr = _quantile(_ECO_Q_REQ,  req)
     qs = _quantile(_ECO_Q_SIZE, size_ko)
@@ -49,50 +49,50 @@ def ecoindex_score(dom, req, size_ko):
 
 
 def ecoindex_grade(score):
-    """Retourne (lettre, couleur_hex) pour un score EcoIndex."""
+    """Returns (letter, hex_color) for an EcoIndex score."""
     for threshold, letter, color in _ECO_GRADES:
         if score >= threshold:
             return letter, color
     return "G", "#ED2124"
 
 
-# Débit du profil de throttling "mobileSlow4G" utilisé par Lighthouse
-# (`throttlingMethod: 'simulate'`, réglage par défaut mobile). RE-VÉRIFIÉ le
-# 2026-09-14 dans le paquet npm @paulirish/trace_engine@0.0.65
-# (models/trace/lantern/simulation/Constants.js), vers lequel
-# GoogleChrome/lighthouse (core/config/constants.js, branche main) réexporte
-# désormais sa constante de throttling : throughputKbps=1.6*1024=1638.4,
+# Throughput of the "mobileSlow4G" throttling profile used by Lighthouse
+# (`throttlingMethod: 'simulate'`, default mobile setting). RE-VERIFIED on
+# 2026-09-14 in the npm package @paulirish/trace_engine@0.0.65
+# (models/trace/lantern/simulation/Constants.js), to which
+# GoogleChrome/lighthouse (core/config/constants.js, main branch) now re-exports
+# its throttling constant: throughputKbps=1.6*1024=1638.4,
 # downloadThroughputKbps = throughputKbps * DEVTOOLS_THROUGHPUT_ADJUSTMENT_FACTOR
-# (0.9) = 1474.56 kbit/s - c'est ce débit de TÉLÉCHARGEMENT (pas le brut) qui
-# s'applique réellement au chargement d'une page.
+# (0.9) = 1474.56 kbit/s - it is this DOWNLOAD throughput (not the raw one) that
+# actually applies to page loading.
 LIGHTHOUSE_SLOW4G_DOWNLOAD_BPS = 1474.56 * 1000  # kbit/s -> bit/s
 
 
 def lcp_delta_s(bytes_removed_transferred, download_bps=LIGHTHOUSE_SLOW4G_DOWNLOAD_BPS):
-    """Delta de temps de transfert estimé pour un retrait d'octets transférés.
+    """Estimated transfer-time delta for a removal of transferred bytes.
 
-    ESTIMATION GROSSIÈRE : (octets retirés x 8) / débit Lighthouse Slow4G.
-    Ignore la latence (RTT), la parallélisation HTTP/2+ et le cache
-    navigateur - RISQUE DE SURESTIMATION du gain réel de LCP, à dire
-    explicitement partout où ce chiffre est affiché.
+    ROUGH ESTIMATE: (bytes removed x 8) / Lighthouse Slow4G throughput.
+    Ignores latency (RTT), HTTP/2+ parallelism and browser cache
+    - RISK OF OVERESTIMATING the real LCP gain, to be stated
+    explicitly wherever this figure is displayed.
     """
     return (bytes_removed_transferred * 8) / download_bps
 
 
 def count_dom_elements(html_text):
-    """Compte les balises ouvrantes dans un corps HTML."""
+    """Counts opening tags in an HTML body."""
     if not html_text:
         return 0
     return len(re.findall(r'<[a-zA-Z][^/>]*', html_text))
 
 
 def extract_dom_from_har_entry(entry):
-    """Extrait le DOM depuis une entrée HAR de type document (HTML).
+    """Extracts the DOM from a HAR entry of type document (HTML).
 
-    Retourne (count, success, reason) :
-      - count : nombre de balises (0 si échec)
-      - success : True si mesuré avec succès
-      - reason : None si succès, message d'erreur sinon
+    Returns (count, success, reason):
+      - count: number of tags (0 on failure)
+      - success: True if measured successfully
+      - reason: None on success, error message otherwise
     """
     content = entry.get("response", {}).get("content", {})
     mime = content.get("mimeType", "")
@@ -103,39 +103,39 @@ def extract_dom_from_har_entry(entry):
     if not text:
         return 0, False, "no_content"
 
-    # Gestion de l'encodage
+    # Encoding handling
     encoding = content.get("encoding", "")
     if encoding == "base64":
         try:
             decoded_bytes = base64.b64decode(text)
             text = decoded_bytes.decode("utf-8")
         except Exception as exc:
-            return 0, False, f"echec_decodage_base64: {str(exc)}"
+            return 0, False, f"base64_decode_failure: {str(exc)}"
     elif encoding and encoding != "":
-        # Encodage non vide et inconnu
-        return 0, False, f"encodage_inconnu: {encoding}"
+        # Non-empty and unknown encoding
+        return 0, False, f"unknown_encoding: {encoding}"
 
-    # Compte des balises
+    # Tag count
     count = count_dom_elements(text)
 
-    # Garde-fou : un document HTML non vide avec zéro balise est anormal
+    # Guard: a non-empty HTML document with zero tags is abnormal
     if count == 0 and len(text.strip()) > 0:
-        return 0, False, "aucune_balise_reconnue"
+        return 0, False, "no_tag_recognized"
 
     return count, True, None
 
 
 def extract_page_metrics(har_data):
     """
-    Extrait les métriques par page depuis les données HAR parsées.
-    Retourne une liste de dicts :
+    Extracts per-page metrics from parsed HAR data.
+    Returns a list of dicts:
       { page_id, url, title, req, size_ko, dom, on_load_ms, on_content_load_ms }
     """
     log = har_data.get("log", {})
     pages = log.get("pages", [])
     entries = log.get("entries", [])
 
-    # Index entries par pageref
+    # Index entries by pageref
     entries_by_page = {}
     for e in entries:
         ref = e.get("pageref", "")
@@ -157,11 +157,11 @@ def extract_page_metrics(har_data):
         )
         size_ko = round(size_bytes / 1024, 1)
 
-        # DOM : première entrée HTML de la page
+        # DOM: first HTML entry of the page
         dom = 0
         dom_success = False
         dom_reason = None
-        url = page.get("title", "")  # HAR pages stockent l'URL dans title
+        url = page.get("title", "")  # HAR pages store the URL in title
 
         for e in page_entries:
             count, success, reason = extract_dom_from_har_entry(e)
@@ -170,54 +170,54 @@ def extract_page_metrics(har_data):
                 dom_success = True
                 dom_reason = None
                 break
-            # Garder trace de la première tentée
+            # Keep track of the first one tried
             if dom_reason is None:
                 dom_reason = reason
 
-        # Construction du bloc mesure selon la convention
+        # Build the measurement block per the convention
         if dom_success:
-            mesure = {
-                "statut": "ok",
-                "cible": url,
+            measurement = {
+                "status": "ok",
+                "target": url,
                 "detail": None
             }
         elif dom_reason == "no_content":
-            mesure = {
-                "statut": "echec_lecture",
-                "cible": url,
-                "detail": "La capture HAR ne contient pas les corps de réponse HTML"
+            measurement = {
+                "status": "read_error",
+                "target": url,
+                "detail": "The HAR capture does not contain the HTML response bodies"
             }
-        elif dom_reason and dom_reason.startswith("echec_decodage_base64"):
-            mesure = {
-                "statut": "echec_lecture",
-                "cible": url,
-                "detail": f"Échec du décodage base64: {dom_reason.split(': ', 1)[1] if ': ' in dom_reason else 'invalide'}"
+        elif dom_reason and dom_reason.startswith("base64_decode_failure"):
+            measurement = {
+                "status": "read_error",
+                "target": url,
+                "detail": f"base64 decoding failed: {dom_reason.split(': ', 1)[1] if ': ' in dom_reason else 'invalid'}"
             }
-        elif dom_reason and dom_reason.startswith("encodage_inconnu"):
-            encoding_name = dom_reason.split(": ", 1)[1] if ": " in dom_reason else "inconnu"
-            mesure = {
-                "statut": "echec_lecture",
-                "cible": url,
-                "detail": f"Encodage non supporté: {encoding_name}"
+        elif dom_reason and dom_reason.startswith("unknown_encoding"):
+            encoding_name = dom_reason.split(": ", 1)[1] if ": " in dom_reason else "unknown"
+            measurement = {
+                "status": "read_error",
+                "target": url,
+                "detail": f"Unsupported encoding: {encoding_name}"
             }
-        elif dom_reason == "aucune_balise_reconnue":
-            mesure = {
-                "statut": "echec_analyse",
-                "cible": url,
-                "detail": "Corps HTML lu mais aucune balise reconnue"
+        elif dom_reason == "no_tag_recognized":
+            measurement = {
+                "status": "analysis_error",
+                "target": url,
+                "detail": "HTML body read but no tag recognized"
             }
         elif dom_reason == "no_html_entry":
-            mesure = {
-                "statut": "echec_analyse",
-                "cible": url,
-                "detail": "Aucun document HTML trouvé pour cette page"
+            measurement = {
+                "status": "analysis_error",
+                "target": url,
+                "detail": "No HTML document found for this page"
             }
         else:
-            # Cas par défaut si aucune entrée du tout
-            mesure = {
-                "statut": "echec_analyse",
-                "cible": url,
-                "detail": "Aucun document HTML trouvé pour cette page"
+            # Default case if there is no entry at all
+            measurement = {
+                "status": "analysis_error",
+                "target": url,
+                "detail": "No HTML document found for this page"
             }
 
         score = ecoindex_score(dom, req, size_ko)
@@ -234,19 +234,20 @@ def extract_page_metrics(har_data):
             "grade_color": color,
             "on_load_ms": round(on_load),
             "on_content_load_ms": round(on_content),
-            "mesure": mesure,
+            "measurement": measurement,
         })
 
     return results
 
 
 def load_cwv(cwv_path):
-    """Charge cwv.json. Retourne un dict indexé par URL (normalisée) ET par page_id.
+    """Loads cwv.json. Returns a dict indexed by (normalized) URL AND by page_id.
 
-    Chaque valeur est un dict groupé par stratégie : {"mobile": row, "desktop": row}.
-    Cela permet de conserver mobile ET desktop côte à côte pour une même page.
-    Les entrées historiques sans champ 'strategy' sont classées 'mobile' (ancien défaut).
-    La correspondance par URL est prioritaire (robuste si les IDs HAR et CWV divergent)."""
+    Each value is a dict grouped by strategy: {"mobile": row, "desktop": row}.
+    This keeps mobile AND desktop side by side for the same page.
+    Historical entries without a 'strategy' field are classified as 'mobile'
+    (old default).
+    URL matching takes priority (robust if HAR and CWV IDs diverge)."""
     p = Path(cwv_path)
     if not p.exists():
         return {}
@@ -265,16 +266,16 @@ def load_cwv(cwv_path):
     return result
 
 
-# --- CLI autonome pour validation ---
+# --- Standalone CLI for validation ---
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 ecoindex_utils.py <fichier.har> [cwv.json]")
+        print("Usage: python3 har_metrics.py <file.har> [cwv.json]")
         sys.exit(1)
 
     har_path = sys.argv[1]
 
-    # Borne de début pour le calcul des coûts (lue par patch-audit-cost.sh)
+    # Start bound for cost computation (read by patch-audit-cost.sh)
     import time as _t
     _start_file = Path(har_path).parent / ".analysis_start"
     if not _start_file.exists():
@@ -289,30 +290,30 @@ if __name__ == "__main__":
 
     metrics = extract_page_metrics(har)
 
-    # Comptage des échecs
+    # Failure count
     total_pages = len(metrics)
-    failed_pages = sum(1 for m in metrics if m["mesure"]["statut"] != "ok")
+    failed_pages = sum(1 for m in metrics if m["measurement"]["status"] != "ok")
 
-    print(f"\n{'Page':<30} {'Req':>5} {'Ko':>8} {'DOM':>6} {'Score':>6} {'Grade':>6} {'onLoad':>9} {'Mesure':<10}")
+    print(f"\n{'Page':<30} {'Req':>5} {'KB':>8} {'DOM':>6} {'Score':>6} {'Grade':>6} {'onLoad':>9} {'Measurement':<10}")
     print("-" * 95)
     for m in metrics:
-        status_marker = "✓" if m["mesure"]["statut"] == "ok" else "✗ ÉCHEC"
+        status_marker = "✓" if m["measurement"]["status"] == "ok" else "✗ FAIL"
         print(f"{m['title'][:29]:<30} {m['req']:>5} {m['size_ko']:>8.1f} {m['dom']:>6} "
               f"{m['ecoindex']:>6} {m['grade']:>6} {m['on_load_ms']:>8}ms {status_marker:<10}")
-        if m["mesure"]["statut"] != "ok":
-            print(f"  └→ {m['mesure']['statut']}: {m['mesure']['detail']}")
+        if m["measurement"]["status"] != "ok":
+            print(f"  └→ {m['measurement']['status']}: {m['measurement']['detail']}")
         if m["page_id"] in cwv:
             c = cwv[m["page_id"]]
             print(f"  CWV → LCP: {c.get('lcp','?')}s  INP: {c.get('inp','?')}ms  CLS: {c.get('cls','?')}")
 
     print()
     if failed_pages > 0:
-        print(f"⚠️  ATTENTION : {failed_pages} pages sur {total_pages} ont un DOM non mesuré")
+        print(f"⚠️  WARNING: {failed_pages} of {total_pages} pages have an unmeasured DOM")
         print()
 
     print()
-    # Validation contre ANTS connus (si P1 avec dom=483, req=82, poids=1930 → score=53)
+    # Validation against known ANTS values (if P1 with dom=483, req=82, weight=1930 → score=53)
     test_score = ecoindex_score(483, 82, 1930)
-    print(f"[Validation ANTS P1] dom=483 req=82 poids=1930 Ko → score={test_score}/100 (attendu: 53)")
+    print(f"[ANTS P1 validation] dom=483 req=82 weight=1930 KB → score={test_score}/100 (expected: 53)")
     g, c = ecoindex_grade(test_score)
     print(f"  Grade: {g} ({c})")

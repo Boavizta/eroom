@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p4
-title Workflow Analyse de parcours web — Page 4/5 : e-footprint collecte (optionnel)
+title Web journey analysis workflow — Page 4/5 : e-footprint collection (optional)
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,89 +22,89 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill /efootprint)" as C #82C1DD
 participant "collect_env_data.py" as CED #DBDDE5
 participant "API SimilarWeb\n(similarweb_api.py)" as SW #C8E6C9
 participant "API ipinfo.io" as IP #C8E6C9
 participant "CrUX Data" as CR #C8E6C9
 participant "detect_tech.py" as DT #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
 note over U, FS
-  Étape OPTIONNELLE — lancée si l'utilisateur invoque /efootprint après un
-  rapport d'analyse de parcours. But : enrichir le rapport HTML d'une section
-  CO2e (fabrication + énergie). Toute valeur produite est une ESTIMATION
-  HYPOTHÉTIQUE (rappelée au démarrage, sur chaque paramètre, dans les résultats).
-  Une seule commande : collect_env_data.py appelle lui-même SimilarWeb et detect_tech.
+  OPTIONAL step — launched if the user invokes /efootprint after a
+  journey analysis report. Goal: enrich the HTML report with a
+  CO2e section (manufacturing + energy). Every produced value is a
+  HYPOTHETICAL ESTIMATE (recalled at startup, on each parameter, in the results).
+  A single command: collect_env_data.py itself calls SimilarWeb and detect_tech.
 end note
 
-== Étape 10 — Localisation du source_dir ==
+== Step 10 — source_dir location ==
 
 U -> C : /efootprint <source_dir>
-C -> C : Résoudre source_dir\n(argument, contexte parcours,\n.har visible, ou demande)
-C -> FS : Vérifier présence .har ou env-data.json
+C -> C : Resolve source_dir\n(argument, journey context,\n.har visible, or request)
+C -> FS : Check presence of .har or env-data.json
 
-== Étape 20 — Collecte env-data.json ==
+== Step 20 — env-data.json collection ==
 
-alt env-data.json absent, ou option refresh
+alt env-data.json absent, or refresh option
   C -> CED : python3 collect_env_data.py <source_dir>
 
-  CED -> FS : [1/3] Lire .har
-  FS -> CED : requêtes, poids, durée,\nIP serveur principale
-  CED -> CED : Poids par type + part tierce\n(mesure directe HAR)
+  CED -> FS : [1/3] Read .har
+  FS -> CED : requests, weight, duration,\nmain server IP
+  CED -> CED : Weight per type + third-party share\n(direct HAR measurement)
 
   CED -> CR : [2/3] CrUX (form_factors)
-  CR -> CED : mix desktop / mobile / tablet
+  CR -> CED : desktop / mobile / tablet mix
 
   note over CED, CR
-    Correction CrUX (Chrome only) SYMÉTRIQUE :
-    - tablette rattachée au mobile
-    - mobile regonflé de l'absence d'iOS,
-      desktop de l'absence de macOS/Safari,
-      puis renormalisation
-    Défaut si CrUX absent : 60 % mobile / 40 % desktop
+    SYMMETRICAL CrUX correction (Chrome only):
+    - tablet attached to mobile
+    - mobile re-inflated by the absence of iOS,
+      desktop by the absence of macOS/Safari,
+      then renormalization
+    Default if CrUX absent: 60 % mobile / 40 % desktop
   end note
 
   CED -> IP : [3/3] GET /json/<IP>
-  IP -> CED : pays, org, intensité carbone
+  IP -> CED : country, org, carbon intensity
 
   note over CED, IP
-    Provider détecté depuis org :
+    Provider detected from org:
     aws / gcp / azure / scaleway / ovh
-    Défaut si échec ipinfo : pays FR
+    Default if ipinfo fails: country FR
   end note
 
   CED -> DT : detect_from_har(.har)
-  DT -> CED : stack technique (CDN, hébergeur,\nserveur web, framework, analytics...)
+  DT -> CED : tech stack (CDN, host,\nweb server, framework, analytics...)
 
-  alt Bloc audience ou traffic manquant (pas de saisie audience manuelle)
-    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domaine>
+  alt Audience or traffic block missing (no manual audience input)
+    CED -> SW : GET data.similarweb.com/api/v1/data?domain=<domain>
     SW -> CED : TopCountryShares\n+ EstimatedMonthlyVisits
-    CED -> CED : Mix pays -> pondère iOS/macOS\nVisites/mois -> annualisées
-  else API bloquée (captcha / WAF) ou domaine non suivi
+    CED -> CED : Country mix -> weighs iOS/macOS\nMonthly visits -> annualized
+  else API blocked (captcha / WAF) or domain not tracked
     note over CED, SW
-      Repli : récupération assistée (Étape 20d)
-      - dictée en chat, ou capture d'écran déposée
-      Dernier recours : défaut FR 100 % + 100 000 visites/an
+      Fallback: assisted retrieval (Step 20d)
+      - dictated in chat, or screenshot dropped
+      Last resort: default FR 100 % + 100 000 visits/year
     end note
   end
 
   CED -> FS : env-data.json (schema_version 1.5)\n{job, server, device_mix, network_mix,\naudience, traffic, tech_stack}
-else Cache existant (option refresh non passée)
-  CED -> FS : Relire env-data.json existant
-  FS -> CED : Données précédentes (inchangées)
+else Existing cache (refresh option not passed)
+  CED -> FS : Re-read existing env-data.json
+  FS -> CED : Previous data (unchanged)
 end
 
-C -> U : Résumé collecte :\n- poids page + part tierce\n- pays / provider + intensité carbone\n- mix appareils (corrigé iOS/macOS)\n- mix pays + trafic (SimilarWeb)\n- stack technique détectée
+C -> U : Collection summary:\n- page weight + third-party share\n- country / provider + carbon intensity\n- device mix (corrected iOS/macOS)\n- country mix + traffic (SimilarWeb)\n- detected tech stack
 
 note over U, C
-  Priorité des sources (mix pays ET trafic) :
-  1. Analytics client (options audience / visits)
-  2. API interne SimilarWeb (voie principale, automatique)
-  3. Récupération assistée (captcha / WAF)
-  4. Défaut FR 100 % + 100 000 visites/an (avec avertissement)
-  Suite du calcul : page 5/5.
+  Source priority (country mix AND traffic):
+  1. Client analytics (options audience / visits)
+  2. Internal SimilarWeb API (main path, automatic)
+  3. Assisted retrieval (captcha / WAF)
+  4. Default FR 100 % + 100 000 visits/year (with warning)
+  Rest of the calculation: page 5/5.
 end note
 
 @enduml

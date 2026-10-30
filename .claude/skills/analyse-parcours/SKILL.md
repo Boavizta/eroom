@@ -1,69 +1,69 @@
 ---
 name: analyse-parcours
 description: >
-  Ce skill s'active quand l'utilisateur veut "analyser un parcours web", "analyser un HAR",
-  "analyser la couverture Chrome", "code mort JS/CSS",
-  "coverage DevTools", "analyser le trafic d'un parcours",
-  ou mentionne des fichiers .har ou Coverage-*.json issus de Chrome DevTools.
-  S'active aussi pour l'estimation CO2e (e-footprint) : "estime l'empreinte carbone",
-  "impact CO2", "empreinte environnementale", "efootprint",
-  "empreinte écologique du site", "/efootprint", ou mention d'un env-data.json /
+  This skill activates when the user wants to "analyze a web journey", "analyze a HAR",
+  "analyze Chrome coverage", "dead JS/CSS code",
+  "DevTools coverage", "analyze the traffic of a journey",
+  or mentions .har files or Coverage-*.json from Chrome DevTools.
+  It also activates for CO2e estimation (e-footprint): "estimate the carbon footprint",
+  "CO2 impact", "environmental footprint", "efootprint",
+  "ecological footprint of the site", "/efootprint", or mentions an env-data.json /
   efootprint-boavizta-model.json.
 version: 1.2.1
 ---
 
-# Analyse de parcours web (HAR + Coverage)
+# Web journey analysis (HAR + Coverage)
 
-## Vue d'ensemble
+## Overview
 
-Ce skill analyse un parcours web complet à partir de :
-1. Un fichier **HAR** (HTTP Archive) - export du trafic réseau Chrome DevTools
-2. Des fichiers **JSON de couverture** - export Chrome DevTools > Coverage (un fichier par page)
+This skill analyzes a complete web journey from:
+1. A **HAR** (HTTP Archive) file - Chrome DevTools network traffic export
+2. **Coverage JSON** files - Chrome DevTools > Coverage export (one file per page)
 
-Il produit deux types d'analyse :
-- **Trafic réseau** : requêtes, domaines, volumes, codes HTTP, performance
-- **Performance/Éco** : EcoIndex (score + grade A-G), code mort JS/CSS, Core Web Vitals
+It produces two types of analysis:
+- **Network traffic**: requests, domains, volumes, HTTP codes, performance
+- **Performance/Eco**: EcoIndex (score + grade A-G), dead JS/CSS code, Core Web Vitals
 
-**Documentation utilisateur** : `docs/capturer-har-et-coverage.md` - procédure pas à pas pour capturer un HAR, les fichiers Coverage et le fichier `cwv.json` optionnel.
+**User documentation**: `docs/capture-har-and-coverage.md` - step-by-step procedure to capture a HAR, the Coverage files and the optional `cwv.json` file.
 
-**Fichier optionnel `cwv.json`** (Core Web Vitals mesurés manuellement) :
+**Optional `cwv.json` file** (manually measured Core Web Vitals):
 ```json
 [
   {"page": "page_1", "lcp": 0.76, "inp": 8, "cls": 0.06},
   {"page": "page_2", "lcp": 1.9,  "inp": 16, "cls": 0.66}
 ]
 ```
-Si absent : le rapport affiche `onLoad` HAR comme proxy pour LCP.
+If absent: the report shows HAR `onLoad` as a proxy for LCP.
 
 ---
 
 ## Invocation
 
 ```
-/analyse-parcours <chemin-dossier>
-/analyse-parcours <fichier.har> <coverage1.json> <coverage2.json> ...
-/efootprint <source_dir>          # étape 45 seule (estimation CO2e)
+/analyse-parcours <folder-path>
+/analyse-parcours <file.har> <coverage1.json> <coverage2.json> ...
+/efootprint <source_dir>          # step 45 only (CO2e estimation)
 ```
 
-Le skill est aussi déclenché automatiquement quand les triggers du `plugin.json` matchent.
+The skill is also triggered automatically when the `plugin.json` triggers match.
 
 ---
 
-## Étape 10 — Localisation des fichiers
+## Step 10 — File location
 
-→ Voir `skill-steps/10_localisation.md`
+→ See `skill-steps/10_location.md`
 
-Extraire du prompt :
-- Un chemin de **dossier** contenant les fichiers HAR et JSON
-- Ou des chemins directs : `<fichier.har> [coverage1.json coverage2.json ...]`
+Extract from the prompt:
+- A **folder** path containing the HAR and JSON files
+- Or direct paths: `<file.har> [coverage1.json coverage2.json ...]`
 
-Si aucun argument fourni : demander le chemin à l'utilisateur.
+If no argument provided: ask the user for the path.
 
 ---
 
-## Étape 15 — Capture du sessionId
+## Step 15 — sessionId capture
 
-Immédiatement après avoir déterminé SOURCE_DIR et AUDIT_DIR (étape 10), capturer le sessionId pour le calcul de coût du rapport :
+Immediately after determining SOURCE_DIR and AUDIT_DIR (step 10), capture the sessionId for the report cost calculation:
 
 ```bash
 AUDIT_DIR="<SOURCE_DIR>/audit"
@@ -74,220 +74,220 @@ if [ -f "$HOME/.claude/.current_session_id" ]; then
 fi
 ```
 
-Ces fichiers seront lus par `patch-audit-cost.sh` (appelé en fin d'étape 40) : `.cost-session-id` pour identifier la session, `.cost-start-ts` pour borner la durée au début réel de l'analyse (et non au début de la session complète).
+These files will be read by `patch-audit-cost.sh` (called at the end of step 40): `.cost-session-id` to identify the session, `.cost-start-ts` to bound the duration to the actual start of the analysis (and not the start of the whole session).
 
 ---
 
-## Étape 20 — Analyse du fichier HAR
+## Step 20 — HAR file analysis
 
-→ Voir `skill-steps/20_analyse-har.md`
+→ See `skill-steps/20_har-analysis.md`
 
-Extraire du HAR :
-- Vue d'ensemble du trafic (requêtes, domaines, codes HTTP, volume)
-- Métriques de performance réseau (cache, doublons, ressources lourdes)
+Extract from the HAR:
+- Traffic overview (requests, domains, HTTP codes, volume)
+- Network performance metrics (cache, duplicates, heavy resources)
 
 ---
 
-## Étape 25 — Orchestration DISPATCH
+## Step 25 — DISPATCH orchestration
 
-→ Voir `skill-steps/25_dispatch-orchestration.md`
+→ See `skill-steps/25_dispatch-orchestration.md`
 
-Deux vagues parallèles via le mécanisme DISPATCH. Si les sous-agents sont
-disponibles (Claude Code), les blocs d'une même vague s'exécutent dans des
-contextes isolés simultanément. Sinon, ils s'enchaînent inline. Sorties
-identiques dans les deux cas.
+Two parallel waves via the DISPATCH mechanism. If sub-agents are
+available (Claude Code), the blocks of the same wave run in isolated
+contexts simultaneously. Otherwise, they run inline one after another. Outputs
+are identical in both cases.
 
-- **Wave 1** (5 dispatches en parallèle) : analyse HAR (étape 20), analyse
-  Coverage (étape 30), collecte CWV (étape 37), collecte env-data (étape 45
-  Étape 20), extraction en-têtes sécurité (étape 39) → produit
+- **Wave 1** (5 parallel dispatches): HAR analysis (step 20), Coverage analysis
+  (step 30), CWV collection (step 37), env-data collection (step 45
+  Step 20), security header extraction (step 39) → produces
   `har-analysis.json`, `coverage-analysis.json`, `cwv.json`, `env-data.json`,
   `security-headers-analysis.json`.
-- **Wave 2** (2 dispatches en parallèle, dépend de `env-data.json` produit en
-  Wave 1) : extraction critères HTML/CSS + well-known (étape 39) → produit
+- **Wave 2** (2 parallel dispatches, depends on `env-data.json` produced in
+  Wave 1): HTML/CSS criteria + well-known extraction (step 39) → produces
   `html-css-criteria.json`, `wellknown-scan.json`.
 
-Seuls `har-analysis.json` et `coverage-analysis.json` sont obligatoires pour
-poursuivre ; les 5 autres fichiers sont des enrichissements best-effort
-(EOF/rapport dégradés mais non bloqués en leur absence).
+Only `har-analysis.json` and `coverage-analysis.json` are required to
+continue; the other 5 files are best-effort enrichments
+(EOF/report degraded but not blocked in their absence).
 
 ---
 
-## Étape 30 — Analyse des fichiers de couverture
+## Step 30 — Coverage file analysis
 
-→ Voir `skill-steps/30_analyse-coverage.md`
+→ See `skill-steps/30_coverage-analysis.md`
 
-Exécutée automatiquement par l'étape 25 (Wave 1, bloc `analyse-coverage`) —
-cette section documente le traitement et sa commande CLI pour un
-relancement manuel isolé.
+Run automatically by step 25 (Wave 1, block `analyze-coverage`) —
+this section documents the processing and its CLI command for an
+isolated manual re-run.
 
-Pour chaque fichier JSON de couverture :
-- Métriques par page (taille totale, code non utilisé, taux %)
-- Fichiers les plus coûteux (JS + CSS)
-- Synthèse multi-pages
+For each Coverage JSON file:
+- Per-page metrics (total size, unused code, % rate)
+- Most expensive files (JS + CSS)
+- Multi-page summary
 
 ---
 
-## Étape 35 — Calcul EcoIndex
+## Step 35 — EcoIndex calculation
 
-→ Voir `skill-steps/35_calcul_ecoindex.md`
+→ See `skill-steps/35_ecoindex-calculation.md`
 
-Calcul automatique depuis le HAR (formule officielle) :
-- DOM extrait du corps HTML (`response.content.text`)
-- Requêtes et poids agrégés par page
-- Score 0-100 + grade A-G avec code couleur
+Automatic calculation from the HAR (official formula):
+- DOM extracted from the HTML body (`response.content.text`)
+- Requests and weight aggregated per page
+- Score 0-100 + grade A-G with color code
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/har_metrics.py <fichier.har> [cwv.json]
+python3 .claude/skills/analyse-parcours/scripts/har_metrics.py <har-file> [cwv.json]
 ```
 
 ---
 
-## Étape 37 — CWV via Lighthouse
+## Step 37 — CWV via Lighthouse
 
-→ Voir `skill-steps/37_lighthouse.md`
+→ See `skill-steps/37_lighthouse.md`
 
-Exécutée automatiquement par l'étape 25 (Wave 1, bloc `collecte-cwv`) —
-cette section documente le traitement et sa commande CLI pour un
-relancement manuel isolé (ex. "relance Lighthouse").
+Run automatically by step 25 (Wave 1, block `collect-cwv`) —
+this section documents the processing and its CLI command for an
+isolated manual re-run (e.g. "re-run Lighthouse").
 
-Si `cwv.json` est absent : lancer automatiquement Lighthouse CLI via `npx` en extrayant
-les URLs du HAR. Génère `cwv.json` avec LCP, INP, CLS mesurés en mode lab.
-Si déjà présent : skippé. Si échec : warning et rapport sans CWV.
-L'utilisateur peut forcer un re-run en disant "relance Lighthouse".
-
----
-
-## Étape 39 — Potentiel d'optimisation (référentiel EOF)
-
-→ Voir `skill-steps/39_eof-audit.md`
-
-Étape **automatique** (pas une commande), séquentielle : attendre que
-`har-analysis.json` et `coverage-analysis.json` existent (Wave 1/2 de
-l'étape 25) avant de la lancer, avant le rapport. Les trois extracteurs
-qu'elle consomme (`security-headers-analysis.json`, `html-css-criteria.json`,
-`wellknown-scan.json`) sont désormais produits automatiquement par les
-Waves 1/2 de l'étape 25, plus besoin de les lancer manuellement au préalable.
-Remplit ce qui peut l'être du référentiel EOF-V.1.1 depuis
-`eof-referentiel.json` (skill `eof`) et les données déjà collectées — jamais
-la Google Sheet. Sur 54 critères détaillés, seuls ~10 sont exploitables
-(4 automatisables, 6 indices partiels) ; les autres restent "je ne sais pas"
-par construction. Si `eof-referentiel.json` est absent : étape sautée,
-rapport sans section EOF.
+If `cwv.json` is absent: automatically launch the Lighthouse CLI via `npx` by extracting
+the URLs from the HAR. Generates `cwv.json` with LCP, INP, CLS measured in lab mode.
+If already present: skipped. If failure: warning and report without CWV.
+The user can force a re-run by saying "re-run Lighthouse".
 
 ---
 
-## Étape 39b — Questionnaire EOF (génération et relecture)
+## Step 39 — Optimization potential (EOF framework)
 
-→ Voir `skill-steps/39b_questionnaire-eof.md`
+→ See `skill-steps/39_eof-audit.md`
 
-Étape **manuelle** (décision de mission, pas un calcul automatique), possible
-dès que l'Étape 39 a écrit `eof-audit-results.json`. Pose au service audité
-les critères que l'Étape 39 n'a pas pu trancher automatiquement :
+**Automatic** step (not a command), sequential: wait for
+`har-analysis.json` and `coverage-analysis.json` to exist (Waves 1/2 of
+step 25) before launching it, before the report. The three extractors
+it consumes (`security-headers-analysis.json`, `html-css-criteria.json`,
+`wellknown-scan.json`) are now produced automatically by Waves 1/2 of
+step 25, no need to launch them manually beforehand.
+Fills what can be filled of the EOF-V.1.1 framework from
+`eof-reference.json` (skill `eof`) and the data already collected — never
+the Google Sheet. Out of 54 detailed criteria, only ~10 are usable
+(4 automatable, 6 partial indicators); the others remain "I don't know"
+by construction. If `eof-reference.json` is absent: step skipped,
+report without EOF section.
+
+---
+
+## Step 39b — EOF questionnaire (generation and review)
+
+→ See `skill-steps/39b_questionnaire-eof.md`
+
+**Manual** step (mission decision, not an automatic calculation), possible
+as soon as Step 39 has written `eof-audit-results.json`. Asks the audited
+service the criteria that Step 39 could not decide automatically:
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <dossier-audit> --output-dir /tmp/questionnaire-<domaine>
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <audit-dir> --output-dir /tmp/questionnaire-<domain>
 ```
 
-**Ne jamais générer directement dans `audits/<domaine>/`** (le script le
-refuse par défaut, sortie 2) : un questionnaire généré est vierge, et
-`--dans-le-dossier-audit` ne doit être utilisé qu'au moment où il part
-réellement vers le client. Une fois le fichier revenu rempli, la relecture se
-fait avec `parse_questionnaire.py` (écrit `lots/relecture-questionnaire.json`) ;
-voir le fichier d'étape pour la suite (fusion des lots, avertissement sur
+**Never generate directly into `audits/<domain>/`** (the script
+refuses by default, exit code 2): a generated questionnaire is blank, and
+`--in-audit-dir` must only be used when it is actually going to the client.
+Once the file comes back filled in, the review is done with
+`parse_questionnaire.py` (writes `lots/questionnaire-review.json`);
+see the step file for what follows (lot merging, warning about
 `run_eof.py`).
 
 ---
 
-## Étape 40 — Rapport HTML
+## Step 40 — HTML report
 
-→ Voir `skill-steps/40_rapport.md`
+→ See `skill-steps/40_report.md`
 
-Étape séquentielle : attendre que `cwv.json`, `env-data.json` et
-`eof-audit-results.json` existent (ou soient notés absents/dégradés) avant
-de la lancer — sections correspondantes simplement omises si absents,
-jamais un blocage.
+Sequential step: wait for `cwv.json`, `env-data.json` and
+`eof-audit-results.json` to exist (or be marked absent/degraded) before
+launching it — corresponding sections are simply omitted if absent,
+never a blocker.
 
-Génère `rapport-parcours-YYYY-MM-DD.html` dans le dossier audit :
+Generates `journey-report-YYYY-MM-DD.html` in the audit folder:
 
 ```bash
-python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <dossier-audit>
+python3 .claude/skills/analyse-parcours/scripts/generate_report_html.py <audit-dir>
 ```
 
-Sections : EcoIndex | Trafic réseau | Code mort | CWV (si cwv.json) | Recommandations
+Sections: EcoIndex | Network traffic | Dead code | CWV (if cwv.json) | Recommendations
 
 ---
 
-## Étape 45 — Estimation CO2e (e-footprint)
+## Step 45 — CO2e estimation (e-footprint)
 
-→ Voir `skill-steps/45_efootprint.md`
+→ See `skill-steps/45_efootprint.md`
 
-Étape **optionnelle**, déclenchée par `/efootprint <source_dir>` ou par des phrases
-comme "estime l'empreinte carbone" / "impact CO2". Réutilise `env-data.json` (HAR +
-CrUX + mix pays/trafic SimilarWeb) pour calculer une estimation CO2e hypothétique via
-la librairie e-footprint (Boavizta), puis insère une section "Impact environnemental"
-dans le rapport HTML (Étape 40) si `efootprint-synthese-python.json` est présent.
+**Optional** step, triggered by `/efootprint <source_dir>` or by phrases
+like "estimate the carbon footprint" / "CO2 impact". Reuses `env-data.json` (HAR +
+CrUX + SimilarWeb country/traffic mix) to compute a hypothetical CO2e estimate via
+the e-footprint library (Boavizta), then inserts an "Environmental impact"
+section into the HTML report (Step 40) if `efootprint-python-summary.json` is present.
 
-Si `/analyse-parcours` a déjà tourné sur ce dossier, `env-data.json` existe
-probablement déjà (produit par la Wave 1 de l'étape 25, bloc
-`collecte-env-data`) : sa propre Étape 20 (§ci-dessous, `skill-steps/45_efootprint.md`)
-se limite alors à proposer `--refresh` si les données doivent être rafraîchies.
-Le flux `/efootprint <source_dir>` autonome, sans `/analyse-parcours`
-préalable, reste inchangé : il relance lui-même `collect_env_data.py` si
-nécessaire.
+If `/analyse-parcours` has already run on this folder, `env-data.json` probably
+already exists (produced by Wave 1 of step 25, block
+`collect-env-data`): its own Step 20 (§below, `skill-steps/45_efootprint.md`)
+is then limited to proposing `--refresh` if the data needs to be refreshed.
+The standalone `/efootprint <source_dir>` flow, without a prior
+`/analyse-parcours`, remains unchanged: it re-runs `collect_env_data.py` itself if
+necessary.
 
 ---
 
-## Maintenance des outils CLI
+## CLI tool maintenance
 
-→ Voir `scripts/README-outils.md`
+→ See `scripts/README-tools.md`
 
-### Install initiale de Lighthouse (une seule fois)
+### Initial Lighthouse install (once only)
 
 ```bash
 npm install --prefix .claude/skills/analyse-parcours/scripts/
 ```
 
-### Vérifier si Lighthouse est à jour
+### Check if Lighthouse is up to date
 
 ```bash
 npm outdated --prefix .claude/skills/analyse-parcours/scripts/
 ```
 
-### Mettre à jour Lighthouse
+### Update Lighthouse
 
 ```bash
 npm update lighthouse --prefix .claude/skills/analyse-parcours/scripts/
 ```
 
-L'utilisateur peut dire à Claude "vérifie si Lighthouse est à jour" ou "mets à jour Lighthouse".
-Claude exécute `npm outdated`, lit la sortie et propose ou exécute `npm update`.
+The user can tell Claude "check if Lighthouse is up to date" or "update Lighthouse".
+Claude runs `npm outdated`, reads the output and proposes or runs `npm update`.
 
 ---
 
-## Règles transversales
+## Cross-cutting rules
 
-### Taille des fichiers HAR
+### HAR file size
 
-Les HAR peuvent dépasser 5 Mo (50 000+ lignes). Procéder par lecture sélective :
-- Lire l'entête JSON pour connaître le nombre d'entrées
-- Traiter les entrées par lots si nécessaire
-- Ne pas charger l'intégralité en une seule passe
+HARs can exceed 5 MB (50,000+ lines). Proceed by selective reading:
+- Read the JSON header to know the number of entries
+- Process entries in batches if necessary
+- Do not load everything in a single pass
 
-### Données sensibles
+### Sensitive data
 
-Si le HAR contient des credentials ou tokens :
-- Ne **jamais** les afficher en clair
-- Masquer : `{"password":"***"}`, `token=****...abc`
-- Tronquer les UIDs : `uid=8116...92`
+If the HAR contains credentials or tokens:
+- **Never** display them in clear text
+- Mask: `{"password":"***"}`, `token=****...abc`
+- Truncate UIDs: `uid=8116...92`
 
-### Progression
+### Progress
 
-Afficher une ligne de progression à chaque étape :
+Display a progress line at each step:
 ```
-▶ Étape 10 — Localisation des fichiers
-▶ Étape 15 — Capture sessionId (silencieux)
-▶ Wave 1 — Analyse HAR + Coverage + CWV + env-data + Sécurité (5 dispatches en parallèle)
-▶ Wave 2 — Extracteurs HTML/CSS + well-known (2 dispatches en parallèle)
-▶ Étape 39 — Audit EOF
-▶ Étape 40 — Rapport de synthèse
+▶ Step 10 — File location
+▶ Step 15 — sessionId capture (silent)
+▶ Wave 1 — HAR + Coverage + CWV + env-data + Security analysis (5 parallel dispatches)
+▶ Wave 2 — HTML/CSS + well-known extractors (2 parallel dispatches)
+▶ Step 39 — EOF audit
+▶ Step 40 — Summary report
 ```

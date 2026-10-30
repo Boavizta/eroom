@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Détection des technologies (stack technique) depuis un HAR — règles MAISON.
+Technology detection (technical stack) from a HAR — CUSTOM rules.
 
-Moteur de pattern-matching pur Python (stdlib uniquement) sur les signaux déjà
-présents dans le HAR : en-têtes de réponse, URLs de requêtes / hosts tiers, HTML
-des pages (balise <meta name="generator">, patterns), cookies (Set-Cookie).
+Pure-Python pattern-matching engine (stdlib only) over the signals already
+present in the HAR: response headers, request URLs / third-party hosts, page
+HTML (<meta name="generator"> tag, patterns), cookies (Set-Cookie).
 
-POURQUOI des règles maison et pas Wappalyzer/webappanalyzer ?
-  La boîte à outils est publiée sous CC BY-SA 4.0, incompatible avec l'intégration
-  de données GPL v3 (webappanalyzer). On écrit donc nos propres règles, 100 %
-  CC BY-SA compatibles, offline, sans dépendance ni appel réseau.
-  Détail complet : documentation/implementation/detection_technologies.md
+WHY custom rules and not Wappalyzer/webappanalyzer?
+  The toolbox is published under CC BY-SA 4.0, incompatible with the
+  integration of GPL v3 data (webappanalyzer). So we write our own rules, 100%
+  CC BY-SA compatible, offline, with no dependency and no network call.
+  Full details: documentation/implementation/detection_technologies.md
 
-Portée assumée : ~20-40 technologies courantes (CDN, serveur web, langages,
-frameworks, CMS, analytics, fonts). On ne détecte QUE ce qui transparaît côté
-client. Le type d'instance (t3.medium…) reste indétectable de l'extérieur.
+Assumed scope: ~20-40 common technologies (CDN, web server, languages,
+frameworks, CMS, analytics, fonts). We only detect what is visible client-side.
+The instance type (t3.medium…) remains undetectable from the outside.
 
-Usage autonome (relançable seul, comme les autres modules du projet) :
-    python3 detect_tech.py <source_dir>     # dossier contenant le .har
-    python3 detect_tech.py <fichier.har>    # chemin direct vers un .har
+Standalone usage (re-runnable on its own, like the other project modules):
+    python3 detect_tech.py <source_dir>     # folder containing the .har
+    python3 detect_tech.py <file.har>       # direct path to a .har
 """
 
 import json
@@ -27,52 +27,52 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+# Optional subfolder where raw captures (HAR, Coverage) are stored, in .gitignore.
+RAW_DATA_DIR = "raw-data-potentially-sensitive"
 
-# Clés de confiance (alignées sur collect_env_data.py)
-CONFIDENCE_HIGH = "high"       # signal distinctif et non ambigu
-CONFIDENCE_MEDIUM = "medium"   # signal probable mais partagé / indirect
-CONFIDENCE_LOW = "low"         # indice faible (sous-chaîne HTML, etc.)
+# Confidence keys (aligned with collect_env_data.py)
+CONFIDENCE_HIGH = "high"       # distinctive and unambiguous signal
+CONFIDENCE_MEDIUM = "medium"   # probable but shared / indirect signal
+CONFIDENCE_LOW = "low"         # weak hint (HTML substring, etc.)
 
-# Ordre d'affichage des catégories dans le rapport
+# Display order of categories in the report
 CATEGORY_ORDER = [
     "CDN",
-    "Hébergeur",
-    "Serveur web",
-    "Langage",
+    "Hosting provider",
+    "Web server",
+    "Language",
     "Framework",
     "CMS",
     "Analytics",
-    "Balise / Tag manager",
-    "Polices",
-    "Bibliothèque JS",
-    "Consentement / RGPD",
-    "Backend-as-a-Service / BDD (tiers)",
-    "Streaming média",
-    "IA générative (tiers)",
+    "Tag manager",
+    "Fonts",
+    "JS library",
+    "Consent / GDPR",
+    "Backend-as-a-Service / DB (third-party)",
+    "Media streaming",
+    "Generative AI (third-party)",
 ]
 
 
 # ---------------------------------------------------------------------------
-# Règles de détection MAISON
+# CUSTOM detection rules
 # ---------------------------------------------------------------------------
-# Format d'une règle (tous les champs sont optionnels sauf "cat") :
-#   "cat"            : catégorie (une de CATEGORY_ORDER)
-#   "headers"        : {nom_header_minuscule: regex} — match si la valeur du header
-#                      matche la regex (au moins un header suffit)
-#   "url"            : regex testée sur chaque URL de requête (host + chemin)
-#   "meta_generator" : regex testée sur le contenu de <meta name="generator">
-#   "html"           : regex testée sur le HTML des pages (indice faible)
-#   "cookie"         : regex testée sur les noms de cookies (Set-Cookie)
-#   "content_type"   : regex testée sur le mimeType de chaque réponse (utile pour
-#                      le streaming média quand l'URL ne révèle rien, ex. flux
-#                      servi derrière un chemin opaque) — confiance MEDIUM
-#   "confidence"     : confiance de base si un signal "fort" matche (défaut medium)
+# Rule format (all fields optional except "cat"):
+#   "cat"            : category (one of CATEGORY_ORDER)
+#   "headers"        : {lowercase_header_name: regex} — match if the header
+#                      value matches the regex (at least one header suffices)
+#   "url"            : regex tested on each request URL (host + path)
+#   "meta_generator" : regex tested on the content of <meta name="generator">
+#   "html"           : regex tested on page HTML (weak hint)
+#   "cookie"         : regex tested on cookie names (Set-Cookie)
+#   "content_type"   : regex tested on the mimeType of each response (useful for
+#                      media streaming when the URL reveals nothing, e.g. a
+#                      stream served behind an opaque path) — MEDIUM confidence
+#   "confidence"     : base confidence if a "strong" signal matches (default medium)
 #
-# Un signal via "headers", "meta_generator" ou "cookie" est considéré FORT
-# (confiance de la règle). Un signal via "url" est MEDIUM, via "content_type"
-# est MEDIUM, via "html" est LOW.
+# A signal via "headers", "meta_generator" or "cookie" is considered STRONG
+# (the rule's confidence). A signal via "url" is MEDIUM, via "content_type"
+# is MEDIUM, via "html" is LOW.
 TECH_RULES = {
     # --- CDN -----------------------------------------------------------------
     "Amazon CloudFront": {
@@ -104,57 +104,57 @@ TECH_RULES = {
         "url": r"cdnjs\.cloudflare\.com",
     },
 
-    # --- Hébergeur (signaux cloud) ------------------------------------------
+    # --- Hosting provider (cloud signals) ------------------------------------
     "Amazon S3": {
-        "cat": "Hébergeur", "confidence": CONFIDENCE_HIGH,
+        "cat": "Hosting provider", "confidence": CONFIDENCE_HIGH,
         "headers": {"x-amz-request-id": r".+", "server": r"AmazonS3"},
     },
     "GitHub Pages": {
-        "cat": "Hébergeur", "confidence": CONFIDENCE_HIGH,
+        "cat": "Hosting provider", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"GitHub\.com"},
     },
     "Vercel": {
-        "cat": "Hébergeur", "confidence": CONFIDENCE_HIGH,
+        "cat": "Hosting provider", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"Vercel", "x-vercel-id": r".+"},
     },
     "Netlify": {
-        "cat": "Hébergeur", "confidence": CONFIDENCE_HIGH,
+        "cat": "Hosting provider", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"Netlify", "x-nf-request-id": r".+"},
     },
 
-    # --- Serveur web ---------------------------------------------------------
+    # --- Web server ----------------------------------------------------------
     "nginx": {
-        "cat": "Serveur web", "confidence": CONFIDENCE_HIGH,
+        "cat": "Web server", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"nginx"},
     },
     "Apache": {
-        "cat": "Serveur web", "confidence": CONFIDENCE_HIGH,
+        "cat": "Web server", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"apache"},
     },
     "Microsoft IIS": {
-        "cat": "Serveur web", "confidence": CONFIDENCE_HIGH,
+        "cat": "Web server", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"Microsoft-IIS"},
     },
     "LiteSpeed": {
-        "cat": "Serveur web", "confidence": CONFIDENCE_HIGH,
+        "cat": "Web server", "confidence": CONFIDENCE_HIGH,
         "headers": {"server": r"LiteSpeed"},
     },
     "Google Frontend": {
-        "cat": "Serveur web", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Web server", "confidence": CONFIDENCE_MEDIUM,
         "headers": {"server": r"^(gws|sffe|ESF|GSE)$"},
     },
 
-    # --- Langage serveur -----------------------------------------------------
+    # --- Server language -----------------------------------------------------
     "PHP": {
-        "cat": "Langage", "confidence": CONFIDENCE_HIGH,
+        "cat": "Language", "confidence": CONFIDENCE_HIGH,
         "headers": {"x-powered-by": r"PHP", "set-cookie": r"^PHPSESSID="},
     },
     "ASP.NET": {
-        "cat": "Langage", "confidence": CONFIDENCE_HIGH,
+        "cat": "Language", "confidence": CONFIDENCE_HIGH,
         "headers": {"x-powered-by": r"ASP\.NET", "x-aspnet-version": r".+"},
     },
     "Express (Node.js)": {
-        "cat": "Langage", "confidence": CONFIDENCE_HIGH,
+        "cat": "Language", "confidence": CONFIDENCE_HIGH,
         "headers": {"x-powered-by": r"Express"},
     },
     "Ruby on Rails": {
@@ -163,7 +163,7 @@ TECH_RULES = {
         "cookie": r"^_session_id=",
     },
 
-    # --- Frameworks front / SSR ---------------------------------------------
+    # --- Front frameworks / SSR ----------------------------------------------
     "Next.js": {
         "cat": "Framework", "confidence": CONFIDENCE_HIGH,
         "headers": {"x-powered-by": r"Next\.js"},
@@ -242,131 +242,131 @@ TECH_RULES = {
 
     # --- Tag manager ---------------------------------------------------------
     "Google Tag Manager": {
-        "cat": "Balise / Tag manager", "confidence": CONFIDENCE_HIGH,
+        "cat": "Tag manager", "confidence": CONFIDENCE_HIGH,
         "url": r"googletagmanager\.com/gtm\.js",
     },
 
-    # --- Polices -------------------------------------------------------------
+    # --- Fonts ---------------------------------------------------------------
     "Google Fonts": {
-        "cat": "Polices", "confidence": CONFIDENCE_HIGH,
+        "cat": "Fonts", "confidence": CONFIDENCE_HIGH,
         "url": r"fonts\.(googleapis|gstatic)\.com",
     },
     "Font Awesome": {
-        "cat": "Polices", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Fonts", "confidence": CONFIDENCE_MEDIUM,
         "url": r"fontawesome|font-awesome",
     },
 
-    # --- Bibliothèques JS ----------------------------------------------------
+    # --- JS libraries --------------------------------------------------------
     "jQuery": {
-        "cat": "Bibliothèque JS", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "JS library", "confidence": CONFIDENCE_MEDIUM,
         "url": r"/jquery[.-]",
     },
 
-    # --- Consentement / RGPD -------------------------------------------------
-    "Orejime (RGPD)": {
-        "cat": "Consentement / RGPD", "confidence": CONFIDENCE_MEDIUM,
+    # --- Consent / GDPR ------------------------------------------------------
+    "Orejime (GDPR)": {
+        "cat": "Consent / GDPR", "confidence": CONFIDENCE_MEDIUM,
         "url": r"/orejime[.-]",
     },
     "Axeptio": {
-        "cat": "Consentement / RGPD", "confidence": CONFIDENCE_HIGH,
+        "cat": "Consent / GDPR", "confidence": CONFIDENCE_HIGH,
         "url": r"axeptio\.(eu|imgix\.net)",
     },
     "Didomi": {
-        "cat": "Consentement / RGPD", "confidence": CONFIDENCE_HIGH,
+        "cat": "Consent / GDPR", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)didomi\.io",
     },
 
-    # --- Backend-as-a-Service / BDD (tiers) -----------------------------------
-    # SEUL signal HAR honnête pour une "base de données" : un BaaS/DBaaS exposé
-    # DIRECTEMENT au navigateur. Une BDD auto-hébergée derrière un serveur
-    # applicatif n'émet AUCUN signal réseau visible côté client — son absence
-    # ici ne prouve jamais son absence réelle (cf. topology_overview.py).
+    # --- Backend-as-a-Service / DB (third-party) ------------------------------
+    # The ONLY honest HAR signal for a "database": a BaaS/DBaaS exposed
+    # DIRECTLY to the browser. A self-hosted DB behind an application server
+    # emits NO visible network signal client-side — its absence here never
+    # proves its real absence (cf. topology_overview.py).
     "Firebase / Firestore": {
-        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Backend-as-a-Service / DB (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"(firebaseio\.com|firestore\.googleapis\.com)",
     },
     "Supabase": {
-        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Backend-as-a-Service / DB (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"\.supabase\.co",
     },
     "MongoDB Atlas (Data API)": {
-        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Backend-as-a-Service / DB (third-party)", "confidence": CONFIDENCE_MEDIUM,
         "url": r"data\.mongodb-api\.com",
     },
     "Airtable (API)": {
-        "cat": "Backend-as-a-Service / BDD (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Backend-as-a-Service / DB (third-party)", "confidence": CONFIDENCE_MEDIUM,
         "url": r"api\.airtable\.com",
     },
 
-    # --- Streaming média -------------------------------------------------------
-    # Deux vecteurs : URL/extension (m3u8/mpd, CDN vidéo connus) et content-type
-    # de réponse (clé "content_type", cf. _match_rule() — utile quand l'URL ne
-    # révèle rien, ex. flux servi derrière un chemin opaque).
-    "Flux HLS (.m3u8)": {
-        "cat": "Streaming média", "confidence": CONFIDENCE_MEDIUM,
+    # --- Media streaming -----------------------------------------------------
+    # Two vectors: URL/extension (m3u8/mpd, known video CDNs) and response
+    # content-type (key "content_type", cf. _match_rule() — useful when the
+    # URL reveals nothing, e.g. a stream served behind an opaque path).
+    "HLS stream (.m3u8)": {
+        "cat": "Media streaming", "confidence": CONFIDENCE_MEDIUM,
         "url": r"\.m3u8(\?|$)",
         "content_type": r"application/(vnd\.apple\.mpegurl|x-mpegurl)",
     },
-    "Flux DASH (.mpd)": {
-        "cat": "Streaming média", "confidence": CONFIDENCE_MEDIUM,
+    "DASH stream (.mpd)": {
+        "cat": "Media streaming", "confidence": CONFIDENCE_MEDIUM,
         "url": r"\.mpd(\?|$)",
         "content_type": r"application/dash\+xml",
     },
-    "Ressource vidéo/audio (content-type)": {
-        "cat": "Streaming média", "confidence": CONFIDENCE_LOW,
+    "Video/audio resource (content-type)": {
+        "cat": "Media streaming", "confidence": CONFIDENCE_LOW,
         "content_type": r"^(video|audio)/",
     },
-    "Mux (streaming vidéo)": {
-        "cat": "Streaming média", "confidence": CONFIDENCE_HIGH,
+    "Mux (video streaming)": {
+        "cat": "Media streaming", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)(stream\.mux\.com|mux\.com)",
     },
     "Cloudflare Stream": {
-        "cat": "Streaming média", "confidence": CONFIDENCE_HIGH,
+        "cat": "Media streaming", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)cloudflarestream\.com|videodelivery\.net",
     },
 
-    # --- IA générative (tiers) --------------------------------------------------
-    # Domaine d'API exact reconnu = signal quasi certain, mais _match_rule()
-    # plafonne tout match "url" à MEDIUM (cohérence avec les autres règles
-    # url-only du fichier) : la nuance "quasi certain" se porte dans le texte
-    # de présentation (topology_overview.py), pas dans ce badge générique.
+    # --- Generative AI (third-party) ------------------------------------------
+    # Exact API domain recognized = near-certain signal, but _match_rule()
+    # caps any "url" match at MEDIUM (consistency with the other url-only
+    # rules of the file): the "near-certain" nuance is carried in the
+    # presentation text (topology_overview.py), not in this generic badge.
     "OpenAI (API)": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)api\.openai\.com",
     },
     "Anthropic (API Claude)": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)api\.anthropic\.com",
     },
     "Google Generative AI (Gemini)": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"generativelanguage\.googleapis\.com",
     },
     "Mistral AI (API)": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)api\.mistral\.ai",
     },
     "Cohere (API)": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_HIGH,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_HIGH,
         "url": r"(//|\.)api\.cohere\.(ai|com)",
     },
     "Azure OpenAI": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_MEDIUM,
         "url": r"openai\.azure\.com",
     },
     "Hugging Face Inference API": {
-        "cat": "IA générative (tiers)", "confidence": CONFIDENCE_MEDIUM,
+        "cat": "Generative AI (third-party)", "confidence": CONFIDENCE_MEDIUM,
         "url": r"api-inference\.huggingface\.co",
     },
 }
 
 
 # ---------------------------------------------------------------------------
-# Extraction des signaux depuis le HAR
+# Signal extraction from the HAR
 # ---------------------------------------------------------------------------
 
 def find_har(source_dir):
-    """Trouve le .har dans un dossier (même logique que collect_env_data.find_har)."""
+    """Finds the .har in a folder (same logic as collect_env_data.find_har)."""
     source_dir = Path(source_dir)
     hars = list(source_dir.glob("*.har")) or list(
         (source_dir / RAW_DATA_DIR).glob("*.har"))
@@ -377,24 +377,24 @@ def find_har(source_dir):
 
 def load_har_signals(har_path):
     """
-    Parcourt les entries du HAR et agrège tous les signaux exploitables.
+    Walks the HAR entries and aggregates all exploitable signals.
 
-    Réutilise la même logique de parsing que collect_env_data.extract_har_data()
-    (json.load puis itération sur log["entries"]).
+    Reuses the same parsing logic as collect_env_data.extract_har_data()
+    (json.load then iteration over log["entries"]).
 
-    Retourne un dict :
-      - "headers"        : liste de (nom_minuscule, valeur) de tous les response headers
-      - "urls"           : liste des URLs de requêtes (host + chemin)
-      - "hosts"          : ensemble des hosts distincts
-      - "main_host"      : host le plus fréquent (domaine principal présumé)
-      - "third_party"    : hosts distincts != main_host
-      - "meta_generators": valeurs des <meta name="generator"> trouvées dans le HTML
-      - "html_blobs"     : liste des corps HTML (pour patterns "html")
-      - "cookies"        : noms de cookies vus (Set-Cookie)
-      - "content_types"  : liste de (host, mimeType) de chaque réponse — le host
-                           est indispensable pour router une détection "content_type"
-                           vers le bon ThirdPartyHost (cf. topology_overview.py)
-      - "request_count"  : nombre d'entries
+    Returns a dict:
+      - "headers"        : list of (lowercase_name, value) of all response headers
+      - "urls"           : list of request URLs (host + path)
+      - "hosts"          : set of distinct hosts
+      - "main_host"      : most frequent host (presumed main domain)
+      - "third_party"    : distinct hosts != main_host
+      - "meta_generators": values of the <meta name="generator"> found in the HTML
+      - "html_blobs"     : list of HTML bodies (for "html" patterns)
+      - "cookies"        : names of cookies seen (Set-Cookie)
+      - "content_types"  : list of (host, mimeType) of each response — the host
+                           is essential to route a "content_type" detection
+                           to the right ThirdPartyHost (cf. topology_overview.py)
+      - "request_count"  : number of entries
     """
     with open(har_path, encoding="utf-8") as f:
         har = json.load(f)
@@ -459,21 +459,21 @@ def load_har_signals(har_path):
 
 
 # ---------------------------------------------------------------------------
-# Application des règles
+# Rule application
 # ---------------------------------------------------------------------------
 
 def _match_rule(name, rule, signals):
     """
-    Teste une règle contre les signaux. Retourne (confidence, evidence) si match,
-    sinon (None, None).
+    Tests a rule against the signals. Returns (confidence, evidence) on match,
+    else (None, None).
 
-    La confiance retenue est la plus forte des signaux ayant matché :
-      - headers / meta_generator / cookie -> confiance de base de la règle
-      - url                               -> plafonnée à MEDIUM
-      - html                              -> plafonnée à LOW
+    The retained confidence is the strongest of the matching signals:
+      - headers / meta_generator / cookie -> the rule's base confidence
+      - url                               -> capped at MEDIUM
+      - html                              -> capped at LOW
     """
     base_conf = rule.get("confidence", CONFIDENCE_MEDIUM)
-    best = None  # tuple (rang, conf, evidence)
+    best = None  # tuple (rank, conf, evidence)
     rank = {CONFIDENCE_HIGH: 3, CONFIDENCE_MEDIUM: 2, CONFIDENCE_LOW: 1}
 
     def _consider(conf, evidence):
@@ -481,7 +481,7 @@ def _match_rule(name, rule, signals):
         if best is None or rank[conf] > best[0]:
             best = (rank[conf], conf, evidence)
 
-    # 1. Headers (signal fort)
+    # 1. Headers (strong signal)
     for hdr_name, pattern in rule.get("headers", {}).items():
         rx = re.compile(pattern, re.IGNORECASE)
         for name_h, value_h in signals["headers"]:
@@ -489,7 +489,7 @@ def _match_rule(name, rule, signals):
                 _consider(base_conf, f'header {hdr_name}: "{value_h[:60]}"')
                 break
 
-    # 2. meta generator (signal fort)
+    # 2. meta generator (strong signal)
     if "meta_generator" in rule:
         rx = re.compile(rule["meta_generator"], re.IGNORECASE)
         for gen in signals["meta_generators"]:
@@ -497,7 +497,7 @@ def _match_rule(name, rule, signals):
                 _consider(base_conf, f'<meta generator> = "{gen[:60]}"')
                 break
 
-    # 3. cookie (signal fort)
+    # 3. cookie (strong signal)
     if "cookie" in rule:
         rx = re.compile(rule["cookie"], re.IGNORECASE)
         for ck in signals["cookies"]:
@@ -505,33 +505,33 @@ def _match_rule(name, rule, signals):
                 _consider(base_conf, f'cookie "{ck}"')
                 break
 
-    # 4. URL (plafonné MEDIUM)
+    # 4. URL (capped at MEDIUM)
     if "url" in rule:
         rx = re.compile(rule["url"], re.IGNORECASE)
         for u in signals["urls"]:
             if rx.search(u):
                 conf = base_conf if rank[base_conf] < rank[CONFIDENCE_MEDIUM] else CONFIDENCE_MEDIUM
-                # Un host tiers dédié est un signal fiable ; on garde MEDIUM par prudence.
+                # A dedicated third-party host is a reliable signal; we keep MEDIUM out of caution.
                 short = urlparse(u).netloc + urlparse(u).path
-                _consider(conf, f'requête {short[:60]}')
+                _consider(conf, f'request {short[:60]}')
                 break
 
-    # 4bis. content-type de réponse (plafonné MEDIUM : un mimeType vidéo/audio
-    # est un fait sur LA RESSOURCE, pas sur le SITE — une page peut charger
-    # une seule vidéo promo sans être un site de streaming).
+    # 4bis. response content-type (capped at MEDIUM: a video/audio mimeType
+    # is a fact about THE RESOURCE, not about the SITE — a page can load
+    # a single promo video without being a streaming site).
     if "content_type" in rule:
         rx = re.compile(rule["content_type"], re.IGNORECASE)
         for host_ct, ct in signals["content_types"]:
             if rx.search(ct):
-                _consider(CONFIDENCE_MEDIUM, f'content-type "{ct[:40]}" chez {host_ct}')
+                _consider(CONFIDENCE_MEDIUM, f'content-type "{ct[:40]}" at {host_ct}')
                 break
 
-    # 5. HTML (plafonné LOW — sous-chaîne, sujette aux faux positifs)
+    # 5. HTML (capped at LOW — substring, prone to false positives)
     if "html" in rule:
         rx = re.compile(rule["html"], re.IGNORECASE)
         for blob in signals["html_blobs"]:
             if rx.search(blob):
-                _consider(CONFIDENCE_LOW, "motif dans le HTML")
+                _consider(CONFIDENCE_LOW, "pattern in the HTML")
                 break
 
     if best is None:
@@ -541,7 +541,7 @@ def _match_rule(name, rule, signals):
 
 def detect(signals, rules=None):
     """
-    Applique les règles aux signaux. Retourne un dict :
+    Applies the rules to the signals. Returns a dict:
       {
         "technologies": [{"name", "category", "confidence", "evidence"}, ...],
         "categories": {cat: [names]},
@@ -561,7 +561,7 @@ def detect(signals, rules=None):
                 "evidence": evidence,
             })
 
-    # Tri : par ordre de catégorie puis confiance décroissante puis nom
+    # Sort: by category order, then decreasing confidence, then name
     conf_rank = {CONFIDENCE_HIGH: 3, CONFIDENCE_MEDIUM: 2, CONFIDENCE_LOW: 1}
 
     def _cat_index(cat):
@@ -584,7 +584,7 @@ def detect(signals, rules=None):
 
 
 def detect_from_har(har_path):
-    """Point d'entrée programmatique : HAR -> résultat de détection (dict) ou None."""
+    """Programmatic entry point: HAR -> detection result (dict) or None."""
     if not har_path or not Path(har_path).exists():
         return None
     signals = load_har_signals(har_path)
@@ -592,21 +592,20 @@ def detect_from_har(har_path):
 
 
 # ---------------------------------------------------------------------------
-# IA générative tierce : détection PAR HOST (pas par catégorie agrégée)
+# Third-party generative AI: detection BY HOST (not by aggregated category)
 # ---------------------------------------------------------------------------
-# detect()/detect_from_har() ci-dessus servent la présentation (Étape 25,
-# topology_overview.py) : ils agrègent par catégorie et ne portent pas le host
-# exact. efootprint_model/from_har.py a besoin, lui, du host exact pour savoir
-# À QUEL job réseau rattacher un calcul EcoLogits (cf. collect_env_data.py qui
-# appelle la fonction ci-dessous et écrit son résultat dans
-# env-data.json::ai_external_apis). Réutilise les mêmes règles "url" de
-# TECH_RULES, jamais une redécouverte de pattern.
+# detect()/detect_from_har() above serve the presentation (step 25,
+# topology_overview.py): they aggregate by category and do not carry the exact
+# host. efootprint_model/from_har.py needs, however, the exact host to know
+# WHICH network job to attach an EcoLogits computation to (cf. collect_env_data.py
+# which calls the function below and writes its result into
+# env-data.json::ai_external_apis). Reuses the same "url" rules of
+# TECH_RULES, never a pattern rediscovery.
 
 AI_PROVIDER_BY_RULE_NAME = {
-    # Nom de règle (TECH_RULES) -> clé provider du catalogue EcoLogits
-    # (efootprint_model/build.py::_build_external_api). Azure OpenAI route vers
-    # les mêmes modèles qu'OpenAI : même catalogue EcoLogits, pas un provider
-    # distinct.
+    # Rule name (TECH_RULES) -> provider key of the EcoLogits catalog
+    # (efootprint_model/build.py::_build_external_api). Azure OpenAI routes to
+    # the same models as OpenAI: same EcoLogits catalog, not a distinct provider.
     "OpenAI (API)": "openai",
     "Anthropic (API Claude)": "anthropic",
     "Google Generative AI (Gemini)": "google_genai",
@@ -618,17 +617,17 @@ AI_PROVIDER_BY_RULE_NAME = {
 
 
 def ai_generative_hosts_from_har(har_path):
-    """Hosts appelant une IA générative tierce, détectés par domaine exact.
+    """Hosts calling a third-party generative AI, detected by exact domain.
 
-    Retourne {host: {"rule_name": ..., "provider": clé_ecologits}}, un host par
-    domaine d'API vu dans le HAR (pas d'agrégation par catégorie). None si le
-    HAR est absent/illisible.
+    Returns {host: {"rule_name": ..., "provider": ecologits_key}}, one host per
+    API domain seen in the HAR (no aggregation by category). None if the
+    HAR is absent/unreadable.
     """
     if not har_path or not Path(har_path).exists():
         return None
     signals = load_har_signals(har_path)
     rules = {name: rule for name, rule in TECH_RULES.items()
-             if rule["cat"] == "IA générative (tiers)"}
+             if rule["cat"] == "Generative AI (third-party)"}
 
     result = {}
     for url in signals["urls"]:
@@ -646,7 +645,7 @@ def ai_generative_hosts_from_har(har_path):
 
 
 # ---------------------------------------------------------------------------
-# Point d'entrée autonome
+# Standalone entry point
 # ---------------------------------------------------------------------------
 
 def main(argv=None):
@@ -659,28 +658,28 @@ def main(argv=None):
     if target.is_dir():
         har_path = find_har(target)
         if not har_path:
-            print(f"[ERREUR] Aucun .har trouvé dans {target}")
+            print(f"[ERROR] No .har found in {target}")
             return 1
     elif target.suffix == ".har" and target.exists():
         har_path = target
     else:
-        print(f"[ERREUR] Cible invalide : {target} (attendu : dossier ou fichier .har)")
+        print(f"[ERROR] Invalid target: {target} (expected: folder or .har file)")
         return 1
 
     print(f"[HAR] {har_path.name}")
     result = detect_from_har(har_path)
     if not result:
-        print("[ERREUR] HAR illisible")
+        print("[ERROR] unreadable HAR")
         return 1
 
-    print(f"[HAR] {result['request_count']} requêtes, "
-          f"{len(result['third_party_hosts'])} host(s) tiers\n")
+    print(f"[HAR] {result['request_count']} requests, "
+          f"{len(result['third_party_hosts'])} third-party host(s)\n")
 
     if not result["technologies"]:
-        print("Aucune technologie détectée par les règles maison.")
+        print("No technology detected by the custom rules.")
         return 0
 
-    print(f"Technologies détectées ({len(result['technologies'])}) :")
+    print(f"Detected technologies ({len(result['technologies'])}):")
     current_cat = None
     for t in result["technologies"]:
         if t["category"] != current_cat:
@@ -689,7 +688,7 @@ def main(argv=None):
         print(f"    - {t['name']:<28} [{t['confidence']:<6}] {t['evidence']}")
 
     if result["third_party_hosts"]:
-        print("\nHosts tiers :")
+        print("\nThird-party hosts:")
         for h in result["third_party_hosts"]:
             print(f"    - {h}")
 

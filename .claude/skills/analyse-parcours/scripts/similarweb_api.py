@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
 """
-Récupération trafic + mix pays via l'API interne de l'extension SimilarWeb.
+Traffic + country mix retrieval via SimilarWeb's internal extension API.
 
-Contrairement au scraping de la page publique (bloquée par captcha AWS WAF),
-l'extension Chrome/Firefox SimilarWeb interroge une API interne qui répond sans
-authentification : ni cookie, ni compte, ni session. Il suffit d'envoyer les
-mêmes en-têtes que l'extension (un vrai User-Agent de navigateur + la version
-d'extension) et de NE PAS envoyer d'en-tête Origin (CloudFront la rejette -> 403).
+Unlike scraping the public page (blocked by AWS WAF captcha),
+the SimilarWeb Chrome/Firefox extension queries an internal API that answers
+without authentication: no cookie, no account, no session. It is enough to send
+the same headers as the extension (a real browser User-Agent + the extension
+version) and NOT to send an Origin header (CloudFront rejects it -> 403).
 
-Diagnostic validé en juillet 2026 : le 403 documenté auparavant venait d'un
-mauvais en-tête (`Origin: chrome-extension://...`) et d'un User-Agent non
-navigateur, pas d'un manque de cookies. Corrigés, l'appel répond 200 depuis un
-simple client HTTP.
+Diagnostic validated in July 2026: the previously documented 403 came from a
+bad header (`Origin: chrome-extension://...`) and a non-browser User-Agent,
+not from missing cookies. Fixed, the call answers 200 from a plain HTTP client.
 
-Ce module est SÉPARÉ de collect_env_data.py à dessein : ce dernier ne récupère
-jamais lui-même le trafic ni le mix pays (il ne fait que valider/normaliser les
-blocs 'audience' et 'traffic' présents dans env-data.json). Ce module écrit ces
-deux blocs dans env-data.json, au format exact attendu par resolve_audience() et
-resolve_traffic(), puis on relance `collect_env_data.py <dir> --refresh` pour
-qu'ils soient normalisés et intégrés au calcul CO2e.
+This module is SEPARATE from collect_env_data.py on purpose: the latter never
+fetches traffic or country mix itself (it only validates/normalizes the
+'audience' and 'traffic' blocks present in env-data.json). This module writes
+these two blocks into env-data.json, in the exact format expected by
+resolve_audience() and resolve_traffic(), then `collect_env_data.py <dir>
+--refresh` is re-run so they are normalized and integrated into the CO2e
+computation.
 
-Usage :
-    python3 similarweb_api.py <source_dir>                  # domaine déduit de env-data.json/HAR
+Usage:
+    python3 similarweb_api.py <source_dir>                  # domain inferred from env-data.json/HAR
     python3 similarweb_api.py <source_dir> --domain octo.com
-    python3 similarweb_api.py <source_dir> --print-only     # affiche le JSON API, n'écrit rien
+    python3 similarweb_api.py <source_dir> --print-only     # prints the API JSON, writes nothing
 
-Voie de repli : si l'API échoue (403 réapparu, réseau, domaine inconnu de
-SimilarWeb), le module sort en code != 0 avec un message clair. L'appelant
-retombe alors sur la récupération assistée (SKILL.md Étape 20d).
+Fallback path: if the API fails (403 again, network, domain unknown to
+SimilarWeb), the module exits with code != 0 and a clear message. The caller
+then falls back to assisted retrieval (SKILL.md step 20d).
 """
 
 import argparse
@@ -39,21 +39,21 @@ import urllib.request
 from pathlib import Path
 
 
-# Endpoint interne de l'extension (cf. background.js décompilé du .crx).
-# Pour refaire la découverte si l'extension change (endpoint/en-tête/version),
-# voir documentation/implementation/similarweb_reconstitution.md
+# Internal endpoint of the extension (cf. background.js decompiled from the .crx).
+# To redo the discovery if the extension changes (endpoint/header/version),
+# see documentation/implementation/similarweb-reconstruction.md
 DATA_API = "https://data.similarweb.com/api/v1/data"
 
-# Sous-dossier optionnel où ranger les captures brutes (HAR, Coverage), dans .gitignore.
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+# Optional subfolder where raw captures (HAR, Coverage) are stored, in .gitignore.
+RAW_DATA_DIR = "raw-data-potentially-sensitive"
 
-# Version d'extension envoyée dans l'en-tête X-Extension-Version. À revalider si
-# l'API se met à renvoyer 403 : installer/mettre à jour l'extension, recapturer
-# la version courante (chrome://extensions -> carte SimilarWeb).
+# Extension version sent in the X-Extension-Version header. To revalidate if
+# the API starts returning 403: install/update the extension, recapture the
+# current version (chrome://extensions -> SimilarWeb card).
 EXTENSION_VERSION = "6.12.21"
 
-# User-Agent d'un vrai navigateur : indispensable. Sans lui (ou avec l'UA par
-# défaut d'un client HTTP), CloudFront répond 403.
+# User-Agent of a real browser: essential. Without it (or with the default UA
+# of an HTTP client), CloudFront answers 403.
 BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
@@ -61,34 +61,34 @@ BROWSER_USER_AGENT = (
 
 CONFIDENCE_MEDIUM = "medium"
 
-_MONTHS_FR = {
-    1: "janvier", 2: "février", 3: "mars", 4: "avril", 5: "mai", 6: "juin",
-    7: "juillet", 8: "août", 9: "septembre", 10: "octobre", 11: "novembre",
-    12: "décembre",
+_MONTHS_EN = {
+    1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
+    7: "July", 8: "August", 9: "September", 10: "October", 11: "November",
+    12: "December",
 }
 
 
 # ---------------------------------------------------------------------------
-# Appel API
+# API call
 # ---------------------------------------------------------------------------
 
 def fetch_domain_data(domain, version=EXTENSION_VERSION, timeout=15):
-    """Interroge l'API interne SimilarWeb pour un domaine.
+    """Queries SimilarWeb's internal API for a domain.
 
-    Retourne (data_dict, None, None) en cas de succès, (None, statut_echec, detail) sinon.
-    N'envoie AUCUN en-tête Origin et un vrai User-Agent navigateur (les deux
-    conditions du succès). Aucun cookie n'est nécessaire.
+    Returns (data_dict, None, None) on success, (None, error_status, detail) otherwise.
+    Sends NO Origin header and a real browser User-Agent (the two
+    conditions for success). No cookie needed.
 
-    Statuts d'échec possibles :
-    - echec_lecture : domaine vide (erreur d'appel côté client)
-    - echec_reseau : timeout, DNS, connexion refusée, erreur HTTP
-    - rien_trouve : domaine absent de SimilarWeb (réponse 200 sans SiteName)
-    - echec_analyse : réponse 200 sans données exploitables (autre cause)
+    Possible error statuses:
+    - read_error: empty domain (client-side call error)
+    - network_error: timeout, DNS, connection refused, HTTP error
+    - not_found: domain absent from SimilarWeb (200 response without SiteName)
+    - analysis_error: 200 response without usable data (other cause)
     """
     domain = (domain or "").strip().lower()
     if not domain:
-        return None, "echec_lecture", "domaine vide"
-    # Nettoyage : on veut un domaine nu (pas d'URL, pas de www.)
+        return None, "read_error", "empty domain"
+    # Cleanup: we want a bare domain (no URL, no www.)
     if "://" in domain:
         domain = urllib.parse.urlparse(domain).netloc or domain
     domain = domain.split("/")[0]
@@ -111,37 +111,37 @@ def fetch_domain_data(domain, version=EXTENSION_VERSION, timeout=15):
             raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            return None, "echec_reseau", ("403 CloudFront : en-têtes rejetés ou API durcie. "
-                          "Vérifier User-Agent navigateur + absence d'en-tête Origin, "
-                          "ou revalider la version d'extension. Repli : Étape 20d assistée.")
-        return None, "echec_reseau", f"HTTP {e.code} : {e.reason}"
+            return None, "network_error", ("403 CloudFront: headers rejected or API hardened. "
+                           "Check browser User-Agent + absence of Origin header, "
+                           "or revalidate the extension version. Fallback: assisted step 20d.")
+        return None, "network_error", f"HTTP {e.code} : {e.reason}"
     except Exception as e:
-        return None, "echec_reseau", f"erreur réseau : {type(e).__name__} - {e}"
+        return None, "network_error", f"network error: {type(e).__name__} - {e}"
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return None, "echec_analyse", f"réponse non-JSON (extrait : {raw[:120]!r})"
+        return None, "analysis_error", f"non-JSON response (excerpt: {raw[:120]!r})"
 
     if not isinstance(data, dict) or not data.get("SiteName"):
-        return None, "rien_trouve", "domaine absent de SimilarWeb (réponse 200 sans SiteName)"
+        return None, "not_found", "domain absent from SimilarWeb (200 response without SiteName)"
     return data, None, None
 
 
 # ---------------------------------------------------------------------------
-# Transformation -> blocs env-data.json
+# Transformation -> env-data.json blocks
 # ---------------------------------------------------------------------------
 
 def build_audience_block(data, source_url, domain):
-    """Construit le bloc 'audience' au format attendu par resolve_audience().
+    """Builds the 'audience' block in the format expected by resolve_audience().
 
-    Reprend TopCountryShares (part de trafic par pays).
-    Retourne (bloc_dict, mesure_dict) en cas de succès,
-    (None, mesure_dict) si les données sont absentes.
+    Uses TopCountryShares (traffic share by country).
+    Returns (block_dict, measurement_dict) on success,
+    (None, measurement_dict) if the data is absent.
 
-    Le dict mesure contient toujours : statut, cible, detail (null si ok).
+    The measurement dict always contains: status, target, detail (null if ok).
     """
-    cible = f"API SimilarWeb : TopCountryShares pour {domain}"
+    target = f"SimilarWeb API: TopCountryShares for {domain}"
     shares = data.get("TopCountryShares") or []
     mix = {}
     for entry in shares:
@@ -150,50 +150,50 @@ def build_audience_block(data, source_url, domain):
         if cc and isinstance(val, (int, float)) and val > 0:
             mix[cc] = mix.get(cc, 0.0) + float(val)
     if not mix:
-        mesure = {
-            "statut": "echec_analyse",
-            "cible": cible,
-            "detail": "TopCountryShares absent ou vide dans la réponse API"
+        measurement = {
+            "status": "analysis_error",
+            "target": target,
+            "detail": "TopCountryShares absent or empty in the API response"
         }
-        return None, mesure
-    # Renormalise (les Top Countries ne somment pas à 1 : reste du monde ignoré).
+        return None, measurement
+    # Renormalize (Top Countries do not sum to 1: rest of the world ignored).
     total = sum(mix.values())
     mix = {cc: round(w / total, 4) for cc, w in mix.items()}
-    bloc = {
+    block = {
         "mix": mix,
-        # Libellé neutre affiché dans le rapport (n'expose pas la méthode technique
-        # d'accès, cf. documentation/implementation/similarweb_api.md).
+        # Neutral label displayed in the report (does not expose the technical
+        # access method, cf. documentation/implementation/similarweb_api.md).
         "source": "SimilarWeb (estimation)",
         "source_url": source_url,
         "confidence": CONFIDENCE_MEDIUM,
     }
-    mesure = {"statut": "ok", "cible": cible, "detail": None}
-    return bloc, mesure
+    measurement = {"status": "ok", "target": target, "detail": None}
+    return block, measurement
 
 
 def _snapshot_label(data):
-    """Libellé lisible du mois de référence, ex. 'juin 2026'. None si absent."""
+    """Readable label of the reference month, e.g. 'June 2026'. None if absent."""
     eng = data.get("Engagments") or {}
     try:
         month = int(eng.get("Month"))
         year = int(eng.get("Year"))
     except (TypeError, ValueError):
         return None
-    return f"{_MONTHS_FR.get(month, str(month))} {year}"
+    return f"{_MONTHS_EN.get(month, str(month))} {year}"
 
 
 def _avg_time_on_page_s(data):
-    """Temps moyen par page vue, en secondes : TimeOnSite / PagePerVisit.
+    """Average time per page view, in seconds: TimeOnSite / PagePerVisit.
 
-    Sert de mesure indépendante pour recalibrer le temps Nielsen brut (cf.
-    `efootprint_model/temps_utilisateur.py`, Lot 4). C'est une moyenne SUR TOUT
-    LE SITE, à comparer à une moyenne de pages, jamais à une seule page :
-    Nielsen calcule un temps par page individuelle (cf. Weinreich et al. 2008,
-    ACM ToWeb, méthodologie section 4.4), SimilarWeb ne renvoie qu'un agrégat.
+    Serves as an independent measurement to recalibrate the raw Nielsen time (cf.
+    `efootprint_model/user_time.py`, Lot 4). It is an average OVER THE WHOLE
+    SITE, to compare with a page average, never with a single page:
+    Nielsen computes a time per individual page (cf. Weinreich et al. 2008,
+    ACM ToWeb, methodology section 4.4), SimilarWeb only returns an aggregate.
 
-    Retourne None si Engagments est absent ou incomplet (le site est ignoré
-    par SimilarWeb, ou l'API ne renvoie pas ce bloc) : c'est une INFORMATION
-    manquante, pas une valeur nulle.
+    Returns None if Engagments is absent or incomplete (the site is ignored
+    by SimilarWeb, or the API does not return this block): it is MISSING
+    INFORMATION, not a zero value.
     """
     eng = data.get("Engagments") or {}
     try:
@@ -207,24 +207,24 @@ def _avg_time_on_page_s(data):
 
 
 def build_traffic_block(data, source_url, domain):
-    """Construit le bloc 'traffic' au format attendu par resolve_traffic().
+    """Builds the 'traffic' block in the format expected by resolve_traffic().
 
-    Base : le mois le plus récent d'EstimatedMonthlyVisits (repli Engagments.Visits),
-    annualisé x12 pour rester cohérent avec monthly_visits (visits_per_year =
+    Base: the most recent month of EstimatedMonthlyVisits (fallback Engagments.Visits),
+    annualized x12 to stay consistent with monthly_visits (visits_per_year =
     monthly_visits x 12).
-    Retourne (bloc_dict, mesure_dict) en cas de succès,
-    (None, mesure_dict) si aucune donnée de visites.
+    Returns (block_dict, measurement_dict) on success,
+    (None, measurement_dict) if no visit data.
 
-    `avg_time_on_page_s`, s'il est disponible, sert au recalage Nielsen (Lot 4) :
-    absent du dict si Engagments ne le fournit pas, jamais mis à 0 ou deviné.
+    `avg_time_on_page_s`, when available, serves the Nielsen recalibration (Lot 4):
+    absent from the dict if Engagments does not provide it, never set to 0 or guessed.
 
-    Le dict mesure contient toujours : statut, cible, detail (null si ok).
+    The measurement dict always contains: status, target, detail (null if ok).
     """
-    cible = f"API SimilarWeb : EstimatedMonthlyVisits et Engagments.Visits pour {domain}"
+    target = f"SimilarWeb API: EstimatedMonthlyVisits and Engagments.Visits for {domain}"
     monthly = None
     emv = data.get("EstimatedMonthlyVisits") or {}
     if isinstance(emv, dict) and emv:
-        # Clés = dates 'YYYY-MM-01' ; on prend la plus récente.
+        # Keys = 'YYYY-MM-01' dates; take the most recent one.
         latest_key = max(emv.keys())
         try:
             monthly = int(round(float(emv[latest_key])))
@@ -236,18 +236,18 @@ def build_traffic_block(data, source_url, domain):
         except (TypeError, ValueError):
             monthly = None
     if not monthly or monthly <= 0:
-        mesure = {
-            "statut": "echec_analyse",
-            "cible": cible,
-            "detail": "EstimatedMonthlyVisits et Engagments.Visits absents ou invalides"
+        measurement = {
+            "status": "analysis_error",
+            "target": target,
+            "detail": "EstimatedMonthlyVisits and Engagments.Visits absent or invalid"
         }
-        return None, mesure
+        return None, measurement
 
-    visits_per_year = int(round(monthly * 12 / 1000.0)) * 1000  # arrondi au millier
+    visits_per_year = int(round(monthly * 12 / 1000.0)) * 1000  # rounded to the thousand
     block = {
         "visits_per_year": visits_per_year,
         "monthly_visits": monthly,
-        # Libellé neutre (voir build_audience_block).
+        # Neutral label (see build_audience_block).
         "source": "SimilarWeb (estimation)",
         "source_url": source_url,
         "snapshot": _snapshot_label(data),
@@ -256,12 +256,12 @@ def build_traffic_block(data, source_url, domain):
     avg_time = _avg_time_on_page_s(data)
     if avg_time is not None:
         block["avg_time_on_page_s"] = round(avg_time, 3)
-    mesure = {"statut": "ok", "cible": cible, "detail": None}
-    return block, mesure
+    measurement = {"status": "ok", "target": target, "detail": None}
+    return block, measurement
 
 
 # ---------------------------------------------------------------------------
-# Déduction du domaine + fusion env-data.json
+# Domain inference + env-data.json merge
 # ---------------------------------------------------------------------------
 
 def _host_from_url(url):
@@ -276,8 +276,8 @@ def _host_from_url(url):
 
 
 def infer_domain(source_dir):
-    """Déduit le domaine audité depuis env-data.json (pages[0].url) puis le HAR.
-    Retourne le domaine nu (sans www.) ou None."""
+    """Infers the audited domain from env-data.json (pages[0].url) then the HAR.
+    Returns the bare domain (without www.) or None."""
     env_path = source_dir / "env-data.json"
     if env_path.exists():
         try:
@@ -290,7 +290,7 @@ def infer_domain(source_dir):
                     return host
         except (json.JSONDecodeError, OSError):
             pass
-    # Repli : premier .har du dossier, title de la première page.
+    # Fallback: first .har of the folder, title of the first page.
     hars = list(source_dir.glob("*.har")) or list(
         (source_dir / RAW_DATA_DIR).glob("*.har"))
     if hars:
@@ -306,17 +306,17 @@ def infer_domain(source_dir):
     return None
 
 
-def merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_block, traffic_mesure):
-    """Écrit/actualise les blocs 'audience', 'traffic' et 'mesures' dans env-data.json.
+def merge_into_env_data(source_dir, audience_block, audience_measurement, traffic_block, traffic_measurement):
+    """Writes/updates the 'audience', 'traffic' and 'measurements' blocks in env-data.json.
 
-    Si le fichier existe, on préserve tout le reste (HAR, device, serveur…) et on
-    ne remplace que ces blocs. Sinon on crée un fichier minimal : le run
-    `collect_env_data.py --refresh` suivant complétera HAR/CrUX/ipinfo tout en
-    relisant ces blocs (resolve_audience/resolve_traffic).
+    If the file exists, everything else is preserved (HAR, device, server…) and
+    only these blocks are replaced. Otherwise a minimal file is created: the next
+    `collect_env_data.py --refresh` run will complete HAR/CrUX/ipinfo while
+    re-reading these blocks (resolve_audience/resolve_traffic).
 
-    IMPORTANT : les mesures sont TOUJOURS écrites, même en cas d'échec. C'est le
-    point central de la convention d'état de mesure : un échec laisse une trace
-    sur le disque, au lieu de s'évaporer avec la session.
+    IMPORTANT: measurements are ALWAYS written, even on failure. That is the
+    core of the measurement-state convention: a failure leaves a trace on
+    disk, instead of evaporating with the session.
     """
     env_path = source_dir / "env-data.json"
     if env_path.exists():
@@ -325,21 +325,21 @@ def merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_blo
     else:
         env = {}
 
-    # Initialiser le dict mesures s'il n'existe pas
-    if "mesures" not in env:
-        env["mesures"] = {}
+    # Initialize the measurements dict if it does not exist
+    if "measurements" not in env:
+        env["measurements"] = {}
 
-    # Écrire les blocs de données seulement s'ils existent
+    # Write the data blocks only if they exist
     if audience_block:
         env["audience"] = audience_block
     if traffic_block:
         env["traffic"] = traffic_block
 
-    # Toujours écrire les mesures, même en cas d'échec
-    if audience_mesure:
-        env["mesures"]["audience"] = audience_mesure
-    if traffic_mesure:
-        env["mesures"]["traffic"] = traffic_mesure
+    # Always write the measurements, even on failure
+    if audience_measurement:
+        env["measurements"]["audience"] = audience_measurement
+    if traffic_measurement:
+        env["measurements"]["traffic"] = traffic_measurement
 
     with open(env_path, "w", encoding="utf-8") as f:
         json.dump(env, f, ensure_ascii=False, indent=2)
@@ -347,46 +347,46 @@ def merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_blo
 
 
 # ---------------------------------------------------------------------------
-# Point d'entrée
+# Entry point
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Récupère trafic + mix pays via l'API interne SimilarWeb "
-                    "et écrit les blocs audience/traffic dans env-data.json.")
-    parser.add_argument("source_dir", help="Dossier source (contenant env-data.json et/ou le .har)")
+        description="Fetches traffic + country mix via the internal SimilarWeb API "
+                    "and writes the audience/traffic blocks into env-data.json.")
+    parser.add_argument("source_dir", help="Source folder (containing env-data.json and/or the .har)")
     parser.add_argument("--domain", default=None,
-                        help="Domaine à interroger (ex. octo.com). Déduit de "
-                             "env-data.json/HAR si omis.")
+                        help="Domain to query (e.g. octo.com). Inferred from "
+                             "env-data.json/HAR if omitted.")
     parser.add_argument("--version", default=EXTENSION_VERSION,
-                        help=f"Version d'extension (en-tête X-Extension-Version). "
-                             f"Défaut : {EXTENSION_VERSION}.")
+                        help=f"Extension version (X-Extension-Version header). "
+                             f"Default: {EXTENSION_VERSION}.")
     parser.add_argument("--print-only", action="store_true",
-                        help="Affiche le JSON brut de l'API et n'écrit rien.")
+                        help="Prints the raw API JSON and writes nothing.")
     args = parser.parse_args()
 
     source_dir = Path(args.source_dir).resolve()
     if not source_dir.exists():
-        print(f"Erreur : dossier introuvable : {source_dir}")
+        print(f"Error: folder not found: {source_dir}")
         sys.exit(1)
 
     domain = args.domain or infer_domain(source_dir)
     if not domain:
-        print("Erreur : domaine introuvable. Préciser --domain (ex. --domain octo.com).")
+        print("Error: domain not found. Specify --domain (e.g. --domain octo.com).")
         sys.exit(1)
 
-    print(f"[similarweb] Interrogation API interne pour : {domain}")
-    data, statut_echec, detail_echec = fetch_domain_data(domain, version=args.version)
-    if statut_echec:
-        print(f"  ECHEC ({statut_echec}) : {detail_echec}")
-        print("  -> Repli attendu : récupération assistée (SKILL.md Étape 20d).")
-        # Construire les mesures d'échec avant de sortir
-        cible_base = f"https://data.similarweb.com/api/v1/data?domain={domain}"
-        audience_mesure = {"statut": statut_echec, "cible": cible_base, "detail": detail_echec}
-        traffic_mesure = {"statut": statut_echec, "cible": cible_base, "detail": detail_echec}
-        # Écrire les mesures d'échec dans env-data.json
-        env_path = merge_into_env_data(source_dir, None, audience_mesure, None, traffic_mesure)
-        print(f"\n[ECHEC] Traces d'échec écrites dans : {env_path}")
+    print(f"[similarweb] Querying the internal API for: {domain}")
+    data, error_status, error_detail = fetch_domain_data(domain, version=args.version)
+    if error_status:
+        print(f"  FAILURE ({error_status}) : {error_detail}")
+        print("  -> Expected fallback: assisted retrieval (SKILL.md step 20d).")
+        # Build the failure measurements before exiting
+        target_base = f"https://data.similarweb.com/api/v1/data?domain={domain}"
+        audience_measurement = {"status": error_status, "target": target_base, "detail": error_detail}
+        traffic_measurement = {"status": error_status, "target": target_base, "detail": error_detail}
+        # Write the failure traces into env-data.json
+        env_path = merge_into_env_data(source_dir, None, audience_measurement, None, traffic_measurement)
+        print(f"\n[FAILURE] Failure traces written into: {env_path}")
         sys.exit(2)
 
     if args.print_only:
@@ -394,33 +394,33 @@ def main():
         return
 
     source_url = f"https://www.similarweb.com/website/{domain}/"
-    audience_block, audience_mesure = build_audience_block(data, source_url, domain)
-    traffic_block, traffic_mesure = build_traffic_block(data, source_url, domain)
+    audience_block, audience_measurement = build_audience_block(data, source_url, domain)
+    traffic_block, traffic_measurement = build_traffic_block(data, source_url, domain)
 
     if not audience_block and not traffic_block:
-        print("  ECHEC : réponse API sans TopCountryShares ni visites exploitables.")
-        print("  -> Repli attendu : récupération assistée (SKILL.md Étape 20d).")
-        # Écrire les mesures d'échec dans env-data.json
-        env_path = merge_into_env_data(source_dir, None, audience_mesure, None, traffic_mesure)
-        print(f"\n[ECHEC] Traces d'échec écrites dans : {env_path}")
+        print("  FAILURE: API response without usable TopCountryShares or visits.")
+        print("  -> Expected fallback: assisted retrieval (SKILL.md step 20d).")
+        # Write the failure measurements into env-data.json
+        env_path = merge_into_env_data(source_dir, None, audience_measurement, None, traffic_measurement)
+        print(f"\n[FAILURE] Failure traces written into: {env_path}")
         sys.exit(2)
 
     if audience_block:
         mix_str = ", ".join(f"{cc} {w:.0%}" for cc, w in audience_block["mix"].items())
-        print(f"  Mix pays : {mix_str}")
+        print(f"  Country mix: {mix_str}")
     else:
-        print("  ⚠ Pas de mix pays (TopCountryShares absent) : bloc audience non écrit, mesure enregistrée.")
+        print("  ⚠ No country mix (TopCountryShares absent): audience block not written, measurement recorded.")
 
     if traffic_block:
         snap = traffic_block.get("snapshot") or "?"
-        print(f"  Trafic : {traffic_block['monthly_visits']:,}/mois ({snap}) "
-              f"-> {traffic_block['visits_per_year']:,}/an")
+        print(f"  Traffic: {traffic_block['monthly_visits']:,}/month ({snap}) "
+              f"-> {traffic_block['visits_per_year']:,}/year")
     else:
-        print("  ⚠ Pas de volume de visites : bloc traffic non écrit, mesure enregistrée.")
+        print("  ⚠ No visit volume: traffic block not written, measurement recorded.")
 
-    env_path = merge_into_env_data(source_dir, audience_block, audience_mesure, traffic_block, traffic_mesure)
-    print(f"\n[OK] Blocs écrits dans : {env_path}")
-    print(f"     Relancer ensuite : python3 collect_env_data.py \"{source_dir}\" --refresh")
+    env_path = merge_into_env_data(source_dir, audience_block, audience_measurement, traffic_block, traffic_measurement)
+    print(f"\n[OK] Blocks written into: {env_path}")
+    print(f"     Then re-run: python3 collect_env_data.py \"{source_dir}\" --refresh")
 
 
 if __name__ == "__main__":

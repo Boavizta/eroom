@@ -1,329 +1,327 @@
-"""Table de correspondance générique entre les 54 critères détaillés du
-référentiel EOF (`eof-referentiel.json`, produit par le skill `eof`) et les
-données d'audit déjà collectées par `analyse-parcours`
+"""Generic mapping table between the 54 detailed criteria of the
+EOF framework (`eof-reference.json`, produced by the `eof` skill) and the
+audit data already collected by `analyse-parcours`
 (`env-data.json`, `audit/har-analysis.json`, `audit/coverage-analysis.json`,
-`cwv.json`, `efootprint-synthese-python.json`).
+`cwv.json`, `efootprint-python-summary.json`).
 
-Construite une fois, réutilisable pour tout site audité (même principe que
-`run_efootprint.py` : générique, pas limité à octo.com). Les chemins de champs
-et les exemples de valeurs ci-dessous ont été vérifiés sur `audits/octo.com/`
-au moment de l'écriture (2026-09-03) ; à revalider si la structure de ces
-fichiers change.
+Built once, reusable for any audited site (same principle as
+`run_efootprint.py`: generic, not limited to octo.com). The field paths
+and value examples below were verified on `audits/octo.com/`
+at the time of writing (2026-09-03); revalidate if the structure of these
+files changes.
 
-Reconnaissance de départ (54 critères passés en revue un par un) : 4 sont
-automatisables depuis les données déjà collectées, 6 donnent un indice
-faible/indirect (jamais une validation), et 44 sont des questions
-organisationnelles ou produit qu'aucune donnée technique d'audit ne peut
-renseigner. Ce n'est pas un défaut de ce fichier : c'est la nature du
-référentiel EOF, largement humain par construction.
+Initial scan (all 54 criteria reviewed one by one): 4 are automatable from
+already-collected data, 6 give a weak/indirect hint (never a validation), and 44
+are organizational or product questions that no technical audit data can answer.
+This is not a flaw of this file: it is the nature of the EOF framework, largely
+human by design.
 
-Extension Phase 1 (2026-09-03, cf. plan `eof-questionnaire`) : +3
-automatisables (1.5, 1.6, 1.13, via `parse_html_criteria.py` et l'extension
-accessibility/best-practices de `collect_cwv_pagespeed.py`) et +5 indices
+Phase 1 extension (2026-09-03, cf. `eof-questionnaire` plan): +3
+automatable (1.5, 1.6, 1.13, via `parse_html_criteria.py` and the
+accessibility/best-practices extension of `collect_cwv_pagespeed.py`) and +5 hints
 (1.4, 1.11, 6.1, 6.3, 6.6, via `parse_html_criteria.py`,
 `analyze_security_headers.py`, `scan_wellknown.py`).
 
-Extension Phase 2 (2026-09-07) : ajout de 0.16 comme automatisable (exception
-unique au diagnostic rapide, doublon exact de 3.3).
+Phase 2 extension (2026-09-07): added 0.16 as automatable (unique
+exception for the quick diagnostic, exact duplicate of 3.3).
 
-Total actuel du MAPPING : **24 entrées, 8 automatisables et 16 partiels**.
-⚠️ Ces deux chiffres portent sur le MAPPING, pas sur les 54 critères détaillés :
-0.16 est une question du diagnostic rapide, elle ne fait pas partie des 54. Les
-deux décomptes à ne jamais mélanger, sous peine de fabriquer un total faux :
-  - sur les **54 critères détaillés** : 23 exploitables (7 automatisables,
-    16 partiels), donc **31 sans donnée**. Inchangé par l'ajout de 0.16.
-  - sur les **16 questions du diagnostic rapide** : 1 exploitable (0.16),
-    donc 15 sans donnée.
-Deux volets prévus par
-le plan initial se sont révélés irréalisables en pratique et ont été
-abandonnés (jamais de valeur inventée à la place) :
-- 1.1 (Lighthouse a11y/Best Practices) supposait des données déjà collectées
-  dans `audit/lighthouse-*.json` — inexistant : ni `run_lighthouse.sh` ni
-  `collect_cwv_pagespeed.py` ne demandaient ces catégories. Corrigé en
-  étendant `collect_cwv_pagespeed.py` (même appel API, catégories
-  supplémentaires, aucun coût réseau additionnel) plutôt qu'abandonné.
-- 1.2/1.8 (réseau CrUX "effective_connection_type", "phone_lowend") :
-  l'API CrUX (`chromeuxreport.googleapis.com`) n'expose PAS ces dimensions
-  (erreur HTTP 400 "invalid metric" testée en conditions réelles) — ce
-  n'est pas un chantier "faible effort", la donnée n'existe simplement pas
-  via cette API. 1.8 et 1.9 restent donc "partiel" comme avant Phase 1.
-- 1.4/1.5 (parsing HTML/CSS) supposait de lire les corps HTML/CSS déjà
-  présents dans le `.har` — vérifié : 46/311 entrées seulement ont un body
-  capturé (aucune n'étant du HTML/CSS de page). `parse_html_criteria.py`
-  refait donc un fetch HTTP direct des mêmes URLs déjà auditées (pas un
-  nouveau périmètre de pages, juste une source de contenu différente).
+Current MAPPING total: **24 entries, 8 automatable and 16 partial**.
+⚠️ These two figures refer to the MAPPING, not to the 54 detailed criteria:
+0.16 is a quick-diagnostic question, it is not part of the 54. The
+two counts must never be mixed, on pain of producing a wrong total:
+   - over the **54 detailed criteria**: 23 usable (7 automatable,
+     16 partial), hence **31 with no data**. Unchanged by the addition of 0.16.
+   - over the **16 quick-diagnostic questions**: 1 usable (0.16),
+     hence 15 with no data.
+Two workstreams foreseen by the
+initial plan turned out to be unrealizable in practice and were
+abandoned (never inventing a value instead):
+- 1.1 (Lighthouse a11y/Best Practices) assumed data already collected
+  in `audit/lighthouse-*.json` — nonexistent: neither `run_lighthouse.sh` nor
+  `collect_cwv_pagespeed.py` requested these categories. Fixed by
+  extending `collect_cwv_pagespeed.py` (same API call, additional categories,
+  no extra network cost) rather than abandoned.
+- 1.2/1.8 (CrUX network "effective_connection_type", "phone_lowend"):
+  the CrUX API (`chromeuxreport.googleapis.com`) does NOT expose these
+  dimensions (HTTP 400 "invalid metric" error tested under real conditions) — this
+  is not a "low effort" job, the data simply does not exist
+  via this API. 1.8 and 1.9 therefore remain "partial" as before Phase 1.
+- 1.4/1.5 (HTML/CSS parsing) assumed reading the HTML/CSS bodies already
+  present in the `.har` — verified: only 46/311 entries have a captured body
+  (none of them page HTML/CSS). `parse_html_criteria.py`
+  therefore re-fetches the same already-audited URLs directly over HTTP (not a
+  new page scope, just a different content source).
 
-Politique de sortie, stricte, pour ne jamais fabriquer un potentiel artificiellement :
-- "automatisable" -> la règle peut cocher une option précise du menu à 5
-  (`options_evaluation` de `eof-referentiel.json`). Si le signal est ambigu
-  au moment de l'exécution (ex. valeur pile au seuil), retomber sur
-  "🤔 À évaluer", jamais deviner.
-- "partiel"        -> JAMAIS de case cochée automatiquement. La donnée n'est
-  qu'un indice contextuel affiché en annexe ("donnée indicative : ...",
-  provenance toujours "suppose" ou "estime", JAMAIS "collecte"), le critère
-  reste "je ne sais pas" dans le référentiel rempli. Un indice présenté comme
-  collecté ferait croire à une mesure là où il n'y a qu'un signal faible.
-- absent de MAPPING -> "aucune_donnee" par défaut : aucun champ ne le
-  renseigne, le critère reste "je ne sais pas", sans entrée dédiée ici (44
-  critères dans ce cas — lister leurs ids un par un n'apporterait rien).
+Strict output policy, to never artificially fabricate a potential:
+- "automatable" -> the rule can tick a specific option of the 5-option menu
+  (`evaluation_options` of `eof-reference.json`). If the signal is ambiguous
+  at runtime (e.g. value exactly at the threshold), fall back to
+  "🤔 To be assessed", never guess.
+- "partial"        -> NEVER auto-tick a box. The data is only a contextual hint
+  displayed in the appendix ("indicative data: ...", provenance always
+  "assumed" or "estimated", NEVER "collected"), the criterion stays
+  "I don't know" in the filled-in framework. A hint presented as
+  collected would suggest a measurement where there is only a weak signal.
+- absent from MAPPING -> "no_data" by default: no field answers it, the
+  criterion stays "I don't know", with no dedicated entry here (44
+  criteria in this case — listing their ids one by one would add nothing).
 
-Ce module ne contient QUE la table de correspondance (données), pas la
-logique d'exécution des règles : celle-ci est prévue dans `run_eof.py`, pas
-encore écrit (cf. plan d'architecture, section "Ce qui reste explicitement
-HORS de ce plan").
+This module contains ONLY the mapping table (data), not the rule execution
+logic: that is planned in `run_eof.py`, not written yet (cf. architecture
+plan, section "What is explicitly OUTSIDE this plan").
 """
 
 MAPPING = {
     "0.16": {
-        "critere_court": "Le service est-il hébergé dans un pays dont le mix électrique a un impact significatif ? (en fonction de l'emplacement)",
-        "categorie": "automatisable",
-        "champ_donnee": "env-data.json: servers[].carbon_intensity_g_kwh (doublon exact de 3.3, même donnée source)",
-        "regle": (
-            "Même règle que 3.3 : si au moins un serveur de la liste a carbon_intensity_g_kwh "
-            "au-dessus du seuil (~250 gCO2/kWh, mix électrique européen moyen) -> "
-            "échelle 1-5 correspondante. Si tous sont en dessous -> échelon bas de l'échelle."
+        "short_criterion": "Is the service hosted in a country whose electricity mix has a significant impact? (depending on location)",
+        "category": "automatable",
+        "data_field": "env-data.json: servers[].carbon_intensity_g_kwh (exact duplicate of 3.3, same source data)",
+        "rule": (
+            "Same rule as 3.3: if at least one server in the list has carbon_intensity_g_kwh "
+            "above the threshold (~250 gCO2/kWh, average European electricity mix) -> "
+            "corresponding 1-5 scale level. If all are below -> low end of the scale."
         ),
-        "provenance_max": "collecte",
-        "note": "Doublon exact du critère 3.3 : même donnée mesurée (intensité carbone du mix électrique du pays d'hébergement), même source (env-data.json: servers[].carbon_intensity_g_kwh). Exception unique au diagnostic rapide (16 questions jamais remplies automatiquement).",
+        "max_provenance": "collected",
+        "note": "Exact duplicate of criterion 3.3: same measured data (carbon intensity of the electricity mix of the hosting country), same source (env-data.json: servers[].carbon_intensity_g_kwh). Unique exception for the quick diagnostic (16 questions never filled automatically).",
     },
     "1.12": {
-        "critere_court": "Y a-t-il beaucoup de pisteurs (trackers) sur le produit ?",
-        "categorie": "automatisable",
-        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (inventaire tiers déclarés) ; har-analysis.json: domains (tiers réellement chargés)",
-        "regle": (
-            "Si un CSP est présent et que des hôtes de pistage (familles "
-            "marketing_crm, pixels_publicitaires_sociaux, analytics_comportemental) "
-            "sont effectivement chargés -> '💡 Potentiel d'amélioration identifié'. "
-            "Si des hôtes de pistage sont déclarés au CSP mais absents du HAR -> "
-            "'🤔 À évaluer' (écart probable : capture faite sans accepter le consentement). "
-            "Si seulement de l'analytics sobre est chargé (sans cookie, sans profilage) -> "
-            "'✅ Point fort confirmé'. "
-            "Si aucun CSP n'est disponible, repli sur l'ancienne heuristique tech_stack."
+        "short_criterion": "Are there many trackers on the product?",
+        "category": "automatable",
+        "data_field": "security-headers-analysis.json: Content-Security-Policy (declared third-party inventory) ; har-analysis.json: domains (third parties actually loaded)",
+        "rule": (
+            "If a CSP is present and tracking hosts (families "
+            "marketing_crm, pixels_publicitaires_sociaux, behavioral_analytics) "
+            "are effectively loaded -> '💡 Improvement potential identified'. "
+            "If tracking hosts are declared in the CSP but absent from the HAR -> "
+            "'🤔 To be assessed' (likely gap: capture made without accepting consent). "
+            "If only lean analytics is loaded (no cookie, no profiling) -> "
+            "'✅ Confirmed strength'. "
+            "If no CSP is available, fall back on the old tech_stack heuristic."
         ),
-        "provenance_max": "estime",
-        "note": "Détecte uniquement ce qui transite côté client (HAR) ; un tracking côté serveur (ex. logs) est invisible. L'analytics sobre (Swetrix, Plausible, Matomo...) est volontairement exclu du pistage.",
+        "max_provenance": "estimated",
+        "note": "Only detects what flows client-side (HAR); server-side tracking (e.g. logs) is invisible. Lean analytics (Swetrix, Plausible, Matomo...) is deliberately excluded from tracking.",
     },
     "2.1": {
-        "critere_court": "Le produit utilise-t-il des technologies dont l'impact environnemental est significatif (IA générative, blockchain) sans justification claire ?",
-        "categorie": "automatisable",
-        "champ_donnee": "env-data.json: ai_external_apis (dict, vide si aucun host IA détecté) ; tech_stack.technologies[].category",
-        "regle": (
-            "Si ai_external_apis est vide ET aucune techno de category "
-            "IA/Blockchain listée -> '✅ Point fort confirmé'. Si au moins un "
-            "host IA ou une techno blockchain est détecté -> "
-            "'💡 Potentiel d'amélioration identifié' (la détection ne juge pas "
-            "si l'usage est justifié, seulement sa présence - jamais '🚫 Non "
-            "applicable' automatique)."
+        "short_criterion": "Does the product use technologies with a significant environmental impact (generative AI, blockchain) without clear justification?",
+        "category": "automatable",
+        "data_field": "env-data.json: ai_external_apis (dict, empty if no AI host detected) ; tech_stack.technologies[].category",
+        "rule": (
+            "If ai_external_apis is empty AND no AI/Blockchain category tech "
+            "is listed -> '✅ Confirmed strength'. If at least one "
+            "AI host or a blockchain tech is detected -> "
+            "'💡 Improvement potential identified' (detection does not judge "
+            "whether the usage is justified, only its presence - never an automatic "
+            "'🚫 Not applicable')."
         ),
-        "provenance_max": "estime",
-        "note": "Un appel IA fait côté backend (jamais visible dans le HAR client) est invisible à cette règle - un 'aucun signal' n'est jamais une preuve d'absence.",
+        "max_provenance": "estimated",
+        "note": "An AI call made backend-side (never visible in the client HAR) is invisible to this rule - a 'no signal' is never proof of absence.",
     },
     "2.3": {
-        "critere_court": "Est-il possible d'optimiser la séparation et la communication entre les composants ?",
-        "categorie": "partiel",
-        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-        "regle": "La présence de domaines PaaS backend distincts déclarés dans le CSP (famille paas_backend de csp_inventory) est un indice de composants séparés - ne prouve ni l'optimisation de leur couplage ni l'efficacité de leur communication.",
-        "provenance_max": "suppose",
-        "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité. Angle mort structurel : un backend auto-hébergé derrière un reverse proxy 1st-party est invisible ici.",
+        "short_criterion": "Is it possible to optimize the separation and communication between components?",
+        "category": "partial",
+        "data_field": "security-headers-analysis.json: Content-Security-Policy (paas_backend family)",
+        "rule": "The presence of distinct backend PaaS domains declared in the CSP (paas_backend family of csp_inventory) is a hint of separated components - it proves neither the optimization of their coupling nor the efficiency of their communication.",
+        "max_provenance": "assumed",
+        "note": "Declared inventory (CSP), not observed. An allowed PaaS domain is not necessarily contacted. Structural blind spot: a self-hosted backend behind a 1st-party reverse proxy is invisible here.",
     },
     "2.5": {
-        "critere_court": "Les résultats de calculs ou de requêtes coûteux sont-ils mis en cache plutôt que recalculés à chaque fois ?",
-        "categorie": "partiel",
-        "champ_donnee": "har-analysis.json: duplicate_urls (liste {url, count}) ; http_codes (part de 304)",
-        "regle": (
-            "Une URL à fort 'count' dans duplicate_urls, avec une faible part "
-            "de réponses 304 dans http_codes, est un indice de requête répétée "
-            "potentiellement non cachée - jamais une preuve : un beacon "
-            "analytics appelé à chaque interaction produit le même motif sans "
-            "être un problème de cache."
+        "short_criterion": "Are the results of costly computations or queries cached instead of recomputed every time?",
+        "category": "partial",
+        "data_field": "har-analysis.json: duplicate_urls (list {url, count}) ; http_codes (share of 304)",
+        "rule": (
+            "A URL with a high 'count' in duplicate_urls, with a low share "
+            "of 304 responses in http_codes, is a hint of a potentially uncached "
+            "repeated query - never proof: an analytics beacon "
+            "called on every interaction produces the same pattern without "
+            "being a cache problem."
         ),
-        "provenance_max": "suppose",
-        "note": "Risque réel de confondre un beacon de mesure d'audience (comportement normal) avec un calcul serveur recalculé par erreur - afficher l'URL et le count en annexe, jamais cocher automatiquement.",
+        "max_provenance": "assumed",
+        "note": "Real risk of confusing an audience-measurement beacon (normal behavior) with a server computation mistakenly recomputed - display the URL and count in the appendix, never tick automatically.",
     },
     "3.2": {
-        "critere_court": "Existe-t-il un système de suivi de l'impact environnemental de l'infrastructure ?",
-        "categorie": "partiel",
-        "champ_donnee": "pages-publiques-criteria.json: declarations_suivi (phrase extraite de pages HTML publiques d'éco-conception)",
-        "regle": (
-            "Une déclaration publique de suivi ou de mesure d'impact environnemental "
-            "est un indice que l'organisation s'intéresse au sujet - ne prouve pas "
-            "que ce suivi couvre l'infrastructure (émissions carbone, PUE/WUE datacenter) "
-            "plutôt que simplement les pages du site. Le critère 3.2 porte explicitement "
-            "sur la surveillance de l'infrastructure, pas des contenus."
+        "short_criterion": "Is there a system for monitoring the environmental impact of the infrastructure?",
+        "category": "partial",
+        "data_field": "public-pages-criteria.json: tracking_declarations (sentence extracted from public HTML pages about eco-design)",
+        "rule": (
+            "A public declaration of monitoring or measuring environmental impact "
+            "is a hint that the organization cares about the topic - it does not prove "
+            "that this monitoring covers the infrastructure (carbon emissions, datacenter PUE/WUE) "
+            "rather than just the site's pages. Criterion 3.2 explicitly "
+            "targets infrastructure monitoring, not content."
         ),
-        "provenance_max": "declare",
-        "note": "Première utilisation de provenance 'declare' : la page est publiée par l'organisation elle-même, ce n'est ni une mesure (collecte) ni une déduction (estime) mais une déclaration publique officielle.",
+        "max_provenance": "declared",
+        "note": "First use of provenance 'declared': the page is published by the organization itself, it is neither a measurement (collected) nor a deduction (estimated) but an official public declaration.",
     },
     "3.3": {
-        "critere_court": "L'hébergement est-il situé dans une région où le mix électrique est fortement carboné ?",
-        "categorie": "automatisable",
-        "champ_donnee": "env-data.json: servers[].carbon_intensity_g_kwh, servers[].country_code (itérer TOUS les serveurs 1st-party de la liste, pas seulement le premier - cf. un host 1st-party à l'infra différente est un serveur distinct)",
-        "regle": (
-            "Si au moins un serveur de la liste a carbon_intensity_g_kwh au-dessus "
-            "d'un seuil (repère : ~250 gCO2/kWh, mix électrique européen moyen) -> "
-            "'💡 Potentiel d'amélioration identifié'. Si tous sont en dessous -> "
-            "'✅ Point fort confirmé'."
+        "short_criterion": "Is the hosting located in a region where the electricity mix is highly carbon-intensive?",
+        "category": "automatable",
+        "data_field": "env-data.json: servers[].carbon_intensity_g_kwh, servers[].country_code (iterate over ALL 1st-party servers in the list, not just the first - cf. a 1st-party host with different infra is a distinct server)",
+        "rule": (
+            "If at least one server in the list has carbon_intensity_g_kwh above "
+            "a threshold (benchmark: ~250 gCO2/kWh, average European electricity mix) -> "
+            "'💡 Improvement potential identified'. If all are below -> "
+            "'✅ Confirmed strength'."
         ),
-        "provenance_max": "collecte",
-        "note": "La donnée carbon_intensity (ipinfo + table carbone) est déjà provenance 'collecte' en source ; ne couvre que les serveurs identifiés depuis le HAR, jamais une infra invisible (BDD/service auto-hébergé derrière l'applicatif).",
+        "max_provenance": "collected",
+        "note": "The carbon_intensity data (ipinfo + carbon table) is already provenance 'collected' at source; it only covers servers identified from the HAR, never invisible infra (self-hosted DB/service behind the application).",
     },
     "3.5": {
-        "critere_court": "L'infrastructure peut-elle être mutualisée ?",
-        "categorie": "partiel",
-        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (familles paas_backend, cdn_bibliotheques, infra_cloud_generique)",
-        "regle": "La présence de domaines PaaS/CDN/cloud mutualisé déclarés dans le CSP est un indice d'infrastructure mutualisée - ne prouve pas que TOUTE l'infrastructure l'est, ni l'absence de serveurs dédiés ailleurs.",
-        "provenance_max": "suppose",
-        "note": "Inventaire déclaré (CSP), pas observé. Un domaine cloud autorisé n'est pas nécessairement sollicité. Angle mort structurel : une infra auto-hébergée derrière un reverse proxy 1st-party est invisible ici.",
+        "short_criterion": "Can the infrastructure be shared/mutualized?",
+        "category": "partial",
+        "data_field": "security-headers-analysis.json: Content-Security-Policy (families paas_backend, cdn_bibliotheques, infra_cloud_generique)",
+        "rule": "The presence of declared shared PaaS/CDN/cloud domains in the CSP is a hint of shared infrastructure - it does not prove that ALL the infrastructure is shared, nor the absence of dedicated servers elsewhere.",
+        "max_provenance": "assumed",
+        "note": "Declared inventory (CSP), not observed. An allowed cloud domain is not necessarily contacted. Structural blind spot: a self-hosted infra behind a 1st-party reverse proxy is invisible here.",
     },
     "3.7": {
-        "critere_court": "Des outils et des stratégies d'élasticité/d'auto-scaling peuvent-ils être déployés pour réduire la taille de l'infrastructure ?",
-        "categorie": "partiel",
-        "champ_donnee": "security-headers-analysis.json: Content-Security-Policy (famille paas_backend)",
-        "regle": "La présence de domaines PaaS backend déclarés dans le CSP est un indice de plate-forme supportant l'élasticité - ne prouve pas que l'auto-scaling est configuré, ni que la charge varie suffisamment pour le justifier.",
-        "provenance_max": "suppose",
-        "note": "Inventaire déclaré (CSP), pas observé. Un domaine PaaS autorisé n'est pas nécessairement sollicité, et même sollicité, rien ne dit que l'élasticité est activée. Angle mort structurel : un Kubernetes auto-hébergé est invisible ici.",
+        "short_criterion": "Can elasticity/auto-scaling tools and strategies be deployed to reduce the size of the infrastructure?",
+        "category": "partial",
+        "data_field": "security-headers-analysis.json: Content-Security-Policy (paas_backend family)",
+        "rule": "The presence of declared backend PaaS domains in the CSP is a hint of a platform supporting elasticity - it does not prove that auto-scaling is configured, nor that the load varies enough to justify it.",
+        "max_provenance": "assumed",
+        "note": "Declared inventory (CSP), not observed. An allowed PaaS domain is not necessarily contacted, and even if contacted, nothing says elasticity is enabled. Structural blind spot: a self-hosted Kubernetes is invisible here.",
     },
     "5.4": {
-        "critere_court": "Les indicateurs de performance (Core Web Vitals) sont-ils bons ?",
-        "categorie": "automatisable",
-        "champ_donnee": "cwv.json (liste par page : lcp, inp, cls, strategy mobile/desktop, source='crux')",
-        "regle": (
-            "Seuils officiels Google : LCP > 4s, INP > 500ms, ou CLS > 0.25 "
-            "sur AU MOINS une page -> '💡 Potentiel d'amélioration identifié' "
-            "('poor', sans ambiguïté). Toutes les pages sous les seuils "
-            "'good' (LCP<=2.5s, INP<=200ms, CLS<=0.1) -> "
-            "'✅ Point fort confirmé'. Zone intermédiaire ('needs improvement') "
-            "sans aucune page 'poor' -> '🤔 À évaluer' (ambigu, ne pas trancher)."
+        "short_criterion": "Are the performance indicators (Core Web Vitals) good?",
+        "category": "automatable",
+        "data_field": "cwv.json (per page: lcp, inp, cls, mobile/desktop strategy, source='crux')",
+        "rule": (
+            "Official Google thresholds: LCP > 4s, INP > 500ms, or CLS > 0.25 "
+            "on AT LEAST one page -> '💡 Improvement potential identified' "
+            "('poor', unambiguous). All pages under the "
+            "'good' thresholds (LCP<=2.5s, INP<=200ms, CLS<=0.1) -> "
+            "'✅ Confirmed strength'. Intermediate zone ('needs improvement') "
+            "with no 'poor' page -> '🤔 To be assessed' (ambiguous, do not decide)."
         ),
-        "provenance_max": "collecte",
-        "note": "Données CrUX terrain réelles (source='crux'), pas un lab test - déjà la mesure la plus fiable de tout le mapping.",
+        "max_provenance": "collected",
+        "note": "Real field CrUX data (source='crux'), not a lab test - already the most reliable measurement in the whole mapping.",
     },
     "1.9": {
-        "critere_court": "Le produit nécessite-t-il une connexion à haut débit ?",
-        "categorie": "partiel",
-        "champ_donnee": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (poids réel transféré)",
-        "regle": "Un poids de page élevé est un indice indirect de besoin de bande passante - une page lourde n'implique pas forcément un besoin de haut débit (dépend aussi de la tolérance au temps de chargement de l'usage).",
-        "provenance_max": "suppose",
-        "note": "Proxy de poids, pas une mesure du besoin réel de débit.",
+        "short_criterion": "Does the product require a high-speed connection?",
+        "category": "partial",
+        "data_field": "env-data.json: har_summary.efootprint.data_transferred_bytes_real (actual transferred weight)",
+        "rule": "A high page weight is an indirect hint of bandwidth need - a heavy page does not necessarily imply a high-speed requirement (also depends on the usage's tolerance for loading time).",
+        "max_provenance": "assumed",
+        "note": "Weight proxy, not a measurement of the real throughput need.",
     },
     "1.14": {
-        "critere_court": "Les écrans/pages principaux sont-ils conçus de façon légère ?",
-        "categorie": "partiel",
-        "champ_donnee": "env-data.json: pages[].size_kb (comparaison entre pages du même parcours)",
-        "regle": "Une page nettement plus lourde que les autres du même parcours est un indice de conception moins légère - ne juge pas la qualité de conception elle-même (contenu justifié vs superflu).",
-        "provenance_max": "suppose",
-        "note": "Proxy de poids, pas de \"clarté de conception\".",
+        "short_criterion": "Are the main screens/pages designed in a lightweight way?",
+        "category": "partial",
+        "data_field": "env-data.json: pages[].size_kb (comparison between pages of the same journey)",
+        "rule": "A page significantly heavier than the others of the same journey is a hint of less lightweight design - it does not judge the design quality itself (justified vs superfluous content).",
+        "max_provenance": "assumed",
+        "note": "Weight proxy, not a measure of \"design lightness\".",
     },
     "1.15": {
-        "critere_court": "Le service est-il fréquemment utilisé au regard de sa consommation de ressources ?",
-        "categorie": "partiel",
-        "champ_donnee": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (estimation SimilarWeb)",
-        "regle": "Donne un ordre de grandeur de fréquentation, pas un jugement de proportionnalité entre usage et ressources consommées (qui suppose de connaître l'architecture déployée).",
-        "provenance_max": "estime",
-        "note": "Source tierce à marge large (cf. étape 20c d'efootprint) - un chiffre, pas une comparaison.",
+        "short_criterion": "Is the service frequently used relative to its resource consumption?",
+        "category": "partial",
+        "data_field": "env-data.json: traffic.visits_per_year / traffic.monthly_visits (SimilarWeb estimate)",
+        "rule": "Gives an order of magnitude of usage, not a judgment of proportionality between usage and resources consumed (which assumes knowing the deployed architecture).",
+        "max_provenance": "estimated",
+        "note": "Third-party source with a wide margin (cf. step 20c of efootprint) - a figure, not a comparison.",
     },
     "1.16": {
-        "critere_court": "Le volume d'utilisateurs justifie-t-il l'infrastructure déployée ?",
-        "categorie": "partiel",
-        "champ_donnee": "env-data.json: traffic.visits_per_year",
-        "regle": "Même champ que 1.15 : donne le chiffre de trafic, pas la comparaison à l'infrastructure réellement déployée (dimensionnement serveur non mesuré de façon fiable, cf. efootprint-synthese-python.json où server_type/instance_type sont souvent des défauts de script, pas des observations).",
-        "provenance_max": "estime",
-        "note": "Ne jamais croiser avec server_type/instance_type d'efootprint-synthese-python.json si leur source est 'default_script' - ce serait fabriquer un jugement à partir d'un défaut technique, pas d'une mesure.",
+        "short_criterion": "Does the user volume justify the deployed infrastructure?",
+        "category": "partial",
+        "data_field": "env-data.json: traffic.visits_per_year",
+        "rule": "Same field as 1.15: gives the traffic figure, not the comparison to the actually deployed infrastructure (server sizing not reliably measured, cf. efootprint-python-summary.json where server_type/instance_type are often script defaults, not observations).",
+        "max_provenance": "estimated",
+        "note": "Never cross-reference with server_type/instance_type from efootprint-python-summary.json if their source is 'default_script' - that would fabricate a judgment from a technical default, not a measurement.",
     },
     "1.5": {
-        "critere_court": "Y a-t-il des animations/vidéos/sons lus automatiquement ?",
-        "categorie": "automatisable",
-        "champ_donnee": "html-css-criteria.json: pages[].has_autoplay_media (HTML re-fetché en direct, cf. note du script — le .har ne contient pas les corps HTML)",
-        "regle": (
-            "Aucune page avec <video autoplay> ni <audio autoplay> -> "
-            "'✅ Point fort confirmé'. Au moins une page concernée -> "
-            "'💡 Potentiel d'amélioration identifié'."
+        "short_criterion": "Are there animations/videos/sounds played automatically?",
+        "category": "automatable",
+        "data_field": "html-css-criteria.json: pages[].has_autoplay_media (HTML re-fetched live, cf. script note — the .har does not contain HTML bodies)",
+        "rule": (
+            "No page with <video autoplay> or <audio autoplay> -> "
+            "'✅ Confirmed strength'. At least one affected page -> "
+            "'💡 Improvement potential identified'."
         ),
-        "provenance_max": "collecte",
-        "note": "Ne détecte que l'attribut HTML autoplay au chargement, pas un autoplay déclenché en JS après coup (angle mort connu).",
+        "max_provenance": "collected",
+        "note": "Only detects the HTML autoplay attribute at load time, not an autoplay triggered by JS afterwards (known blind spot).",
     },
     "1.6": {
-        "critere_court": "Est-il possible d'adapter les ressources à la configuration matérielle de l'utilisateur ?",
-        "categorie": "automatisable",
-        "champ_donnee": "html-css-criteria.json: pages[].adaptive_img_ratio (srcset/<picture>) ET css.media_query_count",
-        "regle": (
-            "'✅' seulement si AUCUNE page n'a un adaptive_img_ratio à 0 (avec des "
-            "images) ET qu'au moins 3 media queries CSS distinctes existent. "
-            "'💡' seulement si NI srcset/<picture> NI media query ne sont trouvés nulle "
-            "part. Sinon (signal mixte : ex. media queries nombreuses mais une page "
-            "sans image adaptative) -> '🤔 À évaluer' (contrainte déterministe : deux "
-            "signaux discordants ne sont jamais tranchés au doigt mouillé)."
+        "short_criterion": "Is it possible to adapt resources to the user's hardware configuration?",
+        "category": "automatable",
+        "data_field": "html-css-criteria.json: pages[].adaptive_img_ratio (srcset/<picture>) AND css.media_query_count",
+        "rule": (
+            "'✅' only if NO page has an adaptive_img_ratio of 0 (with "
+            "images) AND at least 3 distinct CSS media queries exist. "
+            "'💡' only if NEITHER srcset/<picture> NOR media query is found "
+            "anywhere. Otherwise (mixed signal: e.g. many media queries but one "
+            "page without adaptive images) -> '🤔 To be assessed' (deterministic constraint: two "
+            "conflicting signals are never decided by guesswork)."
         ),
-        "provenance_max": "estime",
-        "note": "Deux proxys distincts (images responsive, CSS adaptative) fusionnés prudemment ; ne mesure pas l'adaptation JS (ex. qualité vidéo dynamique).",
+        "max_provenance": "estimated",
+        "note": "Two distinct proxies (responsive images, adaptive CSS) merged cautiously; does not measure JS adaptation (e.g. dynamic video quality).",
     },
     "1.13": {
-        "critere_court": "Les principaux parcours utilisateurs sont-ils optimisés pour être fluides et efficaces ?",
-        "categorie": "automatisable",
-        "champ_donnee": "cwv.json: accessibility_score_pct (API PageSpeed Insights, catégorie accessibility, mêmes appels que les CWV)",
-        "regle": (
-            "Score d'accessibilité >= 90 sur TOUTES les pages/stratégies -> "
-            "'✅ Point fort confirmé'. Score < 60 sur au moins une -> "
-            "'💡 Potentiel d'amélioration identifié'. Zone 60-90 sans aucune page "
-            "< 60 -> '🤔 À évaluer' (ambigu, ne pas trancher)."
+        "short_criterion": "Are the main user journeys optimized to be smooth and efficient?",
+        "category": "automatable",
+        "data_field": "cwv.json: accessibility_score_pct (PageSpeed Insights API, accessibility category, same calls as CWV)",
+        "rule": (
+            "Accessibility score >= 90 on ALL pages/strategies -> "
+            "'✅ Confirmed strength'. Score < 60 on at least one -> "
+            "'💡 Improvement potential identified'. Zone 60-90 with no page "
+            "< 60 -> '🤔 To be assessed' (ambiguous, do not decide)."
         ),
-        "provenance_max": "collecte",
-        "note": "Proxy accessibilité (pas directement 'fluidité de parcours') — le référentiel n'a pas de critère a11y dédié dans les 54, celui-ci est le plus proche sémantiquement. À corroborer humainement.",
+        "max_provenance": "collected",
+        "note": "Accessibility proxy (not directly 'journey smoothness') — the framework has no dedicated a11y criterion among the 54, this one is the closest semantically. To be corroborated by a human.",
     },
     "1.4": {
-        "critere_court": "La conception comprend-elle des composants personnalisés plutôt que des composants natifs ?",
-        "categorie": "partiel",
-        "champ_donnee": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
-        "regle": "Un ratio custom/natif élevé est un indice de composants réinventés plutôt que natifs - ne couvre que les boutons (proxy partiel, pas tous les composants UI personnalisés).",
-        "provenance_max": "suppose",
-        "note": "Détection HTML statique uniquement (post-hydratation React/Vue le DOM réel diffère potentiellement) — indice, jamais une preuve.",
+        "short_criterion": "Does the design include custom components rather than native components?",
+        "category": "partial",
+        "data_field": "html-css-criteria.json: pages[].native_buttons vs pages[].custom_role_buttons",
+        "rule": "A high custom/native ratio is a hint of reinvented rather than native components - only covers buttons (partial proxy, not all custom UI components).",
+        "max_provenance": "assumed",
+        "note": "Static HTML detection only (post-hydration React/Vue the real DOM may differ) — a hint, never proof.",
     },
     "1.11": {
-        "critere_court": "Sobriété par défaut : préférences système respectées (mouvement réduit, thème) ?",
-        "categorie": "partiel",
-        "champ_donnee": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
-        "regle": "Présence de @media (prefers-reduced-motion) ou (prefers-color-scheme) dans le CSS chargé est un indice de sobriété par défaut - l'absence n'est pas une preuve d'absence de sobriété (peut être géré autrement, ex. JS).",
-        "provenance_max": "suppose",
-        "note": "Détection syntaxique simple (présence de la règle), pas de vérification que le comportement réel change en conséquence.",
+        "short_criterion": "Sobriety by default: are system preferences respected (reduced motion, theme)?",
+        "category": "partial",
+        "data_field": "html-css-criteria.json: css.has_prefers_reduced_or_scheme",
+        "rule": "The presence of @media (prefers-reduced-motion) or (prefers-color-scheme) in the loaded CSS is a hint of sobriety by default - absence is not proof of absence of sobriety (may be handled otherwise, e.g. JS).",
+        "max_provenance": "assumed",
+        "note": "Simple syntactic detection (presence of the rule), no verification that the actual behavior changes as a result.",
     },
     "6.1": {
-        "critere_court": "Existe-t-il un dispositif d'observabilité efficace pour le produit ?",
-        "categorie": "partiel",
-        "champ_donnee": "security-headers-analysis.json: worst_page.grade (score sécurité local, proxy de maturité prod)",
-        "regle": "Un score sécurité élevé (grade A/B) est un indice indirect de maturité opérationnelle générale, jamais une preuve d'observabilité (métriques/logs/traces) - donnée totalement invisible côté client.",
-        "provenance_max": "suppose",
-        "note": "Proxy très indirect (rigueur sécurité != observabilité) ; affiché en annexe seulement, jamais coché.",
+        "short_criterion": "Is there an effective observability setup for the product?",
+        "category": "partial",
+        "data_field": "security-headers-analysis.json: worst_page.grade (local security score, proxy for prod maturity)",
+        "rule": "A high security score (grade A/B) is an indirect hint of general operational maturity, never proof of observability (metrics/logs/traces) - data totally invisible client-side.",
+        "max_provenance": "assumed",
+        "note": "Very indirect proxy (security rigor != observability); displayed in the appendix only, never ticked.",
     },
     "6.3": {
-        "critere_court": "Existe-t-il un processus CI/CD efficace ?",
-        "categorie": "partiel",
-        "champ_donnee": "*.har: en-têtes Last-Modified des ressources 1st-party (code HTML/CSS/JS)",
-        "regle": "Fraîcheur de déploiement (âge de la ressource la plus récente) et atomicité (dispersion des Last-Modified entre ressources de code) sont des indices indirects de maturité de déploiement - ne mesurent ni la fréquence de déploiement réelle ni l'existence d'un pipeline CI/CD (le contenu peut être mis à jour manuellement).",
-        "provenance_max": "suppose",
-        "note": "Une dispersion serrée peut résulter d'un dépôt manuel de l'arborissance complète, et un déploiement récent ne dit rien de la fréquence des déploiements.",
+        "short_criterion": "Is there an effective CI/CD process?",
+        "category": "partial",
+        "data_field": "*.har: Last-Modified headers of 1st-party resources (HTML/CSS/JS code)",
+        "rule": "Deployment freshness (age of the most recent resource) and atomicity (dispersion of Last-Modified across code resources) are indirect hints of deployment maturity - they measure neither the actual deployment frequency nor the existence of a CI/CD pipeline (content can be updated manually).",
+        "max_provenance": "assumed",
+        "note": "A tight dispersion can result from manually pushing the whole tree, and a recent deployment says nothing about deployment frequency.",
     },
     "6.6": {
-        "critere_court": "Existe-t-il des indicateurs permettant de suivre la qualité des logiciels ?",
-        "categorie": "partiel",
-        "champ_donnee": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
-        "regle": "Un score Best Practices élevé et/ou un security.txt bien formé sont des indices de pratiques de qualité outillées - ne prouvent jamais l'existence d'indicateurs de qualité suivis en interne (SonarQube, etc., invisibles côté client).",
-        "provenance_max": "suppose",
-        "note": "Trois proxys faibles combinés en annexe informative seulement, jamais un critère cochable automatiquement.",
+        "short_criterion": "Are there indicators to track software quality?",
+        "category": "partial",
+        "data_field": "cwv.json: best_practices_score_pct ; security-headers-analysis.json: worst_page.grade ; wellknown-scan.json: security_txt.present",
+        "rule": "A high Best Practices score and/or a well-formed security.txt are hints of tool-supported quality practices - they never prove the existence of quality indicators tracked internally (SonarQube, etc., invisible client-side).",
+        "max_provenance": "assumed",
+        "note": "Three weak proxies combined in the informative appendix only, never an automatically tickable criterion.",
     },
     "6.8": {
-        "critere_court": "Y a-t-il du code dupliqué dans l'application ?",
-        "categorie": "partiel",
-        "champ_donnee": "cwv.json: lighthouse_insights['duplicated-javascript'] (audit Lighthouse)",
-        "regle": "L'absence de duplication détectée par Lighthouse (score=1, 0 items) ne prouve pas que la gestion des dépendances soit bonne, seulement l'absence de duplication évidente de bundles JS côté client - un indice faible, jamais une validation.",
-        "provenance_max": "suppose",
-        "note": "Détection côté client uniquement (JS chargé dans le HAR), angle mort sur le code backend et sur la duplication interne au sein d'un même bundle.",
+        "short_criterion": "Is there duplicated code in the application?",
+        "category": "partial",
+        "data_field": "cwv.json: lighthouse_insights['duplicated-javascript'] (Lighthouse audit)",
+        "rule": "The absence of duplication detected by Lighthouse (score=1, 0 items) does not prove that dependency management is good, only the absence of obvious client-side JS bundle duplication - a weak hint, never a validation.",
+        "max_provenance": "assumed",
+        "note": "Client-side detection only (JS loaded in the HAR), blind spot on backend code and on duplication within the same bundle.",
     },
     "5.5": {
-        "critere_court": "Les parcours critiques (les plus fréquents) sont-ils optimisés en priorité ?",
-        "categorie": "partiel",
-        "champ_donnee": "coverage-analysis.json (JS/CSS inutilisé par page) ; cwv.json (par page)",
-        "regle": "Suppose que les pages effectivement auditées sont les parcours les plus fréquents du site - hypothèse non vérifiée par les données disponibles (pas de classement de fréquentation par page).",
-        "provenance_max": "suppose",
-        "note": "Le \"critique\"/\"fréquent\" n'est jamais mesuré : seul le contenu des pages auditées l'est.",
+        "short_criterion": "Are the critical journeys (the most frequent ones) prioritized for optimization?",
+        "category": "partial",
+        "data_field": "coverage-analysis.json (unused JS/CSS per page) ; cwv.json (per page)",
+        "rule": "Assumes that the actually audited pages are the site's most frequent journeys - hypothesis not verified by the available data (no usage ranking per page).",
+        "max_provenance": "assumed",
+        "note": "\"Critical\"/\"frequent\" is never measured: only the content of the audited pages is.",
     },
 }

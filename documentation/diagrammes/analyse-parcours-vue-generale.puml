@@ -1,5 +1,5 @@
 @startuml analyse-parcours-vue-generale
-title Analyse de parcours web — Vue generale du workflow (par thematique)
+title Web journey analysis — Overview of the workflow (by theme)
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -22,95 +22,95 @@ skinparam LegendFontSize 14
 start
 
 legend top right
-  **Légende**
+  **Legend**
 
-  <back:#ECECF2><color:#ECECF2>XXXXXX</color></back>  Fond gris pâle : automatique
-  (calcul machine, aucune action humaine)
+  <back:#ECECF2><color:#ECECF2>XXXXXX</color></back>  Pale grey background: automatic
+  (machine calculation, no human action)
 
-  <back:#9BD0DD><color:#9BD0DD>XXXXXX</color></back>  Fond bleu clair : action humaine requise
-  (saisie, décision, ou réponse d'un tiers externe)
+  <back:#9BD0DD><color:#9BD0DD>XXXXXX</color></back>  Light blue background: human action required
+  (input, decision, or answer from an external third party)
 
-  [réf] Doc de référence : capturer-har-et-coverage.md
+  [ref] Reference doc: capture-har-and-coverage.md
   ../../.claude/skills/analyse-parcours/docs/
 endlegend
 
-partition "**CAPTURE MANUELLE** [réf] (prealable, humain, hors skill)" #9BD0DD {
+partition "**MANUAL CAPTURE** [ref] (prerequisite, human, outside the skill)" #9BD0DD {
   :Network : Preserve log + Disable cache
-  Parcours complet, cookies acceptes
+  Full journey, cookies accepted
   -> "Save all as HAR with content" (.har);
   :Coverage panel (Cmd+Shift+P)
-  Enregistrer, recharger, scroller
-  -> export JSON par page (Coverage-*.json);
+  Record, reload, scroll
+  -> export JSON per page (Coverage-*.json);
 }
 
 note right #ECECF2
-  cwv.json (Core Web Vitals) optionnel : Lighthouse se
-  lance automatiquement si absent (collect_cwv_pagespeed.py),
-  ou fourni par l'utilisateur (RUM/PageSpeed).
+  cwv.json (Core Web Vitals) optional: Lighthouse
+  launches automatically if absent (collect_cwv_pagespeed.py),
+  or provided by the user (RUM/PageSpeed).
 end note
 
-partition "**COLLECTE** (automatique)" {
+partition "**COLLECTION** (automatic)" {
   :HAR, Coverage, Core Web Vitals
   (analyze_har.py, coverage_metrics.py,
-  collect_cwv_pagespeed.py ou run_lighthouse.sh en repli);
+  collect_cwv_pagespeed.py or run_lighthouse.sh as fallback);
 }
 
-partition "**JUGEMENT AUTOMATIQUE EOF** (automatique)" {
-  :run_eof.py confronte les donnees
-  deja collectees au referentiel EOF
-  (~10 criteres sur 54 tranches par script,
-  le reste reste "je ne sais pas");
+partition "**AUTOMATIC EOF JUDGMENT** (automatic)" {
+  :run_eof.py compares the already
+  collected data against the EOF reference
+  (~10 criteria out of 54 settled by script,
+  the rest stays "I don't know");
 }
 
-partition "**IMPACT CO2e** (optionnel, a tout moment)" #9BD0DD {
-  :/efootprint -> modele Boavizta (reference
-  + 3 scenarios cumules prio1 / prio1+2 / prio1+2+3)
-  -> donnees disponibles pour la PROCHAINE
-  generation du rapport, pas un ajout final isole;
-  :Action humaine possible : trafic annuel et
-  taille d'instance cloud, si non auto-detectes;
+partition "**CO2e IMPACT** (optional, at any time)" #9BD0DD {
+  :/efootprint -> Boavizta model (reference
+  + 3 cumulative scenarios prio1 / prio1+2 / prio1+2+3)
+  -> data available for the NEXT
+  report generation, not an isolated final add-on;
+  :Possible human action: annual traffic and
+  cloud instance size, if not auto-detected;
 }
 
 note right #ECECF2
-  Peut se lancer avant ou apres le premier rapport,
-  avant ou apres le questionnaire EOF : chaque
-  generation du rapport reprend simplement les
-  donnees alors disponibles sur disque.
+  Can be launched before or after the first report,
+  before or after the EOF questionnaire: each
+  report generation simply picks up the
+  data then available on disk.
 end note
 
-partition "**RAPPORT — premiere generation** (automatique)" {
+partition "**REPORT — first generation** (automatic)" {
   :generate_report_html.py
-  (+ check_valeurs_rapport.py, controle
-  interne non bloquant)
-  -> contient deja le jugement EOF automatique
-  (partiel) et le CO2e si deja calcule;
+  (+ check_report_values.py, internal
+  non-blocking check)
+  -> already contains the automatic EOF judgment
+  (partial) and the CO2e if already calculated;
 }
 
-partition "**QUESTIONNAIRE EOF** (manuel, decision de mission)" #9BD0DD {
-  :Quand : apres le jugement automatique,
-  uniquement sur les criteres restes
-  "je ne sais pas" - jamais avant,
-  jamais declenche seul;
-  :generate_questionnaire.py -> fichier a remplir
-  (questionnaire-eof.md), envoye au client,
-  rempli, relu (parse_questionnaire.py),
-  fusionne (fusionner_lots.py) selon la
-  precedence collecte > estime > precise
-  > declare > suppose;
+partition "**EOF QUESTIONNAIRE** (manual, mission decision)" #9BD0DD {
+  :When: after the automatic judgment,
+  only on the criteria left
+  "I don't know" - never before,
+  never triggered on its own;
+  :generate_questionnaire.py -> file to fill in
+  (questionnaire-eof.md), sent to the client,
+  filled in, read back (parse_questionnaire.py),
+  merged (merge_lots.py) according to the
+  precedence collected > estimated > stated
+  > declared > assumed;
 }
 
 note right #ECECF2
-  Piege a eviter : ne jamais relancer run_eof.py
-  seul apres une relecture de questionnaire
-  (ecrase les reponses en silence). Toujours
-  parse_questionnaire.py -> fusionner_lots.py
+  Trap to avoid: never rerun run_eof.py
+  alone after a questionnaire read-back
+  (it silently overwrites the answers). Always
+  parse_questionnaire.py -> merge_lots.py
   -> generate_report_html.py.
 end note
 
-partition "**RAPPORT — regeneration** (automatique)" {
+partition "**REPORT — regeneration** (automatic)" {
   :generate_report_html.py
-  -> reflete les reponses du questionnaire
-  fusionnees (+ CO2e si calcule entre-temps);
+  -> reflects the questionnaire answers
+  merged (+ CO2e if calculated meanwhile);
 }
 
 stop

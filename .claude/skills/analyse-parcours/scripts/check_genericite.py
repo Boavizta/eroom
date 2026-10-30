@@ -1,59 +1,59 @@
 #!/usr/bin/env python3
 """
-Filet de sécurité du refactoring e-footprint : contrôle de GÉNÉRICITÉ.
+Safety net for the e-footprint refactoring: GENERICITY check.
 
-POURQUOI CE SCRIPT EXISTE
--------------------------
-La bibliothèque de modélisation doit fonctionner sur N'IMPORTE QUEL site, pas
-seulement sur le cas de test. Le risque n'est pas théorique : en déplaçant du
-code, il est facile de figer dans la bibliothèque une valeur qui avait été
-MESURÉE sur un site précis. Ce type de faute est invisible à la relecture, parce
-qu'un nombre nu ressemble à une constante physique.
+WHY THIS SCRIPT EXISTS
+-----------------------
+The modeling library must work on ANY site, not
+only on the test case. The risk is not theoretical: when moving
+code around, it is easy to freeze into the library a value that had been
+MEASURED on one specific site. This kind of mistake is invisible on re-reading, because
+a bare number looks like a physical constant.
 
-Ce script échoue si la bibliothèque contient :
-  - un nom de domaine ou une adresse IP littérale
-  - une valeur numérique mesurée sur un cas d'audit (la faute la plus sournoise :
-    elle passe tous les greps de nom)
-  - un chemin de fichier propre à un cas d'audit
+This script fails if the library contains:
+  - a literal domain name or IP address
+  - a numeric value measured on an audit case (the most sneaky mistake:
+    it passes all name greps)
+  - a file path specific to an audit case
 
-CE QU'IL NE FAIT PAS, ET IL FAUT LE DIRE
-----------------------------------------
-Il attrape le COPIER-COLLER, pas le BIAIS DE CONCEPTION. Une fonction qui
-suppose implicitement un site à deux serveurs, ou qui suppose du HTML servi
-complet, passera ce contrôle sans broncher. Le seul contrôle qui prouve la
-généricité est l'exécution sur un second site réel.
+WHAT IT DOES NOT DO, AND THAT MUST BE SAID
+------------------------------------------
+It catches COPY-PASTE, not DESIGN BIAS. A function that implicitly assumes
+a two-server site, or that assumes complete HTML is served,
+will pass this check without a flinch. The only check that proves
+genericity is execution on a second real site.
 
-Il est volontairement lancé TÔT, dès le lot 0, pour échouer au premier
-copier-coller et non trois lots plus tard.
+It is deliberately launched EARLY, from lot 0, to fail on the first
+copy-paste and not three lots later.
 
-Usage :
-    python3 check_genericite.py                      # cible par défaut
-    python3 check_genericite.py <répertoire>         # cible explicite
-    python3 check_genericite.py --list-values        # affiche les valeurs interdites
+Usage:
+    python3 check_genericite.py                      # default target
+    python3 check_genericite.py <directory>          # explicit target
+    python3 check_genericite.py --list-values        # show forbidden values
 
-Code de sortie : 0 si la cible est générique, 1 sinon.
+Exit code: 0 if the target is generic, 1 otherwise.
 
-CE QUI EST EXCLU DE L'ANALYSE, et pourquoi :
-  - les docstrings et les commentaires : un exemple documenté est légitime et
-    même utile ("ex. audits/octo.com"). Seul le CODE EXÉCUTABLE est contrôlé.
-  - `check_efootprint_contract.py` et `tmp/` : les valeurs du cas de test y sont
-    à leur place, c'est leur raison d'être.
+WHAT IS EXCLUDED FROM THE ANALYSIS, and why:
+  - docstrings and comments: a documented example is legitimate and
+    even useful ("e.g. audits/octo.com"). Only EXECUTABLE CODE is checked.
+  - `check_efootprint_contract.py` and `tmp/`: the test case values belong
+    there, that is their reason to exist.
 
-EXEMPTIONS EXPLICITES
----------------------
-Certaines occurrences sont légitimes : une table de trackers connus, la
-déclaration d'une constante de chemin, un bloc de démonstration. Elles
-s'exemptent par un marqueur qui DOIT porter sa raison :
+EXPLICIT EXEMPTIONS
+-------------------
+Some occurrences are legitimate: a table of known trackers, the
+declaration of a path constant, a demo block. They
+exempt themselves with a marker that MUST carry its reason:
 
-    RAW_DATA_DIR = "..."          # genericite: ok - declaration de la constante
+    RAW_DATA_DIR = "..."          # genericity: ok - constant declaration
 
-    TRACKER_DOMAINS = {           # genericite: ok-debut - table explicite de tiers
+    TRACKER_DOMAINS = {           # genericity: ok-start - explicit third-party table
         "google-analytics.com",
-    }                             # genericite: ok-fin
+    }                             # genericity: ok-end
 
-Une exemption sans raison est refusée : désactiver le filet doit coûter une
-phrase, sinon il se vide de sens ligne par ligne. `--audit-exemptions` les liste
-toutes, pour qu'elles restent relisables.
+An exemption without a reason is refused: disabling the net must cost a
+sentence, otherwise it empties of meaning line by line. `--audit-exemptions` lists
+them all, so they remain reviewable.
 """
 
 import argparse
@@ -67,175 +67,176 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCRIPTS_DIR = Path(__file__).resolve().parent
 
-# Cible par défaut : la bibliothèque de modélisation, quand elle existera (lot 1).
+# Default target: the modeling library, when it exists (lot 1).
 DEFAULT_TARGET = SCRIPTS_DIR / "efootprint_model"
 
 # ---------------------------------------------------------------------------
-# Valeurs mesurées sur les cas d'audit : INTERDITES dans la bibliothèque
+# Values measured on audit cases: FORBIDDEN in the library
 # ---------------------------------------------------------------------------
-# Chaque valeur porte son origine. Sans cette trace, personne ne saurait dans six
-# mois pourquoi tel nombre est proscrit, et la liste deviendrait du folklore.
+# Each value carries its origin. Without this trace, in six
+# months nobody would know why such-and-such a number is banned, and the
+# list would become folklore.
 #
-# Toute nouvelle mesure publiée dans un rapport doit être AJOUTÉE ici.
+# Any new measurement published in a report must be ADDED here.
 
 FORBIDDEN_VALUES = {
-    # Comptages de mots des pages du cas de test (mesurés dans le HAR)
-    317.0: "comptage de mots, cas de test",
-    356.0: "comptage de mots, cas de test",
-    153.0: "comptage de mots, cas de test",
-    1096.0: "comptage de mots, cas de test",
-    591.0: "comptage de mots, cas de test",
-    # Données d'audience SimilarWeb du cas de test
-    2.116: "audience SimilarWeb, cas de test",
-    33.979: "audience SimilarWeb, cas de test",
-    0.460: "audience SimilarWeb, cas de test",
-    36654.0: "audience SimilarWeb, cas de test",
-    16.1: "durée de visite SimilarWeb, cas de test",
-    # Totaux CO2e et facteurs dérivés du cas de test
-    174.139: "total CO2e (lecture propre), cas de test",
-    174.076: "total CO2e (publié, lu par regex), cas de test",
-    146.16: "total CO2e en serverless, cas de test",
-    235.47: "total CO2e, variante mesurée sur le cas de test",
-    203.45: "total CO2e à 2 serveurs, cas de test",
-    203.454: "total CO2e à 2 serveurs, cas de test",
-    176.805: "total CO2e, 2e serveur sans stockage, cas de test",
-    0.41: "facteur de recalage Nielsen, calculé sur UN SEUL site",
-    38.9: "valeur mesurée sur le cas de test, origine précise non tracée",
-    82.0: "valeur mesurée sur le cas de test, origine précise non tracée",
-    440.0: "visites annuelles (milliers), cas de test",
-    # Bornes des fourchettes publiées (mesurées sur le cas de test)
-    145.1: "borne basse fourchette infrastructure, cas de test",
-    271.4: "borne haute du cumul rejeté, cas de test",
-    45.9: "borne basse du cumul rejeté, cas de test",
-    242.1: "borne haute fourchette usage, cas de test",
-    74.9: "borne basse fourchette usage, cas de test",
-    26.6: "CO2e de fabrication d'un Storage de 1 To, cas de test",
-    # Empreinte CO2e par requête testée pour les hôtes tiers (aucune source publique)
-    306.139: "total CO2e avec hôtes tiers à 0,2 g/requête, cas de test",
-    187.339: "total CO2e avec hôtes tiers à 0,02 g/requête, cas de test",
-    # Rejeu complet du 06/08/2026 : recollecte CrUX/SimilarWeb, mix appareils
-    # déplacé. Ces totaux remplacent 174.076 dans les rapports livrés.
-    170.856: "total CO2e après rejeu, cas de test",
-    # Lot 2 (07/08/2026) : build_system() + extraction propre (sans regex) sur
-    # l'env-data.json rejoué. Remplace 174.139 comme repère de non-régression.
-    170.904: "total CO2e (lecture propre, Lot 2), cas de test",
-    # Lot 3 (07/08/2026) : from_har.py, parcours multi-étapes + infras multiples.
-    # Validation confirmée : le HAR = parcours d'une personne, donc chaque page
-    # capturée devient une étape (au lieu de la seule page la plus lourde).
-    853.336: "total CO2e (multi-étapes, Lot 3), cas de test octo.com",
-    14480.895: "total CO2e (3 serveurs + 3 étapes, Lot 3), cas de test ANTS",
-    4801.2: "total CO2e du second cas de test (site public)",
-    # Code mort après correction du typage des URL versionnées
-    975.5: "CSS non utilisé (Ko), cas de test",
-    161.9: "CSS non utilisé d'une page (Ko), cas de test",
-    926.6: "CSS non utilisé (Ko), second cas de test",
-    4270.6: "CSS non utilisé (Ko), second cas de test",
-    10146.6: "JS non utilisé (Ko), second cas de test",
-    # Agrégats Coverage recalculés par coverage_metrics.py, qui classe l'extension
-    # sur le CHEMIN de l'URL. La page dont toutes les URLs sont versionnées était
-    # publiée à zéro : ces totaux remplacent 17657.4 / 9736.3 / 3491.5 / 3024.2.
-    18226.6: "JS total (Ko), second cas de test",
-    10146.4: "JS non utilisé (Ko), second cas de test, calcul déterministe",
-    4840.4: "CSS total (Ko), second cas de test",
-    4270.7: "CSS non utilisé (Ko), second cas de test, calcul déterministe",
-    1349.1: "CSS total de la page servie en DSFR (Ko), second cas de test",
-    1246.4: "CSS non utilisé de la page servie en DSFR (Ko), second cas de test",
-    # Agrégats HAR des deux cas de test
-    6987.9: "poids total HAR (Ko), cas de test",
-    17674.3: "poids total HAR (Ko), second cas de test",
-    # Lot 4 (07/08/2026) : temps_utilisateur.py, Nielsen recalé sur Engagments
-    # SimilarWeb (moyenne des Nielsen bruts du parcours, cf. sa docstring).
-    16.058: "temps moyen par page SimilarWeb (TimeOnSite/PagePerVisit), cas de test",
-    0.250109: "facteur de recalage Nielsen (méthode parcours multi-étapes), cas de test",
-    560.9885: "total CO2e (Nielsen recalé, Lot 4), cas de test octo.com",
-    14372.7561: "total CO2e (Nielsen brut, pas de recalage SimilarWeb, Lot 4), cas de test ANTS",
-    # Lot 4bis (07/08/2026) : ranges.py, fourchettes infra/usage mesurées sur
-    # les deux cas d'audit (cf. tmp/lot2/_verif_lot4bis_fourchettes.py).
-    533.0142: "borne basse fourchette infra (serverless), Lot 4bis, cas de test octo.com",
-    881.3057: "borne haute fourchette usage (Nielsen brut), Lot 4bis, cas de test octo.com",
-    14036.2206: "borne basse fourchette infra (serverless), Lot 4bis, cas de test ANTS",
-    # Lot 10 (11/08/2026) : correction du bug de pairing mots<->page (from_har.py) :
-    # le comptage de mots existait déjà dans le HAR sur une AUTRE répétition de
-    # la même URL que celle retenue pour le poids réseau, jamais lu jusque-là.
-    # Remplace 560.9885 comme repère de non-régression pour octo.com.
-    268.6406: "total CO2e après correction du pairing mots/page (Lot 10), cas de test octo.com",
+    # Word counts of the test case pages (measured in the HAR)
+    317.0: "word count, test case",
+    356.0: "word count, test case",
+    153.0: "word count, test case",
+    1096.0: "word count, test case",
+    591.0: "word count, test case",
+    # SimilarWeb audience data of the test case
+    2.116: "SimilarWeb audience, test case",
+    33.979: "SimilarWeb audience, test case",
+    0.460: "SimilarWeb audience, test case",
+    36654.0: "SimilarWeb audience, test case",
+    16.1: "SimilarWeb visit duration, test case",
+    # CO2e totals and derived factors of the test case
+    174.139: "total CO2e (own parsing), test case",
+    174.076: "total CO2e (published, read by regex), test case",
+    146.16: "total CO2e in serverless, test case",
+    235.47: "total CO2e, variant measured on the test case",
+    203.45: "total CO2e with 2 servers, test case",
+    203.454: "total CO2e with 2 servers, test case",
+    176.805: "total CO2e, 2nd server without storage, test case",
+    0.41: "Nielsen recalibration factor, computed on a SINGLE site",
+    38.9: "value measured on the test case, precise origin untraced",
+    82.0: "value measured on the test case, precise origin untraced",
+    440.0: "annual visits (thousands), test case",
+    # Bounds of the published ranges (measured on the test case)
+    145.1: "lower bound infrastructure range, test case",
+    271.4: "upper bound of the released total, test case",
+    45.9: "lower bound of the released total, test case",
+    242.1: "upper bound usage range, test case",
+    74.9: "lower bound usage range, test case",
+    26.6: "CO2e of manufacturing a 1 TB Storage, test case",
+    # CO2e per request tested for third-party hosts (no public source)
+    306.139: "total CO2e with third-party hosts at 0.2 g/request, test case",
+    187.339: "total CO2e with third-party hosts at 0.02 g/request, test case",
+    # Full replay of 08/06/2026: re-collection CrUX/SimilarWeb, device
+    # mix moved. These totals replace 174.076 in the delivered reports.
+    170.856: "total CO2e after replay, test case",
+    # Lot 2 (08/07/2026): build_system() + own extraction (without regex) on
+    # the replayed env-data.json. Replaces 174.139 as non-regression marker.
+    170.904: "total CO2e (own parsing, Lot 2), test case",
+    # Lot 3 (08/07/2026): from_har.py, multi-step journey + multiple infras.
+    # Validation confirmed: the HAR = one person's journey, so each captured
+    # page becomes a step (instead of only the heaviest page).
+    853.336: "total CO2e (multi-step, Lot 3), test case octo.com",
+    14480.895: "total CO2e (3 servers + 3 steps, Lot 3), test case ANTS",
+    4801.2: "total CO2e of the second test case (public site)",
+    # Dead code after fixing the versioned URL typing
+    975.5: "unused CSS (KB), test case",
+    161.9: "unused CSS of one page (KB), test case",
+    926.6: "unused CSS (KB), second test case",
+    4270.6: "unused CSS (KB), second test case",
+    10146.6: "unused JS (KB), second test case",
+    # Coverage aggregates recomputed by coverage_metrics.py, which classifies the extension
+    # on the URL PATH. The page whose URLs are all versioned was
+    # published at zero: these totals replace 17657.4 / 9736.3 / 3491.5 / 3024.2.
+    18226.6: "total JS (KB), second test case",
+    10146.4: "unused JS (KB), second test case, deterministic computation",
+    4840.4: "total CSS (KB), second test case",
+    4270.7: "unused CSS (KB), second test case, deterministic computation",
+    1349.1: "total CSS of the DSFR-served page (KB), second test case",
+    1246.4: "unused CSS of the DSFR-served page (KB), second test case",
+    # HAR aggregates of the two test cases
+    6987.9: "total HAR weight (KB), test case",
+    17674.3: "total HAR weight (KB), second test case",
+    # Lot 4 (08/07/2026): user_time.py, Nielsen recalibrated on Engagments
+    # SimilarWeb (average of the journey's raw Nielsens, cf. its docstring).
+    16.058: "SimilarWeb average time per page (TimeOnSite/PagePerVisit), test case",
+    0.250109: "Nielsen recalibration factor (multi-step journey method), test case",
+    560.9885: "total CO2e (recalibrated Nielsen, Lot 4), test case octo.com",
+    14372.7561: "total CO2e (raw Nielsen, no SimilarWeb recalibration, Lot 4), test case ANTS",
+    # Lot 4bis (08/07/2026): ranges.py, infra/usage ranges measured on
+    # the two audit cases (cf. tmp/lot2/_verif_lot4bis_fourchettes.py).
+    533.0142: "lower bound infra range (serverless), Lot 4bis, test case octo.com",
+    881.3057: "upper bound usage range (raw Nielsen), Lot 4bis, test case octo.com",
+    14036.2206: "lower bound infra range (serverless), Lot 4bis, test case ANTS",
+    # Lot 10 (08/11/2026): fix of the words<->page pairing bug (from_har.py):
+    # the word count already existed in the HAR on ANOTHER repetition of
+    # the same URL as the one retained for network weight, never read until then.
+    # Replaces 560.9885 as non-regression marker for octo.com.
+    268.6406: "total CO2e after words/page pairing fix (Lot 10), test case octo.com",
 }
 
-# Un entier court (82, 440, 317) est un nombre COURANT : il peut légitimement
-# désigner un comptage, une taille, un code de statut. Mesuré sur le code
-# existant, `82` est ainsi apparu dans un bloc de validation EcoIndex parfaitement
-# légitime de `har_metrics.py`. Signaler ces valeurs reste utile, mais les
-# annoncer avec la même assurance qu'un `174.139` serait mentir sur la précision
-# du contrôle. Elles sont donc marquées "à vérifier" dans le rapport.
+# A short integer (82, 440, 317) is a COMMON number: it can legitimately
+# denote a count, a size, a status code. Measured on the existing
+# code, `82` thus appeared in a perfectly legitimate EcoIndex validation
+# block of `har_metrics.py`. Reporting these values is still useful, but
+# announcing them with the same confidence as a `174.139` would lie about the
+# precision of the check. They are therefore marked "to verify" in the report.
 #
-# Un flottant à plusieurs décimales, lui, ne se retrouve pas par hasard.
+# A multi-decimal float, on the other hand, does not appear by chance.
 COLLISION_PRONE_MAX = 1000.0
 
 
 def collision_prone(value):
-    """La valeur est-elle un nombre courant, susceptible d'apparaître à bon droit ?"""
+    """Is the value a common number, likely to appear legitimately?"""
     return value.is_integer() and abs(value) < COLLISION_PRONE_MAX
 
-# Valeurs autorisées malgré leur présence possible dans les listes ci-dessus :
-# ce sont des constantes de conversion ou des grandeurs universelles.
+# Values allowed despite their possible presence in the lists above:
+# they are conversion constants or universal quantities.
 ALLOWED_VALUES = {
     0.0, 1.0, 2.0, 3.0, 100.0, 1000.0,
-    8760.0,     # heures dans une année
+    8760.0,     # hours in a year
     24.0, 60.0, 365.0,
     1024.0,
 }
 
-# Tolérance de comparaison : un 174.0761 recopié à la main doit être attrapé.
+# Comparison tolerance: a 174.0761 hand-copied must be caught.
 VALUE_TOLERANCE = 1e-4
 
 # ---------------------------------------------------------------------------
-# Motifs textuels interdits dans le code exécutable
+# Forbidden textual patterns in executable code
 # ---------------------------------------------------------------------------
 
 FORBIDDEN_PATTERNS = [
     (
         re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-        "adresse IP littérale",
+        "literal IP address",
     ),
     (
-        # Nom de domaine. Les extensions listées sont celles susceptibles
-        # d'apparaître dans un cas d'audit ; la liste est volontairement courte
-        # pour éviter d'attraper des noms de modules Python (`os.path`).
+        # Domain name. The listed extensions are those likely
+        # to appear in an audit case; the list is deliberately short
+        # to avoid catching Python module names (`os.path`).
         re.compile(
             r"\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*"
             r"\.(?:com|fr|org|net|io|gouv\.fr|tools|ai|dev|co)\b"
         ),
-        "nom de domaine littéral",
+        "literal domain name",
     ),
     (
         re.compile(r"\baudits?/[A-Za-z0-9._-]+"),
-        "chemin vers un cas d'audit",
+        "path to an audit case",
     ),
     (
-        re.compile(r"donnees-brutes-potentiellement-sensibles"),
-        "chemin de captures brutes en dur (utiliser la constante RAW_DATA_DIR)",
+        re.compile(r"raw-data-potentially-sensitive"),
+        "hardcoded raw capture path (use the RAW_DATA_DIR constant)",
     ),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Exemptions explicites
+# Explicit exemptions
 # ---------------------------------------------------------------------------
-# Le marqueur est cherché dans le source ORIGINAL (commentaires inclus), alors que
-# les violations sont cherchées dans le code seul. Les deux passes partagent la
-# numérotation des lignes, ce qui rend la correspondance directe.
+# The marker is looked for in the ORIGINAL source (comments included), while
+# violations are looked for in code only. The two passes share the
+# line numbering, which makes the correspondence direct.
 
-EXEMPT_LINE = re.compile(r"#\s*genericite:\s*ok\b\s*-?\s*(?P<raison>.*)$")
-EXEMPT_START = re.compile(r"#\s*genericite:\s*ok-debut\b\s*-?\s*(?P<raison>.*)$")
-EXEMPT_END = re.compile(r"#\s*genericite:\s*ok-fin\b")
+EXEMPT_LINE = re.compile(r"#\s*genericity:\s*ok\b\s*-?\s*(?P<reason>.*)$")
+EXEMPT_START = re.compile(r"#\s*genericity:\s*ok-start\b\s*-?\s*(?P<reason>.*)$")
+EXEMPT_END = re.compile(r"#\s*genericity:\s*ok-end\b")
 
 
 def parse_exemptions(source):
-    """Rend ({ligne_exemptée: raison}, [(ligne, problème)]).
+    """Returns ({exempted_line: reason}, [(line, problem)]).
 
-    Le second élément liste les exemptions MAL FORMÉES : marqueur sans raison, ou
-    bloc ouvert jamais refermé. Ce sont des erreurs, pas des avertissements : une
-    exemption silencieuse est exactement ce que ce script cherche à empêcher.
+    The second element lists MALFORMED exemptions: marker without reason, or
+    block opened and never closed. These are errors, not warnings: a
+    silent exemption is exactly what this script exists to prevent.
     """
     exempt = {}
     malformed = []
@@ -245,7 +246,7 @@ def parse_exemptions(source):
     for lineno, line in enumerate(source.splitlines(), start=1):
         if EXEMPT_END.search(line):
             if block_start is None:
-                malformed.append((lineno, "marqueur ok-fin sans ok-debut"))
+                malformed.append((lineno, "ok-end marker without ok-start"))
             else:
                 for row in range(block_start, lineno + 1):
                     exempt[row] = block_reason
@@ -255,59 +256,59 @@ def parse_exemptions(source):
 
         match_start = EXEMPT_START.search(line)
         if match_start:
-            reason = match_start.group("raison").strip()
+            reason = match_start.group("reason").strip()
             if not reason:
-                malformed.append((lineno, "exemption de bloc sans raison écrite"))
+                malformed.append((lineno, "block exemption without a written reason"))
                 continue
             if block_start is not None:
-                malformed.append((lineno, "ok-debut imbriqué dans un bloc déjà ouvert"))
+                malformed.append((lineno, "ok-start nested inside an already open block"))
                 continue
             block_start = lineno
             block_reason = reason
             continue
 
-        # ok-debut correspond aussi à EXEMPT_LINE ; l'ordre des tests l'exclut déjà.
+        # ok-start also matches EXEMPT_LINE; the order of the tests already excludes it.
         match_line = EXEMPT_LINE.search(line)
         if match_line:
-            reason = match_line.group("raison").strip()
+            reason = match_line.group("reason").strip()
             if not reason:
-                malformed.append((lineno, "exemption de ligne sans raison écrite"))
+                malformed.append((lineno, "line exemption without a written reason"))
             else:
                 exempt[lineno] = reason
 
     if block_start is not None:
-        malformed.append((block_start, "bloc ok-debut jamais refermé par ok-fin"))
+        malformed.append((block_start, "ok-start block never closed by ok-end"))
 
     return exempt, malformed
 
 
 # ---------------------------------------------------------------------------
-# Extraction du code exécutable seul
+# Executable code only extraction
 # ---------------------------------------------------------------------------
 
 def strip_comments_and_docstrings(source):
-    """Retourne le source privé de ses commentaires et de ses docstrings.
+    """Returns the source stripped of its comments and docstrings.
 
-    Deux passes, parce qu'aucune ne suffit seule :
-      - `tokenize` retire les commentaires (`ast` ne les voit pas du tout).
-      - `ast` identifie les docstrings (`tokenize` ne distingue pas une docstring
-        d'une chaîne de caractères ordinaire).
+    Two passes, because neither suffices alone:
+      - `tokenize` removes comments (`ast` does not see them at all).
+      - `ast` identifies docstrings (`tokenize` does not distinguish a docstring
+        from an ordinary string literal).
 
-    Les lignes retirées sont remplacées par des lignes vides plutôt que
-    supprimées, pour que les numéros de ligne signalés restent EXACTS et
-    cliquables.
+    Removed lines are replaced by empty lines rather than
+    deleted, so that reported line numbers remain EXACT and
+    clickable.
 
-    SUBTILITÉ QUI A COÛTÉ UN TROU DANS LE FILET (corrigée au lot 1) : une classe
-    ou une fonction dont le corps est UNIQUEMENT une docstring se retrouve avec
-    un corps vide après nettoyage, ce qui rend le résultat syntaxiquement
-    invalide. `numeric_literals()` renvoyait alors une liste vide et TOUT le
-    contrôle des valeurs mesurées du fichier était désactivé, sans le moindre
-    message. La docstring est donc remplacée par un `pass` correctement indenté,
-    et `numeric_literals()` signale désormais son échec au lieu de se taire.
+    SUBTLETY THAT ONCE PUNCHED A HOLE IN THE NET (fixed at lot 1): a class
+    or function whose body is ONLY a docstring ends up with
+    an empty body after cleaning, which makes the result syntactically
+    invalid. `numeric_literals()` then returned an empty list and ALL the
+    measured-value check of the file was silently disabled, without any
+    message. The docstring is therefore replaced by a properly indented
+    `pass`, and `numeric_literals()` now reports its failure instead of staying silent.
     """
     lines = source.splitlines()
 
-    # Passe 1 : neutraliser les commentaires.
+    # Pass 1: neutralize comments.
     try:
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
         for token in tokens:
@@ -315,11 +316,11 @@ def strip_comments_and_docstrings(source):
                 row, col = token.start
                 lines[row - 1] = lines[row - 1][:col]
     except (tokenize.TokenError, IndentationError):
-        # Source non tokenisable : on continue sans cette passe plutôt que
-        # d'abandonner le fichier. Le contrôle reste utile, juste moins précis.
+        # Non-tokenizable source: continue without this pass rather than
+        # abandoning the file. The check remains useful, just less precise.
         pass
 
-    # Passe 2 : neutraliser les docstrings.
+    # Pass 2: neutralize docstrings.
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -339,9 +340,9 @@ def strip_comments_and_docstrings(source):
             continue
         for row in range(first.lineno, (first.end_lineno or first.lineno) + 1):
             lines[row - 1] = ""
-        # Si la docstring était tout le corps, il faut le remplacer par un
-        # `pass` à la bonne indentation, sinon le fichier nettoyé ne se parse
-        # plus et le contrôle des valeurs se désactive en silence.
+        # If the docstring was the whole body, it must be replaced by a
+        # `pass` at the right indentation, otherwise the cleaned file no longer parses
+        # and the value check silently deactivates.
         if len(body) == 1 and not isinstance(node, ast.Module):
             indent = " " * first.col_offset
             lines[first.lineno - 1] = f"{indent}pass"
@@ -350,15 +351,15 @@ def strip_comments_and_docstrings(source):
 
 
 def numeric_literals(source):
-    """Rend les littéraux numériques du code, en (ligne, valeur).
+    """Returns the numeric literals of the code, as (line, value).
 
-    Passe par l'arbre syntaxique : un nombre écrit dans une chaîne de caractères
-    n'est pas un littéral numérique et ne doit pas déclencher d'alerte.
+    Goes through the syntax tree: a number written inside a string
+    is not a numeric literal and must not trigger an alert.
 
-    Lève SyntaxError si le source nettoyé ne se parse pas. C'était auparavant
-    un `return []` silencieux, donc un contrôle qui s'annulait tout seul en
-    restant vert. Un filet qui se désactive sans le dire est pire qu'un filet
-    absent : on croit être protégé.
+    Raises SyntaxError if the cleaned source does not parse. It used to be
+    a silent `return []`, hence a check that cancelled itself while
+    staying green. A net that disables itself without saying so is worse than an
+    absent net: you believe you are protected.
     """
     tree = ast.parse(source)
     found = []
@@ -371,37 +372,37 @@ def numeric_literals(source):
 
 
 # ---------------------------------------------------------------------------
-# Contrôles
+# Checks
 # ---------------------------------------------------------------------------
 
 def check_file(path):
-    """Analyse un fichier. Retourne (violations, exemptions_utilisées).
+    """Analyzes a file. Returns (violations, exemptions_used).
 
-    violations : liste de (ligne, motif)
-    exemptions_utilisées : liste de (ligne, raison)
+    violations : list of (line, pattern)
+    exemptions_used : list of (line, reason)
     """
     try:
         source = path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError) as exc:
-        return [(0, f"fichier illisible ({exc})")], []
+        return [(0, f"unreadable file ({exc})")], []
 
     exempt, malformed = parse_exemptions(source)
     code = strip_comments_and_docstrings(source)
 
-    violations = [(lineno, f"exemption invalide : {problem}")
+    violations = [(lineno, f"invalid exemption: {problem}")
                   for lineno, problem in malformed]
 
-    # Un source non analysable est signalé comme une VIOLATION, pas ignoré :
-    # sans analyse syntaxique, le contrôle des valeurs mesurées ne tourne pas du
-    # tout, et le fichier serait déclaré conforme sans avoir été examiné.
+    # A non-analyzable source is reported as a VIOLATION, not ignored:
+    # without syntactic analysis, the measured-value check does not run at
+    # all, and the file would be declared compliant without having been examined.
     try:
         literals = numeric_literals(code)
     except SyntaxError as exc:
         return sorted(violations + [(
             exc.lineno or 0,
-            "code non analysable après retrait des commentaires et docstrings "
-            f"({exc.msg}). Le contrôle des valeurs mesurées n'a PAS pu tourner "
-            "sur ce fichier : le déclarer conforme serait faux."
+            "code not analyzable after removing comments and docstrings "
+            f"({exc.msg}). The measured-value check could NOT run "
+            "on this file: declaring it compliant would be false."
         )]), sorted((lineno, reason) for lineno, reason in exempt.items())
 
     for lineno, value in literals:
@@ -409,8 +410,8 @@ def check_file(path):
             continue
         for forbidden, origin in FORBIDDEN_VALUES.items():
             if abs(value - forbidden) <= VALUE_TOLERANCE:
-                prefix = ("valeur À VÉRIFIER (nombre courant, peut être un faux positif)"
-                          if collision_prone(value) else "valeur mesurée en dur")
+                prefix = ("value TO VERIFY (common number, may be a false positive)"
+                          if collision_prone(value) else "hardcoded measured value")
                 violations.append((lineno, f"{prefix} : {value} ({origin})"))
                 break
 
@@ -428,46 +429,46 @@ def check_file(path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Contrôle de généricité : la bibliothèque ne doit contenir "
-                    "aucune trace d'un cas d'audit particulier.",
+        description="Genericity check: the library must contain "
+                    "no trace of a particular audit case.",
     )
     parser.add_argument("target", type=Path, nargs="?", default=DEFAULT_TARGET,
-                        help=f"Répertoire ou fichier à contrôler "
-                             f"(défaut : {DEFAULT_TARGET.name}/).")
+                        help=f"Directory or file to check "
+                             f"(default: {DEFAULT_TARGET.name}/).")
     parser.add_argument("--list-values", action="store_true",
-                        help="Affiche les valeurs interdites et leur origine, puis s'arrête.")
+                        help="Show the forbidden values and their origin, then stop.")
     parser.add_argument("--audit-exemptions", action="store_true",
-                        help="Liste les exemptions en vigueur avec leur raison. "
-                             "À relire périodiquement : une exemption oubliée est "
-                             "un trou dans le filet.")
+                        help="List the exemptions in force with their reason. "
+                             "To review periodically: a forgotten exemption is "
+                             "a hole in the net.")
     args = parser.parse_args()
 
     if args.list_values:
-        print(f"{len(FORBIDDEN_VALUES)} valeurs interdites dans la bibliothèque :")
+        print(f"{len(FORBIDDEN_VALUES)} forbidden values in the library:")
         for value, origin in sorted(FORBIDDEN_VALUES.items()):
             print(f"    {value:>12}  {origin}")
         print()
-        print("Légitimes en revanche dans check_efootprint_contract.py et dans tmp/.")
+        print("Legitimate however in check_efootprint_contract.py and in tmp/.")
         return 0
 
     target = args.target
     if not target.exists():
-        # Cas normal avant le lot 1 : la bibliothèque n'existe pas encore. Ce
-        # n'est pas un échec, et le dire clairement évite de croire à une panne.
-        print(f"[info] Cible absente : {target}")
-        print("[info] Rien à contrôler. Normal tant que la bibliothèque n'existe pas.")
+        # Normal case before lot 1: the library does not exist yet. This
+        # is not a failure, and saying so clearly avoids believing in a breakdown.
+        print(f"[info] Target missing: {target}")
+        print("[info] Nothing to check. Normal as long as the library does not exist.")
         return 0
 
     files = sorted(target.rglob("*.py")) if target.is_dir() else [target]
     files = [f for f in files if "__pycache__" not in f.parts]
 
     if not files:
-        print(f"[info] Aucun fichier Python sous {target}. Rien à contrôler.")
+        print(f"[info] No Python file under {target}. Nothing to check.")
         return 0
 
     print("-" * 68)
-    print(f"  GÉNÉRICITÉ — {target}")
-    print(f"  {len(files)} fichier(s), {len(FORBIDDEN_VALUES)} valeurs interdites")
+    print(f"  GENERICITY — {target}")
+    print(f"  {len(files)} file(s), {len(FORBIDDEN_VALUES)} forbidden values")
     print("-" * 68)
     print()
 
@@ -483,44 +484,44 @@ def main():
         total_exempt += len(exemptions)
         if args.audit_exemptions:
             if exemptions:
-                print(f"{shown} — {len(exemptions)} ligne(s) exemptée(s) :")
+                print(f"{shown} — {len(exemptions)} exempted line(s):")
                 for lineno, reason in exemptions:
                     print(f"    {shown}:{lineno}  {reason}")
             continue
 
-        suffix = f"  ({len(exemptions)} ligne(s) exemptée(s))" if exemptions else ""
+        suffix = f"  ({len(exemptions)} exempted line(s))" if exemptions else ""
         if not violations:
             print(f"[OK] {shown}{suffix}")
             continue
         total += len(violations)
-        print(f"[ÉCHEC] {shown} — {len(violations)} violation(s){suffix} :")
+        print(f"[FAIL] {shown} — {len(violations)} violation(s){suffix} :")
         for lineno, reason in violations:
             print(f"    {shown}:{lineno}  {reason}")
         print()
 
     if args.audit_exemptions:
         print()
-        print(f"{total_exempt} ligne(s) exemptée(s) au total.")
-        print("Chacune est un endroit où le contrôle ne voit rien. Vérifier que la")
-        print("raison tient toujours.")
+        print(f"{total_exempt} exempted line(s) in total.")
+        print("Each is a place where the check sees nothing. Verify that the")
+        print("reason still holds.")
         return 0
 
     print()
     if total:
-        print(f"[ÉCHEC] {total} violation(s). La cible n'est pas générique.")
-        print("Ces valeurs et ces noms doivent venir des DONNÉES du site analysé,")
-        print("pas du code. Trois issues, dans cet ordre de préférence :")
-        print("  1. faire venir la valeur des données du site (le bon réflexe) ;")
-        print("  2. si elle est vraiment universelle, l'ajouter à ALLOWED_VALUES ;")
-        print("  3. si l'occurrence est légitime, l'exempter avec sa raison :")
-        print("     # genericite: ok - <raison>")
+        print(f"[FAIL] {total} violation(s). The target is not generic.")
+        print("These values and these names must come from the DATA of the analyzed site,")
+        print("not from the code. Three options, in this order of preference:")
+        print("  1. take the value from the site data (the right reflex);")
+        print("  2. if it is really universal, add it to ALLOWED_VALUES;")
+        print("  3. if the occurrence is legitimate, exempt it with its reason:")
+        print("     # genericity: ok - <reason>")
         return 1
 
-    print("[SUCCÈS] Aucune trace d'un cas d'audit particulier.")
+    print("[SUCCESS] No trace of a particular audit case.")
     if total_exempt:
-        print(f"({total_exempt} ligne(s) exemptée(s) — les relire avec --audit-exemptions.)")
-    print("Rappel : ce contrôle attrape le copier-coller, PAS le biais de")
-    print("conception. Seule l'exécution sur un second site réel le prouve.")
+        print(f"({total_exempt} exempted line(s) — review them with --audit-exemptions.)")
+    print("Reminder: this check catches copy-paste, NOT design")
+    print("bias. Only execution on a second real site proves it.")
     return 0
 
 

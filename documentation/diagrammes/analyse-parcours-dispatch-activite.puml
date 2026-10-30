@@ -1,5 +1,5 @@
 @startuml analyse-parcours-dispatch-activite
-title Mécanisme DISPATCH — Flux des vagues d'analyse de parcours
+title DISPATCH mechanism — Flow of the journey analysis waves
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -16,221 +16,221 @@ skinparam NoteBorderColor #9BD0DD
 skinparam PartitionBackgroundColor #ECECF2
 skinparam PartitionBorderColor #5BA1BC
 
-|#E0F0F4| Contexte principal |
+|#E0F0F4| Main context |
 start
 
-:SKILL.md -> lit 25_dispatch-orchestration.md;
+:SKILL.md -> reads 25_dispatch-orchestration.md;
 
 note right
-  Détection plateforme :
-  - Claude Code -> sous-agents isolés (parallèle)
-  - Autres -> exécution séquentielle inline
+  Platform detection:
+  - Claude Code -> isolated sub-agents (parallel)
+  - Others -> sequential inline execution
 end note
 
-partition "**Wave 0 — Localisation** (contexte principal)" {
-  :Lire args : dossier ou fichiers directs;
-  :Identifier .har + Coverage-*.json + cwv.json (optionnel);
-  :Vérifier existence + taille HAR\n(lecture sélective si > 5 Mo);
+partition "**Wave 0 — Location** (main context)" {
+  :Read args: directory or direct files;
+  :Identify .har + Coverage-*.json + cwv.json (optional);
+  :Check HAR existence + size\n(selective reading if > 5 MB);
 }
 
 note right #C8E6C9
-  ✅ Wave 0 terminée — fichiers prêts
-  Les dispatches suivants lisent les fichiers disque.
+  ✅ Wave 0 done — files ready
+  The following dispatches read the disk files.
 end note
 
-partition "**Wave 1 — HAR + Coverage + CWV + env-data + Sécurité** (5 sous-agents en parallèle)" {
+partition "**Wave 1 — HAR + Coverage + CWV + env-data + Security** (5 sub-agents in parallel)" {
   fork
-    :Dispatch analyse-har
-    (20_analyse-har.md)
-    python3 analyze_har.py <dossier-source>
-    Trafic + performance (requêtes, domaines,
-    codes HTTP, doublons, ressources bloquantes)
+    :Dispatch analyze-har
+    (20_har-analysis.md)
+    python3 analyze_har.py <source-dir>
+    Traffic + performance (requests, domains,
+    HTTP codes, duplicates, blocking resources)
     -> har-analysis.json;
   fork again
-    :Dispatch analyse-coverage
-    (30_analyse-coverage.md)
-    Format A ou B détecté
-    Métriques JS/CSS par page
-    (total Ko, inutilisé Ko, %)
-    Top 5 JS + Top 3 CSS inutilisés
-    Synthèse multi-pages + outliers
+    :Dispatch analyze-coverage
+    (30_coverage-analysis.md)
+    Format A or B detected
+    JS/CSS metrics per page
+    (total KB, unused KB, %)
+    Top 5 unused JS + Top 3 unused CSS
+    Multi-page summary + outliers
     -> coverage-analysis.json;
   fork again
-    :Dispatch collecte-cwv
+    :Dispatch collect-cwv
     (37_lighthouse.md)
     collect_cwv_pagespeed.py --strategy both
     PageSpeed Insights + CrUX (mobile+desktop,
-    accessibility/best-practices inclus dès le
-    départ) ; fallback Lighthouse auto si
-    GOOGLE_API_KEY absente ou 0 métrique exploitable
+    accessibility/best-practices included from the
+    start) ; automatic Lighthouse fallback if
+    GOOGLE_API_KEY absent or 0 usable metric
     -> cwv.json;
   fork again
-    :Dispatch collecte-env-data
-    (45_efootprint.md, Étape 20)
-    collect_env_data.py <dossier-source>
-    HAR + CrUX (mix device) + ipinfo.io
-    (pays/provider) + API interne SimilarWeb
-    (mix pays + trafic)
+    :Dispatch collect-env-data
+    (45_efootprint.md, Step 20)
+    collect_env_data.py <source-dir>
+    HAR + CrUX (device mix) + ipinfo.io
+    (country/provider) + internal SimilarWeb API
+    (country mix + traffic)
     -> env-data.json;
   fork again
-    :Dispatch extracteur-security-headers
+    :Dispatch extractor-security-headers
     (39_eof-audit.md)
-    analyze_security_headers.py <dossier-source>
-    Score sécurité local depuis les en-têtes
-    déjà dans le .har, aucun appel réseau
+    analyze_security_headers.py <source-dir>
+    Local security score from the headers
+    already in the .har, no network call
     -> security-headers-analysis.json;
   end fork
 }
 
 note right
-  Indépendance vérifiée en code, pas supposée :
-  analyse-har et extracteur-security-headers lisent
-  AUSSI env-data.json, mais en dégradation DOUCE
-  (fichier absent -> classification moins précise /
-  filtre de pages ignoré, jamais un crash).
-  Condition de réussite :
-  har-analysis.json ET coverage-analysis.json
-  obligatoires (avertissement bloquant si absents).
+  Independence verified in code, not assumed:
+  analyze-har and extractor-security-headers ALSO
+  read env-data.json, but in SOFT degradation
+  (file absent -> less precise classification /
+  page filter ignored, never a crash).
+  Success condition:
+  har-analysis.json AND coverage-analysis.json
+  mandatory (blocking warning if absent).
   cwv.json / env-data.json / security-headers-analysis.json
-  best-effort (absence signalée, jamais bloquante).
+  best-effort (absence signaled, never blocking).
 end note
 
-partition "**Wave 2 — Extracteurs EOF dépendants d'env-data.json** (2 sous-agents en parallèle)" {
+partition "**Wave 2 — EOF extractors depending on env-data.json** (2 sub-agents in parallel)" {
   fork
-    :Dispatch extracteur-html-css
-    depends_on="collecte-env-data"
-    parse_html_criteria.py <dossier-source>
-    Re-fetch live des pages déjà auditées
-    (le .har ne contient pas les corps HTML/CSS)
-    Archive sous pages-html/ (chantier 27)
+    :Dispatch extractor-html-css
+    depends_on="collect-env-data"
+    parse_html_criteria.py <source-dir>
+    Live re-fetch of already audited pages
+    (the .har does not contain the HTML/CSS bodies)
+    Archived under html-pages/ (job 27)
     -> html-css-criteria.json;
   fork again
-    :Dispatch extracteur-wellknown
-    depends_on="collecte-env-data"
-    scan_wellknown.py <dossier-source>
-    Fetch direct security.txt / robots.txt /
-    sitemap.xml sur le domaine déduit d'env-data.json
+    :Dispatch extractor-wellknown
+    depends_on="collect-env-data"
+    scan_wellknown.py <source-dir>
+    Direct fetch security.txt / robots.txt /
+    sitemap.xml on the domain deduced from env-data.json
     -> wellknown-scan.json;
   end fork
 }
 
 note right #FFECB3
-  DÉPENDANCE DURE (pas une dégradation), vérifiée
-  ligne par ligne dans le code :
-  parse_html_criteria.py et scan_wellknown.py font
-  sys.exit(1) si env-data.json est absent ou vide.
-  Ne jamais dispatcher cette vague avant d'avoir
-  confirmé env-data.json sur disque (Wave 1 terminée) —
-  un simple retry ne compense pas cette dépendance dure.
+  HARD DEPENDENCY (not a degradation), verified
+  line by line in the code:
+  parse_html_criteria.py and scan_wellknown.py
+  sys.exit(1) if env-data.json is absent or empty.
+  Never dispatch this wave before having
+  confirmed env-data.json on disk (Wave 1 done) —
+  a simple retry does not compensate for this hard dependency.
 end note
 
-partition "**Merge + suite** (contexte principal)" {
-  :Lire har-analysis.json + coverage-analysis.json
-  (obligatoires) + cwv.json / env-data.json /
+partition "**Merge + rest** (main context)" {
+  :Read har-analysis.json + coverage-analysis.json
+  (mandatory) + cwv.json / env-data.json /
   security-headers-analysis.json / html-css-criteria.json /
   wellknown-scan.json (best-effort, Wave 1/2);
-  :Étape 35 — har_metrics.py
-  Calcul score/grade A-G par page
-  (formule officielle cnumr/ecoindex);
+  :Step 35 — har_metrics.py
+  Score/grade A-G per page calculation
+  (official cnumr/ecoindex formula);
 
   note right
-    Limites :
-    DOM=0 si HAR sans corps HTML
-    SPA : DOM = état initial seulement
-    -> documenté dans le rapport
-    Aucun OUTPUT_FILE réutilisé ailleurs :
-    validation console libre, hors dispatch
+    Limits:
+    DOM=0 if HAR without HTML body
+    SPA: DOM = initial state only
+    -> documented in the report
+    No OUTPUT_FILE reused elsewhere:
+    free console validation, outside dispatch
   end note
 
   note right #FFECB3
-    Si cwv.json absent (Wave 1 en échec) :
-    rapport sans CWV, onLoad du HAR utilisé
-    comme proxy du LCP
+    If cwv.json absent (Wave 1 failed):
+    report without CWV, HAR onLoad used
+    as LCP proxy
   end note
 
-  :Étape 39 — run_eof.py <dossier-source>
-  Confronte har-analysis.json / coverage-analysis.json
-  (obligatoires) + cwv.json / env-data.json /
+  :Step 39 — run_eof.py <source-dir>
+  Confronts har-analysis.json / coverage-analysis.json
+  (mandatory) + cwv.json / env-data.json /
   security-headers-analysis.json / html-css-criteria.json /
-  wellknown-scan.json (best-effort, déjà produits par
-  Wave 1/2 — plus d'extracteurs annexes à lancer ici)
-  à eof-referentiel.json (54 critères + 16 diagnostic rapide)
-  -> eof-audit-results.json, eof-rempli.md,
-  eof-radar-<domaine>.svg;
+  wellknown-scan.json (best-effort, already produced by
+  Wave 1/2 — no more annex extractors to launch here)
+  against eof-reference.json (54 criteria + 16 quick diagnostic)
+  -> eof-audit-results.json, eof-filled.md,
+  eof-radar-<domain>.svg;
 
   note right #FFECB3
-    ARRÊT ICI, rien n'est automatique après :
+    STOP HERE, nothing is automatic after:
     generate_questionnaire.py / parse_questionnaire.py /
-    fusionner_lots.py sont des étapes manuelles assumées
-    (décision de mission), jamais déclenchées par ce skill.
-    Piège : ne jamais relancer run_eof.py seul après une
-    relecture de questionnaire (écrase les réponses en silence,
-    il ne relit jamais lots/relecture-questionnaire.json).
-    Toujours parse_questionnaire.py -> fusionner_lots.py
+    merge_lots.py are manual steps taken on purpose
+    (mission decision), never triggered by this skill.
+    Trap: never rerun run_eof.py alone after a
+    questionnaire read-back (it silently overwrites the answers,
+    it never re-reads lots/questionnaire-review.json).
+    Always parse_questionnaire.py -> merge_lots.py
     -> generate_report_html.py.
   end note
 
-  :Étape 40 — generate_report_html.py
-  Sections : Recommandations P1/P2/P3,
-  Bonnes pratiques GreenIT, CWV (si cwv.json),
-  e-footprint CO2e (si efootprint-synthese-python.json),
-  Potentiel d'optimisation EOF (si eof-audit-results.json,
-  mesuré + questionnaire fusionné),
-  Annexes (EcoIndex, Trafic, Code mort)
-  -> rapport-parcours-YYYY-MM-DD.html
-  (check_valeurs_rapport.py interne, non bloquant);
+  :Step 40 — generate_report_html.py
+  Sections: Recommendations P1/P2/P3,
+  GreenIT best practices, CWV (if cwv.json),
+  e-footprint CO2e (if efootprint-python-summary.json),
+  EOF optimization potential (if eof-audit-results.json,
+  measured + questionnaire merged),
+  Appendices (EcoIndex, Traffic, Dead code)
+  -> journey-report-YYYY-MM-DD.html
+  (internal check_report_values.py, non-blocking);
 
-  :livrer chemin rapport à l'utilisateur;
+  :deliver the report path to the user;
 
   note right #E0F0F4
-    Section CO2e conditionnelle :
-    affichée uniquement si efootprint-synthese-python.json
-    présent dans le dossier-audit
+    Conditional CO2e section:
+    displayed only if efootprint-python-summary.json
+    is present in the audit-dir
   end note
 }
 
-partition "**Étape optionnelle - e-footprint CO2e** (skill /efootprint)" #C8E6C9 {
-  if (Utilisateur lance /efootprint ?) then (oui)
+partition "**Optional step - e-footprint CO2e** (skill /efootprint)" #C8E6C9 {
+  if (User launches /efootprint ?) then (yes)
     :E1 - collect_env_data.py
-    Extraction HAR (poids, durée, IP)
-    API ipinfo.io (pays + provider)
-    CrUX (mix device desktop/mobile)
+    HAR extraction (weight, duration, IP)
+    API ipinfo.io (country + provider)
+    CrUX (desktop/mobile device mix)
     -> env-data.json;
 
     note right
-      Mode cache :
-      Si env-data.json existe déjà (souvent déjà
-      produit par la Wave 1 de /analyse-parcours,
-      bloc collecte-env-data), skip API calls
-      (sauf --refresh)
+      Cache mode:
+      If env-data.json already exists (often already
+      produced by the Wave 1 of /analyse-parcours,
+      collect-env-data block), skip API calls
+      (except --refresh)
     end note
 
     :E2 - AskUserQuestion
-    - Trafic annuel (visites/an) [REQUIS]
-    - Instance cloud (si AWS/Azure/GCP détecté);
+    - Annual traffic (visits/year) [REQUIRED]
+    - Cloud instance (if AWS/Azure/GCP detected);
 
     :E3 - run_efootprint.py
-    Modèle Boavizta (devices/network/server/storage)
-    Calcul fabrication + énergie
+    Boavizta model (devices/network/server/storage)
+    Manufacturing + energy calculation
     -> efootprint-boavizta-model.json
-    -> efootprint-synthese-python.json;
+    -> efootprint-python-summary.json;
 
     note right
-      Résultats :
-      - Total CO2e (kg/an)
-      - Par visite (g CO2e/visite)
-      - Breakdown fab/énergie
-      - Hypothèses + badges confiance
+      Results:
+      - Total CO2e (kg/year)
+      - Per visit (g CO2e/visit)
+      - Manufacturing/energy breakdown
+      - Hypotheses + confidence badges
     end note
 
-    :E4 - Régénérer rapport HTML
+    :E4 - Regenerate HTML report
     generate_report_html.py
-    -> rapport enrichi avec section CO2e;
+    -> report enriched with the CO2e section;
 
-    :Synthèse impact CO2e
-    livrée à l'utilisateur;
-  else (non)
-    :Rapport sans section CO2e;
+    :CO2e impact summary
+    delivered to the user;
+  else (no)
+    :Report without CO2e section;
   endif
 }
 

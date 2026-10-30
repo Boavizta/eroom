@@ -1,45 +1,45 @@
 #!/usr/bin/env python3
 """
-Rapport de dimensionnement (Lot 6) : compare, serveur par serveur, la demande
-RÉELLE (raw_nb_of_instances, fractionnaire) au nombre d'instances effectivement
-FACTURÉES (nb_of_instances, arrondi selon le mode de dimensionnement).
+Sizing report (Lot 6): compares, server by server, the REAL demand
+(raw_nb_of_instances, fractional) to the number of instances actually
+BILLED (nb_of_instances, rounded according to the sizing mode).
 
-CE QUE CE RAPPORT MESURE, ET CE QU'IL NE MESURE PAS
-----------------------------------------------------
-Le ratio facturé/réel PEUT ressembler à un indicateur de surdimensionnement du
-client, mais ce n'est PAS ce qu'il mesure ici : le trafic annuel est réparti en
-timeseries UNIFORME sur 24 h (build.py:_hourly_volume), jamais sur le vrai
-profil horaire du site. Un trafic uniforme lisse les pics qu'un trafic réel
-concentrerait sur quelques heures, ce qui MINIMISE artificiellement l'écart
-mesuré. NE JAMAIS présenter ce chiffre comme une mesure du surdimensionnement
-réel d'un client (cf. handoff du 06/08/2026, plan H, Lot 6).
+WHAT THIS REPORT MEASURES, AND WHAT IT DOES NOT MEASURE
+-------------------------------------------------------
+The billed/real ratio MAY look like a client over-sizing indicator, but that
+is NOT what it measures here: the annual traffic is spread as a UNIFORM
+timeseries over 24 h (build.py:_hourly_volume), never over the site's real
+hourly profile. A uniform traffic smooths out the peaks that a real traffic
+would concentrate on a few hours, which ARTIFICIALLY MINIMIZES the measured
+gap. NEVER present this number as a measurement of a client's real
+over-sizing (cf. handoff of 06/08/2026, plan H, Lot 6).
 
-Pour l'instant ce n'est qu'un diagnostic INTERNE (écrit dans le JSON, pas
-encore rendu dans le rapport HTML) : la décision d'affichage revient au Lot 9,
-qui devra porter l'avertissement ci-dessus s'il choisit de le montrer.
+For now it is only an INTERNAL diagnostic (written into the JSON, not yet
+rendered in the HTML report): the display decision belongs to Lot 9, which
+will have to carry the warning above if it chooses to show it.
 
-PAS D'IMPORT EFOOTPRINT ICI
-----------------------------
-Ce module ne lit que des attributs déjà calculés par `build_system()`
-(build.py) : `raw_nb_of_instances`/`nb_of_instances`, déjà des tableaux numpy
-via `.magnitude`. Comme `ranges.py`, il n'a donc pas besoin d'être exempté du
-contrôle `check_no_efootprint_import()`.
+NO EFOOTPRINT IMPORT HERE
+-------------------------
+This module only reads attributes already computed by `build_system()`
+(build.py): `raw_nb_of_instances`/`nb_of_instances`, already numpy arrays
+via `.magnitude`. Like `ranges.py`, it therefore does not need to be exempted
+from the `check_no_efootprint_import()` check.
 """
 
 import numpy as np
 
 
 def server_sizing(key, server, server_spec):
-    """Dimensionnement d'un seul serveur construit.
+    """Sizing of a single built server.
 
-    `server_spec` peut être None (défensif) si la clé n'est plus alignée avec
-    `built.spec.servers` ; le rapport retombe alors sur la clé technique comme
-    étiquette plutôt que d'échouer.
+    `server_spec` may be None (defensive) if the key is no longer aligned with
+    `built.spec.servers`; the report then falls back to the technical key as
+    label rather than failing.
 
-    Un serveur sans aucun octet transféré (ex. host observé seulement sur des
-    requêtes à 0 octet) peut faire dégénérer `.magnitude` en scalaire plutôt
-    qu'en tableau numpy : `np.atleast_1d` uniformise les deux cas sans changer
-    le résultat pour un tableau déjà normal.
+    A server with no transferred byte at all (e.g. a host observed only on
+    0-byte requests) can make `.magnitude` degenerate to a scalar rather
+    than a numpy array: `np.atleast_1d` uniformizes both cases without
+    changing the result for an already-normal array.
     """
     raw = np.atleast_1d(server.raw_nb_of_instances.magnitude)
     billed = np.atleast_1d(server.nb_of_instances.magnitude)
@@ -62,7 +62,7 @@ def server_sizing(key, server, server_spec):
 
 
 def servers_sizing(built):
-    """Dimensionnement de tous les serveurs d'un `BuiltModel` (build.py)."""
+    """Sizing of all the servers of a `BuiltModel` (build.py)."""
     server_specs = {s.key: s for s in built.spec.servers}
     return [
         server_sizing(key, server, server_specs.get(key))

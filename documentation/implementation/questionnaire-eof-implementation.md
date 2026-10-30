@@ -1,546 +1,746 @@
 -----
-Implémentation du questionnaire EOF
+EOF questionnaire implementation
 -----
 
-Date : 2026-09-07
-Auteur : Agent Claude (session Sonnet)
-Statut : Complet, autotests validés
+Date: 2026-09-07
+Author: Claude Agent (Sonnet session)
+Status: Complete, autotests validated
 
-## Contexte
+## Context
 
-Décision du 07/09/2026 : couvrir le radar EOF par un questionnaire généré et hiérarchisé. Cette implémentation produit deux scripts Python qui génèrent et parsent des questionnaires Markdown pour compléter un audit EOF existant.
+Decision of 07/09/2026: cover the EOF radar with a generated and prioritized questionnaire. This implementation produces two Python scripts that generate and parse Markdown questionnaires to complete an existing EOF audit.
 
-## Livrables créés
+## Deliverables created
 
-Deux scripts dans `.claude/skills/analyse-parcours/scripts/` :
+Two scripts in `.claude/skills/analyse-parcours/scripts/`:
 
 1. **`generate_questionnaire.py`**
-   - Lit `eof-audit-results.json`, `eof-referentiel.json` et `questionnaire-blocs.json`
-   - Génère `questionnaire-eof.md` (un seul fichier)
-   - Calcule le résidu (critères sans verdict utile)
-   - Ordonnance les blocs par rendement décroissant (nombre de critères couverts), puis phase "porte" avant "detail"
+   - Reads `eof-audit-results.json`, `eof-reference.json` and `questionnaire-blocs.json`
+   - Generates `questionnaire-eof.md` (a single file)
+   - Computes the residual (criteria without a useful verdict)
+   - Schedules the blocks by decreasing yield (number of criteria covered), then phase "gate" before "detail"
 
 2. **`parse_questionnaire.py`**
-   - Lit `questionnaire-eof.md`
-   - Produit `lots/relecture-questionnaire.json`
-   - Vérifie exactement une case cochée par bloc
-   - Respecte le contrat de sortie de lot (5 clés racine, omission des null)
-   - Pose un bloc `mesure` conforme à la convention d'état de mesure
+   - Reads `questionnaire-eof.md`
+   - Produces `lots/questionnaire-review.json`
+   - Checks exactly one checkbox per block
+   - Respects the lot output contract (5 root keys, null keys omitted)
+   - Emits a `measurement` block compliant with the measurement state convention
 
-## Ce que les autotests couvrent
+## What the autotests cover
 
-⚠️ **Aucun compte de cas n'est écrit ici, volontairement** : un nombre recopié devient faux au
-premier cas ajouté, et se met alors à mentir sans que personne ne le voie. Pour connaître l'état
-réel, lancer les `--autotest` ci-dessous et lire leur code de sortie.
+⚠️ **No case count is written here, on purpose**: a copied number becomes wrong at the
+first added case, and then lies without anyone noticing. To know the real state, run
+the `--autotest` commands below and read their exit code.
 
-**`generate_questionnaire.py --autotest`** couvre :
-- Bloc direct sur critère détaillé (1.x à 6.x)
-- Bloc direct sur question diagnostic rapide (0.x, vérification absence de potentiel_max)
-- Critère avec réponse "🤔 À évaluer" dans le résidu (règle cruciale)
-- Bloc composé avec critères déjà tranchés (marqueur `<!-- deja-tranche:... -->`)
-- Ordonnancement porte avant detail
-- Nettoyage à l'affichage de la mention "je ne sais pas" collée au pire cas
-- Tri numérique des identifiants (`0.2` avant `0.10`)
+**`generate_questionnaire.py --autotest`** covers:
+- Direct block on a detailed criterion (1.x to 6.x)
+- Direct block on a quick diagnostic question (0.x, check absence of max_potential)
+- Criterion with answer "🤔 To be assessed" in the residual (crucial rule)
+- Composite block with already decided criteria (marker `<!-- already-decided:... -->`)
+- Gate ordering before detail
+- Display-time cleanup of the "I don't know" mention glued to the worst case
+- Numeric sorting of identifiers (`0.2` before `0.10`)
 
-**`parse_questionnaire.py --autotest`** couvre :
-- Bloc direct case cochée (vérification coefficient obligatoire pour critère détaillé)
-- Diagnostic rapide sans coefficient (règle contractuelle)
-- Case "Je ne sais pas" = contexte seulement, jamais de réponse
-- Bloc vide (aucune case cochée) = rien versé
-- Deux cases cochées = rien versé (erreur signalée)
-- Critère déjà tranché ignoré
-- (Aller-retour générateur/parseur : couvert implicitement)
-- Bloc mesure conforme à la convention : fichier absent = `echec_lecture`, fichier vide = `rien_trouve`, fichier répondu = `ok`
+**`parse_questionnaire.py --autotest`** covers:
+- Direct block, checkbox checked (verification that coefficient is mandatory for a detailed criterion)
+- Quick diagnostic without coefficient (contractual rule)
+- "I don't know" checkbox = context only, never an answer
+- Empty block (no checkbox checked) = nothing poured
+- Two checkboxes checked = nothing poured (error reported)
+- Already decided criterion ignored
+- (Generator/parser round trip: covered implicitly)
+- Measurement block compliant with the convention: file absent = `read_error`, empty file = `not_found`, answered file = `ok`
 
-## Décisions clés prises
+## Key decisions made
 
-### 1. Le résidu inclut "🤔 À évaluer" et "⌛️ Évaluation en cours"
+### 1. The residual includes "🤔 To be assessed" and "⌛️ Assessment in progress"
 
-**Raison** : Ces réponses ont un coefficient 0 et comptent comme des réponses dans le reste du code, mais NE TRANCHENT RIEN. Si on ne les repose pas, le critère reste un faux zéro détectable.
+**Reason**: These answers have a coefficient of 0 and count as answers in the rest of the
+code, but they DECIDE NOTHING. If we do not re-ask them, the criterion remains a
+detectable false zero.
 
-**Impact** : Un critère avec ces réponses est reposé dans le questionnaire.
+**Impact**: A criterion with these answers is re-asked in the questionnaire.
 
-### 2. Options des blocs "direct" lues dans le référentiel
+### 2. Options of "direct" blocks read from the framework
 
-**Raison** : Éviter toute divergence entre la bibliothèque de blocs et le référentiel. Les options ne sont jamais recopiées.
+**Reason**: Avoid any divergence between the block library and the framework. Options are
+never copied.
 
-**Impact** : 
-- Critère détaillé : lecture de `options_evaluation`
-- Question diagnostic rapide : lecture de `crans`
+**Impact**:
+- Detailed criterion: read `evaluation_options`
+- Quick diagnostic question: read `screens`
 
-### 3. Ordonnancement par rendement décroissant sur les critères restants
+### 3. Scheduling by decreasing yield on the remaining criteria
 
-**Raison** : Axe unique et prioritaire - minimiser le nombre de questions posées, maximiser le nombre de critères répondus, et le plus précisément possible. Les questions qui renseignent PLUSIEURS critères passent d'abord.
+**Reason**: Single and priority axis — minimize the number of questions asked, maximize the
+number of criteria answered, and as precisely as possible. Questions that inform SEVERAL
+criteria come first.
 
-**Impact** : Le rendement se calcule sur les critères RESTANTS dans le résidu. Un bloc dont la mesure a déjà tranché une partie redescend automatiquement dans l'ordre. Exemple réel : le bloc "parcours et écrans" tombe en 41e position parce que le critère 1.13 a déjà été tranché par la mesure, il ne rapporte donc plus qu'un critère.
+**Impact**: Yield is computed on the criteria REMAINING in the residual. A block whose
+measurement already decided part of them automatically drops in the order. Real example: the
+"journey and screens" block falls to 41st position because criterion 1.13 was already
+decided by the measurement, so it no longer brings but one criterion.
 
-**Structure** : Le questionnaire garde DEUX PARTIES (porte puis détail), avec le tri par rendement décroissant à l'intérieur de chacune. Ce n'est pas un tri global, et c'est délibéré : la porte sert à décider si un diagnostic approfondi vaut la peine.
+**Structure**: The questionnaire keeps TWO PARTS (gate then detail), with sorting by
+decreasing yield inside each. It is not a global sort, and that is deliberate: the gate
+decides whether an in-depth diagnosis is worth it.
 
-**Mesure ultérieure** : La session 19 a montré que ce tri ne fait gagner que 4,5 questions sur 37 par rapport à un tirage au hasard. Le tri est conservé parce qu'il ne coûte rien et qu'il permet à l'interlocuteur de s'arrêter en sachant ce qu'il laisse, mais il ne faut pas en attendre un gain de compaction. Voir la section "Session 19 : le plafond du format actuel, mesuré".
+**Follow-up measurement**: Session 19 showed that this sort only saves 4.5 questions out
+of 37 compared to a random draw. The sort is kept because it costs nothing and lets the
+interviewee stop while knowing what they are leaving out, but no compaction gain should be
+expected from it. See the section "Session 19: the ceiling of the current format, measured".
 
-### 4. Un seul fichier, le destinataire n'est plus un axe de classement
+### 4. A single file, the recipient is no longer a sorting axis
 
-**Décision** : `questionnaire-eof.md` remplace les deux fichiers `questionnaire-produit-usage.md` et `questionnaire-technique.md`.
+**Decision**: `questionnaire-eof.md` replaces the two files `questionnaire-produit-usage.md`
+and `questionnaire-technique.md`.
 
-**Raison** : Le découpage ne routait rien. Sur 4 destinataires, 3 recevaient des questions dans les DEUX fichiers. Envoyer "le fichier produit" au responsable produit lui cachait 5 questions qui le concernaient et lui en donnait 5 qui ne le concernaient pas. Répartition mesurée des 62 questions par destinataire : équipe de développement 30, responsable produit 16, exploitation de l'infrastructure 12, personne qui gère les données 4.
+**Reason**: The split routed nothing. Out of 4 recipients, 3 received questions in BOTH
+files. Sending "the product file" to the product manager hid 5 questions that concerned
+them and gave them 5 that did not. Measured distribution of the 62 questions by recipient:
+development team 30, product manager 16, infrastructure operations 12, the person who
+manages the data 4.
 
-Le destinataire reste écrit dans le titre de chaque question, sous la forme "à voir avec l'équipe de développement". Classer le document par destinataire a été explicitement ÉCARTÉ : le découpage des rôles dépend trop de l'organisation de chaque client.
+The recipient is still written in the title of each question, in the form "to check with the
+development team". Classifying the document by recipient was explicitly REJECTED: the role
+split depends too much on each client's organization.
 
-### 5. Case "Je ne sais pas" ajoutée à chaque bloc
+### 5. "I don't know" checkbox added to each block
 
-**Raison** : Distinguer "on a demandé et personne ne sait" de "personne n'a demandé". Évite de fabriquer un faux zéro qui rend un service ignoré indistinguable d'un service exemplaire.
+**Reason**: Distinguish "we asked and nobody knows" from "nobody asked". Avoids
+manufacturing a false zero that makes an ignored service indistinguishable from an
+exemplary service.
 
-**Impact** : Le parseur produit un `contexte` mais JAMAIS de `reponse` pour cette case.
+**Impact**: The parser produces a `context` but NEVER an `answer` for this checkbox.
 
-### 6. Provenance = "precise", catégorie = "aucune_donnee"
+### 6. Provenance = "stated", category = "no_data"
 
-**Raison** : Contrat de lot - une case cochée par le service audité, sans preuve, ne vient d'aucune donnée collectée.
+**Reason**: Lot contract — a checkbox ticked by the audited service, without evidence, comes
+from no collected data.
 
-**Impact** : Tous les critères versés portent ces valeurs fixes.
+**Impact**: All poured criteria carry these fixed values.
 
-### 7. Format Markdown strict
+### 7. Strict Markdown format
 
-**Raison** : Consignes de style du projet (TTS macOS lit les séparateurs en signes égal lettre par lettre).
+**Reason**: Project style guidelines (macOS TTS reads `-----` separators letter by letter).
 
-**Impact** :
-- Séparateurs en `-----` uniquement
-- Guillemets droits `"`
-- Pas de tiret long (cadratin)
+**Impact**:
+- Separators in `-----` only
+- Straight quotes `"`
+- No em dash
 
-### 8. Coefficient obligatoire pour critères détaillés, absent pour diagnostic rapide
+### 8. Coefficient mandatory for detailed criteria, absent for the quick diagnostic
 
-**Raison** : Règle du validateur de lots. Le référentiel ne définit pas de coefficient pour les questions `0.x`.
+**Reason**: Lot validator rule. The framework does not define a coefficient for `0.x`
+questions.
 
-**Impact** : Le parseur omet la clé `coefficient` pour les questions diagnostic rapide.
+**Impact**: The parser omits the `coefficient` key for quick diagnostic questions.
 
-## Formats contractuels respectés
+## Respected contractual formats
 
-### Bibliothèque de blocs (entrée, ne PAS la modifier)
+### Block library (input, do NOT modify it)
 
 ```json
 {
   "version": 1,
-  "blocs": [
+  "blocks": [
     {
       "id": "...",
-      "fichier": "produit-usage" | "technique",  (vestigial, n'est plus utilisé)
-      "phase": "porte" | "detail",
-      "titre": "...",
-      "interlocuteur": "..." (facultatif),
-      "type": "direct" | "compose",
-      "critere": "..." (si direct),
+      "file": "product-usage" | "technical",  (vestigial, no longer used)
+      "phase": "gate" | "detail",
+      "title": "...",
+      "interviewee": "..." (optional),
+      "type": "direct" | "composite",
+      "criterion": "..." (if direct),
       "question": "...",
-      "aide": "..." (facultatif),
-      "options": [...] (si compose)
+      "help": "..." (optional),
+      "options": [...] (if composite)
     }
   ]
 }
 ```
 
-### Fichier Markdown généré
+### Generated Markdown file
 
-- Marqueurs machine : `<!-- questionnaire: ... -->`, `<!-- version-blocs: ... -->`
-- Par bloc : `<!-- bloc:id -->`, options avec `<!-- opt:n -->`, case jnsp avec `<!-- opt:jnsp -->`
-- Blocs composés : `<!-- deja-tranche:id1,id2,... -->` si besoin
-- Format de case : `- [ ] Libellé  <!-- opt:n -->`
+- Machine markers: `<!-- questionnaire: ... -->`, `<!-- version-blocks: ... -->`
+- Per block: `<!-- block:id -->`, options with `<!-- opt:n -->`, dnk checkbox with `<!-- opt:dnk -->`
+- Composite blocks: `<!-- already-decided:id1,id2,... -->` if needed
+- Checkbox format: `- [ ] Label  <!-- opt:n -->`
 
-### Contrat de sortie de lot
+### Lot output contract
 
-Racine : exactement 5 clés `lot_id`, `genere_le`, `entrees`, `criteres`, `mesure`.
+Root: exactly 5 keys `lot_id`, `generated_at`, `inputs`, `criteria`, `measurement`.
 
-La clé `mesure` est la dernière arrivée. Elle porte l'état de lecture du questionnaire, décrit plus
-bas dans "Le bloc mesure sur le lot de relecture".
+The `measurement` key is the latest addition. It carries the reading state of the
+questionnaire, described further down in "The measurement block on the review lot".
 
-Par critère :
-- `id` et `categorie` : obligatoires
-- `reponse`, `coefficient`, `provenance`, `source`, `contexte` : facultatifs
-- **NE JAMAIS écrire une clé qui vaut null** : l'omettre
-- Si `reponse` posée sur critère détaillé : `coefficient` obligatoire et non nul
-- Si `reponse` posée sur diagnostic rapide : `coefficient` ABSENT
-- Si `reponse` ou `contexte` posé : `provenance` ET `source` obligatoires
+Per criterion:
+- `id` and `category`: mandatory
+- `answer`, `coefficient`, `provenance`, `source`, `context`: optional
+- **NEVER write a key whose value is null**: omit it
+- If `answer` is set on a detailed criterion: `coefficient` mandatory and non-null
+- If `answer` is set on a quick diagnostic question: `coefficient` ABSENT
+- If `answer` or `context` is set: `provenance` AND `source` mandatory
 
-## Ce qui n'est pas couvert
+## What is not covered
 
-- Validation du fichier `questionnaire-blocs.json` (un autre agent l'écrit en parallèle)
-- Génération d'un questionnaire vide (si résidu vide, aucun fichier créé)
-- Gestion des blocs dont l'ID change entre deux versions de la bibliothèque
-- Interface graphique de remplissage (hors périmètre : Markdown éditable manuellement)
-- Branchement dans le pipeline d'audit (voir section dédiée ci-après)
+- Validation of the `questionnaire-blocs.json` file (another agent writes it in parallel)
+- Generation of an empty questionnaire (if the residual is empty, no file is created)
+- Handling of blocks whose ID changes between two versions of the library
+- Fill-in graphical interface (out of scope: manually editable Markdown)
+- Wiring into the audit pipeline (see dedicated section below)
 
-## Traçabilité des bugs corrigés en autotest
+## Traceability of bugs fixed in autotest
 
-1. **Bug regex** : `[^-\s]+` n'acceptait pas les tirets dans les IDs de blocs (ex: `test-11`). Corrigé en `[^\s]+?`.
-2. **Bug JSON Python** : `null` au lieu de `None` dans les autotests. Corrigé dans 5 endroits.
-3. **Bug fichier absent** : autotests du parseur ne créaient pas `questionnaire-eof.md`. Corrigé en créant le fichier dans le répertoire temporaire de test.
+1. **Regex bug**: `[^-\s]+` did not accept dashes in block IDs (e.g. `test-11`). Fixed to `[^\s]+?`.
+2. **Python JSON bug**: `null` instead of `None` in the autotests. Fixed in 5 places.
+3. **Missing file bug**: the parser autotests did not create `questionnaire-eof.md`. Fixed by creating the file in the test temporary directory.
 
-## Vérifications effectuées
+## Verifications performed
 
-- **Aucune trace d'audit spécifique** : pas de "octo.com", pas d'IP, pas de chemin `audits/quelquechose` dans le code (vérifié par `grep -i "octo|192\.|audits/"`)
-- **Autotests exécutés et validés** : codes de sortie 0 pour les deux scripts
-- **Commentaires en français** : conformément aux consignes du projet
-- **Style respecté** : séparateurs `-----`, guillemets droits, pas de tiret long
+- **No trace of a specific audit**: no "octo.com", no IP, no `audits/something` path in the code (verified with `grep -i "octo|192\.|audits/"`)
+- **Autotests run and validated**: exit code 0 for both scripts
+- **Comments in French**: in accordance with the project guidelines
+- **Style respected**: `-----` separators, straight quotes, no em dash
 
-## Garde-fou : refus d'écrire dans audits/
+## Guardrail: refusal to write into audits/
 
-Décision de l'utilisatrice, 2026-09-08 : **seul un questionnaire revenu REMPLI du client a le droit d'exister dans `audits/<domaine>/`.** Or le générateur ne produit que des questionnaires vierges, dont toutes les cases restent à cocher. Un tel fichier posé dans le dossier d'audit peut être envoyé au client comme s'il était à jour, alors qu'il ne contient aucune réponse.
+User's decision, 2026-09-08: **only a questionnaire returned FILLED IN by the client has the
+right to exist in `audits/<domain>/`.** But the generator only produces blank questionnaires,
+whose checkboxes all remain to be ticked. Such a file placed in the audit folder can be sent
+to the client as if it were up to date, while it contains no answer at all.
 
-Ce n'est pas une crainte théorique. Le fichier trouvé le 2026-09-08 dans `audits/octo.com/` portait **322 cases vides et 0 cochée**, et il était en plus antérieur à la fonctionnalité des filtres : ses deux questions filtres étaient posées en tête au lieu d'être placées dans la partie détaillée, et il ne portait aucune mention "À IGNORER". Il a été supprimé.
+This is not a theoretical fear. The file found on 2026-09-08 in `audits/octo.com/` carried
+**322 empty checkboxes and 0 ticked**, and it was additionally older than the filter feature:
+its two filter questions were asked at the top instead of being placed in the detailed part,
+and it carried no "IGNORE" mention. It was deleted.
 
-Le générateur refuse donc d'écrire dans un chemin dont un composant s'appelle `audits`, sauf si le drapeau `--dans-le-dossier-audit` est passé explicitement. Il sort alors en 2 avec un message qui dit ce qu'il refuse, pourquoi, et quoi faire à la place.
+The generator therefore refuses to write into a path where one component is called `audits`,
+unless the `--in-audit-dir` flag is passed explicitly. It then exits with code 2 with a message
+saying what it refuses, why, and what to do instead.
 
-Recommandation : générer dans `/tmp/questionnaire-<domaine>`.
+Recommendation: generate into `/tmp/questionnaire-<domain>`.
 
-Trois autotests couvrent ce garde-fou : refus sans drapeau, acceptation avec drapeau, acceptation sans drapeau hors de `audits/`. Ce sont les seuls cas de la batterie qui relancent le script par `subprocess` : ils exercent `main()`, pas une fonction interne, et travaillent donc avec le vrai référentiel et la vraie bibliothèque de blocs, que le script retrouve depuis son propre répertoire.
+Three autotests cover this guardrail: refusal without flag, acceptance with flag, acceptance
+without flag outside `audits/`. These are the only cases of the battery that rerun the script
+via `subprocess`: they exercise `main()`, not an internal function, and therefore work with
+the real framework and the real block library, which the script finds from its own directory.
 
-## Le titre lu par le client ne dit plus "porte"
+## The title read by the client no longer says "gate"
 
-Décision de l'utilisatrice, 2026-09-08. `porte` est notre étiquette interne pour la phase de dépistage, celle qui décide si l'audit complet vaut la peine. Cette étiquette était imprimée telle quelle comme titre dans le document envoyé au client : "Partie 1 : Questions de porte". Le mot n'existe que dans notre code, et il n'a rien dit à l'utilisatrice elle-même, qui connaît le projet.
+User's decision, 2026-09-08. `gate` is our internal label for the screening phase, the one
+that decides whether the full audit is worth it. This label was printed as-is as the title in
+the document sent to the client: "Part 1: Gate questions". The word only exists in our code,
+and it told the user nothing — she knows the project.
 
-Le titre imprimé devient donc **"Partie 1 : Premier tri"**, et la phrase d'introduction "Ce premier tri permet de décider rapidement si un diagnostic approfondi est pertinent." Le nom de la phase dans le code, `porte`, ne change pas : rien ne relit ce titre, ni `parse_questionnaire.py`, ni aucun autre script.
+The printed title therefore becomes **"Part 1: First pass"**, and the introductory sentence
+"This first pass quickly decides whether an in-depth diagnosis is relevant." The phase name
+in the code, `gate`, does not change: nothing re-reads this title, neither
+`parse_questionnaire.py` nor any other script.
 
-## Commandes de référence
+## Reference commands
 
 ```bash
-# Générer le questionnaire
-python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <repertoire-audit> --output-dir /tmp/questionnaire-<domaine>
+# Generate the questionnaire
+python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py <audit-directory> --output-dir /tmp/questionnaire-<domain>
 
-# Parser le questionnaire rempli
-python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <repertoire-audit>
+# Parse the filled-in questionnaire
+python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py <audit-directory>
 
-# Lancer les autotests
+# Run the autotests
 python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py --autotest
 python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py --autotest
 
-# Fusionner les lots (OBLIGATOIRE après parse_questionnaire.py ou run_eof.py)
-python3 processus/fusionner_lots.py <repertoire-audit>
+# Merge the lots (MANDATORY after parse_questionnaire.py or run_eof.py)
+python3 process/merge_lots.py <audit-directory>
 
-# Contrôler la santé des sondes (détecte les échecs de mesure)
-python3 processus/valider_sante_sondes.py <repertoire-audit>
+# Check probe health (detects measurement failures)
+python3 process/validate_probe_health.py <audit-directory>
 ```
 
-## Session 19, 2026-09-07 : le plafond du format actuel, mesuré
+## Session 19, 2026-09-07: the ceiling of the current format, measured
 
-Le but posé par l'utilisatrice : **minimiser le nombre de questions pour maximiser le nombre de critères remplis**, de façon générique, indépendamment du site servant de terrain d'essai.
+The goal set by the user: **minimize the number of questions to maximize the number of
+criteria filled in**, generically, regardless of the site used as a test bed.
 
-État après la fusion `0.3` + `6.10` : **62 questions couvrent les 70 critères** et les 80,0 de potentiel, soit **1,13 critère par question**.
+State after the `0.3` + `6.10` merge: **62 questions cover the 70 criteria** and the 80.0 of
+potential, i.e. **1.13 criterion per question**.
 
-Trois mesures qui ferment les fausses pistes. Elles sont là pour éviter qu'une session future les rouvre sur une intuition.
+Three measurements that close false leads. They are here to prevent a future session from
+reopening them on a hunch.
 
-| Mesure | Résultat | Ce qu'elle interdit |
+| Measurement | Result | What it forbids |
 |---|---|---|
-| Potentiel par question, phase `porte` contre phase `detail` | 0,60 contre 1,74 | allonger la porte pour raccourcir le détail est un mauvais échange |
-| Dispersion du `potentiel_max` des critères détaillés | tous entre 1,0 et 2,0, distribution plate | il n'existe aucun critère lourd qu'on pourrait poser en premier pour couvrir la moitié du radar |
-| Questions nécessaires pour couvrir 50 % du potentiel de détail | 14 sur 37, contre 18,5 en tirant au hasard | le tri par potentiel décroissant ne fait gagner que 4,5 questions sur 37 |
+| Potential per question, phase `gate` vs phase `detail` | 0.60 vs 1.74 | lengthening the gate to shorten the detail is a bad trade |
+| Dispersion of the `max_potential` of detailed criteria | all between 1.0 and 2.0, flat distribution | there is no heavy criterion that could be asked first to cover half the radar |
+| Questions needed to cover 50 % of the detail potential | 14 out of 37, vs 18.5 when drawing at random | sorting by decreasing potential only saves 4.5 questions out of 37 |
 
-## Session 19 : le format à cases indépendantes, évalué et écarté
+## Session 19: the independent-checkbox format, evaluated and rejected
 
-Une tentative antérieure du projet posait des questions **multi-select** ("coche toutes les affirmations qui s'appliquent"), chaque case remplissant ses propres critères, à raison de 3 à 5 critères par question. Capacité théorique : **3,0 critères par question**, contre 1,13 pour le format actuel à choix unique.
+An earlier attempt of the project asked **multi-select** questions ("check all the
+statements that apply"), each checkbox filling its own criteria, at a rate of 3 to 5 criteria
+per question. Theoretical capacity: **3.0 criteria per question**, vs 1.13 for the current
+single-choice format.
 
-**Ce format est écarté.** Sur le déroulé réel de la tentative, 7 questions visant 21 critères en ont rempli 9 :
+**This format is rejected.** On the actual run of the attempt, 7 questions targeting 21
+criteria filled in 9:
 
-| Question | Critères visés | Réellement remplis |
+| Question | Criteria targeted | Actually filled in |
 |---|---|---|
-| Q1 criticité et disponibilité | 3 | 0, la case cochée ne correspondait à aucun cran du référentiel |
-| Q2 complexité et architecture | 3 | 3 |
-| Q3 utilité fonctionnelle | 3 | 1 |
-| Q4 UX et données | 2 | 2 |
-| Q5 maturité d'ingénierie | 5 | 3 |
-| Q6 pratiques de développement | 3 | 0 |
-| Q7 observabilité | 2 | 0 |
-| **Total** | **21, soit 3,0 par question** | **9, soit 1,29 par question** |
+| Q1 criticality and availability | 3 | 0, the checked box matched no level of the framework |
+| Q2 complexity and architecture | 3 | 3 |
+| Q3 functional usefulness | 3 | 1 |
+| Q4 UX and data | 2 | 2 |
+| Q5 engineering maturity | 5 | 3 |
+| Q6 development practices | 3 | 0 |
+| Q7 observability | 2 | 0 |
+| **Total** | **21, i.e. 3.0 per question** | **9, i.e. 1.29 per question** |
 
-**Le gain réel est de 14 %, pas de 160 %.** La raison est de conception : le multi-select offre au client une sortie de secours groupée ("aucune de ces affirmations" ou "je ne sais pas" pour cinq critères d'un coup), et il la prend. Le choix unique, lui, force une réponse déterminée par question.
+**The real gain is 14 %, not 160 %.** The reason is by design: multi-select offers the
+client a grouped escape hatch ("none of these statements" or "I don't know" for five
+criteria at once), and they take it. Single choice, for its part, forces a determined
+answer per question.
 
-Quatre défauts de cette tentative, à ne pas reproduire :
+Four defects of this attempt, not to be reproduced:
 
-1. **La plomberie était visible par le lecteur.** Les annotations du genre "0.1 = niveau d'impact élevé si coché" et les mentions "couvre EOF 0.1, 0.3, 6.10" s'adressaient à l'outil, pas au service audité. C'est le défaut que le commit `104e0ec` a corrigé dans le questionnaire actuel.
-2. **Des cases contradictoires cochables ensemble.** Une question proposait "une politique de suppression existe" et "pas de politique formelle" dans la même liste ; une autre, "objectif de disponibilité formel" et "un mode dégradé serait acceptable", qui tirent le même critère en sens inverses. Rien n'empêchait de cocher les deux.
-3. **Une case collait "aucune de ces pratiques n'est en place" et "je ne sais pas".** Ce sont deux réponses opposées : l'une est un constat, l'autre est l'absence de constat. Le référentiel EOF fait déjà cette faute dans 8 de ses crans, cf. `.claude/skills/eof/docs/source-sheet/PIEGES-REFERENTIEL.md`. Ne pas la refaire.
-4. **Perte de résolution structurelle.** 15 des 16 questions du diagnostic rapide ont **5 crans** (`0.13` en a 3) : une case à cocher n'en exprime que 2. Cocher "objectif de disponibilité formel" ne distingue pas 99 % de 99,99 %. Sur la dimension 6, le niveau intermédiaire `🟡 Effort modéré`, de coefficient 0,5, devient inatteignable.
+1. **The plumbing was visible to the reader.** Annotations like "0.1 = high impact level if
+   checked" and mentions "covers EOF 0.1, 0.3, 6.10" were addressed to the tool, not to the
+   audited service. This is the defect that commit `104e0ec` fixed in the current
+   questionnaire.
+2. **Contradictory checkboxes could be ticked together.** One question offered "a deletion
+   policy exists" and "no formal policy" in the same list; another, "formal availability
+   target" and "a degraded mode would be acceptable", which pull the same criterion in
+   opposite directions. Nothing prevented checking both.
+3. **One checkbox glued together "none of these practices is in place" and "I don't know".**
+   These are two opposite answers: one is a finding, the other is the absence of a finding.
+   The EOF framework already makes this mistake in 8 of its levels, cf.
+   `.claude/skills/eof/docs/source-sheet/REFERENCE-PITFALLS.md`. Do not repeat it.
+4. **Structural loss of resolution.** 15 of the 16 quick diagnostic questions have **5
+   levels** (`0.13` has 3): a checkbox can only express 2. Checking "formal availability
+   target" does not distinguish 99 % from 99.99 %. On dimension 6, the intermediate level
+   `🟡 Moderate effort`, with coefficient 0.5, becomes unreachable.
 
-## Session 19 : ce qu'il faut emprunter à cette tentative
+## Session 19: what to borrow from this attempt
 
-Le format est écarté, **la formulation est bonne à prendre**. Trois emprunts, retenus par l'utilisatrice dans cet ordre.
+The format is rejected, **the phrasing is good to take**. Three borrowings, retained by the
+user in this order.
 
-### Emprunt 1 : rappeler dans la question ce que les sondes ont déjà mesuré
+### Borrowing 1: recall in the question what the probes already measured
 
-Faire lire au service audité le fait mesuré avant qu'il réponde, pour qu'il **confirme ou corrige** au lieu de deviner. Bénéfice secondaire : sa réponse cesse d'être une déclaration en l'air.
+Have the audited service read the measured fact before answering, so that they **confirm
+or correct** instead of guessing. Secondary benefit: their answer ceases to be a statement
+in the air.
 
-**Portée réelle, mesurée : 17 des 62 blocs**, pas la totalité.
+**Real scope, measured: 17 of the 62 blocks**, not all of them.
 
-| | Nombre | Identifiants |
+| | Count | Identifiers |
 |---|---|---|
-| Critères détaillés avec un `contexte` non vide et sans réponse | 16 | `1.4, 1.9, 1.11, 1.14, 1.15, 1.16, 2.3, 2.5, 3.2, 3.5, 3.7, 5.5, 6.1, 6.3, 6.6, 6.8` |
-| Questions du diagnostic rapide avec un `indice_contextuel` non vide et sans réponse | 1 | `0.4` |
-| Critères avec un `contexte` mais **déjà** répondus, donc sans question posée | 0 | - |
+| Detailed criteria with a non-empty `context` and no answer | 16 | `1.4, 1.9, 1.11, 1.14, 1.15, 1.16, 2.3, 2.5, 3.2, 3.5, 3.7, 5.5, 6.1, 6.3, 6.6, 6.8` |
+| Quick diagnostic questions with a non-empty `context_index` and no answer | 1 | `0.4` |
+| Criteria with a `context` but **already** answered, hence no question asked | 0 | - |
 
-Les 45 autres blocs n'ont **aucun** fait mesuré à rappeler : l'emprunt améliore un quart du questionnaire. Bonne nouvelle en revanche, ces 17 textes sont **rédigés pour un lecteur humain**, avec unités et nuances, et non des dumps techniques : ils sont réutilisables presque tels quels.
+The other 45 blocks have **no** measured fact to recall: the borrowing improves a quarter of
+the questionnaire. Good news though: these 17 texts are **written for a human reader**, with
+units and nuances, not technical dumps: they are almost reusable as-is.
 
-### Emprunt 2 : reformuler les questions en affirmations concrètes sur le service
+### Borrowing 2: rephrase the questions as concrete statements about the service
 
-Remplacer l'intitulé du référentiel par une affirmation que le client peut confirmer. "Disparition du service = impact fort sur l'image, le recrutement, le commerce" se répond ; "Les composants principaux sont-ils soumis à des contraintes de haute disponibilité ?" fait hésiter. **Zéro code**, travail rédactionnel sur les 62 blocs de la bibliothèque.
+Replace the framework's wording with a statement the client can confirm. "Disappearance of
+the service = strong impact on image, recruitment, commerce" is answerable; "Are the main
+components subject to high-availability constraints?" makes people hesitate. **Zero code**,
+editorial work on the 62 blocks of the library.
 
-⚠️ Contrainte non négociable : la reformulation porte sur le champ `question` et le champ `aide`, **jamais** sur les libellés de réponse d'un bloc `type: "direct"`, qui sont lus dans le référentiel, ni sur les valeurs du dictionnaire `reponses` d'un bloc `type: "compose"`, qui doivent rester des libellés exacts du référentiel au caractère près.
+⚠️ Non-negotiable constraint: the rephrasing applies to the `question` field and the `help`
+field, **never** to the answer labels of a `type: "direct"` block, which are read from the
+framework, nor to the values of the `answers` dict of a `type: "composite"` block, which must
+remain exact framework labels character for character.
 
-### Emprunt 3 : un titre thématique qui dit à qui passer la question
+### Borrowing 3: a thematic title that says who to pass the question to
 
-"Maturité d'ingénierie et connaissance du code" indique l'interlocuteur, là où un intitulé de critère ne le fait pas. La coupure `produit-usage` / `technique` existe déjà, l'indication de l'interlocuteur non.
+"Engineering maturity and knowledge of the code" indicates the interviewee, where a
+criterion title does not. The `product-usage` / `technical` split already exists, the
+interviewee indication does not.
 
-## Session 19 : décision sur la granularité et la provenance
+## Session 19: decision on granularity and provenance
 
-Question posée : accepterait-on une réponse **plus grossière** en échange d'une question qui couvre plus de critères, à condition que ce soit signalé dans la provenance ?
+Question asked: would we accept a **coarser** answer in exchange for a question covering more
+criteria, provided it is flagged in the provenance?
 
-**Réponse : l'axe de provenance ne sait pas l'exprimer, et on ne le modifie pas.**
+**Answer: the provenance axis cannot express it, and we do not modify it.**
 
-L'axe est fermé à 5 valeurs par `processus/valider_sortie_lot.py:65`, avec la précédence `collecte > estime > precise > declare > suppose` (décision du 2026-09-11 : `precise` passe devant `declare` car le client connaît directement sa réalité technique via le questionnaire, alors qu'une déclaration publique (CGU, mentions légales) est parfois générique, datée, ou rédigée sans vérification technique). Le manifeste dit ce qu'elles veulent dire (`processus/manifeste-lots.json:11`) :
+The axis is closed to 5 values by `process/validate_lot_output.py:65`, with the precedence
+`collected > estimated > stated > declared > assumed` (decision of 2026-09-11: `stated`
+ranks ahead of `declared` because the client knows their technical reality directly via the
+questionnaire, whereas a public declaration (ToS, legal notice) is sometimes generic,
+dated, or written without technical verification). The manifest says what they mean
+(`process/lots-manifest.json:11`):
 
-> La provenance 'precise' (case cochee par le client sans preuve jointe) est placee au-dessus de 'declare' (declaration publique trouvee, ex. CGU) : le client connait son equipe et sa realite technique directement, alors qu'une declaration publique est parfois generique ou datee, redigee sans verification technique. La provenance 'suppose' designe une deduction depuis un indice faible : elle est placee en derniere position de precedence car une case cochee par le client sans preuve (precise) vaut davantage - le client connait son equipe alors que nous devinons depuis un signal qui parle souvent d'autre chose.
+> The 'stated' provenance (checkbox ticked by the client without attached evidence) ranks
+> above 'declared' (public declaration found, e.g. ToS): the client knows their team and
+> their technical reality directly, whereas a public declaration is sometimes generic or
+> dated, written without technical verification. The 'assumed' provenance designates a
+> deduction from a weak clue: it is placed last in precedence because a checkbox ticked by
+> the client without evidence (stated) is worth more — the client knows their team while we
+> guess from a signal that often talks about something else.
 
-L'axe répond donc à **"qui l'affirme, et sur quelle base ?"**, pas à **"à quel point la réponse est-elle fine ?"**. Y ajouter un 6ᵉ niveau mélangerait deux natures d'incertitude sur un seul axe, ce que la consigne du projet interdit, et casserait l'axe unique partagé avec la table de badges e-footprint.
+The axis therefore answers **"who claims it, and on what basis?"**, not **"how fine is the
+answer?"**. Adding a 6th level would mix two natures of uncertainty on a single axis, which
+the project guideline forbids, and would break the single axis shared with the e-footprint
+badge table.
 
-**Décision de principe, à appliquer le jour où la question se posera vraiment** : la granularité serait un **marqueur séparé**, jamais un niveau de provenance.
+**Principle decision, to apply the day the question really arises**: granularity would be a
+**separate marker**, never a provenance level.
 
-La question ne se pose pas aujourd'hui : aucun des trois emprunts retenus ne rend une réponse plus grossière. Elle ne se posait qu'avec le format multi-select, écarté.
+The question does not arise today: none of the three retained borrowings makes an answer
+coarser. It only arose with the multi-select format, which was rejected.
 
-## Session 19 : ce que le code fait déjà, et ce qui manque pour l'emprunt 1
+## Session 19: what the code already does, and what is missing for borrowing 1
 
-État relevé dans `.claude/skills/analyse-parcours/scripts/generate_questionnaire.py` :
+State found in `.claude/skills/analyse-parcours/scripts/generate_questionnaire.py`:
 
-| Point | État |
+| Point | State |
 |---|---|
-| Clés lues dans `eof-audit-results.json` | `id` et `reponse` **seulement**, lignes 143-153 |
-| `contexte` et `indice_contextuel` | **non lus**, c'est tout le manque |
-| Condition de rétention d'un bloc | lignes 216-219, retenu si au moins un de ses critères est sans réponse |
-| Rendu du champ `aide` | lignes 312-313, rendu **tel quel**, enrobé d'italique, aucune autre mise en forme |
+| Keys read in `eof-audit-results.json` | `id` and `answer` **only**, lines 143-153 |
+| `context` and `context_index` | **not read**, that is the whole gap |
+| Condition for retaining a block | lines 216-219, retained if at least one of its criteria has no answer |
+| Rendering of the `help` field | lines 312-313, rendered **as-is**, wrapped in italics, no other formatting |
 
-Contrat de lot, dans `processus/valider_sortie_lot.py` : le champ `contexte` est **autorisé** sur une entrée de critère (lignes 159-162), et `provenance` ainsi que `source` sont **requis et non vides** dès que `reponse` **ou** `contexte` est non null (lignes 246-249, règle verbatim `"requis si reponse ou contexte non null"`).
+Lot contract, in `process/validate_lot_output.py`: the `context` field is **allowed** on a
+criterion entry (lines 159-162), and `provenance` as well as `source` are **required and
+non-empty** as soon as `answer` **or** `context` is non-null (lines 246-249, verbatim rule
+"required if answer or context non-null").
 
-Généricité : le fait mesuré est injecté **au moment de la génération**, depuis le dossier d'audit. La bibliothèque `questionnaire-blocs.json` ne contient donc aucune valeur d'un site particulier et **reste générique**. ⚠️ À savoir sur l'outil de contrôle : `check_genericite.py` vise par défaut les fichiers `.py` de `efootprint_model/`. Pointé explicitement sur la bibliothèque JSON il tourne et passe. **Pointé sur un fichier Markdown il échoue toujours**, y compris sur un fichier intact, parce qu'il parse ses cibles comme du Python. Ce n'est pas une régression : ne pas partir en chasse.
+Genericity: the measured fact is injected **at generation time**, from the audit folder. The
+`questionnaire-blocs.json` library therefore contains no value from any particular site and
+**stays generic**. ⚠️ To know about the control tool: `check_genericite.py` targets the `.py`
+files of `efootprint_model/` by default. Pointed explicitly at the JSON library it runs and
+passes. **Pointed at a Markdown file it always fails**, even on an intact file, because it
+parses its targets as Python. This is not a regression: do not go hunting for it.
 
-## Session 19 : spécification de l'emprunt 1, pour la session suivante
+## Session 19: specification of borrowing 1, for the next session
 
-Travail exécutable par Sonnet à partir de cette seule section.
+Work executable by Sonnet from this section alone.
 
-**Objectif** : quand un bloc est retenu, faire apparaître sous la question le fait déjà mesuré pour le ou les critères que ce bloc couvre, s'il existe.
+**Objective**: when a block is retained, show under the question the already measured fact
+for the criterion or criteria this block covers, if it exists.
 
-**Sources à lire dans le dossier d'audit** : `criteres[].contexte` pour les critères détaillés, `diagnostic_rapide_apercu.questions[].indice_contextuel` pour les `0.x`.
+**Sources to read in the audit folder**: `criteria[].context` for the detailed criteria,
+`quick_diag_overview.questions[].context_index` for the `0.x`.
 
-**Pièges à traiter explicitement, chacun a déjà coûté au projet** :
+**Pitfalls to handle explicitly, each has already cost the project**:
 
-1. **Une clé peut exister et valoir `null`.** Un repli du genre `bloc.get("contexte", "")` ne protège de rien : la clé est présente, sa valeur est `None`, et elle s'affiche telle quelle au lecteur. Tester `is not None` **et** la chaîne vide.
-2. **Le texte injecté s'adresse au service audité, pas à l'outil.** Interdiction d'y faire figurer un identifiant de critère, un nom de sonde, un nom de fichier ou de fonction. C'est le défaut corrigé par `104e0ec`, et le contrôle est visuel : lire le Markdown généré.
-3. **Un bloc `type: "compose"` couvre plusieurs critères**, donc potentiellement plusieurs `contexte`. Décider et documenter ce qu'on fait : les concaténer, n'en garder qu'un, ou ne rien afficher. Ne pas laisser le comportement émerger du hasard de l'itération.
-4. **Le rappel ne doit rien affirmer de plus que ce que la sonde a trouvé.** Une sonde qui n'a rien trouvé ne prouve pas l'absence : ne jamais transformer un zéro en constat.
-5. **45 blocs sur 62 n'ont aucun fait à rappeler.** L'absence doit être silencieuse : pas d'intitulé orphelin, pas de "Rappel :" suivi de rien.
+1. **A key can exist and be worth `null`.** A fallback like `block.get("context", "")`
+   protects against nothing: the key is present, its value is `None`, and it displays as-is
+   to the reader. Test `is not None` **and** the empty string.
+2. **The injected text is addressed to the audited service, not to the tool.** Forbidden to
+   include a criterion identifier, a probe name, a file or function name. This is the defect
+   fixed by `104e0ec`, and the control is visual: read the generated Markdown.
+3. **A `type: "composite"` block covers several criteria**, hence potentially several
+   `context`s. Decide and document what we do: concatenate them, keep only one, or show
+   nothing. Do not let the behavior emerge from the randomness of iteration.
+4. **The recall must not assert anything more than what the probe found.** A probe that
+   found nothing does not prove absence: never turn a zero into a finding.
+5. **45 blocks out of 62 have no fact to recall.** The absence must be silent: no orphan
+   heading, no "Recall:" followed by nothing.
 
-**Contrôles à passer avant tout commit** :
+**Controls to pass before any commit**:
 
 ```bash
 cd "/Users/pierrick.crepy/Documents/missions/MyAIEnv/Agent EROOM"
-python3 .claude/skills/analyse-parcours/scripts/valider_blocs_questionnaire.py
-python3 .claude/skills/analyse-parcours/scripts/valider_blocs_questionnaire.py --autotest
+python3 .claude/skills/analyse-parcours/scripts/validate_questionnaire_blocks.py
+python3 .claude/skills/analyse-parcours/scripts/validate_questionnaire_blocks.py --autotest
 python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py --autotest
 python3 .claude/skills/analyse-parcours/scripts/parse_questionnaire.py --autotest
-python3 .claude/skills/analyse-parcours/scripts/check_valeurs_rapport.py --autotest
-python3 processus/valider_manifeste.py
-python3 processus/valider_coherence_cles.py
+python3 .claude/skills/analyse-parcours/scripts/check_report_values.py --autotest
+python3 process/validate_manifest.py
+python3 process/validate_key_consistency.py
 ```
 
-⚠️ Ne jamais enchaîner un script avec `| tail` : le code de sortie rendu serait celui de `tail`.
+⚠️ Never chain a script with `| tail`: the exit code returned would be that of `tail`.
 
-**Nouveaux autotests attendus** : un critère dont `contexte` vaut `null`, un dont il vaut la chaîne vide, un bloc composé dont un seul des deux critères a un contexte, et un audit dont **tous** les contextes sont vides.
+**New expected autotests**: a criterion whose `context` is `null`, one whose it is the empty
+string, a composite block where only one of the two criteria has a context, and an audit whose
+**all** contexts are empty.
 
-**Vérification par le rendu, obligatoire** : générer le questionnaire sur un audit réel **et** sur un audit entièrement vide, puis **lire le Markdown produit**, pas compter des occurrences. L'audit vide se fabrique dans `/tmp`, jamais dans `audits/` :
+**Verification by rendering, mandatory**: generate the questionnaire on a real audit **and**
+on a fully empty audit, then **read the produced Markdown**, do not count occurrences. The
+empty audit is built in `/tmp`, never in `audits/`:
 
 ```bash
 mkdir -p /tmp/audit-zero/site-x.fr
-jq '.domaine="site-x.fr"
-  | .criteres = [.criteres[] | .reponse=null | .coefficient=null | .provenance=null
-                 | .source=null | .contexte=null | .categorie="aucune_donnee"]
-  | .criteres_repondus=0 | .completude_globale_pct=0
-  | .diagnostic_rapide_apercu.questions = [.diagnostic_rapide_apercu.questions[]
-      | .reponse=null | .provenance=null | .source=null | .indice_contextuel=null]' \
+jq '.domain="site-x.fr"
+  | .criteria = [.criteria[] | .answer=null | .coefficient=null | .provenance=null
+                 | .source=null | .context=null | .category="no_data"]
+  | .answered_criteria=0 | .global_completeness_pct=0
+  | .quick_diag_overview.questions = [.quick_diag_overview.questions[]
+      | .answer=null | .provenance=null | .source=null | .context_index=null]' \
   audits/octo.com/eof-audit-results.json > /tmp/audit-zero/site-x.fr/eof-audit-results.json
 python3 .claude/skills/analyse-parcours/scripts/generate_questionnaire.py /tmp/audit-zero/site-x.fr
 ```
 
-Attendu sur l'audit vide : **62 blocs posés**, la bibliothèque entière, et **aucun rappel de mesure affiché**.
+Expected on the empty audit: **62 blocks asked**, the whole library, and **no measurement
+recall displayed**.
 
-## Les trois emprunts sont faits
+## The three borrowings are done
 
-| Emprunt | Commit | Ce que le client voit |
+| Borrowing | Commit | What the client sees |
 |---|---|---|
-| 1, le rappel des mesures | `9ba4f5b`, textes réécrits pour lui en `e091e98` | sous la question, le fait déjà mesuré, à confirmer ou corriger |
-| 2, les questions en affirmations | `2f4205d`, relu en `009a647` | les 62 questions écrites dans ses mots, sans aucun acronyme interne |
-| 3, les titres et l'interlocuteur | `431e127`, relu en `009a647` | `## 3 sur 41 - Disponibilité du code source (à voir avec l'équipe de développement)` |
+| 1, the recall of measurements | `9ba4f5b`, texts rewritten for them in `e091e98` | under the question, the already measured fact, to confirm or correct |
+| 2, questions as statements | `2f4205d`, re-read in `009a647` | the 62 questions written in their words, with no internal acronym |
+| 3, titles and the interviewee | `431e127`, re-read in `009a647` | `## 3 of 41 - Code source availability (to check with the development team)` |
 
-La plomberie interne du Markdown (`Critères EOF couverts`, `Potentiel débloqué`) est passée en
-commentaires HTML en `f28bf8e` : elle n'est plus lue par le client.
+The internal plumbing of the Markdown (`Criteres EOF couverts`, `Potentiel debloque`) moved to
+HTML comments in `f28bf8e`: it is no longer read by the client.
 
-⚠️ **Les textes de mesure viennent du dossier d'audit, pas du code de génération.** Un dossier
-d'audit produit avant `e091e98` publie donc encore les anciens textes, avec leurs acronymes
-internes. Les rafraîchir se fait **sans appel réseau**, en rejouant `run_eof.py` sur une copie du
-dossier : il ne relit que des fichiers déjà sur le disque. Vérifié, aucun verdict ne change et le
-radar reste identique à l'octet ; seuls les 16 textes de contexte sont réécrits.
+⚠️ **The measurement texts come from the audit folder, not from the generation code.** An
+audit folder produced before `e091e98` therefore still publishes the old texts, with their
+internal acronyms. Refreshing them is done **without a network call**, by replaying
+`run_eof.py` on a copy of the folder: it only re-reads files already on disk. Verified, no
+verdict changes and the radar stays identical to the byte; only the 16 context texts are
+rewritten.
 
 -----
 
-## Session 25, 2026-09-08 : l'axe unique, et ce qu'il donne quand on le suit
+## Session 25, 2026-09-08: the single axis, and what it gives when followed
 
-Tout ce qui suit relève d'un seul axe, posé par l'utilisatrice et prioritaire sur tout le reste :
-**poser le moins de questions possible pour faire répondre le plus grand nombre de critères, et le
-plus précisément possible.** Le contenu des questions et leur ordre découlent de cet axe, et de rien
-d'autre. En particulier, ni le destinataire ni le confort de lecture ne sont des axes de classement.
+Everything below falls under a single axis, set by the user and taking precedence over
+everything else: **ask as few questions as possible to get the largest number of criteria
+answered, and as precisely as possible.** The content of the questions and their order
+derive from this axis, and from nothing else. In particular, neither the recipient nor reading
+comfort are sorting axes.
 
-Deux conséquences valent d'être dites tout de suite, parce qu'elles ferment des pistes qui reviennent
-naturellement à l'esprit. La redondance apparente entre questions n'est presque pas exploitable, et
-gagner des questions en remplaçant une question par un indice technique approximatif est un recul,
-pas un gain : cela fait baisser le compteur en fabriquant de l'imprécision.
+Two consequences are worth stating right away, because they close leads that naturally come
+back to mind. The apparent redundancy between questions is almost not exploitable, and saving
+questions by replacing a question with an approximate technical clue is a step backward, not
+a gain: it lowers the counter by manufacturing imprecision.
 
-### Les comptes réels
+### The real counts
 
-70 critères au référentiel (54 détaillés sur 6 dimensions + 16 questions de diagnostic rapide).
+70 criteria in the framework (54 detailed over 6 dimensions + 16 quick diagnostic questions).
 
-62 blocs de questions dans la bibliothèque, ce qui est un PLAFOND et non le nombre posé : `generate_questionnaire.py` ne garde que les critères restés sans réponse.
+62 question blocks in the library, which is a CEILING and not the number asked:
+`generate_questionnaire.py` only keeps the criteria left unanswered.
 
-Sur un audit réel, 57 questions ont été produites, contre 16 + 41 = 57 avec l'ancien code : le regroupement ne coûte aucune question.
+On a real audit, 57 questions were produced, vs 16 + 41 = 57 with the old code: the grouping
+costs no question.
 
-8 critères sont tranchés par la mesure seule (1.5, 1.6, 1.12, 1.13, 2.1, 3.3, 5.4 et 0.16).
+8 criteria are decided by measurement alone (1.5, 1.6, 1.12, 1.13, 2.1, 3.3, 5.4 and 0.16).
 
-16 critères reçoivent un contexte affiché mais JAMAIS de réponse.
+16 criteria receive a displayed context but NEVER an answer.
 
-46 critères qu'aucune sonde n'atteint.
+46 criteria that no probe reaches.
 
-### La fusion est épuisée
+### The merge is exhausted
 
-Les 8 blocs de type composé couvrent 16 critères à eux seuls. Une recherche exhaustive a conclu qu'AUCUNE fusion supplémentaire n'est possible sans perte.
+The 8 composite-type blocks cover 16 criteria by themselves. An exhaustive search concluded
+that NO further merge is possible without loss.
 
-Une seule paire nouvelle a été proposée, 1.1 avec 1.7, et elle a été rejetée : 1.1 demande si une solution non numérique a été écartée preuve en main, 1.7 si chaque fonctionnalité est réellement utilisée, et une réponse "potentiel d'amélioration" ne dirait plus lequel des deux manque.
+A single new pair was proposed, 1.1 with 1.7, and it was rejected: 1.1 asks whether a
+non-digital solution was ruled out with evidence in hand, 1.7 whether each feature is
+really used, and a "improvement potential" answer would no longer say which of the two is
+missing.
 
-Dix fusions tentantes ont été examinées et rejetées, toutes sur le même mécanisme : DEUX PRATIQUES DÉCOUPLÉES DANS LA VRAIE VIE. Liste à ne pas rouvrir : 1.2 avec 2.2, 1.5 avec 1.10, 1.3 avec 1.6, 3.1 avec 3.2, 4.2 avec 4.3, 6.1 avec 6.6, 6.2 avec 6.4, 6.3 avec 6.4, 1.11 avec 1.12, 2.3 avec 2.4. Exemples parlants : un CI/CD peut tourner sans tests, on peut faire du FinOps sans GreenOps, une base mal choisie peut être correctement optimisée.
+Ten tempting merges were examined and rejected, all on the same mechanism: TWO PRACTICES
+DECOUPLED IN REAL LIFE. List not to reopen: 1.2 with 2.2, 1.5 with 1.10, 1.3 with 1.6, 3.1
+with 3.2, 4.2 with 4.3, 6.1 with 6.6, 6.2 with 6.4, 6.3 with 6.4, 1.11 with 1.12, 2.3 with 2.4.
+Telling examples: a CI/CD can run without tests, one can do FinOps without GreenOps, a badly
+chosen database can be correctly optimized.
 
-### La contrainte des deux vocabulaires
+### The constraint of the two vocabularies
 
-⚠️ **Ce paragraphe affirmait l'inverse de ce que dit le référentiel, et il a été corrigé en session 26 après lecture directe de `eof-referentiel.json`. Le référentiel fait foi.**
+⚠️ **This paragraph claimed the opposite of what the framework says, and it was corrected in
+session 26 after directly reading `eof-reference.json`. The framework is authoritative.**
 
-Les 44 critères des dimensions 1 à 5 offrent "🚫 Non applicable", coefficient 0, ainsi que "🤔 À évaluer". Les 16 questions de diagnostic rapide 0.x n'offrent NI l'un NI l'autre : elles portent des crans graduués, sans option de non-applicabilité. Les 10 critères de la dimension 6 portent leur propre échelle à trois crans, "🟢 Facile à modifier" / "🟡 Effort modéré" / "🔴 Difficile à changer", et n'offrent pas non plus "Non applicable".
+The 44 criteria of dimensions 1 to 5 offer "🚫 Not applicable", coefficient 0, as well as
+"🤔 To be assessed". The 16 quick diagnostic questions 0.x offer NEITHER: they carry graduated
+levels, with no non-applicability option. The 10 criteria of dimension 6 carry their own
+three-level scale, "🟢 Easy to change" / "🟡 Moderate effort" / "🔴 Hard to change", and do
+not offer "Not applicable" either.
 
-Conséquence, inchangée : fusionner une 0.x avec un critère des dimensions 1 à 5 rend une réponse INEXPRIMABLE. C'est le "🚫 Non applicable" du critère détaillé qui devient impossible à cocher, puisque les crans de la 0.x ne le proposent pas.
+Consequence, unchanged: merging a 0.x with a criterion of dimensions 1 to 5 makes an answer
+UNEXPRESSIBLE. It is the "🚫 Not applicable" of the detailed criterion that becomes
+impossible to tick, since the levels of the 0.x do not offer it.
 
-C'est pour cela que le seul bloc composé touchant une 0.x associe 0.3 et 6.10.
+That is why the only composite block touching a 0.x associates 0.3 and 6.10.
 
-Conséquence pratique : sur 5 groupes de questions redondantes repérés, 4 traversent cette frontière et ne sont donc pas fusionnables ; seul 0.7 avec 0.10 l'est, pour un gain d'une seule question. La redondance apparente n'est PAS le levier.
+Practical consequence: out of 5 groups of redundant questions spotted, 4 cross this boundary
+and are therefore not mergeable; only 0.7 with 0.10 is, for a gain of a single question. The
+apparent redundancy is NOT the lever.
 
-### "Non applicable" et sans_objet sont désormais UN SEUL mécanisme, le critère écarté
+### "Not applicable" and not_applicable are now ONE SINGLE mechanism, the discarded criterion
 
-⚠️ **Réunifiés en session 26. Contrat complet dans `convention-critere-ecarte.md`, qui fait foi. Ce qui suit résume, et décrit au passage l'état d'AVANT, parce que c'est ce défaut-là qui a été fermé.**
+⚠️ **Unified in session 26. Full contract in `discarded-criterion-convention.md`, which is
+authoritative. What follows summarizes, and incidentally describes the BEFORE state, because
+it is that defect that was closed.**
 
-Un critère est **écarté** quand il ne s'applique pas au service. Deux chemins mènent au même état et produisent exactement les mêmes chiffres : sa `reponse` vaut "🚫 Non applicable", ou son booléen `sans_objet` vaut vrai. Un critère écarté sort de TOUS les dénominateurs, ne compte dans aucun numérateur, et n'est visible que dans la nouvelle clé `criteres_ecartes`.
+A criterion is **discarded** when it does not apply to the service. Two paths lead to the same
+state and produce exactly the same figures: its `answer` is "🚫 Not applicable", or its
+boolean `not_applicable` is true. A discarded criterion is removed from ALL denameinators,
+counts in no numerator, and is only visible in the new key `discarded_criteria`.
 
-**L'état d'avant, à ne pas restaurer.** La réponse "🚫 Non applicable" comptait dans `criteres_repondus` et ne retirait le critère d'aucun dénominateur. Elle se comportait donc exactement comme "🤔 À évaluer" : les deux gonflaient la complétude sans rien apporter au potentiel. Démonstration : 10 critères dont 3 répondus, passer les 7 autres à "Non applicable" donnait `criteres_repondus` 3 vers 10, `completude_pct` 30 % vers 100 %, et `potentiel_optimisation_pct` 15 % vers 15 %, INCHANGÉ.
+**The previous state, not to be restored.** The answer "🚫 Not applicable" counted in
+`answered_criteria` and removed the criterion from no denameinator. It therefore behaved
+exactly like "🤔 To be assessed": both inflated completeness while adding nothing to the
+potential. Demonstration: 10 criteria with 3 answered, switching the 7 others to "Not
+applicable" gave `answered_criteria` 3 to 10, `completeness_pct` 30 % to 100 %, and
+`optimization_potential_pct` 15 % to 15 %, UNCHANGED.
 
-**Le piège de fond, qui a décidé du reste.** "🚫 Non applicable" et "✅ Point fort confirmé" portent le MÊME coefficient 0. Compter un critère écarté comme répondu le rend donc arithmétiquement identique à un point fort : un service sans base de données aurait vu sa dimension 4 affichée à 0 % de potentiel d'optimisation, c'est-à-dire comme la dimension la mieux notée de son rapport. D'où le troisième état `hors_perimetre` par dimension, qui sort `null` et jamais 0 %.
+**The underlying trap, which decided the rest.** "🚫 Not applicable" and "✅ Confirmed
+strength" carry the SAME coefficient 0. Counting a discarded criterion as answered therefore
+makes it arithmetically identical to a strength: a service without a database would have
+seen its dimension 4 displayed at 0 % optimization potential, i.e. as the best-scored
+dimension of its report. Hence the third state `out_of_scope` per dimension, which outputs
+`null` and never 0 %.
 
-**La divergence entre les deux producteurs est corrigée** : `run_eof.py` et `fusionner_lots.py` traitent désormais les deux chemins de la même façon. Au passage, une incohérence interne de `fusionner_lots.py` a été fermée : son total par dimension soustrayait déjà les écartés, son total global non.
+**The divergence between the two producers is corrected**: `run_eof.py` and `merge_lots.py`
+now treat both paths the same way. Incidentally, an internal inconsistency of `merge_lots.py`
+was closed: its per-dimension total already subtracted the discarded ones, its global total did
+not.
 
-### Un levier apparent, refusé : remplacer une question par un indice technique
+### An apparent lever, refused: replacing a question with a technical clue
 
-Six questions pourraient être approchées par un signal que nous mesurons déjà : 0.4 par le nombre de
-domaines tiers, 0.10 par le nombre d'URL du sitemap, 1.9 et 1.14 par le poids de page, 2.5 par les
-codes HTTP 304, 6.3 par la fraîcheur des déploiements.
+Six questions could be approximated by a signal we already measure: 0.4 by the number of
+third-party domains, 0.10 by the number of URLs in the sitemap, 1.9 and 1.14 by the page weight,
+2.5 by HTTP 304 codes, 6.3 by deployment freshness.
 
-Ce sont des proxys faibles. Un déploiement récent ne prouve pas qu'un pipeline existe, un poids de
-page ne dit rien de la clarté d'un écran. Les transformer en réponses gagnerait 6 questions **en
-dégradant la précision**, c'est-à-dire l'inverse du but. Refusé.
+These are weak proxies. A recent deployment does not prove a pipeline exists, a page weight
+says nothing about screen clarity. Turning them into answers would save 6 questions **while
+degrading precision**, i.e. the opposite of the goal. Refused.
 
-### Les questions filtres, implémentées en session 26
+### Filter questions, implemented in session 26
 
-Une question filtre ne fait pas répondre 2 critères, elle en fait répondre dix quand la réponse est "ça ne s'applique pas chez nous" : un service sans base de données propre règle la dimension 4 d'un coup, sans perte de précision puisque "Non applicable" est une réponse légitime du référentiel pour les dimensions 1 à 5.
+A filter question does not make 2 criteria answered, it makes ten answered when the answer is
+"this does not apply to us": a service without its own database settles dimension 4 all at
+once, without loss of precision since "Not applicable" is a legitimate framework answer for
+dimensions 1 to 5.
 
-**Contrat complet dans `convention-critere-ecarte.md`. Ce qui suit ne dit que ce qu'il faut savoir en lisant le code.**
+**Full contract in `discarded-criterion-convention.md`. What follows only says what you need
+to know when reading the code.**
 
-Un troisième `type` de bloc, `filtre`, à côté de `direct` et `compose`. Il porte une liste `criteres` au lieu d'un `critere` au singulier, plus un `libelle_ecarte` et un `libelle_applicable`. Cocher `libelle_ecarte` verse une entrée "🚫 Non applicable" par critère, sans promotion de provenance ; cocher `libelle_applicable` ne verse RIEN, les critères restent à poser.
+A third block `type`, `filter`, alongside `direct` and `composite`. It carries a `criteria`
+list instead of a singular `criterion`, plus a `discarded_label` and an `applicable_label`.
+Ticking `discarded_label` pours one "🚫 Not applicable" entry per criterion, with no
+provenance promotion; ticking `applicable_label` pours NOTHING, the criteria remain to be
+asked.
 
-Les trois filtres livrés :
+The three delivered filters:
 
-| Filtre | Critères gouvernés | Potentiel |
+| Filter | Governed criteria | Potential |
 |---|---|---|
-| Pas d'interface utilisateur humaine | 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.14, 5.9 | 12,5 |
-| Pas de données persistantes propres | 4.1 à 4.6 | 8,0 |
-| Pas d'environnement de test distinct | 3.8, 3.9 | 4,5 |
+| No human user interface | 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.14, 5.9 | 12.5 |
+| No persistent data of its own | 4.1 to 4.6 | 8.0 |
+| No separate test environment | 3.8, 3.9 | 4.5 |
 
-4.4 est volontairement laissé au filtre "données persistantes" seul : `valider_blocs_questionnaire.py` interdit le recouvrement entre deux filtres, alors qu'il tolère celui d'un filtre avec un bloc `direct`, qui est le principe même du levier.
+4.4 is deliberately left to the "persistent data" filter alone:
+`validate_questionnaire_blocks.py` forbids overlap between two filters, whereas it tolerates
+that of a filter with a `direct` block, which is the very principle of the lever.
 
-Trois règles qu'on ne devine pas en lisant le code :
+Three rules you cannot guess by reading the code:
 
-1. **Un filtre n'est imprimé que si aucun de ses critères ne porte déjà une réponse tranchante.** Si la mesure a tranché un seul de ses critères, elle a prouvé que le sujet s'applique. Sur `audits/octo.com`, le filtre "pas d'interface utilisateur" n'est donc PAS imprimé, parce que 1.5 et 1.13 sont tranchés par la collecte.
-2. **Un filtre est en phase `detail`, en tête de la partie détaillée**, jamais en phase `porte` : il ne gouverne que des critères du diagnostic détaillé, et le mettre en porte le ferait poser avant même la décision d'aller plus loin.
-3. ⚠️ **Un filtre ne RETIRE aucune question du document.** Le générateur ne connaît pas la réponse au filtre au moment où il écrit. Sans correctif, le levier allonge le questionnaire et n'économise rien : il ne rend que de la véracité au rapport, pas de l'effort au client. D'où la mention "À IGNORER" portée par tout bloc dont TOUS les critères sont gouvernés, avec une condition en **conjonction, jamais en disjonction**.
+1. **A filter is printed only if none of its criteria already carries a decisive answer.** If
+   the measurement has decided a single one of its criteria, it has proven that the subject
+   applies. On `audits/octo.com`, the "no human user interface" filter is therefore NOT
+   printed, because 1.5 and 1.13 are decided by the collection.
+2. **A filter is in phase `detail`, at the head of the detailed part**, never in phase `gate`:
+   it only governs criteria of the detailed diagnostic, and putting it in the gate would ask
+   it before even the decision to go further.
+3. ⚠️ **A filter REMOVES no question from the document.** The generator does not know the
+   answer to the filter at the moment it writes. Without a fix, the lever lengthens the
+   questionnaire and saves nothing: it only adds truthfulness to the report, not effort saved
+   for the client. Hence the "IGNORE" mention carried by any block whose ALL criteria are
+   governed, with a condition in **conjunction, never disjunction**.
 
-**Ce levier n'est pas une réduction garantie.** Pour un site web classique, les filtres reçoivent "cela s'applique" et n'écartent rien : le questionnaire s'allonge alors de deux questions. Le gain n'existe que pour les services dont une partie du référentiel ne parle pas. C'est un pari sur la diversité des services audités, à présenter comme tel.
+**This lever is not a guaranteed reduction.** For a classic website, the filters receive "this
+applies" and discard nothing: the questionnaire then grows by two questions. The gain exists
+only for services for which a part of the framework does not speak. It is a bet on the
+diversity of audited services, to be presented as such.
 
-**GARDE-FOU, tenu** : le rapport affiche À PART le nombre de critères écartés, via un KPI `Écartés` lisant `criteres_ecartes`. Sans lui, une complétude de 100 % construite sur des exclusions serait indiscernable d'un audit réellement instruit : on fabriquerait de la complétude.
+**GUARDRAIL, held**: the report displays SEPARATELY the number of discarded criteria, via a
+`Discarded` KPI reading `discarded_criteria`. Without it, a completeness of 100 % built on
+exclusions would be indistinguishable from a genuinely instructed audit: we would be
+manufacturing completeness.
 
-### Le bloc mesure sur le lot de relecture
+### The measurement block on the review lot
 
-`parse_questionnaire.py` produit un bloc `mesure` conforme à `documentation/implementation/convention-etat-de-mesure.md`, avec trois statuts :
+`parse_questionnaire.py` produces a `measurement` block compliant with
+`documentation/implementation/measurement-state-convention.md`, with three statuses:
 
-- `echec_lecture` si le fichier est absent ou illisible
-- `rien_trouve` s'il est lu mais qu'aucune case n'est cochée
-- `ok` sinon
+- `read_error` if the file is absent or unreadable
+- `not_found` if it is read but no checkbox is ticked
+- `ok` otherwise
 
-Vérifié par les trois tests de convention : fichier absent, `valider_sante_sondes.py` sort en 1 et nomme l'échec ; fichier présent et vide, il sort en 0 sans faux positif ; fichier répondu, il sort en 0.
+Verified by the three convention tests: file absent, `validate_probe_health.py` exits with 1
+and names the failure ; file present and empty, it exits with 0 without false positive ; file
+answered, it exits with 0.
 
-Un questionnaire revenu entièrement vide est un résultat d'audit légitime, pas un échec de notre outil : c'est `rien_trouve`, jamais `ok` ni `echec_*`.
+A questionnaire returned fully empty is a legitimate audit result, not a failure of our tool:
+it is `not_found`, never `ok` nor an error value.
 
-Sur un dossier sans questionnaire, `parse_questionnaire.py` écrivait un lot indistinguable d'un questionnaire revenu entièrement vide. Le lot porte désormais un bloc mesure qui distingue les deux cas.
+On a folder without a questionnaire, `parse_questionnaire.py` used to write a lot
+indistinguishable from a questionnaire returned fully empty. The lot now carries a measurement
+block that distinguishes the two cases.
 
-### Le questionnaire n'est branché nulle part dans le pipeline
+### The questionnaire is wired nowhere in the pipeline
 
-Établi par `grep` sur `SKILL.md` et les 9 fichiers de skill-steps : le mot "questionnaire" n'apparaît qu'une fois, dans une parenthèse de nom de plan à `39_eof-audit.md` ligne 16. Aucune étape n'appelle `generate_questionnaire.py`. Aucune échéance de retour n'est encodée nulle part.
+Established by `grep` on `SKILL.md` and the 9 skill-steps files: the word "questionnaire"
+appears only once, in a plan name parenthesis in `39_eof-audit.md` line 16. No step calls
+`generate_questionnaire.py`. No return deadline is encoded anywhere.
 
-Le circuit complet est dessiné dans `documentation/diagrammes/eof-questionnaire-sequence.pdf`, 3 pages : ce que l'audit lance seul, générer et envoyer hors pipeline, relire et fusionner.
+The full circuit is drawn in `documentation/diagrammes/eof-questionnaire-sequence.pdf`, 3 pages:
+what the audit launches on its own, generate and send outside the pipeline, re-read and merge.
 
-### Le piège de manipulation
+### The manipulation trap
 
-`run_eof.py` réécrit `eof-audit-results.json` sans relire les lots. Le relancer seul après une fusion fait donc disparaître du rapport, EN SILENCE, toutes les réponses du questionnaire. Il faut toujours relancer `fusionner_lots.py` derrière lui.
+`run_eof.py` rewrites `eof-audit-results.json` without re-reading the lots. Rerunning it alone
+after a merge therefore makes all the questionnaire answers disappear from the report, IN
+SILENCE. `merge_lots.py` must always be rerun after it.
 
-### Une leçon de méthode à ne pas oublier
+### A method lesson not to forget
 
-La fusion en un seul fichier a d'abord été commitée après `py_compile` et `valider_coherence_cles.py`, SANS lancer `parse_questionnaire.py --autotest`. Cet autotest fabriquait ses fixtures sous les deux anciens noms de fichier : 6 cas sur 7 tombaient, et la fusion était donc livrée avec son propre filet de sécurité crevé. Corrigé, 7 sur 7.
+The single-file merge was first committed after `py_compile` and `validate_key_consistency.py`,
+WITHOUT running `parse_questionnaire.py --autotest`. This autotest built its fixtures under the
+two old file names: 6 cases out of 7 fell, and the merge was therefore delivered with its own
+safety net torn. Fixed, 7 out of 7.
 
-La batterie de `processus/CONTROLES.md` ne suffit donc pas : **un script qui porte un `--autotest`
-doit voir son `--autotest` rejoué avant tout commit.** Cette règle est désormais inscrite dans
-`processus/CONTROLES.md`, avec la liste des **six** scripts concernés et la commande pour la
-retrouver plutôt que de lui faire confiance.
+The `process/CHECKS.md` battery is therefore not enough: **a script that carries an
+`--autotest` must see its `--autotest` rerun before any commit.** This rule is now written in
+`process/CHECKS.md`, with the list of the **six** scripts concerned and the command to find it
+rather than trust it.
 
-## Chantiers livrés
+## Work items delivered
 
-1. **Chantier 13, le radar à deux couches** : livré. Le script `generate_radar_svg.py` produit un radar distinguant les provenances par deux couches.
-2. **Chantier 31, séparateurs accessibles** : livré. Les séparateurs fabriqués dynamiquement ont été corrigés.
+1. **Work item 13, the two-layer radar**: delivered. The script `generate_radar_svg.py`
+   produces a radar distinguishing provenances by two layers.
+2. **Work item 31, accessible separators**: delivered. The dynamically generated separators
+   were fixed.
 
-⛔ **Ce qui est clos et ne doit pas être rouvert** :
+⛔ **What is closed and must not be reopened**:
 
-- **Le regroupement de questions.** Les 5 grappes antérieures plus la fusion `0.3` + `6.10` closent le sujet.
-- **Le format multi-select à cases indépendantes.** Écarté sur mesure : 1,29 contre 1,13, cf. la section dédiée.
-- **Le tri des questions par potentiel décroissant.** 4,5 questions gagnées sur 37, sans intérêt.
-- **La chasse aux recoupements entre diagnostic rapide et critères détaillés.** Les 6 ont été passés au crible, un seul était exploitable.
-- **L'espoir d'automatiser davantage.** Le plafond est structurel, pas un défaut d'outillage : les méthodes d'évaluation du référentiel exigent des faits internes à l'équipe, qu'aucune sonde ne peut observer.
+- **Question grouping.** The 5 former clusters plus the `0.3` + `6.10` merge close the subject.
+- **The independent-checkbox multi-select format.** Rejected on measurement: 1.29 vs 1.13, cf.
+  the dedicated section.
+- **Sorting questions by decreasing potential.** 4.5 questions saved out of 37, no interest.
+- **The hunt for overlaps between quick diagnostic and detailed criteria.** The 6 were screened,
+  only one was exploitable.
+- **The hope of automating more.** The ceiling is structural, not a tooling defect: the
+  framework's evaluation methods require facts internal to the team, that no probe can observe.
 
-Le levier qui reste n'est pas de poser **moins** de questions, c'est de rendre chaque question **plus facile à répondre**.
+The lever that remains is not to ask **fewer** questions, it is to make each question **easier
+to answer**.
 
-## Un défaut du référentiel EROOM, laissé ouvert
+## A defect of the EROOM framework, left open
 
-Certains crans du diagnostic rapide **collent la mention "je ne sais pas" au cran le plus
-défavorable** (`0.10`, `0.11`, `0.14`). Un répondant honnête pouvait donc se faire noter "très
-complexe" pour avoir dit qu'il ne savait pas, alors que tout le projet s'interdit le pire cas par
-défaut. Le générateur retire la mention **à l'affichage seulement**, et le fichier de lot conserve
-le cran d'origine au caractère près, parce que le parseur résout la réponse par l'indice
-`<!-- opt:N -->` et relit le référentiel.
+Some levels of the quick diagnostic **glue the "I don't know" mention onto the most
+unfavorable level** (`0.10`, `0.11`, `0.14`). An honest respondent could therefore be scored
+"very complex" for having said they did not know, while the whole project forbids the worst
+case by default. The generator removes the mention **at display time only**, and the lot file
+keeps the original level character for character, because the parser resolves the answer from
+the `<!-- opt:N -->` index and re-reads the framework.
 
-⚠️ **Ne jamais faire dépendre le parseur du texte affiché** : ce nettoyage deviendrait une
-falsification. Signaler ou non ce défaut à EROOM reste à trancher.
+⚠️ **Never make the parser depend on the displayed text**: this cleanup would become a
+falsification. Whether to report this defect to EROOM remains to be decided.
 
 -----
-Fin de trace
+End of trace
 -----

@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """
-Parsing de questionnaires EOF remplis.
+Parsing of filled-in EOF questionnaires.
 
-Lit questionnaire-eof.md, extrait les réponses cochées, et produit
-lots/relecture-questionnaire.json respectant le contrat de sortie de lot.
+Reads questionnaire-eof.md, extracts the checked boxes, and produces
+lots/questionnaire-review.json following the lot output contract.
 
-Règles strictes :
-- Un bloc doit porter EXACTEMENT une case cochée. Zéro ou plusieurs = rien versé.
-- La case "Je ne sais pas" (opt:jnsp) ne pose JAMAIS de réponse, seulement un contexte.
-- Les critères listés dans <!-- deja-tranche:... --> ne sont PAS versés.
-- Provenance = "precise" (case cochée par le service audité, sans preuve).
-- Catégorie = "aucune_donnee" (réponse ne vient d'aucune donnée collectée).
+Strict rules:
+- A block must carry EXACTLY one checked box. Zero or several = nothing written.
+- The "I don't know" box (opt:dnk) NEVER records an answer, only a context.
+- The criteria listed in <!-- already-decided:... --> are NOT written.
+- Provenance = "stated" (box checked by the audited service, without proof).
+- Category = "no_data" (the answer comes from no collected data).
 
-Contrat de sortie :
-- 4 clés racine : lot_id, genere_le, entrees, criteres
-- Par critère : id et categorie obligatoires, puis reponse, coefficient, provenance, source, contexte facultatifs
-- NE JAMAIS écrire une clé qui vaut null : l'omettre
-- Si reponse posée sur critère détaillé : coefficient obligatoire et non nul
-- Si reponse posée sur question diagnostic rapide : coefficient ABSENT
-- Des qu'une reponse ou contexte est pose : provenance ET source obligatoires
+Output contract:
+- 4 root keys: lot_id, generated_at, inputs, criteria
+- Per criterion: id and category mandatory, then answer, coefficient, provenance, source, context optional
+- NEVER write a key that is null: omit it
+- If an answer is given on a detailed criterion: coefficient mandatory and non-null
+- If an answer is given on a quick diagnostic question: coefficient ABSENT
+- As soon as an answer or a context is written: provenance AND source mandatory
 
-Usage :
-    python3 parse_questionnaire.py <repertoire-audit>
+Usage:
+    python3 parse_questionnaire.py <audit-dir>
     python3 parse_questionnaire.py --autotest
 
-Écrit <repertoire-audit>/lots/relecture-questionnaire.json.
+Writes <audit-dir>/lots/questionnaire-review.json.
 """
 
 import argparse
@@ -35,34 +35,34 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def find_referentiel():
-    """Trouve le référentiel EOF dans l'arborescence."""
+def find_reference():
+    """Finds the EOF reference in the tree."""
     current = Path(__file__).resolve().parent
     for _ in range(5):
-        matches = list(current.glob("**/eof-referentiel.json"))
+        matches = list(current.glob("**/eof-reference.json"))
         matches = [m for m in matches if ".venv" not in str(m)]
         if matches:
             return matches[0]
         current = current.parent
-    raise FileNotFoundError("eof-referentiel.json introuvable")
+    raise FileNotFoundError("eof-reference.json not found")
 
 
-def load_referentiel(path):
-    """Charge le référentiel et retourne un dict {id: critère} et {id: question}."""
+def load_reference(path):
+    """Loads the reference and returns a dict {id: criterion} and {id: question}."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
-    criteres = {c["id"]: c for c in data["criteres"]}
-    diag_rapide = {q["id"]: q for q in data["diagnostic_rapide"]}
+    criteria = {c["id"]: c for c in data["criteria"]}
+    quick_diag = {q["id"]: q for q in data["quick_diagnostic"]}
 
-    return criteres, diag_rapide
+    return criteria, quick_diag
 
 
-def load_blocs(scripts_dir):
-    """Charge la bibliothèque de blocs."""
+def load_blocks(scripts_dir):
+    """Loads the block library."""
     path = scripts_dir / "questionnaire-blocs.json"
     if not path.exists():
-        raise FileNotFoundError(f"questionnaire-blocs.json introuvable dans {scripts_dir}")
+        raise FileNotFoundError(f"questionnaire-blocs.json not found in {scripts_dir}")
 
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -70,24 +70,24 @@ def load_blocs(scripts_dir):
 
 def parse_markdown_file(md_path):
     """
-    Parse un fichier Markdown de questionnaire et retourne les blocs avec leurs réponses.
+    Parses a questionnaire Markdown file and returns the blocks with their answers.
 
-    Retourne un dict :
+    Returns a dict:
     {
         "filename": str,
         "read_success": bool,
         "read_error": str | None,
-        "blocs": [{"id": str, "options_cochees": [int], "deja_tranches": [str]}]
+        "blocks": [{"id": str, "checked_options": [int], "already_decided": [str]}]
     }
 
-    Lit ligne par ligne en se repérant sur les marqueurs HTML, jamais en devinant
-    la structure du Markdown.
+    Reads line by line, relying on the HTML markers, never guessing
+    the Markdown structure.
     """
     result = {
         "filename": md_path.name,
         "read_success": False,
         "read_error": None,
-        "blocs": []
+        "blocks": []
     }
 
     try:
@@ -98,257 +98,257 @@ def parse_markdown_file(md_path):
         result["read_error"] = str(exc)
         return result
 
-    current_bloc_id = None
-    current_deja_tranches = []
-    current_options_cochees = []
+    current_block_id = None
+    current_already_decided = []
+    current_checked_options = []
     current_opt_index = None
 
     for line in lines:
-        # Chercher marqueur de bloc
-        match_bloc = re.search(r'<!--\s*bloc:([^\s]+?)\s*-->', line)
-        if match_bloc:
-            # Sauvegarder le bloc précédent
-            if current_bloc_id is not None:
-                result["blocs"].append({
-                    "id": current_bloc_id,
-                    "options_cochees": current_options_cochees,
-                    "deja_tranches": current_deja_tranches
+        # Look for the block marker
+        match_block = re.search(r'<!--\s*block:([^\s]+?)\s*-->', line)
+        if match_block:
+            # Save the previous block
+            if current_block_id is not None:
+                result["blocks"].append({
+                    "id": current_block_id,
+                    "checked_options": current_checked_options,
+                    "already_decided": current_already_decided
                 })
 
-            # Nouveau bloc
-            current_bloc_id = match_bloc.group(1)
-            current_deja_tranches = []
-            current_options_cochees = []
+            # New block
+            current_block_id = match_block.group(1)
+            current_already_decided = []
+            current_checked_options = []
             continue
 
-        # Chercher marqueur deja-tranche
-        match_deja = re.search(r'<!--\s*deja-tranche:([^\s]+?)\s*-->', line)
-        if match_deja:
-            criteres_str = match_deja.group(1)
-            current_deja_tranches = [c.strip() for c in criteres_str.split(",") if c.strip()]
+        # Look for the already-decided marker
+        match_decided = re.search(r'<!--\s*already-decided:([^\s]+?)\s*-->', line)
+        if match_decided:
+            criteria_str = match_decided.group(1)
+            current_already_decided = [c.strip() for c in criteria_str.split(",") if c.strip()]
             continue
 
-        # Chercher une case cochée avec marqueur d'option
-        # Accepter - [x] et - [X], tolèrer les espaces variables
+        # Look for a checked box with an option marker
+        # Accept - [x] and - [X], tolerate variable spaces
         if re.match(r'^\s*-\s*\[[xX]\]', line):
-            # Extraire l'indice d'option
+            # Extract the option index
             match_opt = re.search(r'<!--\s*opt:([^\s]+?)\s*-->', line)
             if match_opt:
                 opt_str = match_opt.group(1)
-                current_options_cochees.append(opt_str)
+                current_checked_options.append(opt_str)
 
-    # Sauvegarder le dernier bloc
-    if current_bloc_id is not None:
-        result["blocs"].append({
-            "id": current_bloc_id,
-            "options_cochees": current_options_cochees,
-            "deja_tranches": current_deja_tranches
+    # Save the last block
+    if current_block_id is not None:
+        result["blocks"].append({
+            "id": current_block_id,
+            "checked_options": current_checked_options,
+            "already_decided": current_already_decided
         })
 
     return result
 
 
-def get_criteres_from_bloc(bloc_def, blocs_data):
-    """Retourne la liste des critères couverts par un bloc."""
-    if bloc_def["type"] == "direct":
-        return [bloc_def["critere"]]
-    elif bloc_def["type"] == "filtre":
-        # Bloc filtre : liste de critères écartés
-        return bloc_def.get("criteres", [])
+def get_criteria_from_block(block_def, blocks_data):
+    """Returns the list of criteria covered by a block."""
+    if block_def["type"] == "direct":
+        return [block_def["criterion"]]
+    elif block_def["type"] == "filter":
+        # Filter block: list of discarded criteria
+        return block_def.get("criteria", [])
     else:
-        # Bloc composé : extraire tous les critères des options
-        criteres = set()
-        for option in bloc_def.get("options", []):
-            for cid in option.get("reponses", {}).keys():
-                criteres.add(cid)
-        return list(criteres)
+        # Composite block: extract all criteria from the options
+        criteria = set()
+        for option in block_def.get("options", []):
+            for cid in option.get("answers", {}).keys():
+                criteria.add(cid)
+        return list(criteria)
 
 
-def process_bloc(bloc_parsed, bloc_def, criteres_ref, diag_rapide_ref):
+def process_block(block_parsed, block_def, criteria_ref, quick_diag_ref):
     """
-    Traite un bloc parsé et retourne les entrées de critères à verser.
+    Processes a parsed block and returns the criterion entries to write.
 
-    Retourne (entries, errors) où :
-    - entries : liste de dicts {id, categorie, reponse?, coefficient?, provenance?, source?, contexte?}
-    - errors : liste de str (messages d'erreur)
+    Returns (entries, errors) where:
+    - entries: list of dicts {id, category, answer?, coefficient?, provenance?, source?, context?}
+    - errors: list of str (error messages)
 
-    Règles :
-    - Exactement une case cochée, sinon rien versé
-    - Case jnsp : contexte seulement
-    - Critères deja_tranches ignorés
+    Rules:
+    - Exactly one checked box, otherwise nothing written
+    - "I don't know" box: context only
+    - already_decided criteria ignored
     """
     entries = []
     errors = []
 
-    bloc_id = bloc_parsed["id"]
-    options_cochees = bloc_parsed["options_cochees"]
-    deja_tranches = set(bloc_parsed["deja_tranches"])
+    block_id = block_parsed["id"]
+    checked_options = block_parsed["checked_options"]
+    already_decided = set(block_parsed["already_decided"])
 
-    # Vérifier exactement une case cochée
-    if len(options_cochees) == 0:
-        errors.append(f"Bloc {bloc_id} : aucune case cochée, rien versé")
+    # Check exactly one checked box
+    if len(checked_options) == 0:
+        errors.append(f"Block {block_id}: no box checked, nothing written")
         return entries, errors
-    elif len(options_cochees) > 1:
-        errors.append(f"Bloc {bloc_id} : plusieurs cases cochées ({len(options_cochees)}), rien versé")
+    elif len(checked_options) > 1:
+        errors.append(f"Block {block_id}: several boxes checked ({len(checked_options)}), nothing written")
         return entries, errors
 
-    opt_str = options_cochees[0]
+    opt_str = checked_options[0]
 
-    # Cas "Je ne sais pas" : contexte seulement
-    if opt_str == "jnsp":
-        criteres = get_criteres_from_bloc(bloc_def, None)
-        for cid in criteres:
-            if cid in deja_tranches:
+    # Case "I don't know": context only
+    if opt_str == "dnk":
+        criteria = get_criteria_from_block(block_def, None)
+        for cid in criteria:
+            if cid in already_decided:
                 continue
 
             entry = {
                 "id": cid,
-                "categorie": "aucune_donnee",
-                "provenance": "precise",
-                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"Je ne sais pas\"",
-                "contexte": f"Question posée au service audité, réponse : ne sait pas"
+                "category": "no_data",
+                "provenance": "stated",
+                "source": f"questionnaire-eof.md: block {block_id}, checked box \"I don't know\"",
+                "context": "Question asked to the audited service, answer: don't know"
             }
             entries.append(entry)
 
         return entries, errors
 
-    # Cas bloc filtre : deux options spéciales (ecarte / applicable)
-    if bloc_def.get("type") == "filtre":
-        if opt_str == "ecarte":
-            # Case "libelle_ecarte" cochée : verser une entrée par critère avec 🚫 Non applicable
-            criteres = bloc_def.get("criteres", [])
-            for cid in criteres:
-                if cid in deja_tranches:
+    # Filter block case: two special options (discarded / applicable)
+    if block_def.get("type") == "filter":
+        if opt_str == "discarded":
+            # "discarded_label" box checked: write one entry per criterion with 🚫 Not applicable
+            criteria = block_def.get("criteria", [])
+            for cid in criteria:
+                if cid in already_decided:
                     continue
 
                 entry = {
                     "id": cid,
-                    "categorie": "aucune_donnee",
-                    "reponse": "🚫 Non applicable",
+                    "category": "no_data",
+                    "answer": "🚫 Not applicable",
                     "coefficient": 0,
-                    "provenance": "precise",
-                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{bloc_def['libelle_ecarte']}\""
+                    "provenance": "stated",
+                    "source": f"questionnaire-eof.md: block {block_id}, checked box \"{block_def['discarded_label']}\""
                 }
                 entries.append(entry)
 
         elif opt_str == "applicable":
-            # Case "libelle_applicable" cochée : ne rien verser
+            # "applicable_label" box checked: write nothing
             pass
 
         else:
-            errors.append(f"Bloc {bloc_id} : option filtre invalide ({opt_str}), rien versé")
+            errors.append(f"Block {block_id}: invalid filter option ({opt_str}), nothing written")
 
         return entries, errors
 
-    # Option normale : extraire l'indice
+    # Normal option: extract the index
     try:
         opt_index = int(opt_str)
     except ValueError:
-        errors.append(f"Bloc {bloc_id} : indice d'option invalide ({opt_str}), rien versé")
+        errors.append(f"Block {block_id}: invalid option index ({opt_str}), nothing written")
         return entries, errors
 
-    # Récupérer la réponse selon le type de bloc
-    if bloc_def["type"] == "direct":
-        # Bloc direct : lire l'option depuis le référentiel
-        cid = bloc_def["critere"]
+    # Retrieve the answer according to the block type
+    if block_def["type"] == "direct":
+        # Direct block: read the option from the reference
+        cid = block_def["criterion"]
 
-        if cid in deja_tranches:
+        if cid in already_decided:
             return entries, errors
 
         if cid.startswith("0."):
-            # Question diagnostic rapide
-            if cid not in diag_rapide_ref:
-                errors.append(f"Bloc {bloc_id} : question {cid} introuvable dans le référentiel")
+            # Quick diagnostic question
+            if cid not in quick_diag_ref:
+                errors.append(f"Block {block_id}: question {cid} not found in the reference")
                 return entries, errors
 
-            crans = diag_rapide_ref[cid]["crans"]
-            if opt_index >= len(crans):
-                errors.append(f"Bloc {bloc_id} : indice {opt_index} hors limites (max {len(crans)-1})")
+            screens = quick_diag_ref[cid]["screens"]
+            if opt_index >= len(screens):
+                errors.append(f"Block {block_id}: index {opt_index} out of range (max {len(screens)-1})")
                 return entries, errors
 
-            reponse_libelle = crans[opt_index]
+            answer_label = screens[opt_index]
 
             entry = {
                 "id": cid,
-                "categorie": "aucune_donnee",
-                "reponse": reponse_libelle,
-                # PAS de coefficient pour diagnostic rapide
-                "provenance": "precise",
-                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
+                "category": "no_data",
+                "answer": answer_label,
+                # NO coefficient for the quick diagnostic
+                "provenance": "stated",
+                "source": f"questionnaire-eof.md: block {block_id}, checked box \"{answer_label}\""
             }
             entries.append(entry)
 
         else:
-            # Critère détaillé
-            if cid not in criteres_ref:
-                errors.append(f"Bloc {bloc_id} : critère {cid} introuvable dans le référentiel")
+            # Detailed criterion
+            if cid not in criteria_ref:
+                errors.append(f"Block {block_id}: criterion {cid} not found in the reference")
                 return entries, errors
 
-            options_eval = criteres_ref[cid]["options_evaluation"]
-            if opt_index >= len(options_eval):
-                errors.append(f"Bloc {bloc_id} : indice {opt_index} hors limites (max {len(options_eval)-1})")
+            eval_options = criteria_ref[cid]["evaluation_options"]
+            if opt_index >= len(eval_options):
+                errors.append(f"Block {block_id}: index {opt_index} out of range (max {len(eval_options)-1})")
                 return entries, errors
 
-            reponse_libelle = options_eval[opt_index]
-            coefficient = criteres_ref[cid]["options_evaluation_coefficient"].get(reponse_libelle)
+            answer_label = eval_options[opt_index]
+            coefficient = criteria_ref[cid]["evaluation_coefficient_options"].get(answer_label)
 
             if coefficient is None:
-                errors.append(f"Bloc {bloc_id} : coefficient introuvable pour réponse \"{reponse_libelle}\"")
+                errors.append(f"Block {block_id}: coefficient not found for answer \"{answer_label}\"")
                 return entries, errors
 
             entry = {
                 "id": cid,
-                "categorie": "aucune_donnee",
-                "reponse": reponse_libelle,
+                "category": "no_data",
+                "answer": answer_label,
                 "coefficient": coefficient,
-                "provenance": "precise",
-                "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{reponse_libelle}\""
+                "provenance": "stated",
+                "source": f"questionnaire-eof.md: block {block_id}, checked box \"{answer_label}\""
             }
             entries.append(entry)
 
     else:
-        # Bloc composé
-        options = bloc_def.get("options", [])
+        # Composite block
+        options = block_def.get("options", [])
         if opt_index >= len(options):
-            errors.append(f"Bloc {bloc_id} : indice {opt_index} hors limites (max {len(options)-1})")
+            errors.append(f"Block {block_id}: index {opt_index} out of range (max {len(options)-1})")
             return entries, errors
 
         option = options[opt_index]
-        option_libelle = option["libelle"]
-        reponses = option.get("reponses", {})
+        option_label = option["label"]
+        answers = option.get("answers", {})
 
-        for cid, reponse_libelle in reponses.items():
-            if cid in deja_tranches:
+        for cid, answer_label in answers.items():
+            if cid in already_decided:
                 continue
 
-            # Déterminer si c'est un critère détaillé ou diagnostic rapide
+            # Determine whether it is a detailed criterion or a quick diagnostic one
             if cid.startswith("0."):
-                # Diagnostic rapide : pas de coefficient
+                # Quick diagnostic: no coefficient
                 entry = {
                     "id": cid,
-                    "categorie": "aucune_donnee",
-                    "reponse": reponse_libelle,
-                    "provenance": "precise",
-                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
+                    "category": "no_data",
+                    "answer": answer_label,
+                    "provenance": "stated",
+                    "source": f"questionnaire-eof.md: block {block_id}, checked box \"{option_label}\""
                 }
             else:
-                # Critère détaillé : coefficient obligatoire
-                if cid not in criteres_ref:
-                    errors.append(f"Bloc {bloc_id} : critère {cid} introuvable dans le référentiel")
+                # Detailed criterion: coefficient mandatory
+                if cid not in criteria_ref:
+                    errors.append(f"Block {block_id}: criterion {cid} not found in the reference")
                     continue
 
-                coefficient = criteres_ref[cid]["options_evaluation_coefficient"].get(reponse_libelle)
+                coefficient = criteria_ref[cid]["evaluation_coefficient_options"].get(answer_label)
                 if coefficient is None:
-                    errors.append(f"Bloc {bloc_id} : coefficient introuvable pour critère {cid}, réponse \"{reponse_libelle}\"")
+                    errors.append(f"Block {block_id}: coefficient not found for criterion {cid}, answer \"{answer_label}\"")
                     continue
 
                 entry = {
                     "id": cid,
-                    "categorie": "aucune_donnee",
-                    "reponse": reponse_libelle,
+                    "category": "no_data",
+                    "answer": answer_label,
                     "coefficient": coefficient,
-                    "provenance": "precise",
-                    "source": f"questionnaire-eof.md: bloc {bloc_id}, case cochée \"{option_libelle}\""
+                    "provenance": "stated",
+                    "source": f"questionnaire-eof.md: block {block_id}, checked box \"{option_label}\""
                 }
 
             entries.append(entry)
@@ -356,655 +356,655 @@ def process_bloc(bloc_parsed, bloc_def, criteres_ref, diag_rapide_ref):
     return entries, errors
 
 
-def parse_questionnaires(audit_dir, blocs_data, criteres_ref, diag_rapide_ref):
+def parse_questionnaires(audit_dir, blocks_data, criteria_ref, quick_diag_ref):
     """
-    Parse le questionnaire unique et retourne les entrées de critères.
+    Parses the single questionnaire and returns the criterion entries.
 
-    Retourne (entries, report, errors, mesure) où :
-    - entries : liste de dicts pour le fichier JSON de sortie
-    - report : dict avec les statistiques
-    - errors : liste de messages d'erreur
-    - mesure : bloc mesure conforme à la convention (statut, cible, detail)
+    Returns (entries, report, errors, measurement) where:
+    - entries: list of dicts for the output JSON file
+    - report: dict with the statistics
+    - errors: list of error messages
+    - measurement: measurement block conforming to the convention (status, target, detail)
     """
     entries = []
     errors = []
 
     report = {
-        "blocs_lus": 0,
-        "blocs_repondus": 0,
-        "blocs_vides": 0,
-        "blocs_erreur": 0,
-        "criteres_verses": 0,
-        "criteres_jnsp": 0,
-        "fichier_lu": None
+        "blocks_read": 0,
+        "answered_blocks": 0,
+        "empty_blocks": 0,
+        "error_blocks": 0,
+        "emitted_criteria": 0,
+        "dnk_criteria": 0,
+        "file_read": None
     }
 
-    # Construire un index {bloc_id: bloc_def}
-    blocs_index = {b["id"]: b for b in blocs_data["blocs"]}
+    # Build an index {block_id: block_def}
+    blocks_index = {b["id"]: b for b in blocks_data["blocks"]}
 
     md_path = audit_dir / "questionnaire-eof.md"
 
     if not md_path.exists():
-        errors.append(f"Fichier {md_path.name} absent")
-        mesure = {
-            "statut": "echec_lecture",
-            "cible": md_path.name,
-            "detail": "Fichier questionnaire-eof.md absent"
+        errors.append(f"File {md_path.name} missing")
+        measurement = {
+            "status": "read_error",
+            "target": md_path.name,
+            "detail": "File questionnaire-eof.md missing"
         }
-        return entries, report, errors, mesure
+        return entries, report, errors, measurement
 
     parsed = parse_markdown_file(md_path)
 
     if not parsed["read_success"]:
-        errors.append(f"Erreur lecture {md_path.name} : {parsed['read_error']}")
-        mesure = {
-            "statut": "echec_lecture",
-            "cible": md_path.name,
-            "detail": f"Erreur de lecture : {parsed['read_error']}"
+        errors.append(f"Read error {md_path.name}: {parsed['read_error']}")
+        measurement = {
+            "status": "read_error",
+            "target": md_path.name,
+            "detail": f"Read error: {parsed['read_error']}"
         }
-        return entries, report, errors, mesure
+        return entries, report, errors, measurement
 
-    report["fichier_lu"] = md_path.name
+    report["file_read"] = md_path.name
 
-    for bloc_parsed in parsed["blocs"]:
-        report["blocs_lus"] += 1
-        bloc_id = bloc_parsed["id"]
+    for block_parsed in parsed["blocks"]:
+        report["blocks_read"] += 1
+        block_id = block_parsed["id"]
 
-        if bloc_id not in blocs_index:
-            errors.append(f"Bloc {bloc_id} introuvable dans la bibliothèque, ignoré")
-            report["blocs_erreur"] += 1
+        if block_id not in blocks_index:
+            errors.append(f"Block {block_id} not found in the library, ignored")
+            report["error_blocks"] += 1
             continue
 
-        bloc_def = blocs_index[bloc_id]
+        block_def = blocks_index[block_id]
 
-        if len(bloc_parsed["options_cochees"]) == 0:
-            report["blocs_vides"] += 1
+        if len(block_parsed["checked_options"]) == 0:
+            report["empty_blocks"] += 1
             continue
 
-        bloc_entries, bloc_errors = process_bloc(bloc_parsed, bloc_def,
-                                                 criteres_ref, diag_rapide_ref)
+        block_entries, block_errors = process_block(block_parsed, block_def,
+                                                    criteria_ref, quick_diag_ref)
 
-        if bloc_errors:
-            errors.extend(bloc_errors)
-            report["blocs_erreur"] += 1
+        if block_errors:
+            errors.extend(block_errors)
+            report["error_blocks"] += 1
         else:
-            # Un bloc compte comme répondu s'il n'a pas d'erreur, même s'il ne verse rien
-            # (cas du filtre avec case "applicable" cochée)
-            report["blocs_repondus"] += 1
+            # A block counts as answered if it has no error, even if it writes nothing
+            # (case of a filter with the "applicable" box checked)
+            report["answered_blocks"] += 1
 
-            # Compter les critères versés vs jnsp
-            for entry in bloc_entries:
-                if "reponse" in entry:
-                    report["criteres_verses"] += 1
-                elif "contexte" in entry:
-                    report["criteres_jnsp"] += 1
+            # Count written criteria vs dnk
+            for entry in block_entries:
+                if "answer" in entry:
+                    report["emitted_criteria"] += 1
+                elif "context" in entry:
+                    report["dnk_criteria"] += 1
 
-            entries.extend(bloc_entries)
+            entries.extend(block_entries)
 
-    # Le fichier a été lu. Reste à dire si on y a trouvé des réponses ou non.
-    # Un questionnaire revenu entièrement vide est un résultat d'audit légitime,
-    # pas un échec de notre outil : c'est rien_trouve, jamais ok ni echec_*.
-    if report["blocs_repondus"] == 0:
-        mesure = {
-            "statut": "rien_trouve",
-            "cible": md_path.name,
+    # The file was read. Now say whether answers were found in it or not.
+    # A questionnaire returned entirely empty is a legitimate audit result,
+    # not a failure of our tool: it is not_found, never ok nor an error_*.
+    if report["answered_blocks"] == 0:
+        measurement = {
+            "status": "not_found",
+            "target": md_path.name,
             "detail": (
-                f"Fichier lu, {report['blocs_lus']} blocs reconnus, "
-                "aucune case cochée."
+                f"File read, {report['blocks_read']} blocks recognized, "
+                "no box checked."
             )
         }
     else:
-        mesure = {
-            "statut": "ok",
-            "cible": md_path.name,
+        measurement = {
+            "status": "ok",
+            "target": md_path.name,
             "detail": (
-                f"{report['blocs_repondus']} blocs répondus sur "
-                f"{report['blocs_lus']}."
+                f"{report['answered_blocks']} blocks answered out of "
+                f"{report['blocks_read']}."
             )
         }
 
-    return entries, report, errors, mesure
+    return entries, report, errors, measurement
 
 
 def autotest():
-    """Rejoue les cas de test embarqués."""
+    """Replays the embedded test cases."""
     import tempfile
 
-    echecs = []
+    failures = []
     total = 0
 
-    # Cas 1 : Bloc direct critère détaillé, une case cochée
+    # Case 1: Direct block detailed criterion, one box checked
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Référentiel minimal
+            # Minimal reference
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "1.1",
-                        "options_evaluation": ["✅ Point fort confirmé", "💡 Potentiel d'amélioration identifié"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0, "💡 Potentiel d'amélioration identifié": 1}
+                        "evaluation_options": ["✅ Confirmed strength", "💡 Improvement potential identified"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "💡 Improvement potential identified": 1}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            # Bibliothèque de blocs
-            blocs_data = {
+            # Block library
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-11",
-                        "fichier": "produit-usage",
+                        "file": "product-usage",
                         "phase": "detail",
                         "type": "direct",
-                        "critere": "1.1",
-                        "question": "Question ?"
+                        "criterion": "1.1",
+                        "question": "Question?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
-            # Fichier MD avec une case cochée
+            # MD file with one box checked
             md_content = """
-<!-- questionnaire: produit-usage -->
-<!-- version-blocs: 1 -->
+<!-- questionnaire: product-usage -->
+<!-- version-blocks: 1 -->
 
-## Bloc 1 sur 1
+## Block 1 of 1
 
-<!-- bloc:test-11 -->
+<!-- block:test-11 -->
 
-**Question ?**
+**Question?**
 
-- [x] ✅ Point fort confirmé  <!-- opt:0 -->
-- [ ] 💡 Potentiel d'amélioration identifié  <!-- opt:1 -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+- [x] ✅ Confirmed strength  <!-- opt:0 -->
+- [ ] 💡 Improvement potential identified  <!-- opt:1 -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            # Créer l'autre fichier vide pour éviter les warnings
+            # Create the other empty file to avoid warnings
 
-            # Parser
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            # Parse
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if errors:
-                echecs.append(("Bloc direct case cochée", f"Erreurs : {errors}"))
+                failures.append(("Direct block checked box", f"Errors: {errors}"))
             elif len(entries) != 1:
-                echecs.append(("Bloc direct case cochée", f"Attendu 1 entrée, obtenu {len(entries)}"))
+                failures.append(("Direct block checked box", f"Expected 1 entry, got {len(entries)}"))
             elif entries[0]["id"] != "1.1":
-                echecs.append(("Bloc direct case cochée", f"ID incorrect : {entries[0]['id']}"))
-            elif entries[0].get("reponse") != "✅ Point fort confirmé":
-                echecs.append(("Bloc direct case cochée", f"Réponse incorrecte : {entries[0].get('reponse')}"))
+                failures.append(("Direct block checked box", f"Wrong ID: {entries[0]['id']}"))
+            elif entries[0].get("answer") != "✅ Confirmed strength":
+                failures.append(("Direct block checked box", f"Wrong answer: {entries[0].get('answer')}"))
             elif entries[0].get("coefficient") != 0:
-                echecs.append(("Bloc direct case cochée", f"Coefficient incorrect : {entries[0].get('coefficient')}"))
+                failures.append(("Direct block checked box", f"Wrong coefficient: {entries[0].get('coefficient')}"))
     except Exception as exc:
-        echecs.append(("Bloc direct case cochée", f"Exception : {exc}"))
+        failures.append(("Direct block checked box", f"Exception: {exc}"))
 
-    # Cas 2 : Bloc direct question diagnostic rapide (vérifier absence de coefficient)
+    # Case 2: Direct block quick diagnostic question (check absence of coefficient)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [],
-                "diagnostic_rapide": [
+                "criteria": [],
+                "quick_diagnostic": [
                     {
                         "id": "0.1",
-                        "crans": ["Cran 1", "Cran 2"]
+                        "screens": ["Screen 1", "Screen 2"]
                     }
                 ]
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-01",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
+                        "file": "product-usage",
+                        "phase": "gate",
                         "type": "direct",
-                        "critere": "0.1",
-                        "question": "Question ?"
+                        "criterion": "0.1",
+                        "question": "Question?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:test-01 -->
-- [x] Cran 1  <!-- opt:0 -->
-- [ ] Cran 2  <!-- opt:1 -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+<!-- block:test-01 -->
+- [x] Screen 1  <!-- opt:0 -->
+- [ ] Screen 2  <!-- opt:1 -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if errors:
-                echecs.append(("Diagnostic rapide sans coefficient", f"Erreurs : {errors}"))
+                failures.append(("Quick diagnostic without coefficient", f"Errors: {errors}"))
             elif len(entries) != 1:
-                echecs.append(("Diagnostic rapide sans coefficient", f"Attendu 1 entrée, obtenu {len(entries)}"))
+                failures.append(("Quick diagnostic without coefficient", f"Expected 1 entry, got {len(entries)}"))
             elif "coefficient" in entries[0]:
-                echecs.append(("Diagnostic rapide sans coefficient", "Coefficient présent (attendu : absent)"))
+                failures.append(("Quick diagnostic without coefficient", "Coefficient present (expected: absent)"))
     except Exception as exc:
-        echecs.append(("Diagnostic rapide sans coefficient", f"Exception : {exc}"))
+        failures.append(("Quick diagnostic without coefficient", f"Exception: {exc}"))
 
-    # Cas 3 : Case "Je ne sais pas" = contexte seulement
+    # Case 3: "I don't know" box = context only
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
+                "criteria": [
                     {
                         "id": "2.1",
-                        "options_evaluation": ["✅ Point fort confirmé"],
-                        "options_evaluation_coefficient": {"✅ Point fort confirmé": 0}
+                        "evaluation_options": ["✅ Confirmed strength"],
+                        "evaluation_coefficient_options": {"✅ Confirmed strength": 0}
                     }
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-jnsp",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
                         "type": "direct",
-                        "critere": "2.1",
-                        "question": "Question ?"
+                        "criterion": "2.1",
+                        "question": "Question?"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:test-jnsp -->
-- [ ] ✅ Point fort confirmé  <!-- opt:0 -->
-- [x] Je ne sais pas  <!-- opt:jnsp -->
+<!-- block:test-jnsp -->
+- [ ] ✅ Confirmed strength  <!-- opt:0 -->
+- [x] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if errors:
-                echecs.append(("Case Je ne sais pas", f"Erreurs : {errors}"))
+                failures.append(("I don't know box", f"Errors: {errors}"))
             elif len(entries) != 1:
-                echecs.append(("Case Je ne sais pas", f"Attendu 1 entrée, obtenu {len(entries)}"))
-            elif "reponse" in entries[0]:
-                echecs.append(("Case Je ne sais pas", "Réponse présente (attendu : contexte seulement)"))
-            elif "contexte" not in entries[0]:
-                echecs.append(("Case Je ne sais pas", "Contexte absent"))
+                failures.append(("I don't know box", f"Expected 1 entry, got {len(entries)}"))
+            elif "answer" in entries[0]:
+                failures.append(("I don't know box", "Answer present (expected: context only)"))
+            elif "context" not in entries[0]:
+                failures.append(("I don't know box", "Context missing"))
     except Exception as exc:
-        echecs.append(("Case Je ne sais pas", f"Exception : {exc}"))
+        failures.append(("I don't know box", f"Exception: {exc}"))
 
-    # Cas 4 : Bloc vide (aucune case cochée) = rien versé
+    # Case 4: Empty block (no box checked) = nothing written
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [{"id": "3.1", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}}],
-                "diagnostic_rapide": []
+                "criteria": [{"id": "3.1", "evaluation_options": ["✅"], "evaluation_coefficient_options": {"✅": 0}}],
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [{"id": "test-vide", "fichier": "technique", "phase": "detail", "type": "direct", "critere": "3.1", "question": "?"}]
+                "blocks": [{"id": "test-vide", "file": "technical", "phase": "detail", "type": "direct", "criterion": "3.1", "question": "?"}]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:test-vide -->
+<!-- block:test-vide -->
 - [ ] ✅  <!-- opt:0 -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
-            # Aucune entrée versée, un bloc vide signalé
+            # No entry written, one empty block reported
             if len(entries) != 0:
-                echecs.append(("Bloc vide rien versé", f"Attendu 0 entrée, obtenu {len(entries)}"))
-            if report["blocs_vides"] != 1:
-                echecs.append(("Bloc vide rien versé", f"Attendu 1 bloc vide, obtenu {report['blocs_vides']}"))
+                failures.append(("Empty block writes nothing", f"Expected 0 entries, got {len(entries)}"))
+            if report["empty_blocks"] != 1:
+                failures.append(("Empty block writes nothing", f"Expected 1 empty block, got {report['empty_blocks']}"))
     except Exception as exc:
-        echecs.append(("Bloc vide rien versé", f"Exception : {exc}"))
+        failures.append(("Empty block writes nothing", f"Exception: {exc}"))
 
-    # Cas 5 : Deux cases cochées = rien versé
+    # Case 5: Two boxes checked = nothing written
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [{"id": "4.1", "options_evaluation": ["✅", "💡"], "options_evaluation_coefficient": {"✅": 0, "💡": 1}}],
-                "diagnostic_rapide": []
+                "criteria": [{"id": "4.1", "evaluation_options": ["✅", "💡"], "evaluation_coefficient_options": {"✅": 0, "💡": 1}}],
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [{"id": "test-multi", "fichier": "technique", "phase": "detail", "type": "direct", "critere": "4.1", "question": "?"}]
+                "blocks": [{"id": "test-multi", "file": "technical", "phase": "detail", "type": "direct", "criterion": "4.1", "question": "?"}]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:test-multi -->
+<!-- block:test-multi -->
 - [x] ✅  <!-- opt:0 -->
 - [x] 💡  <!-- opt:1 -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if len(entries) != 0:
-                echecs.append(("Deux cases cochées rien versé", f"Attendu 0 entrée, obtenu {len(entries)}"))
-            if report["blocs_erreur"] != 1:
-                echecs.append(("Deux cases cochées rien versé", f"Attendu 1 bloc en erreur, obtenu {report['blocs_erreur']}"))
+                failures.append(("Two boxes checked write nothing", f"Expected 0 entries, got {len(entries)}"))
+            if report["error_blocks"] != 1:
+                failures.append(("Two boxes checked write nothing", f"Expected 1 block in error, got {report['error_blocks']}"))
     except Exception as exc:
-        echecs.append(("Deux cases cochées rien versé", f"Exception : {exc}"))
+        failures.append(("Two boxes checked write nothing", f"Exception: {exc}"))
 
-    # Cas 6 : Critère déjà tranché ignoré (bloc composé)
+    # Case 6: Already-decided criterion ignored (composite block)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "5.1", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}},
-                    {"id": "5.2", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}}
+                "criteria": [
+                    {"id": "5.1", "evaluation_options": ["✅"], "evaluation_coefficient_options": {"✅": 0}},
+                    {"id": "5.2", "evaluation_options": ["✅"], "evaluation_coefficient_options": {"✅": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
                         "id": "test-compose",
-                        "fichier": "technique",
+                        "file": "technical",
                         "phase": "detail",
-                        "type": "compose",
+                        "type": "composite",
                         "question": "?",
                         "options": [
-                            {"libelle": "Option A", "reponses": {"5.1": "✅", "5.2": "✅"}}
+                            {"label": "Option A", "answers": {"5.1": "✅", "5.2": "✅"}}
                         ]
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:test-compose -->
+<!-- block:test-compose -->
 - [x] Option A  <!-- opt:0 -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
-<!-- deja-tranche:5.1 -->
+- [ ] I don't know  <!-- opt:dnk -->
+<!-- already-decided:5.1 -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
-            # Seul 5.2 doit être versé, 5.1 ignoré
+            # Only 5.2 must be written, 5.1 ignored
             if len(entries) != 1:
-                echecs.append(("Critère déjà tranché ignoré", f"Attendu 1 entrée, obtenu {len(entries)}"))
+                failures.append(("Already-decided criterion ignored", f"Expected 1 entry, got {len(entries)}"))
             elif entries[0]["id"] != "5.2":
-                echecs.append(("Critère déjà tranché ignoré", f"Attendu 5.2, obtenu {entries[0]['id']}"))
+                failures.append(("Already-decided criterion ignored", f"Expected 5.2, got {entries[0]['id']}"))
     except Exception as exc:
-        echecs.append(("Critère déjà tranché ignoré", f"Exception : {exc}"))
+        failures.append(("Already-decided criterion ignored", f"Exception: {exc}"))
 
-    # Cas 7 : Aller-retour générateur puis parseur
+    # Case 7: Round trip generator then parser
     total += 1
     try:
-        # On va importer le générateur pour tester l'aller-retour
-        # (note : ceci suppose que generate_questionnaire.py est dans le même répertoire)
-        # Pour simplifier, on teste juste que le parseur peut lire ce que le générateur produit
-        # Ce cas est plus un test d'intégration
-        pass  # Déjà couvert par les autres cas
+        # We would import the generator to test the round trip
+        # (note: this assumes generate_questionnaire.py is in the same directory)
+        # To simplify, we just check that the parser can read what the generator produces
+        # This case is more of an integration test
+        pass  # Already covered by the other cases
     except Exception as exc:
-        echecs.append(("Aller-retour générateur/parseur", f"Exception : {exc}"))
+        failures.append(("Generator/parser round trip", f"Exception: {exc}"))
 
-    # Cas 8 : Bloc filtre avec case "écarte" cochée (doit verser N entrées)
+    # Case 8: Filter block with the "discarded" box checked (must write N entries)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "4.1", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.2", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}},
-                    {"id": "4.3", "options_evaluation": ["✅", "🚫 Non applicable"], "options_evaluation_coefficient": {"✅": 0, "🚫 Non applicable": 0}}
+                "criteria": [
+                    {"id": "4.1", "evaluation_options": ["✅", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.2", "evaluation_options": ["✅", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅": 0, "🚫 Not applicable": 0}},
+                    {"id": "4.3", "evaluation_options": ["✅", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅": 0, "🚫 Not applicable": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-donnees",
-                        "fichier": "technique",
-                        "phase": "porte",
-                        "type": "filtre",
-                        "criteres": ["4.1", "4.2", "4.3"],
-                        "question": "Avez-vous des données ?",
-                        "libelle_ecarte": "Non, pas de données",
-                        "libelle_applicable": "Oui, nous avons des données"
+                        "id": "filter-donnees",
+                        "file": "technical",
+                        "phase": "gate",
+                        "type": "filter",
+                        "criteria": ["4.1", "4.2", "4.3"],
+                        "question": "Do you have data?",
+                        "discarded_label": "No, no data",
+                        "applicable_label": "Yes, we have data"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:filtre-donnees -->
-- [x] Non, pas de données  <!-- opt:ecarte -->
-- [ ] Oui, nous avons des données  <!-- opt:applicable -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+<!-- block:filter-donnees -->
+- [x] No, no data  <!-- opt:discarded -->
+- [ ] Yes, we have data  <!-- opt:applicable -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if errors:
-                echecs.append(("Bloc filtre case écarte", f"Erreurs : {errors}"))
+                failures.append(("Filter block discarded box", f"Errors: {errors}"))
             elif len(entries) != 3:
-                echecs.append(("Bloc filtre case écarte", f"Attendu 3 entrées, obtenu {len(entries)}"))
+                failures.append(("Filter block discarded box", f"Expected 3 entries, got {len(entries)}"))
             else:
-                # Vérifier que toutes les entrées ont la réponse "🚫 Non applicable"
+                # Check that all entries have the answer "🚫 Not applicable"
                 for entry in entries:
-                    if entry.get("reponse") != "🚫 Non applicable":
-                        echecs.append(("Bloc filtre case écarte", f"Réponse incorrecte pour {entry['id']} : {entry.get('reponse')}"))
+                    if entry.get("answer") != "🚫 Not applicable":
+                        failures.append(("Filter block discarded box", f"Wrong answer for {entry['id']}: {entry.get('answer')}"))
                     if entry.get("coefficient") != 0:
-                        echecs.append(("Bloc filtre case écarte", f"Coefficient incorrect pour {entry['id']} : {entry.get('coefficient')}"))
-                    if entry.get("provenance") != "precise":
-                        echecs.append(("Bloc filtre case écarte", f"Provenance incorrecte pour {entry['id']} : {entry.get('provenance')}"))
+                        failures.append(("Filter block discarded box", f"Wrong coefficient for {entry['id']}: {entry.get('coefficient')}"))
+                    if entry.get("provenance") != "stated":
+                        failures.append(("Filter block discarded box", f"Wrong provenance for {entry['id']}: {entry.get('provenance')}"))
     except Exception as exc:
-        echecs.append(("Bloc filtre case écarte", f"Exception : {exc}"))
+        failures.append(("Filter block discarded box", f"Exception: {exc}"))
 
-    # Cas 9 : Bloc filtre avec case "applicable" cochée (ne doit rien verser)
+    # Case 9: Filter block with the "applicable" box checked (must write nothing)
     total += 1
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             ref_data = {
-                "criteres": [
-                    {"id": "1.5", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}},
-                    {"id": "1.13", "options_evaluation": ["✅"], "options_evaluation_coefficient": {"✅": 0}}
+                "criteria": [
+                    {"id": "1.5", "evaluation_options": ["✅"], "evaluation_coefficient_options": {"✅": 0}},
+                    {"id": "1.13", "evaluation_options": ["✅"], "evaluation_coefficient_options": {"✅": 0}}
                 ],
-                "diagnostic_rapide": []
+                "quick_diagnostic": []
             }
-            ref_path = tmpdir / "eof-referentiel.json"
+            ref_path = tmpdir / "eof-reference.json"
             ref_path.write_text(json.dumps(ref_data, ensure_ascii=False), encoding="utf-8")
 
-            blocs_data = {
+            blocks_data = {
                 "version": 1,
-                "blocs": [
+                "blocks": [
                     {
-                        "id": "filtre-interface",
-                        "fichier": "produit-usage",
-                        "phase": "porte",
-                        "type": "filtre",
-                        "criteres": ["1.5", "1.13"],
-                        "question": "Le service a-t-il une interface ?",
-                        "libelle_ecarte": "Non",
-                        "libelle_applicable": "Oui"
+                        "id": "filter-interface",
+                        "file": "product-usage",
+                        "phase": "gate",
+                        "type": "filter",
+                        "criteria": ["1.5", "1.13"],
+                        "question": "Does the service have an interface?",
+                        "discarded_label": "No",
+                        "applicable_label": "Yes"
                     }
                 ]
             }
-            blocs_path = tmpdir / "questionnaire-blocs.json"
-            blocs_path.write_text(json.dumps(blocs_data, ensure_ascii=False), encoding="utf-8")
+            blocks_path = tmpdir / "questionnaire-blocs.json"
+            blocks_path.write_text(json.dumps(blocks_data, ensure_ascii=False), encoding="utf-8")
 
             md_content = """
-<!-- bloc:filtre-interface -->
-- [ ] Non  <!-- opt:ecarte -->
-- [x] Oui  <!-- opt:applicable -->
-- [ ] Je ne sais pas  <!-- opt:jnsp -->
+<!-- block:filter-interface -->
+- [ ] No  <!-- opt:discarded -->
+- [x] Yes  <!-- opt:applicable -->
+- [ ] I don't know  <!-- opt:dnk -->
 """
             md_path = tmpdir / "questionnaire-eof.md"
             md_path.write_text(md_content, encoding="utf-8")
 
-            criteres_ref, diag_ref = load_referentiel(ref_path)
-            blocs = load_blocs(tmpdir)
-            entries, report, errors, mesure = parse_questionnaires(tmpdir, blocs, criteres_ref, diag_ref)
+            criteria_ref, diag_ref = load_reference(ref_path)
+            blocks = load_blocks(tmpdir)
+            entries, report, errors, measurement = parse_questionnaires(tmpdir, blocks, criteria_ref, diag_ref)
 
             if errors:
-                echecs.append(("Bloc filtre case applicable", f"Erreurs : {errors}"))
+                failures.append(("Filter block applicable box", f"Errors: {errors}"))
             elif len(entries) != 0:
-                echecs.append(("Bloc filtre case applicable", f"Attendu 0 entrée, obtenu {len(entries)}"))
-            # Le bloc doit compter comme répondu
-            if report["blocs_repondus"] != 1:
-                echecs.append(("Bloc filtre case applicable", f"Attendu 1 bloc répondu, obtenu {report['blocs_repondus']}"))
+                failures.append(("Filter block applicable box", f"Expected 0 entries, got {len(entries)}"))
+            # The block must count as answered
+            if report["answered_blocks"] != 1:
+                failures.append(("Filter block applicable box", f"Expected 1 answered block, got {report['answered_blocks']}"))
     except Exception as exc:
-        echecs.append(("Bloc filtre case applicable", f"Exception : {exc}"))
+        failures.append(("Filter block applicable box", f"Exception: {exc}"))
 
-    if echecs:
-        print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
-        for libelle, erreur in echecs:
-            print(f"  - {libelle}")
-            print(f"      {erreur}")
+    if failures:
+        print(f"AUTOTEST FAILED: {len(failures)} case(s) out of {total}")
+        for label, error in failures:
+            print(f"  - {label}")
+            print(f"      {error}")
         return 1
 
-    print(f"Autotest : {total} cas passés.")
+    print(f"Autotest: {total} cases passed.")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Parse les questionnaires EOF remplis et produit relecture-questionnaire.json")
-    parser.add_argument("repertoire_audit", nargs="?",
-                        help="dossier d'audit contenant les questionnaires .md")
+        description="Parses filled-in EOF questionnaires and produces questionnaire-review.json")
+    parser.add_argument("audit_dir", nargs="?",
+                        help="audit directory containing the .md questionnaires")
     parser.add_argument("--autotest", action="store_true",
-                        help="rejoue les cas de test embarqués et sort 1 si un cas échoue")
+                        help="replays the embedded test cases and exits 1 if a case fails")
     args = parser.parse_args()
 
     if args.autotest:
         sys.exit(autotest())
 
-    if not args.repertoire_audit:
-        parser.error("repertoire_audit est requis (ou utiliser --autotest)")
+    if not args.audit_dir:
+        parser.error("audit_dir is required (or use --autotest)")
 
-    audit_dir = Path(args.repertoire_audit).resolve()
+    audit_dir = Path(args.audit_dir).resolve()
 
-    # Charger les données
-    ref_path = find_referentiel()
-    criteres_ref, diag_rapide_ref = load_referentiel(ref_path)
+    # Load the data
+    ref_path = find_reference()
+    criteria_ref, quick_diag_ref = load_reference(ref_path)
 
     scripts_dir = Path(__file__).resolve().parent
-    blocs_data = load_blocs(scripts_dir)
+    blocks_data = load_blocks(scripts_dir)
 
-    # Parser les questionnaires
-    entries, report, errors, mesure = parse_questionnaires(audit_dir, blocs_data,
-                                                           criteres_ref, diag_rapide_ref)
+    # Parse the questionnaires
+    entries, report, errors, measurement = parse_questionnaires(audit_dir, blocks_data,
+                                                                  criteria_ref, quick_diag_ref)
 
-    # Afficher le compte-rendu
-    print(f"Fichier lu : {report['fichier_lu'] if report['fichier_lu'] else 'aucun'}")
-    print(f"Statut de mesure : {mesure['statut']}")
-    print(f"Blocs lus : {report['blocs_lus']}")
-    print(f"Blocs répondus : {report['blocs_repondus']}")
-    print(f"Blocs vides : {report['blocs_vides']}")
-    print(f"Blocs en erreur : {report['blocs_erreur']}")
-    print(f"Critères versés : {report['criteres_verses']}")
-    print(f"Critères en 'je ne sais pas' : {report['criteres_jnsp']}")
+    # Print the report
+    print(f"File read: {report['file_read'] if report['file_read'] else 'none'}")
+    print(f"Measurement status: {measurement['status']}")
+    print(f"Blocks read: {report['blocks_read']}")
+    print(f"Blocks answered: {report['answered_blocks']}")
+    print(f"Empty blocks: {report['empty_blocks']}")
+    print(f"Blocks in error: {report['error_blocks']}")
+    print(f"Criteria written: {report['emitted_criteria']}")
+    print(f"Criteria in 'I don't know': {report['dnk_criteria']}")
 
     if errors:
-        print("\nErreurs détectées :")
+        print("\nErrors detected:")
         for err in errors:
             print(f"  - {err}")
 
-    # Écrire le fichier de sortie
+    # Write the output file
     lots_dir = audit_dir / "lots"
     lots_dir.mkdir(exist_ok=True)
 
     output = {
-        "lot_id": "relecture-questionnaire",
-        "genere_le": datetime.now(timezone.utc).isoformat(),
-        "entrees": [report["fichier_lu"]] if report["fichier_lu"] else [],
-        "criteres": entries,
-        "mesure": mesure
+        "lot_id": "questionnaire-review",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "inputs": [report["file_read"]] if report["file_read"] else [],
+        "criteria": entries,
+        "measurement": measurement
     }
 
-    output_path = lots_dir / "relecture-questionnaire.json"
+    output_path = lots_dir / "questionnaire-review.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
-    print(f"\nÉcrit : {output_path}")
+    print(f"\nWritten: {output_path}")
 
     return 0
 

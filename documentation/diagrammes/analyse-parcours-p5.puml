@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p5
-title Workflow Analyse de parcours web — Page 5/5 : e-footprint calcul + rapport (optionnel)
+title Web journey analysis workflow — Page 5/5 : e-footprint calculation + report (optional)
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,109 +22,109 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill /efootprint)" as C #82C1DD
 participant "run_efootprint.py" as REF #DBDDE5
 participant "generate_report_html.py" as GR #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+database "audit-dir/" as FS #9BD0DD
 
 note over U, FS
-  Suite de la page 4/5 : env-data.json est prêt. On demande les hypothèses non
-  auto-détectables, on calcule, on synthétise, on enrichit le rapport HTML.
-  Rappel : toute valeur reste une ESTIMATION HYPOTHÉTIQUE.
+  Rest of page 4/5: env-data.json is ready. We ask for the non
+  auto-detectable hypotheses, we calculate, we summarize, we enrich the HTML report.
+  Reminder: every value remains a HYPOTHETICAL ESTIMATE.
 end note
 
-== Étape 30 — Paramètres utilisateur ==
+== Step 30 — User parameters ==
 
-C -> C : Trafic déjà résolu (bloc traffic\nSimilarWeb ou analytics client) ?
+C -> C : Traffic already resolved (traffic block\nSimilarWeb or client analytics) ?
 
-alt Trafic déjà résolu (page 4)
-  note over C : Ne pas reposer la question :\nréutiliser le volume résolu à l'Étape 20c.
-else Aucune source de trafic
-  C -> U : AskUserQuestion — trafic annuel\n(10k / 100k / 500k / 1M, ou libre)
-  U -> C : Trafic retenu (option visits)
+alt Traffic already resolved (page 4)
+  note over C : Do not ask the question again:\nreuse the volume resolved at Step 20c.
+else No traffic source
+  C -> U : AskUserQuestion — annual traffic\n(10k / 100k / 500k / 1M, or free)
+  U -> C : Traffic retained (option visits)
 end
 
-alt Provider cloud supporté détecté\n(aws / gcp / azure / scaleway / ovh)
-  C -> U : AskUserQuestion — taille d'instance\n(ex. AWS : t3.medium défaut, t3.large, m5.large...)
-  U -> C : Instance retenue (option instance)
-else Provider inconnu ou non supporté
-  note over C : Pas de question :\nrun_efootprint bascule sur Server générique.
+alt Supported cloud provider detected\n(aws / gcp / azure / scaleway / ovh)
+  C -> U : AskUserQuestion — instance size\n(ex. AWS: t3.medium default, t3.large, m5.large...)
+  U -> C : Instance retained (option instance)
+else Unknown or unsupported provider
+  note over C : No question:\nrun_efootprint switches to generic Server.
 end
 
 note over C, U
-  Toujours rappeler qu'il s'agit d'hypothèses.
-  Poids, durée, mix appareils, pays : imposés par env-data.json
-  (pour les changer, éditer env-data.json puis relancer).
+  Always remind that these are hypotheses.
+  Weight, duration, device mix, country: imposed by env-data.json
+  (to change them, edit env-data.json then rerun).
 end note
 
-== Étape 40 — Calcul e-footprint ==
+== Step 40 — e-footprint calculation ==
 
 C -> REF : python3 run_efootprint.py <source_dir>\n[option visits N] [option instance TYPE]
-REF -> FS : Lire env-data.json
-FS -> REF : Données environnement
+REF -> FS : Read env-data.json
+FS -> REF : Environment data
 
-REF -> REF : Construire modèle Boavizta :\n- Devices (2 profils : mobile / desktop)\n- Network (mobile -> réseau mobile, desktop -> wifi)\n- Server (instance cloud ou générique)\n- Storage (hypothèse 50 GB)
+REF -> REF : Build Boavizta model:\n- Devices (2 profiles: mobile / desktop)\n- Network (mobile -> mobile network, desktop -> wifi)\n- Server (cloud instance or generic)\n- Storage (50 GB hypothesis)
 
-REF -> REF : Calcul impact :\n- Fabrication (dict par poste)\n- Énergie (dict par poste)\n- Total kg/an + g/visite
+REF -> REF : Impact calculation:\n- Manufacturing (dict per item)\n- Energy (dict per item)\n- Total kg/year + g/visit
 
-REF -> FS : efootprint-boavizta-model.json\n(modèle complet sérialisé)
-REF -> FS : efootprint-synthese-python.json\n(totaux + hypothèses, format léger)
+REF -> FS : efootprint-boavizta-model.json\n(full serialized model)
+REF -> FS : efootprint-python-summary.json\n(totals + hypotheses, lightweight format)
 
 note over REF, FS
-  efootprint-synthese-python.json (extrait) :
+  efootprint-python-summary.json (extract):
   {
     "visits_per_year": ...,
     "traffic": {source, source_url, snapshot, confidence},
     "totals": {
       "total_kg_co2e_per_year": ...,
       "per_visit_g_co2e": ...,
-      "fabrication_kg_co2e_per_year": {poste: kg},
-      "energy_kg_co2e_per_year": {poste: kg}
+      "fabrication_kg_co2e_per_year": {item: kg},
+      "energy_kg_co2e_per_year": {item: kg}
     },
     "hypotheses": {
       page_weight_kb, request_duration_ms,
       weight_by_type_bytes, third_party_share,
       country, carbon_intensity_g_kwh, provider, instance_type,
-      phone_fraction / desktop_fraction (corrigé iOS/macOS),
+      phone_fraction / desktop_fraction (corrected iOS/macOS),
       audience_mix + source, device_scenarios,
-      + niveau de confiance par champ
+      + confidence level per field
     }
   }
 end note
 
-REF -> REF : Automatique — Scénarios de recommandations\n(recommendations.py) : recalcul RÉEL du modèle\npour 3 paliers cumulés (prio1 / prio1+2 / prio1+2+3)
-REF -> FS : efootprint-scenario-{palier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
+REF -> REF : Automatic — Recommendation scenarios\n(recommendations.py): REAL recalculation of the model\nfor 3 cumulative tiers (prio1 / prio1+2 / prio1+2+3)
+REF -> FS : efootprint-scenario-{tier}.e-f.json (x4)\n+ efootprint-recommendations-gains.json
 
 note over REF, FS
-  Aucune question posée à l'utilisateur pour cette étape :
-  entièrement automatique, à partir des mêmes seuils
-  prio1/prio2/prio3 déjà utilisés par les recommandations
-  qualitatives du rapport (JS/CSS mort, doublons, Brotli).
+  No question asked to the user for this step:
+  fully automatic, from the same thresholds
+  prio1/prio2/prio3 already used by the qualitative
+  recommendations of the report (dead JS/CSS, duplicates, Brotli).
 end note
 
-REF -> C : stdout : tableau hypothèses\n+ résultats CO2e bruts
+REF -> C : stdout: hypotheses table\n+ raw CO2e results
 
-== Étape 50 — Synthèse et enrichissement rapport ==
+== Step 50 — Summary and report enrichment ==
 
-C -> U : Synthèse (3 lignes) :\n- ~{total} kg CO2e/an\n- ~{per_visit} g CO2e/visite\n- Poste dominant : devices / server / network / storage
+C -> U : Summary (3 lines):\n- ~{total} kg CO2e/year\n- ~{per_visit} g CO2e/visit\n- Dominant item: devices / server / network / storage
 
-C -> U : AskUserQuestion — et ensuite ?\n- Relancer avec d'autres hypothèses\n- Recollecte (option refresh)\n- Régénérer le rapport HTML\n- Terminer
+C -> U : AskUserQuestion — and then?\n- Rerun with other hypotheses\n- Recollect (option refresh)\n- Regenerate the HTML report\n- Finish
 
-alt Régénérer le rapport HTML
-  C -> GR : python3 generate_report_html.py <dossier-audit>
-  GR -> FS : Lire efootprint-synthese-python.json\n(+ har, coverage, cwv, tech_stack)
-  FS -> GR : Données rapport
-  GR -> GR : Insérer section "Impact\nenvironnemental (CO2e)"\nentre CWV et Annexes
-  GR -> GR : Recommandations -> bloc "Gain CO2e estimé"\n+ bloc "Gain EcoIndex & LCP estimé"\n(si efootprint-recommendations-gains.json présent)
-  GR -> FS : rapport-parcours-YYYY-MM-DD.html
-  GR -> C : Chemin rapport
-  C -> U : Rapport enrichi livré\n(KPIs CO2e, décomposition fab/énergie,\nannexe méthodologique A à H,\ndont F. Recommandations et G. EcoIndex/LCP)
+alt Regenerate the HTML report
+  C -> GR : python3 generate_report_html.py <audit-dir>
+  GR -> FS : Read efootprint-python-summary.json\n(+ har, coverage, cwv, tech_stack)
+  FS -> GR : Report data
+  GR -> GR : Insert section "Environmental\nimpact (CO2e)"\nbetween CWV and Appendices
+  GR -> GR : Recommendations -> block "Estimated CO2e gain"\n+ block "Estimated EcoIndex & LCP gain"\n(if efootprint-recommendations-gains.json present)
+  GR -> FS : journey-report-YYYY-MM-DD.html
+  GR -> C : Report path
+  C -> U : Enriched report delivered\n(CO2e KPIs, manufacturing/energy breakdown,\nmethodology appendix A to H,\nincluding F. Recommendations and G. EcoIndex/LCP)
 end
 
 note over U, C
-  Boucle humain-dans-la-boucle : aucune itération automatique.
-  Section CO2e omise si efootprint-synthese-python.json absent (rapport rétro-compatible).
+  Human-in-the-loop loop: no automatic iteration.
+  CO2e section omitted if efootprint-python-summary.json absent (backward-compatible report).
 end note
 
 @enduml

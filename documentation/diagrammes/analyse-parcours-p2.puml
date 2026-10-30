@@ -1,5 +1,5 @@
 @startuml analyse-parcours-p2
-title Workflow Analyse de parcours web — Page 2/5 : DISPATCH + EcoIndex
+title Web journey analysis workflow — Page 2/5 : DISPATCH + EcoIndex
 
 skinparam backgroundColor #FFFFFF
 skinparam participant {
@@ -22,78 +22,80 @@ skinparam sequenceMessageAlign center
 skinparam maxMessageSize 200
 skinparam responseMessageBelowArrow true
 
-actor "Utilisateur" as U #82C1DD
+actor "User" as U #82C1DD
 participant "Claude\n(skill analyse-parcours)" as C #82C1DD
-participant "Sous-agents\n(HAR / Coverage)" as SA #C8E6C9
+participant "Sub-agents\n(HAR / Coverage)" as SA #C8E6C9
 participant "analyze_har.py" as AH #DBDDE5
-participant "Scripts mesure\n(har_metrics.py, CWV)" as EI #DBDDE5
-database "dossier-audit/" as FS #9BD0DD
+participant "Measurement scripts\n(har_metrics.py, CWV)" as EI #DBDDE5
+database "audit-dir/" as FS #9BD0DD
 
-== Étape 25 — Détection capacités DISPATCH ==
+== Step 25 — DISPATCH capability detection ==
 
-C -> C : Sous-agents disponibles ?\n(Claude Code -> OUI, autres -> séquentiel)
+C -> C : Sub-agents available?\n(Claude Code -> YES, others -> sequential)
 
-== Wave 1 — Analyse HAR + Coverage (en parallèle) ==
+== Wave 1 — HAR + Coverage analysis (in parallel) ==
 
 par
-  C -> SA : :::dispatch analyse-har\n(20_analyse-har.md)
-  SA -> AH : python3 analyze_har.py <dossier-source>
-  AH -> AH : Trafic + performance (requêtes, domaines,\ncodes HTTP, doublons, ressources bloquantes)
+  C -> SA : :::dispatch analyze-har\n(20_har-analysis.md)
+  SA -> AH : python3 analyze_har.py <source-dir>
+  AH -> AH : Traffic + performance (requests, domains,\nHTTP codes, duplicates, blocking resources)
   AH -> FS : har-analysis.json
 else
-  C -> SA : :::dispatch analyse-coverage\n(30_analyse-coverage.md)
-  SA -> FS : Lire Coverage-*.json
-  SA -> SA : Détecter format A ou B
-  SA -> SA : Métriques JS/CSS par page\n(total, inutilisé, %)
-  SA -> SA : Synthèse multi-pages + outliers
+  C -> SA : :::dispatch analyze-coverage\n(30_coverage-analysis.md)
+  SA -> FS : Read Coverage-*.json
+  SA -> SA : Detect format A or B
+  SA -> SA : JS/CSS metrics per page\n(total, unused, %)
+  SA -> SA : Multi-page summary + outliers
   SA -> FS : coverage-analysis.json
 end
 
 note over C, SA
-  Mode plateforme :
-  Claude Code -> sous-agents natifs (fenêtres contexte isolées)
-  Autres plateformes -> exécution séquentielle inline
-  Résultat disque identique dans les deux cas
+  Platform mode:
+  Claude Code -> native sub-agents (isolated context windows)
+  Other platforms -> sequential inline execution
+  Disk result identical in both cases
 end note
 
 == Merge Wave 1 ==
 
-C -> FS : Lire har-analysis.json
-FS -> C : Données trafic réseau
-C -> FS : Lire coverage-analysis.json
-FS -> C : Données code mort JS/CSS
+C -> FS : Read har-analysis.json
+FS -> C : Network traffic data
+C -> FS : Read coverage-analysis.json
+FS -> C : Dead JS/CSS code data
 
-== Étape 35 — Calcul EcoIndex (contexte principal) ==
+== Step 35 — EcoIndex calculation (main context) ==
 
 C -> EI : python3 har_metrics.py <har> [cwv.json]
-EI -> EI : Extraire DOM HTML depuis\nresponse.content.text
-EI -> EI : Compter requêtes + poids\npar page (pageref)
-EI -> C : Tableau : score/grade/req/Ko/DOM\npar page + onLoad
+EI -> EI : Extract HTML DOM from\nresponse.content.text
+EI -> EI : Count requests + weight\nper page (pageref)
+EI -> C : Table: score/grade/req/KB/DOM\nper page + onLoad
 
 note over C, EI
-  Limites :
-  - DOM=0 si HAR sans corps HTML\n    (response.content.text absent)
-  - SPA : DOM = état initial seulement\n    (pas après hydratation JS)
-  Ces cas sont documentés dans le rapport.
+  Limits:
+  - DOM=0 if HAR without HTML body
+    (response.content.text absent)
+  - SPA: DOM = initial state only
+    (not after JS hydration)
+  These cases are documented in the report.
 end note
 
-== Étape 37 — Core Web Vitals ==
+== Step 37 — Core Web Vitals ==
 
-alt cwv.json déjà présent
-  C -> C : Collecte CWV skippée
-else GOOGLE_API_KEY disponible (voie prioritaire)
+alt cwv.json already present
+  C -> C : CWV collection skipped
+else GOOGLE_API_KEY available (priority path)
   C -> EI : python3 collect_cwv_pagespeed.py <audit-dir>
-  EI -> EI : PageSpeed Insights API\n(CrUX terrain + Lighthouse lab, par page)
+  EI -> EI : PageSpeed Insights API\n(CrUX field + Lighthouse lab, per page)
   EI -> FS : cwv.json\n{lcp, inp, cls, source: "pagespeed/crux"}
-  FS -> C : cwv.json prêt
-else GOOGLE_API_KEY absent (repli)
-  C -> C : Extraire URLs depuis HAR\n(log.pages[].title)
+  FS -> C : cwv.json ready
+else GOOGLE_API_KEY absent (fallback)
+  C -> C : Extract URLs from HAR\n(log.pages[].title)
   C -> EI : run_lighthouse.sh <audit-dir> <url1> <url2> ...
-  EI -> EI : Lighthouse CLI (npx ou install locale)\npar page en mode lab
+  EI -> EI : Lighthouse CLI (npx or local install)\nper page in lab mode
   EI -> FS : cwv.json\n{lcp, inp, cls, source: "lighthouse"}
-  FS -> C : cwv.json prêt
-else Aucune source disponible
-  C -> C : Warning : rapport sans CWV\n(onLoad du HAR utilisé comme proxy du LCP)
+  FS -> C : cwv.json ready
+else No source available
+  C -> C : Warning: report without CWV\n(HAR onLoad used as LCP proxy)
 end
 
 @enduml

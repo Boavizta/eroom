@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Contrôle de non-régression dédié à la piste 1 (IA générative tierce texte,
-cf. documentation/implementation/methodologie_efootprint.md section 3.1).
+"""Non-regression check dedicated to track 1 (third-party generative AI text,
+cf. documentation/implementation/efootprint-methodology.md section 3.1).
 
-Contrairement à check_efootprint_contract.py (compare un audit réel à sa
-baseline), ce script rejoue une fixture HAR SYNTHÉTIQUE minimale : aucun audit
-réel disponible aujourd'hui n'a de host IA générative détecté, donc rien à
-comparer à une baseline existante. Contrairement à check_efootprint_spec.py
-(garde-fous purs Python, zéro import e-footprint), celui-ci importe la
-librairie (comme build.py) pour vérifier un vrai calcul EcoLogits.
+Unlike check_efootprint_contract.py (compares a real audit against its
+baseline), this script replays a minimal SYNTHETIC HAR fixture: no real audit
+available today has a detected generative-AI host, so there is nothing to
+compare against an existing baseline. Unlike check_efootprint_spec.py
+(pure Python guards, zero e-footprint imports), this one imports the
+library (like build.py) to verify a real EcoLogits computation.
 
-Ce que ce script prouve, par construction du modèle (pas par lecture de code) :
-  1. un host IA détecté mais dont l'utilisatrice n'a pas donné le modèle
-     ("resolved": False) NE CHANGE RIEN au total (statu quo, jamais de valeur
-     inventée) ;
-  2. le job IA générative, attaché au serveur 1st-party RÉEL, N'INFLATE JAMAIS
-     son poste Servers (pas de double comptage, pas de serveur fictif — le
-     risque identifié dans l'archétype ia_streaming.py lors du cadrage) ;
-  3. une fois le modèle et output_tokens connus, le poste ExternalAPIs
-     apparaît et le total augmente réellement.
+What this script proves, by construction of the model (not by reading code):
+  1. a detected AI host whose model the user did not provide
+     ("resolved": False) CHANGES NOTHING in the total (status quo, never an
+     invented value);
+  2. the generative-AI job, attached to the REAL 1st-party server, NEVER
+     inflates its Servers line (no double counting, no fictitious server — the
+     risk identified in the ia_streaming.py archetype during scoping);
+  3. once the model and output_tokens are known, the ExternalAPIs line
+     appears and the total really increases.
 """
 import json
 import sys
@@ -40,7 +40,7 @@ _FIXTURE_HAR = {
                     "_transferSize": 200000,
                     "headers": [],
                     "content": {"size": 200000, "mimeType": "text/html",
-                                "text": "<html><body><p>bonjour le monde</p></body></html>"},
+                                "text": "<html><body><p>hello world</p></body></html>"},
                 },
                 "serverIPAddress": "1.2.3.4",
             },
@@ -74,7 +74,7 @@ def _run(har_path, ai_external_apis):
         env_data["ai_external_apis"] = ai_external_apis
     spec, warnings = spec_from_env_data(env_data, har_path, "example.com")
     if warnings:
-        raise AssertionError(f"warnings inattendus sur la fixture : {warnings}")
+        raise AssertionError(f"unexpected warnings on the fixture: {warnings}")
     built = build_system(spec)
     return fabrication_kg(built), energy_kg(built), total_kg(built)
 
@@ -96,9 +96,9 @@ def main():
                                    "model_name": "claude-sonnet-4-5",
                                    "output_tokens": 300},
         })
-        # Modèle connu, longueur de réponse INCONNUE (décision QCM du 28/08/2026) :
-        # ne doit PAS exclure le host, doit utiliser la valeur par défaut
-        # documentée (_DEFAULT_OUTPUT_TOKENS dans from_har.py).
+        # Known model, UNKNOWN response length (multiple-choice decision of 2026-08-28):
+        # must NOT exclude the host, must fall back to the documented default
+        # value (_DEFAULT_OUTPUT_TOKENS in from_har.py).
         fab_default_len, ener_default_len, total_default_len = _run(har_path, {
             "api.anthropic.com": {"rule_name": "Anthropic (API Claude)",
                                    "provider": "anthropic", "resolved": True,
@@ -108,37 +108,37 @@ def main():
 
     checks = [
         (total_off == total_unresolved,
-         "un host détecté mais NON résolu (modèle inconnu) ne doit rien changer "
-         "au total (statu quo)"),
+         "a detected but UNRESOLVED host (unknown model) must not change "
+         "the total (status quo)"),
         (fab_off.get("Servers", 0) == fab_on.get("Servers", 0),
-         "le job IA ne doit JAMAIS inflater le poste Servers du serveur réel "
-         "(double comptage / serveur fictif)"),
+         "the AI job must NEVER inflate the Servers line of the real server "
+         "(double counting / fictitious server)"),
         (fab_on.get("ExternalAPIs", 0) > 0 or ener_on.get("ExternalAPIs", 0) > 0,
-         "le calcul EcoLogits doit produire une empreinte ExternalAPIs non nulle "
-         "une fois le modèle et output_tokens connus"),
+         "the EcoLogits computation must produce a non-zero ExternalAPIs "
+         "footprint once the model and output_tokens are known"),
         (total_on > total_off,
-         "le total doit augmenter une fois l'appel IA compté"),
+         "the total must increase once the AI call is counted"),
         (total_default_len > total_off,
-         "modèle connu mais longueur de réponse inconnue : ne doit PAS exclure "
-         "le host, doit retomber sur la valeur par défaut documentée"),
+         "known model but unknown response length: must NOT exclude "
+         "the host, must fall back to the documented default value"),
         (fab_default_len.get("ExternalAPIs", 0) > 0 or ener_default_len.get("ExternalAPIs", 0) > 0,
-         "la valeur par défaut de longueur de réponse doit produire un calcul "
-         "ExternalAPIs non nul, pas un calcul silencieusement ignoré"),
+         "the default response-length value must produce a non-zero "
+         "ExternalAPIs computation, not a silently skipped one"),
     ]
 
     failed = [msg for ok, msg in checks if not ok]
     if failed:
-        print("[ÉCHEC]")
+        print("[FAIL]")
         for msg in failed:
             print(f"  - {msg}")
         sys.exit(1)
 
-    print(f"[SUCCÈS] {len(checks)} contrôles piste 1 (IA générative tierce texte).")
-    print(f"  statu quo (non résolu) : total={total_off:.4f} kg")
-    print(f"  résolu (modèle connu)  : total={total_on:.4f} kg "
-          f"(+{total_on - total_off:.4f} kg dont ExternalAPIs "
+    print(f"[SUCCESS] {len(checks)} checks, track 1 (third-party generative AI text).")
+    print(f"  status quo (unresolved): total={total_off:.4f} kg")
+    print(f"  resolved (known model) : total={total_on:.4f} kg "
+          f"(+{total_on - total_off:.4f} kg, of which ExternalAPIs "
           f"fab={fab_on.get('ExternalAPIs', 0):.4f} + "
-          f"énergie={ener_on.get('ExternalAPIs', 0):.4f})")
+          f"energy={ener_on.get('ExternalAPIs', 0):.4f})")
 
 
 if __name__ == "__main__":

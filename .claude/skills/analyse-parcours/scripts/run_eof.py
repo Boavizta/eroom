@@ -1,48 +1,48 @@
 #!/usr/bin/env python3
-"""Remplit automatiquement ce qui peut l'être du référentiel EOF pour un
-site audité, à partir UNIQUEMENT de `eof-referentiel.json` (produit par le
-skill `eof`) et des données déjà collectées par `analyse-parcours`
+"""Automatically fills what can be filled of the EOF framework for an
+audited site, from ONLY `eof-reference.json` (produced by the
+`eof` skill) and the data already collected by `analyse-parcours`
 (`env-data.json`, `audit/har-analysis.json`, `audit/coverage-analysis.json`,
 `cwv.json`, `security-headers-analysis.json`, `wellknown-scan.json`,
-`html-css-criteria.json`, `pages-publiques-criteria.json`). Ne lit JAMAIS la Google Sheet ni le Markdown
-humain — c'est le découplage voulu entre "synchroniser le référentiel" et
-"auditer un site" (cf. plan d'architecture, `tmp/handoff.md`).
+`html-css-criteria.json`, `public-pages-criteria.json`). NEVER reads the Google Sheet nor the
+human Markdown — that is the intended decoupling between "sync the reference" and
+"audit a site" (cf. architecture plan, `tmp/handoff.md`).
 
-Sur les 54 critères détaillés (6 dimensions), une reconnaissance manuelle
-initiale (2026-09-03) avait montré que 10 étaient exploitables (4
-"automatisable", 6 "partiel"). Extension Phase 1 (même jour, plan
-`eof-questionnaire`) : 18 exploitables (7 "automatisable" avec case cochée :
-1.12, 2.1, 3.3, 5.4, 1.5, 1.6, 1.13 ; 11 "partiel" avec indice contextuel
-jamais coché). Extension Phase 2 (2026-09-07, pages publiques) : 23
-exploitables (7 "automatisable" inchangé ; 16 "partiel", dont 3.2 ajouté par
-cette phase et 4 déjà présents depuis la Phase 1 sans que ce commentaire ait
-été mis à jour). Les 31 autres restent "je ne sais pas" par construction,
+Of the 54 detailed criteria (6 dimensions), an initial manual
+review (2026-09-03) had shown that 10 were usable (4
+"automatable", 6 "partial"). Phase 1 extension (same day, plan
+`eof-questionnaire`): 18 usable (7 "automatable" with a ticked box:
+1.12, 2.1, 3.3, 5.4, 1.5, 1.6, 1.13 ; 11 "partial" with a contextual hint
+never ticked). Phase 2 extension (2026-09-07, public pages): 23
+usable (7 "automatable" unchanged ; 16 "partial", including 3.2 added by
+this phase and 4 already present since Phase 1 without this comment having
+been updated). The other 31 remain "I don't know" by construction,
 cf. `eof_criteria_mapping.py`.
-⚠️ Ces chiffres portent sur les 54 critères détaillés et RESTENT justes après
-l'ajout de 0.16 au MAPPING le 2026-09-07 : 0.16 est une question du diagnostic
-rapide, pas l'un des 54. Le MAPPING compte donc 8 automatisables quand ce
-commentaire en annonce 7, et les deux sont exacts dans leur périmètre. Ne pas
-"corriger" l'un d'après l'autre.
-Les 16 questions de 🏦
-0-Diagnostic rapide ne sont JAMAIS remplies automatiquement (échelle 1-5
-différente, décision explicite), SAUF 0.16 : elles apparaissent en aperçu,
-avec pour 0.4, 0.7, 0.10, 0.11, 0.12 et 0.15 un indice contextuel affiché à
-titre indicatif (jamais une réponse cochée).
+⚠️ These figures cover the 54 detailed criteria and REMAIN correct after
+adding 0.16 to the MAPPING on 2026-09-07: 0.16 is a quick diagnostic
+question, not one of the 54. The MAPPING therefore counts 8 automatable when this
+comment announces 7, and both are exact in their scope. Do not
+"fix" one from the other.
+The 16 questions of 🏦
+0-Quick diagnostic are NEVER filled automatically (different 1-5
+scale, explicit decision), EXCEPT 0.16: they appear in the overview,
+with for 0.4, 0.7, 0.10, 0.11, 0.12 and 0.15 a contextual hint displayed as
+indicative (never a ticked answer).
 
-Usage :
+Usage:
     python3 run_eof.py <source_dir>
 
-Écrit dans <source_dir>/ :
-    eof-audit-results.json  - résumé léger, consommé par generate_report_html.py
-    eof-rempli.md           - référentiel complet lisible, réponses + provenance + source
-    eof-radar-<domaine>.svg - radar des 6 dimensions à deux couches (ce que nous avons
-        établi en plein, ce que le service audité a déclaré en hachuré), avec le nombre de
-        critères renseignés sous chaque axe et une jauge de ce qui est renseigné en tout.
-        Une dimension sans aucune réponse est marquée "aucune réponse", jamais 0 %.
-    lots/jugement-automatique.json - la sortie de lot que processus/manifeste-lots.json
-        déclare, consommée par processus/fusionner_lots.py et contrôlée par
-        processus/valider_sortie_lot.py. N'y figurent que les critères sur lesquels ce lot
-        s'est prononcé, jamais les critères sans donnée.
+Writes into <source_dir>/:
+    eof-audit-results.json  - light summary, consumed by generate_report_html.py
+    eof-filled.md           - complete readable framework, answers + provenance + source
+    eof-radar-<domain>.svg - radar of the 6 dimensions in two layers (what we have
+        established solidly, what the audited service declared hatched), with the number of
+        filled-in criteria under each axis and a gauge of what is filled in overall.
+        A dimension with no answer at all is marked "no answer", never 0%.
+    lots/automatic-judgment.json - the lot output declared by process/lots-manifest.json,
+        consumed by process/merge_lots.py and checked by
+        process/validate_lot_output.py. Only the criteria this lot has
+        ruled on appear there, never the criteria without data.
 """
 import argparse
 import json
@@ -54,15 +54,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from eof_criteria_mapping import MAPPING  # noqa: E402
 from csp_inventory import inventory_from_headers_analysis, tracking_summary  # noqa: E402
-from deploy_freshness import analyse_har_freshness, find_har, summarise  # noqa: E402
+from deploy_freshness import analyze_har_freshness, find_har, summarise  # noqa: E402
 
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent / "eof" / "scripts"))
 from generate_radar_svg import build_radar_from_results  # noqa: E402
 
-REFERENTIEL_PATH = (
+REFERENCE_PATH = (
     SCRIPT_DIR.parent.parent / "eof" / "docs"
-    / "EOF-V.1.1 (EROOM Optimization Framework) - Template - Français"
-    / "eof-referentiel.json"
+    / "EOF-V.1.1 (EROOM Optimization Framework) - Template - English"
+    / "eof-reference.json"
 )
 
 CWV_GOOD = {"lcp": 2.5, "inp": 200, "cls": 0.1}
@@ -83,17 +83,17 @@ def find_first(*candidates):
 
 
 def load_audit_data(source_dir):
-    """Charge les données d'audit. COÛT : parse le .har entier (fichier lourd)
-    pour deploy_freshness, alors qu'aujourd'hui seuls les résumés JSON étaient lus.
+    """Loads the audit data. COST: parses the whole .har (heavy file)
+    for deploy_freshness, whereas today only the JSON summaries were read.
 
-    Retient au passage le chemin des fichiers RÉELLEMENT trouvés, sous la clé
-    `fichiers_charges`. C'est ce qui alimente le champ `entrees` du fichier de lot :
-    il doit dire ce qui a été lu, pas ce qui aurait pu l'être. Chemins relatifs à
-    source_dir, pour rester justes quand l'audit est rejoué depuis un autre dossier.
-    L'ordre des candidats par clé est celui d'avant, il porte la priorité de recherche.
+    Also records the paths of the files ACTUALLY found, under the key
+    `loaded_files`. This feeds the `inputs` field of the lot file:
+    it must say what was read, not what could have been. Paths relative to
+    source_dir, to stay correct when the audit is replayed from another directory.
+    The order of candidates per key is the previous one, it carries the search priority.
     """
     audit_dir = source_dir / "audit"
-    candidats = {
+    candidates = {
         "env": (source_dir / "env-data.json", audit_dir / "env-data.json"),
         "har": (audit_dir / "har-analysis.json", source_dir / "har-analysis.json"),
         "coverage": (audit_dir / "coverage-analysis.json", source_dir / "coverage-analysis.json"),
@@ -101,123 +101,123 @@ def load_audit_data(source_dir):
         "headers": (source_dir / "security-headers-analysis.json", audit_dir / "security-headers-analysis.json"),
         "wellknown": (source_dir / "wellknown-scan.json", audit_dir / "wellknown-scan.json"),
         "htmlcss": (source_dir / "html-css-criteria.json", audit_dir / "html-css-criteria.json"),
-        "pages_publiques": (source_dir / "pages-publiques-criteria.json", audit_dir / "pages-publiques-criteria.json"),
+        "public_pages": (source_dir / "public-pages-criteria.json", audit_dir / "public-pages-criteria.json"),
     }
-    trouves = {cle: find_first(*chemins) for cle, chemins in candidats.items()}
-    data = {cle: load_json(chemin) for cle, chemin in trouves.items()}
-    data["fichiers_charges"] = [
-        str(chemin.relative_to(source_dir)) for chemin in trouves.values() if chemin is not None
+    found = {key: find_first(*paths) for key, paths in candidates.items()}
+    data = {key: load_json(path) for key, path in found.items()}
+    data["loaded_files"] = [
+        str(path.relative_to(source_dir)) for path in found.values() if path is not None
     ]
-    data["source_dir"] = source_dir  # exposé pour deploy_freshness (nécessite le chemin du .har, pas le JSON)
+    data["source_dir"] = source_dir  # exposed for deploy_freshness (needs the .har path, not the JSON)
     return data
 
 
 # ---------------------------------------------------------------------------
-# Règles "automatisable" : retournent (reponse, provenance, source) ou (None, None, motif)
+# "automatable" rules: return (answer, provenance, source) or (None, None, reason)
 # ---------------------------------------------------------------------------
 
 def rule_1_12(data):
-    """Distingue pistage (marketing, pixels publicitaires, analytics comportemental)
-    de l'analytics sobre (sans cookie, sans profilage).
+    """Distinguishes tracking (marketing, ad pixels, behavioral analytics)
+    from lean analytics (no cookie, no profiling).
 
-    Provenance : estime (classification taxonomique des domaines en familles pistage/sobre).
+    Provenance: estimated (taxonameic classification of domains into tracking/lean families).
     """
     headers = data["headers"]
     har = data["har"]
     inv = inventory_from_headers_analysis(headers)
 
-    # Si aucun CSP disponible, repli sur l'ancienne heuristique tech_stack
+    # If no CSP available, fall back on the old tech_stack heuristic
     if inv is None:
         env = data["env"]
         categories = ((env or {}).get("tech_stack") or {}).get("categories") or {}
         analytics = categories.get("Analytics")
         if not analytics:
-            return "✅ Point fort confirmé", "estime", "env-data.json: tech_stack.categories — aucune techno 'Analytics' détectée"
+            return "✅ Confirmed strength", "estimated", "env-data.json: tech_stack.categories — no 'Analytics' technology detected"
         tp_share = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("third_party_share")
         extra = f", third_party_share={tp_share:.1%}" if tp_share is not None else ""
-        return ("💡 Potentiel d'amélioration identifié", "estime",
-                f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra} (CSP absent : heuristique ancienne)")
+        return ("💡 Improvement potential identified", "estimated",
+                f"env-data.json: tech_stack.categories['Analytics'] = {', '.join(analytics)}{extra} (no CSP: old heuristic)")
 
     summary = tracking_summary(inv, har)
     if summary is None or not summary["loaded_connu"]:
         return (None, None,
-                "security-headers-analysis.json: CSP présent mais har-analysis.json absent — "
-                "impossible de distinguer déclaré/chargé")
+                "security-headers-analysis.json: CSP present but har-analysis.json missing — "
+                "cannot distinguish declared/loaded")
 
-    pistage = summary["pistage_charge"]
-    pistage_declare_only = summary["pistage_declare_non_charge"]
-    sobre = summary["analytics_sobre_charge"]
+    trackers = summary["load_tracking"]
+    declared_only_trackers = summary["declared_not_loaded"]
+    lean_analytics = summary["analytics_sobre_charge"]
 
-    # Pistage effectivement chargé -> problème identifié
-    if pistage:
-        return ("💡 Potentiel d'amélioration identifié", "estime",
-                f"security-headers-analysis.json + har-analysis.json: pistage effectivement chargé : {', '.join(pistage)}")
+    # Tracking effectively loaded -> problem identified
+    if trackers:
+        return ("💡 Improvement potential identified", "estimated",
+                f"security-headers-analysis.json + har-analysis.json: tracking effectively loaded: {', '.join(trackers)}")
 
-    # Pistage déclaré mais absent du HAR -> écart (probablement capture sans consentement)
-    if pistage_declare_only:
-        return ("🤔 À évaluer", "estime",
-                f"security-headers-analysis.json + har-analysis.json: pistage déclaré au CSP mais absent du HAR "
-                f"({', '.join(pistage_declare_only)}) — probable capture sans accepter le consentement")
+    # Tracking declared but absent from the HAR -> gap (probably capture without consent)
+    if declared_only_trackers:
+        return ("🤔 To be assessed", "estimated",
+                f"security-headers-analysis.json + har-analysis.json: tracking declared in the CSP but absent from the HAR "
+                f"({', '.join(declared_only_trackers)}) — probable capture without accepting consent")
 
-    # Seulement analytics sobre -> point fort
-    if sobre:
-        return ("✅ Point fort confirmé", "estime",
-                f"security-headers-analysis.json + har-analysis.json: seulement analytics sobre chargé ({', '.join(sobre)}), "
-                "aucun pistage marketing/publicitaire/comportemental")
+    # Only lean analytics -> strength
+    if lean_analytics:
+        return ("✅ Confirmed strength", "estimated",
+                f"security-headers-analysis.json + har-analysis.json: only lean analytics loaded ({', '.join(lean_analytics)}), "
+                "no marketing/ad/behavioral tracking")
 
-    # Ni pistage ni analytics sobre
-    return ("✅ Point fort confirmé", "estime",
-            "security-headers-analysis.json + har-analysis.json: aucun pistage ni analytics détecté")
+    # Neither tracking nor lean analytics
+    return ("✅ Confirmed strength", "estimated",
+            "security-headers-analysis.json + har-analysis.json: no tracking or analytics detected")
 
 
 def rule_2_1(data):
-    """Détection de technologies IA et blockchain.
+    """Detection of AI and blockchain technologies.
 
-    Provenance : estime. La détection de technologies est une empreinte, pas une
-    mesure : l'absence d'empreinte IA ne prouve pas l'absence d'IA, et le
-    rattachement d'une techno à la catégorie "IA" vient du catalogue de l'outil de
-    détection, pas du service audité.
+    Provenance: estimated. Technology detection is a footprint, not a
+    measurement: the absence of an AI footprint does not prove the absence of AI, and the
+    attachment of a technology to the "AI" category comes from the detection tool's
+    catalog, not from the audited service.
     """
     env = data["env"]
     ai = (env or {}).get("ai_external_apis") or {}
     techs = ((env or {}).get("tech_stack") or {}).get("technologies") or []
     flagged = [t["name"] for t in techs if t.get("category", "").lower() in ("ia", "intelligence artificielle", "blockchain")]
     if not ai and not flagged:
-        return "✅ Point fort confirmé", "estime", "env-data.json: ai_external_apis vide, aucune techno IA/blockchain détectée"
+        return "✅ Confirmed strength", "estimated", "env-data.json: ai_external_apis empty, no AI/blockchain technology detected"
     detail = list(ai.keys()) + flagged
-    return "💡 Potentiel d'amélioration identifié", "estime", f"env-data.json: ai_external_apis/tech_stack = {detail}"
+    return "💡 Improvement potential identified", "estimated", f"env-data.json: ai_external_apis/tech_stack = {detail}"
 
 
 def rule_3_3(data):
-    """Intensité carbone de l'hébergement.
+    """Carbon intensity of the hosting.
 
-    Provenance : collecte (API ipinfo + table de référence intensité carbone par pays).
+    Provenance: collected (ipinfo API + reference table of carbon intensity by country).
     """
     env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
         servers = [env["server"]]
     if not servers:
-        return None, None, "env-data.json: servers[] absent"
-    seuil = 250
+        return None, None, "env-data.json: servers[] missing"
+    threshold = 250
     detail = "; ".join(
         f"{s.get('host') or '?'} ({s.get('country_code') or '?'}, {s.get('carbon_intensity_g_kwh') or '?'} gCO2/kWh)"
         for s in servers
     )
-    over = [s for s in servers if (s.get("carbon_intensity_g_kwh") or 0) > seuil]
+    over = [s for s in servers if (s.get("carbon_intensity_g_kwh") or 0) > threshold]
     if over:
-        return "💡 Potentiel d'amélioration identifié", "collecte", f"env-data.json: servers[] = {detail} (seuil {seuil} gCO2/kWh dépassé)"
-    return "✅ Point fort confirmé", "collecte", f"env-data.json: servers[] = {detail} (sous le seuil {seuil} gCO2/kWh)"
+        return "💡 Improvement potential identified", "collected", f"env-data.json: servers[] = {detail} (threshold {threshold} gCO2/kWh exceeded)"
+    return "✅ Confirmed strength", "collected", f"env-data.json: servers[] = {detail} (below the {threshold} gCO2/kWh threshold)"
 
 
 def rule_5_4(data):
     """Core Web Vitals (LCP, INP, CLS).
 
-    Provenance : collecte (données terrain Chrome UX Report via API CrUX).
+    Provenance: collected (field data Chrome UX Report via the CrUX API).
     """
     cwv = data["cwv"]
     if not cwv:
-        return None, None, "cwv.json absent"
+        return None, None, "cwv.json missing"
     poor_pages, all_good = [], True
     for entry in cwv:
         lcp, inp, cls = entry.get("lcp"), entry.get("inp"), entry.get("cls")
@@ -231,72 +231,72 @@ def rule_5_4(data):
                 (cls is None or cls <= CWV_GOOD["cls"])):
             all_good = False
     if poor_pages:
-        return "💡 Potentiel d'amélioration identifié", "collecte", f"cwv.json: page(s) en zone 'poor' : {', '.join(sorted(set(poor_pages)))}"
+        return "💡 Improvement potential identified", "collected", f"cwv.json: page(s) in the 'poor' zone: {', '.join(sorted(set(poor_pages)))}"
     if all_good:
-        return "✅ Point fort confirmé", "collecte", "cwv.json: toutes les pages sous les seuils CWV 'good'"
-    return "🤔 À évaluer", "collecte", "cwv.json: zone intermédiaire ('needs improvement'), aucune page 'poor'"
+        return "✅ Confirmed strength", "collected", "cwv.json: all pages under the CWV 'good' thresholds"
+    return "🤔 To be assessed", "collected", "cwv.json: intermediate zone ('needs improvement'), no 'poor' page"
 
 
-# --- Extension Phase 1 (2026-09-03) ---------------------------------------
+# --- Phase 1 extension (2026-09-03) ---------------------------------------
 
 def rule_1_5(data):
-    """Détection de médias à lecture automatique (autoplay).
+    """Detection of auto-playing media (autoplay).
 
-    Provenance : collecte (parsing HTML, recherche attribut autoplay sur <video>/<audio>).
+    Provenance: collected (HTML parsing, autoplay attribute search on <video>/<audio>).
     """
     htmlcss = data["htmlcss"]
     pages = (htmlcss or {}).get("pages")
     if not pages:
-        return None, None, "html-css-criteria.json absent"
+        return None, None, "html-css-criteria.json missing"
     offenders = [p["url"] for p in pages if p.get("has_autoplay_media")]
     if offenders:
-        return "💡 Potentiel d'amélioration identifié", "collecte", f"html-css-criteria.json: autoplay détecté sur {offenders}"
-    return "✅ Point fort confirmé", "collecte", "html-css-criteria.json: aucune balise <video|audio autoplay> détectée sur les pages auditées"
+        return "💡 Improvement potential identified", "collected", f"html-css-criteria.json: autoplay detected on {offenders}"
+    return "✅ Confirmed strength", "collected", "html-css-criteria.json: no <video|audio autoplay> tag detected on the audited pages"
 
 
 def rule_1_6(data):
-    """Adaptation des ressources (images responsive, media queries CSS).
+    """Adaptation of resources (responsive images, CSS media queries).
 
-    Provenance : estime. Les comptages sont mesurés, mais le verdict repose sur des
-    seuils de notre invention (ratio d'images adaptatives >= 0,5 et au moins
-    3 @media queries) que ni le référentiel EOF ni aucune source publique ne fixe.
-    Le chiffre est collecté, la conclusion est déduite.
+    Provenance: estimated. The counts are measured, but the verdict rests on
+    thresholds of our own invention (adaptive image ratio >= 0.5 and at least
+    3 @media queries) that neither the EOF framework nor any public source sets.
+    The figure is collected, the conclusion is deduced.
     """
     htmlcss = data["htmlcss"]
     pages = (htmlcss or {}).get("pages")
     css = (htmlcss or {}).get("css")
     if not pages or css is None:
-        return None, None, "html-css-criteria.json absent"
+        return None, None, "html-css-criteria.json missing"
     ratios = [p["adaptive_img_ratio"] for p in pages if p.get("adaptive_img_ratio") is not None]
     has_any_adaptive_img = any(r > 0 for r in ratios)
     all_pages_adaptive = bool(ratios) and all(r >= 0.5 for r in ratios)
     has_media_queries = (css.get("media_query_count") or 0) >= 3
-    source = f"html-css-criteria.json: adaptive_img_ratio par page = {ratios} ; media_query_count = {css.get('media_query_count')}"
+    source = f"html-css-criteria.json: adaptive_img_ratio per page = {ratios} ; media_query_count = {css.get('media_query_count')}"
     if all_pages_adaptive and has_media_queries:
-        return "✅ Point fort confirmé", "estime", source
+        return "✅ Confirmed strength", "estimated", source
     if not has_any_adaptive_img and not has_media_queries:
-        return "💡 Potentiel d'amélioration identifié", "estime", source
-    return "🤔 À évaluer", "estime", source + " (signaux discordants entre pages/CSS, contrainte déterministe : ne pas trancher)"
+        return "💡 Improvement potential identified", "estimated", source
+    return "🤔 To be assessed", "estimated", source + " (conflicting signals between pages/CSS, deterministic constraint: do not decide)"
 
 
 def rule_1_13(data):
-    """Optimisation des parcours (proxy : score d'accessibilité Lighthouse).
+    """Journey optimization (proxy: Lighthouse accessibility score).
 
-    Provenance : collecte (API PageSpeed Insights, catégorie accessibility).
+    Provenance: collected (PageSpeed Insights API, accessibility category).
     """
     cwv = data["cwv"]
     if not cwv:
-        return None, None, "cwv.json absent"
+        return None, None, "cwv.json missing"
     accessibility_scores = [e["accessibility_score_pct"] for e in cwv if e.get("accessibility_score_pct") is not None]
     if not accessibility_scores:
-        return None, None, "cwv.json: aucun accessibility_score_pct disponible"
+        return None, None, "cwv.json: no accessibility_score_pct available"
     worst = min(accessibility_scores)
-    source = f"cwv.json: accessibility_score_pct (PageSpeed Insights) — pire page/stratégie = {worst}, valeurs = {accessibility_scores}"
+    source = f"cwv.json: accessibility_score_pct (PageSpeed Insights) — worst page/strategy = {worst}, values = {accessibility_scores}"
     if worst < 60:
-        return "💡 Potentiel d'amélioration identifié", "collecte", source
+        return "💡 Improvement potential identified", "collected", source
     if worst >= 90:
-        return "✅ Point fort confirmé", "collecte", source
-    return "🤔 À évaluer", "collecte", source + " (zone 60-90, ambigu)"
+        return "✅ Confirmed strength", "collected", source
+    return "🤔 To be assessed", "collected", source + " (60-90 zone, ambiguous)"
 
 
 RULES = {
@@ -306,35 +306,35 @@ RULES = {
 
 
 # ---------------------------------------------------------------------------
-# Diagnostic rapide : JAMAIS automatisé, sauf 0.16 — doublon quasi exact de
-# 3.3 (même donnée : servers[].carbon_intensity_g_kwh), avec une échelle
-# numérique plus précise. Décision explicite du 2026-09-03 (analyse
-# eof-analyse-minimisation-questions.md, section 1) : seule exception au
-# principe "Diagnostic rapide = aperçu, jamais rempli automatiquement".
+# Quick diagnostic: NEVER automated, except 0.16 — near-exact duplicate of
+# 3.3 (same data: servers[].carbon_intensity_g_kwh), with a more precise
+# numeric scale. Explicit decision of 2026-09-03 (analysis
+# eof-question-minimization-analysis.md, section 1): the only exception to the
+# principle "Quick diagnostic = overview, never filled automatically".
 # ---------------------------------------------------------------------------
 
-# (seuil_haut_exclusif, rang_cran) des crans 2 à 5 ("< X gCO2e/kWh"), du
-# meilleur au pire. Le cran 1 ("> 750") est le repli si aucun seuil n'est
-# satisfait. Zone [500, 750] non couverte par l'échelle du Sheet source
-# (biais connu, cf. eof-analyse-minimisation-questions.md) : repli sur le
-# cran 1 avec provenance dégradée à "estime" au lieu de "collecte", pour ne pas
-# prétendre à une précision que l'échelle source n'a pas à cet endroit.
+# (exclusive_upper_bound, screen_rank) of screens 2 to 5 ("< X gCO2e/kWh"), from
+# best to worst. Screen 1 ("> 750") is the fallback if no threshold is
+# met. Zone [500, 750] not covered by the source Sheet scale
+# (known bias, cf. eof-question-minimization-analysis.md): fallback to
+# screen 1 with provenance degraded to "estimated" instead of "collected", so as not to
+# claim a precision the source scale does not have there.
 _CARBON_BUCKETS = [(100, 5), (200, 4), (300, 3), (500, 2)]
 
 
-def rule_diag_0_16(data, crans):
-    """Diagnostic rapide 0.16 : intensité carbone hébergement (doublon de 3.3).
+def rule_diag_0_16(data, screens):
+    """Quick diagnostic 0.16: hosting carbon intensity (duplicate of 3.3).
 
-    Provenance : collecte (même source que 3.3, API ipinfo + table carbone),
-    dégradée à estime pour la zone [500, 750] gCO2/kWh non couverte par l'échelle.
+    Provenance: collected (same source as 3.3, ipinfo API + carbon table),
+    degraded to estimated for the [500, 750] gCO2/kWh zone not covered by the scale.
     """
     env = data["env"]
     servers = (env or {}).get("servers")
     if not servers and (env or {}).get("server"):
         servers = [env["server"]]
     if not servers:
-        return None, None, "env-data.json: servers[] absent"
-    # Cran le plus défavorable parmi tous les serveurs 1st-party détectés.
+        return None, None, "env-data.json: servers[] missing"
+    # Most unfavorable screen among all detected 1st-party servers.
     worst_rank, worst_value = 1, None
     for s in servers:
         v = s.get("carbon_intensity_g_kwh")
@@ -344,25 +344,25 @@ def rule_diag_0_16(data, crans):
         if worst_value is None or rank < worst_rank:
             worst_rank, worst_value = rank, v
     if worst_value is None:
-        return None, None, "env-data.json: servers[].carbon_intensity_g_kwh absent"
-    # Dégradation de provenance pour la zone [500, 750] non couverte par l'échelle EOF
-    provenance = "estime" if (worst_rank == 1 and worst_value <= 750) else "collecte"
-    reponse = next((c for c in crans if c.strip().startswith(f"{worst_rank}")), crans[worst_rank - 1] if len(crans) >= worst_rank else None)
-    source_suffix = " (repli échelle, zone non couverte [500, 750])" if provenance == "estime" else ""
-    source = f"env-data.json: servers[].carbon_intensity_g_kwh = {worst_value} gCO2e/kWh (doublon de 3.3, même donnée){source_suffix}"
-    return reponse, provenance, source
+        return None, None, "env-data.json: servers[].carbon_intensity_g_kwh missing"
+    # Provenance degradation for the [500, 750] zone not covered by the EOF scale
+    provenance = "estimated" if (worst_rank == 1 and worst_value <= 750) else "collected"
+    answer = next((c for c in screens if c.strip().startswith(f"{worst_rank}")), screens[worst_rank - 1] if len(screens) >= worst_rank else None)
+    source_suffix = " (scale fallback, uncovered zone [500, 750])" if provenance == "estimated" else ""
+    source = f"env-data.json: servers[].carbon_intensity_g_kwh = {worst_value} gCO2e/kWh (duplicate of 3.3, same data){source_suffix}"
+    return answer, provenance, source
 
 
 # ---------------------------------------------------------------------------
-# Contextes "partiel" : indice affiché en annexe, jamais une réponse cochée
+# "partial" contexts: hint displayed in the appendix, never a ticked answer
 # ---------------------------------------------------------------------------
 
 def context_1_9(data):
     env = data["env"]
     v = ((env or {}).get("har_summary") or {}).get("efootprint", {}).get("data_transferred_bytes_real")
-    # La mesure porte sur la page LA PLUS LOURDE de la capture, pas sur la page d'accueil :
-    # cf. collect_env_data.py, qui alimente ce champ depuis la variable heaviest.
-    return f"Données réellement transférées (page la plus lourde) : {v / 1024:.0f} Ko" if v else None
+    # The measurement covers the HEAVIEST page of the capture, not the home page:
+    # cf. collect_env_data.py, which feeds this field from the heaviest variable.
+    return f"Actually transferred data (heaviest page): {v / 1024:.0f} KB" if v else None
 
 
 def context_1_14(data):
@@ -371,13 +371,13 @@ def context_1_14(data):
     if not pages:
         return None
     pages.sort(key=lambda x: -x[1])
-    # Omettre la page la plus légère si son poids s'arrondit à 0 (échec de mesure, pas un résultat)
-    heaviest = f"{pages[0][0]} ({pages[0][1]:.0f} Ko)"
+    # Omit the lightest page if its weight rounds to 0 (measurement failure, not a result)
+    heaviest = f"{pages[0][0]} ({pages[0][1]:.0f} KB)"
     if pages[-1][1] >= 0.5:
-        lightest = f"{pages[-1][0]} ({pages[-1][1]:.0f} Ko)"
-        return f"Page la plus lourde : {heaviest} ; la plus légère : {lightest}"
+        lightest = f"{pages[-1][0]} ({pages[-1][1]:.0f} KB)"
+        return f"Heaviest page: {heaviest} ; lightest: {lightest}"
     else:
-        return f"Page la plus lourde : {heaviest}"
+        return f"Heaviest page: {heaviest}"
 
 
 def context_1_15(data):
@@ -385,9 +385,9 @@ def context_1_15(data):
     t = (env or {}).get("traffic") or {}
     v = t.get("visits_per_year")
     if v:
-        # Séparateur de milliers français (espace insécable), pas anglais (virgule)
+        # French thousands separator (non-breaking space), not English (comma)
         formatted = f"{v:,}".replace(",", " ")
-        return f"Trafic estimé : {formatted} visites/an ({t.get('source', '?')})"
+        return f"Estimated traffic: {formatted} visits/year ({t.get('source', '?')})"
     return None
 
 
@@ -397,20 +397,20 @@ def context_5_5(data):
     worst = sorted(pages, key=lambda p: -(p.get("js_unused_pct") or 0))[:2]
     if not worst:
         return None
-    return " ; ".join(f"{p.get('url', '?')} : JavaScript inutilisé {p.get('js_unused_pct', '?')}%" for p in worst)
+    return " ; ".join(f"{p.get('url', '?')} : unused JavaScript {p.get('js_unused_pct', '?')}%" for p in worst)
 
 
 def context_2_3(data):
-    """Indice de composants backend séparés (PaaS distincts déclarés au CSP)."""
+    """Hint of separated backend components (distinct PaaS declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
     if not inv:
         return None
-    families = inv["familles"]
+    families = inv["families"]
     paas = families.get("paas_backend") or []
     if not paas:
         return None
-    return f"Plusieurs composants d'hébergement distincts détectés ({', '.join(paas)}), ce qui suggère une architecture séparant les responsabilités. Nous ne pouvons pas évaluer de l'extérieur l'efficacité de leur couplage ni l'optimisation de leur communication."
+    return f"Several distinct hosting components detected ({', '.join(paas)}), which suggests an architecture separating responsibilities. We cannot assess from the outside the efficiency of their coupling nor the optimization of their communication."
 
 
 def context_2_5(data):
@@ -418,10 +418,10 @@ def context_2_5(data):
     dups = sorted((har or {}).get("duplicate_urls") or [], key=lambda d: -d.get("count", 0))[:3]
     if not dups:
         return None
-    return " ; ".join(f"{d['url']} chargé {d['count']} fois" for d in dups)
+    return " ; ".join(f"{d['url']} loaded {d['count']} times" for d in dups)
 
 
-# --- Extension Phase 1 (2026-09-03) ---------------------------------------
+# --- Phase 1 extension (2026-09-03) ---------------------------------------
 
 def context_1_4(data):
     htmlcss = data["htmlcss"]
@@ -430,7 +430,7 @@ def context_1_4(data):
     custom = sum(p.get("custom_role_buttons") or 0 for p in pages)
     if native + custom == 0:
         return None
-    return f"Boutons HTML natifs détectés : {native} ; boutons avec attribut role='button' : {custom} (sur l'ensemble des pages)"
+    return f"Native HTML buttons detected: {native} ; buttons with role='button' attribute: {custom} (across all pages)"
 
 
 def context_1_11(data):
@@ -438,9 +438,9 @@ def context_1_11(data):
     css = (htmlcss or {}).get("css")
     if css is None:
         return None
-    return ("Règles @media (prefers-reduced-motion ou prefers-color-scheme) détectées dans les feuilles de style"
+    return ("@media rules (prefers-reduced-motion or prefers-color-scheme) detected in the stylesheets"
             if css.get("has_prefers_reduced_or_scheme")
-            else "Aucune règle @media (prefers-reduced-motion ou prefers-color-scheme) détectée dans les feuilles de style")
+            else "No @media rule (prefers-reduced-motion or prefers-color-scheme) detected in the stylesheets")
 
 
 def context_6_1(data):
@@ -448,40 +448,40 @@ def context_6_1(data):
     worst = (headers or {}).get("worst_page")
     if not worst:
         return None
-    return f"Score en-têtes de sécurité HTTP : {worst['score_pct']}% (grade {worst['grade']}) sur {worst['url']} - indicateur parmi d'autres de la maturité en production"
+    return f"HTTP security headers score: {worst['score_pct']}% (grade {worst['grade']}) on {worst['url']} - one indicator among others of production maturity"
 
 
 def context_3_5(data):
-    """Indice d'infrastructure mutualisée (PaaS/CDN/cloud déclarés au CSP)."""
+    """Hint of shared infrastructure (PaaS/CDN/cloud declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
     if not inv:
         return None
-    families = inv["familles"]
+    families = inv["families"]
     paas = families.get("paas_backend") or []
     cdn = families.get("cdn_bibliotheques") or []
     cloud = families.get("infra_cloud_generique") or []
-    all_mut = paas + cdn + cloud
-    if not all_mut:
+    all_shared = paas + cdn + cloud
+    if not all_shared:
         return None
-    return f"Votre service fait appel à {len(all_mut)} service(s) d'infrastructure externe(s) (hébergement, diffusion de contenu, cloud) : {', '.join(all_mut[:5])}{'...' if len(all_mut) > 5 else ''}"
+    return f"Your service uses {len(all_shared)} external infrastructure service(s) (hosting, content delivery, cloud): {', '.join(all_shared[:5])}{'...' if len(all_shared) > 5 else ''}"
 
 
 def context_3_7(data):
-    """Indice de plate-forme supportant l'élasticité (PaaS déclarés au CSP)."""
+    """Hint of a platform supporting elasticity (PaaS declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
     if not inv:
         return None
-    families = inv["familles"]
+    families = inv["families"]
     paas = families.get("paas_backend") or []
     if not paas:
         return None
-    return f"Votre service s'appuie sur une plate-forme d'hébergement ({', '.join(paas)}) capable d'ajuster automatiquement ses ressources. Nous ne pouvons pas voir de l'extérieur si cet ajustement est activé chez vous, ni si votre charge varie assez pour le justifier."
+    return f"Your service relies on a hosting platform ({', '.join(paas)}) capable of automatically adjusting its resources. We cannot see from the outside whether this adjustment is enabled on your side, nor whether your load varies enough to justify it."
 
 
 def context_6_3(data):
-    """Indice de fraîcheur et atomicité de déploiement (Last-Modified du .har)."""
+    """Hint of deployment freshness and atomicity (Last-Modified of the .har)."""
     source_dir = data.get("source_dir")
     if not source_dir:
         return None
@@ -497,10 +497,10 @@ def context_6_3(data):
             host = urlparse(url).netloc.lower()
             if host:
                 first_party_hosts.add(host)
-    info = analyse_har_freshness(har_path, first_party_hosts or None)
-    # summarise() rédige déjà son texte pour le service audité : ne pas le retoucher ici
-    # par substitution de mots, cela fabrique des phrases incorrectes ("paramètre d'évite
-    # la mise en cache"). Toute reformulation se fait dans deploy_freshness.summarise().
+    info = analyze_har_freshness(har_path, first_party_hosts or None)
+    # summarise() already writes its text for the audited service: do not rework it here
+    # by word substitution, that would fabricate incorrect sentences ("avoid
+    # cache parameter"). Any rewording happens in deploy_freshness.summarise().
     return summarise(info)
 
 
@@ -512,29 +512,29 @@ def context_6_6(data):
     if cwv:
         bp_scores = [e["best_practices_score_pct"] for e in cwv if e.get("best_practices_score_pct") is not None]
         if bp_scores:
-            parts.append(f"Audit Lighthouse - Bonnes Pratiques (pire page) : {min(bp_scores)}%")
+            parts.append(f"Lighthouse audit - Best Practices (worst page): {min(bp_scores)}%")
     if headers and headers.get("worst_page"):
-        parts.append(f"en-têtes de sécurité (pire page) : grade {headers['worst_page']['grade']}")
+        parts.append(f"security headers (worst page): grade {headers['worst_page']['grade']}")
     if wellknown is not None:
         txt = (wellknown.get("security_txt") or {})
-        parts.append(f"fichier security.txt : {'présent et bien formé' if txt.get('well_formed') else ('présent mais mal formé' if txt.get('present') else 'absent')}")
+        parts.append(f"security.txt file: {'present and well-formed' if txt.get('well_formed') else ('present but malformed' if txt.get('present') else 'missing')}")
     return " ; ".join(parts) if parts else None
 
 
 def context_6_8(data):
-    """Indice de duplication de bundles JS (audit Lighthouse duplicated-javascript).
-    Tolérant aux deux formats : logical_name ("duplicated-javascript") ou clé brute
-    ("duplicated-javascript-insight" ou "duplicated-javascript").
+    """Hint of JS bundle duplication (Lighthouse duplicated-javascript audit).
+    Tolerant of both formats: logical_name ("duplicated-javascript") or raw key
+    ("duplicated-javascript-insight" or "duplicated-javascript").
     """
     cwv = data["cwv"]
     if not cwv:
         return None
-    # Chercher l'audit dans toutes les entrées (pages/stratégies)
+    # Look for the audit in all entries (pages/strategies)
     for entry in cwv:
         insights = entry.get("lighthouse_insights")
         if not insights:
             continue
-        # Chercher par logical_name (nouveau format) ou par clés brutes (ancien format)
+        # Look by logical_name (new format) or by raw keys (old format)
         dup = (insights.get("duplicated-javascript") or
                insights.get("duplicated-javascript-insight"))
         if dup is None:
@@ -542,59 +542,59 @@ def context_6_8(data):
         score = dup.get("score")
         item_count = dup.get("itemCount", 0)
         if score == 1 and item_count == 0:
-            return "Aucune duplication de code JavaScript détectée par l'audit Lighthouse (score parfait). Cela ne prouve pas que votre gestion des dépendances soit optimale, seulement qu'aucune duplication évidente n'a été repérée."
+            return "No JavaScript code duplication detected by the Lighthouse audit (perfect score). This does not prove that your dependency management is optimal, only that no obvious duplication was spotted."
         elif score is not None:
-            return f"Audit Lighthouse de duplication JavaScript : score {score:.2f}, {item_count} élément(s) détecté(s) - indice de duplication potentielle"
+            return f"Lighthouse JavaScript duplication audit: score {score:.2f}, {item_count} item(s) detected - hint of potential duplication"
         else:
-            return "Audit Lighthouse de duplication JavaScript : présent mais sans score (contenu non analysable)"
+            return "Lighthouse JavaScript duplication audit: present but without a score (content not analyzable)"
     return None
 
 
 def context_3_2(data):
-    """Indice de déclaration publique de suivi d'impact environnemental."""
-    pages_publiques = data["pages_publiques"]
-    if not pages_publiques:
+    """Hint of a public declaration of environmental impact monitoring."""
+    public_pages = data["public_pages"]
+    if not public_pages:
         return None
 
-    status = pages_publiques.get("status")
+    status = public_pages.get("status")
     if status == "no_directory":
         return None
 
     if status == "no_files":
-        motifs = ", ".join(pages_publiques.get("files_searched", []))
-        return f"Aucune page publique d'éco-conception trouvée (motifs cherchés : {motifs})"
+        patterns = ", ".join(public_pages.get("files_searched", []))
+        return f"No public eco-design page found (patterns searched: {patterns})"
 
-    # Compiler toutes les déclarations trouvées
+    # Compile all declarations found
     all_declarations = []
 
-    for file_analysis in pages_publiques.get("files_analyzed", []):
+    for file_analysis in public_pages.get("files_analyzed", []):
         if not file_analysis.get("read_success"):
             continue
         decl = file_analysis.get("declarations")
         if not decl or not decl.get("parse_success"):
             continue
 
-        all_declarations.extend(decl.get("declarations_suivi", []))
+        all_declarations.extend(decl.get("tracking_declarations", []))
 
     if not all_declarations:
-        return "Page publique d'éco-conception trouvée, mais aucune déclaration de suivi d'impact détectée"
+        return "Public eco-design page found, but no impact monitoring declaration detected"
 
-    # Prendre la première déclaration (phrase complète, casse d'origine)
-    premiere = all_declarations[0]["phrase"]
+    # Take the first declaration (full sentence, original case)
+    first_decl = all_declarations[0]["phrase"]
 
-    # Si la phrase est très longue (> 200 caractères), couper à une frontière de mot
-    if len(premiere) > 200:
-        coupe = premiere[:197].rfind(' ')
-        if coupe > 100:  # Ne couper que si on garde au moins 100 caractères
-            premiere = premiere[:coupe] + "..."
+    # If the sentence is very long (> 200 characters), cut at a word boundary
+    if len(first_decl) > 200:
+        cut = first_decl[:197].rfind(' ')
+        if cut > 100:  # Only cut if we keep at least 100 characters
+            first_decl = first_decl[:cut] + "..."
 
-    filename = pages_publiques.get("files_found", ["page publique"])[0]
-    return f"Déclaration sur {filename} : \"{premiere}\""
+    filename = public_pages.get("files_found", ["public page"])[0]
+    return f"Declaration on {filename}: \"{first_decl}\""
 
 
 CONTEXTS = {
     "1.9": context_1_9, "1.14": context_1_14,
-    "1.15": context_1_15, "1.16": context_1_15,  # même champ trafic
+    "1.15": context_1_15, "1.16": context_1_15,  # same traffic field
     "5.5": context_5_5, "2.3": context_2_3, "2.5": context_2_5,
     "3.2": context_3_2,
     "3.5": context_3_5, "3.7": context_3_7,
@@ -602,16 +602,16 @@ CONTEXTS = {
     "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6, "6.8": context_6_8,
 }
 
-# Indices contextuels pour 🏦 0-Diagnostic rapide — jamais une réponse cochée
-# (seul 0.16 a droit à une réponse automatique, cf. plus haut), simplement une
-# donnée affichée en regard de la question dans l'aperçu.
+# Contextual hints for 🏦 0-Quick diagnostic — never a ticked answer
+# (only 0.16 is entitled to an automatic answer, cf. above), just a
+# piece of data displayed next to the question in the overview.
 
 def diag_context_0_4(data):
     har = data["har"]
     third_party = (har or {}).get("domains", {}).get("third_party")
     if third_party is None:
         return None
-    return f"{len(third_party)} domaine(s) tiers détecté(s) lors de la capture (liste observée depuis l'extérieur, ne dit rien de l'architecture technique complète) : {', '.join(third_party)}"
+    return f"{len(third_party)} third-party domain(s) detected during the capture (list observed from the outside, says nothing about the complete technical architecture): {', '.join(third_party)}"
 
 
 def diag_context_0_10(data):
@@ -621,26 +621,26 @@ def diag_context_0_10(data):
         return None
     import math
     n = sitemap["url_count"]
-    return f"{n} URL(s) dans le sitemap (ordre de grandeur logarithmique : environ {math.log2(n):.1f})"
+    return f"{n} URL(s) in the sitemap (logarithmic order of magnitude: about {math.log2(n):.1f})"
 
 
 def diag_context_0_7(data):
-    """Indice de complexité architecturale (composants d'hébergement/diffusion distincts déclarés au CSP)."""
+    """Hint of architectural complexity (distinct hosting/distribution components declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
     if not inv:
         return None
-    families = inv["familles"]
+    families = inv["families"]
     paas = families.get("paas_backend") or []
     cdn = families.get("cdn_bibliotheques") or []
-    composants = paas + cdn
-    if not composants:
+    components = paas + cdn
+    if not components:
         return None
     return (
-        f"{len(composants)} composant(s) d'hébergement/diffusion distinct(s) déclaré(s) au CSP "
-        f"({', '.join(composants)}), ce qui suggère plusieurs briques séparées plutôt qu'un bloc unique. "
-        "Ce n'est qu'un indice indirect et partiel : il ne voit ni le nombre de microservices internes, "
-        "ni le couplage réel entre ces briques, ni la complexité fonctionnelle du site."
+        f"{len(components)} distinct hosting/distribution component(s) declared in the CSP "
+        f"({', '.join(components)}), which suggests several separate building blocks rather than a single block. "
+        "This is only an indirect and partial hint: it sees neither the number of internal microservices, "
+        "nor the real coupling between these blocks, nor the functional complexity of the site."
     )
 
 
@@ -648,7 +648,7 @@ _CRUX_CATEGORY_RANK = {"SLOW": 2, "AVERAGE": 1, "FAST": 0}
 
 
 def _cwv_status_rank(entry):
-    """0 = 'good', 1 = zone intermédiaire, 2 = 'poor' (mêmes seuils que rule_5_4)."""
+    """0 = 'good', 1 = intermediate zone, 2 = 'poor' (same thresholds as rule_5_4)."""
     lcp, inp, cls = entry.get("lcp"), entry.get("inp"), entry.get("cls")
     if (lcp is not None and lcp > CWV_POOR["lcp"]) or \
        (inp is not None and inp > CWV_POOR["inp"]) or \
@@ -681,8 +681,8 @@ def _describe_cwv_entry(entry):
         bits.append(f"INP {inp}ms")
     if cls is not None:
         bits.append(f"CLS {cls}")
-    metrics = ", ".join(bits) if bits else "métriques indisponibles"
-    cat_txt = f", catégorie CrUX '{category}'" if category else ""
+    metrics = ", ".join(bits) if bits else "metrics unavailable"
+    cat_txt = f", CrUX category '{category}'" if category else ""
     return f"{label} ({strategy}) : {metrics}{cat_txt}"
 
 
@@ -693,8 +693,8 @@ def diag_context_0_11(data):
     worst = _cwv_worst_entry(cwv)
     if worst is None:
         return None
-    return (f"Pire page toutes stratégies confondues (Core Web Vitals terrain/lab) : {_describe_cwv_entry(worst)}. "
-            "Ce sont des scores techniques de chargement, réactivité et stabilité visuelle, pas une mesure directe du ressenti utilisateur.")
+    return (f"Worst page across all strategies (Core Web Vitals field/lab): {_describe_cwv_entry(worst)}. "
+            "These are technical loading, responsiveness and visual stability scores, not a direct measure of the user's feeling.")
 
 
 def diag_context_0_12(data):
@@ -707,39 +707,39 @@ def diag_context_0_12(data):
     worst = _cwv_worst_entry(mobile_entries)
     if worst is None:
         return None
-    return (f"Pire page en stratégie mobile (proxy matériel bas de gamme/ancien) : {_describe_cwv_entry(worst)}. "
-            "Le CrUX mobile terrain mélange tous types d'appareils, ce n'est pas une mesure isolée sur du matériel ancien spécifiquement.")
+    return (f"Worst page in mobile strategy (proxy for low-end/old hardware): {_describe_cwv_entry(worst)}. "
+            "Mobile field CrUX mixes all device types, it is not an isolated measurement on specifically old hardware.")
 
 
 def diag_context_0_15(data):
-    """Indice de déclaration publique de rétention/suppression/archivage des données."""
-    pages_publiques = data["pages_publiques"]
-    if not pages_publiques:
+    """Hint of a public declaration of data retention/deletion/archiving."""
+    public_pages = data["public_pages"]
+    if not public_pages:
         return None
-    if pages_publiques.get("status") in ("no_directory", "no_files"):
+    if public_pages.get("status") in ("no_directory", "no_files"):
         return None
 
-    for file_analysis in pages_publiques.get("files_analyzed", []):
+    for file_analysis in public_pages.get("files_analyzed", []):
         if not file_analysis.get("read_success"):
             continue
         decl = file_analysis.get("declarations")
         if not decl or not decl.get("parse_success"):
             continue
-        retention = decl.get("declarations_retention") or []
+        retention = decl.get("retention_declarations") or []
         if not retention:
             continue
         phrase = retention[0]["phrase"]
-        filename = file_analysis.get("filename", "page publique")
+        filename = file_analysis.get("filename", "public page")
         if len(phrase) > 200:
-            coupe = phrase[:197].rfind(" ")
-            if coupe > 100:
-                phrase = phrase[:coupe] + "..."
+            cut = phrase[:197].rfind(" ")
+            if cut > 100:
+                phrase = phrase[:cut] + "..."
         return (
-            f"Déclaration sur {filename} : \"{phrase}\". "
-            "Une déclaration publique de conservation des données ne prouve pas qu'une politique "
-            "formalisée et appliquée existe réellement en interne, ni qu'elle couvre tous les "
-            "traitements du service : c'est seulement un indice qu'une politique de suppression et "
-            "d'archivage existe potentiellement."
+            f"Declaration on {filename}: \"{phrase}\". "
+            "A public declaration of data retention does not prove that a formalized "
+            "and actually applied policy exists internally, nor that it covers all "
+            "the service's processing: it is only a hint that a deletion and "
+            "archiving policy potentially exists."
         )
     return None
 
@@ -751,474 +751,473 @@ DIAG_CONTEXTS = {
 
 
 # ---------------------------------------------------------------------------
-# Évaluation d'un critère
+# Evaluating a criterion
 # ---------------------------------------------------------------------------
 
-def evaluate_criterion(crit, data):
-    entry = MAPPING.get(crit["id"])
+def evaluate_criterion(criterion, data):
+    entry = MAPPING.get(criterion["id"])
     result = {
-        "id": crit["id"], "dimension": crit["pilier"], "critere": crit["critere"],
-        "potentiel_max": crit["potentiel_max"], "categorie": "aucune_donnee",
-        "reponse": None, "coefficient": None, "provenance": None, "source": None, "contexte": None,
+        "id": criterion["id"], "dimension": criterion["pillar"], "criterion": criterion["criterion"],
+        "max_potential": criterion["max_potential"], "category": "no_data",
+        "answer": None, "coefficient": None, "provenance": None, "source": None, "context": None,
     }
     if not entry:
         return result
 
-    result["categorie"] = entry["categorie"]
-    if entry["categorie"] == "automatisable":
-        rule = RULES.get(crit["id"])
-        reponse, provenance, source = rule(data) if rule else (None, None, "règle non implémentée")
+    result["category"] = entry["category"]
+    if entry["category"] == "automatable":
+        rule = RULES.get(criterion["id"])
+        answer, provenance, source = rule(data) if rule else (None, None, "rule not implemented")
         result["source"] = source
-        if reponse is not None:
-            result["reponse"] = reponse
-            result["coefficient"] = crit["options_evaluation_coefficient"].get(reponse)
+        if answer is not None:
+            result["answer"] = answer
+            result["coefficient"] = criterion["evaluation_coefficient_options"].get(answer)
             result["provenance"] = provenance
-    elif entry["categorie"] == "partiel":
-        ctx_fn = CONTEXTS.get(crit["id"])
-        contexte = ctx_fn(data) if ctx_fn else None
-        if contexte:
-            result["contexte"] = contexte
-            result["provenance"] = entry["provenance_max"]
-            result["source"] = entry["champ_donnee"]
+    elif entry["category"] == "partial":
+        ctx_fn = CONTEXTS.get(criterion["id"])
+        context = ctx_fn(data) if ctx_fn else None
+        if context:
+            result["context"] = context
+            result["provenance"] = entry["max_provenance"]
+            result["source"] = entry["data_field"]
     return result
 
 
-def build_diag_rapide_apercu(referentiel, data):
+def build_quick_diag_overview(reference, data):
     questions = []
-    for q in referentiel["diagnostic_rapide"]:
-        entry = {"id": q["id"], "critere": q["critere"], "niveau_impact": q["niveau_impact"],
-                 "reponse": None, "provenance": None, "source": None, "indice_contextuel": None}
+    for q in reference["quick_diagnostic"]:
+        entry = {"id": q["id"], "criterion": q["criterion"], "impact_level": q["impact_level"],
+                 "answer": None, "provenance": None, "source": None, "context_index": None}
         if q["id"] == "0.16":
-            reponse, provenance, source = rule_diag_0_16(data, q["crans"])
-            if reponse is not None:
-                entry.update(reponse=reponse, provenance=provenance, source=source)
+            answer, provenance, source = rule_diag_0_16(data, q["screens"])
+            if answer is not None:
+                entry.update(answer=answer, provenance=provenance, source=source)
         ctx_fn = DIAG_CONTEXTS.get(q["id"])
         if ctx_fn:
-            entry["indice_contextuel"] = ctx_fn(data)
+            entry["context_index"] = ctx_fn(data)
         questions.append(entry)
     return questions
 
 
 # ---------------------------------------------------------------------------
-# Sortie de lot, consommée par processus/fusionner_lots.py
+# Lot output, consumed by process/merge_lots.py
 # ---------------------------------------------------------------------------
 
-LOT_ID = "jugement-automatique"
+LOT_ID = "automatic-judgment"
 
-# Les champs que la couche processus refuse dans un fichier de lot : ils viennent du
-# référentiel et c'est la fusion qui les rajoute. Cf. FORBIDDEN_FIELDS dans
-# processus/valider_sortie_lot.py. Le lot ne dit QUE ce qu'il a jugé.
-CHAMPS_DU_LOT = ("reponse", "coefficient", "provenance", "source", "contexte")
+# The fields the process layer refuses in a lot file: they come from the
+# reference and the merge adds them back. Cf. FORBIDDEN_FIELDS in
+# process/validate_lot_output.py. The lot says ONLY what it has ruled on.
+LOT_FIELDS = ("answer", "coefficient", "provenance", "source", "context")
 
 
-def _entree_de_lot(critere_id, categorie, valeurs):
-    """Une entrée de lot : `id` et `categorie` toujours, le reste seulement s'il vaut
-    quelque chose. Omettre plutôt que poser `null` évite d'écrire un `coefficient: null`
-    à côté d'une réponse là où le contrat en exige un non nul, et se relit mieux.
+def _lot_entry(criterion_id, category, values):
+    """A lot entry: `id` and `category` always, the rest only if it has
+    a value. Omitting rather than setting `null` avoids writing a `coefficient: null`
+    next to an answer where the contract requires a non-null one, and reads better.
     """
-    entree = {"id": critere_id, "categorie": categorie}
-    for cle in CHAMPS_DU_LOT:
-        if valeurs.get(cle) is not None:
-            entree[cle] = valeurs[cle]
-    return entree
+    entry = {"id": criterion_id, "category": category}
+    for key in LOT_FIELDS:
+        if values.get(key) is not None:
+            entry[key] = values[key]
+    return entry
 
 
-def build_sortie_lot(results, diag_questions, fichiers_charges, genere_le):
-    """Construit ce que ce lot a à dire, au format que processus/valider_sortie_lot.py
-    fait respecter : racine à exactement 4 clés, rejet strict de toute autre.
+def build_lot_output(results, diag_questions, loaded_files, generated_at):
+    """Builds what this lot has to say, in the format that process/validate_lot_output.py
+    enforces: root with exactly 4 keys, strict rejection of any other.
 
-    Ne verse QUE les critères sur lesquels le lot s'est prononcé, c'est-à-dire ceux qui
-    portent une réponse ou un contexte. Un critère sans donnée n'est pas une information :
-    le taire évite de faire passer 31 silences pour un travail.
+    Writes ONLY the criteria the lot has ruled on, i.e. those that carry
+    an answer or a context. A criterion without data is not information:
+    staying silent avoids passing 31 silences off as work.
 
-    Les questions du diagnostic rapide (préfixe `0.`) ne sont versées que si elles sont au
-    MAPPING, donc aujourd'hui la seule 0.16. C'est une question de propriété : l'indice
-    contextuel de 0.4 appartient au lot `jugement-diagnostic-rapide`, et il n'a de toute
-    façon ni provenance ni source, que le contrat exigerait dès qu'un contexte est posé.
+    Quick diagnostic questions (prefix `0.`) are written only if they are in the
+    MAPPING, so today the only 0.16. It is a matter of ownership: the contextual hint
+    of 0.4 belongs to the `quick-diagnostic-judgment` lot, and it has neither
+    provenance nor source anyway, which the contract requires as soon as a context is set.
     """
-    criteres = []
+    criteria = []
     for r in results:
-        if r["reponse"] is None and not r["contexte"]:
+        if r["answer"] is None and not r["context"]:
             continue
-        criteres.append(_entree_de_lot(r["id"], r["categorie"], r))
+        criteria.append(_lot_entry(r["id"], r["category"], r))
     for q in diag_questions:
         entry = MAPPING.get(q["id"])
         if not entry:
             continue
-        if q["reponse"] is None and not q["indice_contextuel"]:
+        if q["answer"] is None and not q["context_index"]:
             continue
-        criteres.append(_entree_de_lot(q["id"], entry["categorie"], {
-            "reponse": q["reponse"],
-            # Jamais de coefficient sur le diagnostic rapide : le référentiel n'en définit
-            # pas pour ses crans, et le validateur le refuse. Ce n'est pas un oubli.
+        criteria.append(_lot_entry(q["id"], entry["category"], {
+            "answer": q["answer"],
+            # Never a coefficient on the quick diagnostic: the reference does not define
+            # one for its screens, and the validator rejects it. It is not an oversight.
             "coefficient": None,
             "provenance": q["provenance"],
             "source": q["source"],
-            "contexte": q["indice_contextuel"],
+            "context": q["context_index"],
         }))
     return {
         "lot_id": LOT_ID,
-        "genere_le": genere_le,
-        "entrees": fichiers_charges,
-        "criteres": criteres,
+        "generated_at": generated_at,
+        "inputs": loaded_files,
+        "criteria": criteria,
     }
 
 
-def compute_dimension_scores(criteres_results):
+def compute_dimension_scores(criteria_results):
     by_dim = {}
-    for c in criteres_results:
+    for c in criteria_results:
         by_dim.setdefault(c["dimension"], []).append(c)
     dimensions = []
     for dim, items in by_dim.items():
-        # Identifier les critères écartés (convention critère écarté, section 2)
-        ecartes = [c for c in items if c["reponse"] == "🚫 Non applicable"]
-        nb_ecartes = len(ecartes)
+        # Identify the discarded criteria (discarded-criterion convention, section 2)
+        discarded = [c for c in items if c["answer"] == "🚫 Not applicable"]
+        nb_discarded = len(discarded)
 
-        # Les critères écartés sortent de tous les dénominateurs (convention 2.1)
-        items_retenus = [c for c in items if c["reponse"] != "🚫 Non applicable"]
-        answered = [c for c in items_retenus if c["reponse"] is not None]
+        # Discarded criteria leave all denameinators (convention 2.1)
+        kept_items = [c for c in items if c["answer"] != "🚫 Not applicable"]
+        answered = [c for c in kept_items if c["answer"] is not None]
 
-        # Garde-fou : une dimension entièrement écartée ne doit JAMAIS sortir 0 %
-        hors_perimetre = (nb_ecartes == len(items))
+        # Guard: a fully discarded dimension must NEVER come out at 0%
+        out_of_scope = (nb_discarded == len(items))
 
-        # Formule canonique : somme des potentiels retenus ÷ somme des potentiel_max des critères RETENUS
-        # (les critères écartés sont retirés du dénominateur, convention 2.1)
-        total_potentiel_max = sum(c["potentiel_max"] for c in items_retenus) or 1e-9
-        if hors_perimetre:
-            potentiel_optimisation_pct = None
-            completude_pct = None
+        # Canonical formula: sum of potentials kept ÷ sum of max_potential of the KEPT criteria
+        # (discarded criteria are removed from the denameinator, convention 2.1)
+        total_max_potential = sum(c["max_potential"] for c in kept_items) or 1e-9
+        if out_of_scope:
+            optimization_pct = None
+            completeness_pct = None
             total = 0
         elif answered:
-            potentiel_optimisation_pct = sum(c["coefficient"] * c["potentiel_max"] for c in answered) / total_potentiel_max * 100
-            completude_pct = len(answered) / len(items_retenus) * 100 if items_retenus else 0
-            total = len(items_retenus)
+            optimization_pct = sum(c["coefficient"] * c["max_potential"] for c in answered) / total_max_potential * 100
+            completeness_pct = len(answered) / len(kept_items) * 100 if kept_items else 0
+            total = len(kept_items)
         else:
-            potentiel_optimisation_pct = None
-            completude_pct = len(answered) / len(items_retenus) * 100 if items_retenus else 0
-            total = len(items_retenus)
+            optimization_pct = None
+            completeness_pct = len(answered) / len(kept_items) * 100 if kept_items else 0
+            total = len(kept_items)
 
-        # Comptage par provenance
-        # Les 5 provenances de conventions.precedence_provenance, dans l'ordre. `suppose` y
-        # figure depuis le 2026-09-07 : sans elle, le test `if prov in ...` juste en dessous
-        # jetterait sans un mot une réponse posée en `suppose`. Un compteur à zéro est un
-        # renseignement, une réponse perdue n'en est pas un.
-        repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
+        # Count by provenance
+        # The 5 provenances of conventions.precedence_provenance, in order. `assumed` is
+        # in it since 2026-09-07: without it, the `if prov in ...` test just below
+        # would discard without a word an answer set in `assumed`. A zero counter is
+        # information, a lost answer is not.
+        answered_by_provenance = {"collected": 0, "estimated": 0, "declared": 0, "stated": 0, "assumed": 0}
         for c in answered:
             prov = c.get("provenance")
-            if prov in repondus_par_provenance:
-                repondus_par_provenance[prov] += 1
+            if prov in answered_by_provenance:
+                answered_by_provenance[prov] += 1
         dimensions.append({
-            "nom": dim, "potentiel_optimisation_pct": potentiel_optimisation_pct,
-            "repondus": len(answered), "total": total,
-            "completude_pct": completude_pct,
-            "repondus_par_provenance": repondus_par_provenance,
-            "ecartes": nb_ecartes,
-            "hors_perimetre": hors_perimetre,
+            "name": dim, "optimization_potential_pct": optimization_pct,
+            "answered": len(answered), "total": total,
+            "completeness_pct": completeness_pct,
+            "answered_by_provenance": answered_by_provenance,
+            "discarded": nb_discarded,
+            "out_of_scope": out_of_scope,
         })
     return dimensions
 
 
-def build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_apercu):
-    lines = ["# EOF — Référentiel rempli automatiquement (partiel)\n"]
+def build_eof_filled_md(reference, results_by_id, dimensions, diag_overview):
+    lines = ["# EOF — Automatically filled-in framework (partial)\n"]
     lines.append(
-        "> Généré par `run_eof.py`, depuis les données d'audit disponibles. "
-        "**La grande majorité des critères ne peut pas être déduite automatiquement** "
-        "(questions organisationnelles/produit) : ils restent \"je ne sais pas\", à "
-        "compléter humainement dans le template vierge du skill `eof`.\n"
+        "> Generated by `run_eof.py`, from the available audit data. "
+        "**The vast majority of criteria cannot be deduced automatically** "
+        "(organizational/product questions): they stay \"I don't know\", to "
+        "be completed by a human in the blank template of the `eof` skill.\n"
     )
     lines.append(
-        "## 🏦 0 — Diagnostic rapide (aperçu, jamais rempli automatiquement — "
-        "SAUF 0.16, doublon exact de 3.3, cf. `eof-analyse-minimisation-questions.md`)\n"
+        "## 🏦 0 — Quick diagnostic (overview, never filled automatically — "
+        "EXCEPT 0.16, exact duplicate of 3.3, cf. `eof-question-minimization-analysis.md`)\n"
     )
-    for q in diag_rapide_apercu:
-        if q["reponse"]:
+    for q in diag_overview:
+        if q["answer"]:
             lines.append(
-                f"- **{q['id']}** — {q['critere']} → **{q['reponse']}** "
-                f"_(automatique, provenance {q['provenance']} — {q['source']})_"
+                f"- **{q['id']}** — {q['criterion']} → **{q['answer']}** "
+                f"_(automatic, provenance {q['provenance']} — {q['source']})_"
             )
-        elif q.get("indice_contextuel"):
+        elif q.get("context_index"):
             lines.append(
-                f"- **{q['id']}** — {q['critere']} _(niveau d'impact : {q['niveau_impact']})_ "
-                f"— donnée indicative : {q['indice_contextuel']}"
+                f"- **{q['id']}** — {q['criterion']} _(impact level: {q['impact_level']})_ "
+                f"— indicative data: {q['context_index']}"
             )
         else:
-            lines.append(f"- **{q['id']}** — {q['critere']} _(niveau d'impact : {q['niveau_impact']})_")
+            lines.append(f"- **{q['id']}** — {q['criterion']} _(impact level: {q['impact_level']})_")
     lines.append("")
     current_dim = None
-    for crit in referentiel["criteres"]:
+    for crit in reference["criteria"]:
         r = results_by_id[crit["id"]]
-        if crit["pilier"] != current_dim:
-            current_dim = crit["pilier"]
-            dim_info = next(d for d in dimensions if d["nom"] == current_dim)
-            potentiel_txt = f"{dim_info['potentiel_optimisation_pct']:.0f}%" if dim_info["potentiel_optimisation_pct"] is not None else "sans donnée"
-            lines.append(f"\n## {current_dim} — potentiel d'optimisation : {potentiel_txt} ({dim_info['repondus']}/{dim_info['total']} répondus)\n")
-        lines.append(f"### {crit['id']} — {crit['critere']}\n")
-        if r["reponse"]:
-            lines.append(f"**Réponse (automatique)** : {r['reponse']}")
-            lines.append(f"**Provenance** : {r['provenance']} — **Source** : {r['source']}")
-        elif r["contexte"]:
-            lines.append("**Réponse** : je ne sais pas (aucune règle assez fiable pour trancher)")
-            lines.append(f"**Donnée indicative** ({r['provenance']}) : {r['contexte']} — _champ : {r['source']}_")
+        if crit["pillar"] != current_dim:
+            current_dim = crit["pillar"]
+            dim_info = next(d for d in dimensions if d["name"] == current_dim)
+            potential_txt = f"{dim_info['optimization_potential_pct']:.0f}%" if dim_info["optimization_potential_pct"] is not None else "no data"
+            lines.append(f"\n## {current_dim} — optimization potential: {potential_txt} ({dim_info['answered']}/{dim_info['total']} answered)\n")
+        lines.append(f"### {crit['id']} — {crit['criterion']}\n")
+        if r["answer"]:
+            lines.append(f"**Answer (automatic)**: {r['answer']}")
+            lines.append(f"**Provenance**: {r['provenance']} — **Source**: {r['source']}")
+        elif r["context"]:
+            lines.append("**Answer**: I don't know (no rule reliable enough to decide)")
+            lines.append(f"**Indicative data** ({r['provenance']}): {r['context']} — _field: {r['source']}_")
         else:
-            lines.append("**Réponse** : je ne sais pas (aucune donnée d'audit disponible — critère organisationnel/produit)")
+            lines.append("**Answer**: I don't know (no audit data available — organizational/product criterion)")
         lines.append("")
     return "\n".join(lines)
 
 
 def autotest():
-    """Rejoue les cas de test embarqués sur l'arithmétique du critère écarté."""
+    """Replays the embedded test cases on the discarded-criterion arithmetic."""
     import tempfile
 
-    echecs = []
+    failures = []
     total = 0
 
-    # Cas 1 : Dimension entièrement écartée ne doit JAMAIS sortir 0 %
-    # POURQUOI 0 serait faux : "🚫 Non applicable" et "✅ Point fort confirmé" partagent le
-    # coefficient 0, donc une dimension entièrement écartée affichée à 0 % passerait pour
-    # la MIEUX notée du rapport.
+    # Case 1: A fully discarded dimension must NEVER come out at 0%
+    # WHY 0 would be wrong: "🚫 Not applicable" and "✅ Confirmed strength" share the
+    # coefficient 0, so a fully discarded dimension displayed at 0% would pass for
+    # the BEST rated in the report.
     total += 1
     try:
-        criteres = [
-            {"id": "1.1", "dimension": "🛖 1 — Produit", "potentiel_max": 3.0, "reponse": "🚫 Non applicable", "coefficient": 0},
-            {"id": "1.2", "dimension": "🛖 1 — Produit", "potentiel_max": 2.5, "reponse": "🚫 Non applicable", "coefficient": 0},
+        criteria = [
+            {"id": "1.1", "dimension": "🛖 1 — Product", "max_potential": 3.0, "answer": "🚫 Not applicable", "coefficient": 0},
+            {"id": "1.2", "dimension": "🛖 1 — Product", "max_potential": 2.5, "answer": "🚫 Not applicable", "coefficient": 0},
         ]
-        dimensions = compute_dimension_scores(criteres)
-        dim = next((d for d in dimensions if d["nom"] == "🛖 1 — Produit"), None)
+        dimensions = compute_dimension_scores(criteria)
+        dim = next((d for d in dimensions if d["name"] == "🛖 1 — Product"), None)
 
         if not dim:
-            echecs.append(("Dimension entièrement écartée", "dimension non trouvée"))
-        elif not dim["hors_perimetre"]:
-            echecs.append(("Dimension entièrement écartée", f"hors_perimetre devrait être True, obtenu {dim['hors_perimetre']}"))
-        elif dim["potentiel_optimisation_pct"] is not None:
-            echecs.append(("Dimension entièrement écartée", f"potentiel_optimisation_pct devrait être None, obtenu {dim['potentiel_optimisation_pct']}"))
-        elif dim["potentiel_optimisation_pct"] == 0:
-            echecs.append(("Dimension entièrement écartée", "potentiel_optimisation_pct vaut 0 (devrait être None) — POURQUOI 0 EST FAUX : coefficient 0 = aussi bien qu'un ✅ Point fort confirmé"))
-        elif dim["completude_pct"] is not None:
-            echecs.append(("Dimension entièrement écartée", f"completude_pct devrait être None, obtenu {dim['completude_pct']}"))
+            failures.append(("Fully discarded dimension", "dimension not found"))
+        elif not dim["out_of_scope"]:
+            failures.append(("Fully discarded dimension", f"out_of_scope should be True, got {dim['out_of_scope']}"))
+        elif dim["optimization_potential_pct"] is not None:
+            failures.append(("Fully discarded dimension", f"optimization_potential_pct should be None, got {dim['optimization_potential_pct']}"))
+        elif dim["optimization_potential_pct"] == 0:
+            failures.append(("Fully discarded dimension", "optimization_potential_pct is 0 (should be None) — WHY 0 IS WRONG: coefficient 0 = as good as a ✅ Confirmed strength"))
+        elif dim["completeness_pct"] is not None:
+            failures.append(("Fully discarded dimension", f"completeness_pct should be None, got {dim['completeness_pct']}"))
         elif dim["total"] != 0:
-            echecs.append(("Dimension entièrement écartée", f"total devrait être 0, obtenu {dim['total']}"))
-        elif dim["ecartes"] != 2:
-            echecs.append(("Dimension entièrement écartée", f"ecartes devrait être 2, obtenu {dim['ecartes']}"))
+            failures.append(("Fully discarded dimension", f"total should be 0, got {dim['total']}"))
+        elif dim["discarded"] != 2:
+            failures.append(("Fully discarded dimension", f"discarded should be 2, got {dim['discarded']}"))
     except Exception as exc:
-        echecs.append(("Dimension entièrement écartée", f"Exception : {exc}"))
+        failures.append(("Fully discarded dimension", f"Exception: {exc}"))
 
-    # Cas 2 : Dimension partiellement écartée (chiffres discriminants)
-    # Choisir des nombres où l'erreur se verrait : si on COMPTAIT les écartés,
-    # le calcul serait DIFFÉRENT.
-    # Critères : 2 écartés (potentiel_max 10 chacun), 2 retenus (potentiel_max 5 chacun).
-    # Un critère retenu a coefficient 0.5, l'autre 0.2.
-    # Potentiel retenu CORRECT : (0.5 * 5 + 0.2 * 5) / 10 = 3.5 / 10 = 35 %
-    # Potentiel retenu FAUX (si on comptait les écartés) : 3.5 / 30 = 11.67 %
+    # Case 2: Partially discarded dimension (discriminating numbers)
+    # Choose numbers where the error would show: if the discarded ones were COUNTED,
+    # the computation would be DIFFERENT.
+    # Criteria: 2 discarded (max_potential 10 each), 2 kept (max_potential 5 each).
+    # One kept criterion has coefficient 0.5, the other 0.2.
+    # CORRECT kept potential: (0.5 * 5 + 0.2 * 5) / 10 = 3.5 / 10 = 35 %
+    # WRONG potential (if discarded were counted): 3.5 / 30 = 11.67 %
     total += 1
     try:
-        criteres = [
-            {"id": "2.1", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 10.0, "reponse": "🚫 Non applicable", "coefficient": 0},
-            {"id": "2.2", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 10.0, "reponse": "🚫 Non applicable", "coefficient": 0},
-            {"id": "2.3", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 5.0, "reponse": "💡 Potentiel d'amélioration identifié", "coefficient": 0.5, "provenance": "collecte"},
-            {"id": "2.4", "dimension": "🗺️ 2 — Architecture", "potentiel_max": 5.0, "reponse": "🤔 À évaluer", "coefficient": 0.2, "provenance": "estime"},
+        criteria = [
+            {"id": "2.1", "dimension": "🗺️ 2 — Architecture", "max_potential": 10.0, "answer": "🚫 Not applicable", "coefficient": 0},
+            {"id": "2.2", "dimension": "🗺️ 2 — Architecture", "max_potential": 10.0, "answer": "🚫 Not applicable", "coefficient": 0},
+            {"id": "2.3", "dimension": "🗺️ 2 — Architecture", "max_potential": 5.0, "answer": "💡 Improvement potential identified", "coefficient": 0.5, "provenance": "collected"},
+            {"id": "2.4", "dimension": "🗺️ 2 — Architecture", "max_potential": 5.0, "answer": "🤔 To be assessed", "coefficient": 0.2, "provenance": "estimated"},
         ]
-        dimensions = compute_dimension_scores(criteres)
-        dim = next((d for d in dimensions if d["nom"] == "🗺️ 2 — Architecture"), None)
+        dimensions = compute_dimension_scores(criteria)
+        dim = next((d for d in dimensions if d["name"] == "🗺️ 2 — Architecture"), None)
 
-        attendu = 35.0
-        faux_calcul = 11.67
+        expected = 35.0
+        wrong_calc = 11.67
         if not dim:
-            echecs.append(("Dimension partiellement écartée", "dimension non trouvée"))
-        elif dim["potentiel_optimisation_pct"] is None:
-            echecs.append(("Dimension partiellement écartée", "potentiel_optimisation_pct est None (devrait être 35.0)"))
-        elif abs(dim["potentiel_optimisation_pct"] - attendu) > 0.1:
-            echecs.append(("Dimension partiellement écartée", f"potentiel_optimisation_pct attendu {attendu}%, obtenu {dim['potentiel_optimisation_pct']:.2f}% — calcul FAUX donnerait {faux_calcul}%"))
+            failures.append(("Partially discarded dimension", "dimension not found"))
+        elif dim["optimization_potential_pct"] is None:
+            failures.append(("Partially discarded dimension", "optimization_potential_pct is None (should be 35.0)"))
+        elif abs(dim["optimization_potential_pct"] - expected) > 0.1:
+            failures.append(("Partially discarded dimension", f"optimization_potential_pct expected {expected}%, got {dim['optimization_potential_pct']:.2f}% — WRONG computation would give {wrong_calc}%"))
         elif dim["total"] != 2:
-            echecs.append(("Dimension partiellement écartée", f"total devrait être 2 (retenus), obtenu {dim['total']}"))
-        elif dim["ecartes"] != 2:
-            echecs.append(("Dimension partiellement écartée", f"ecartes devrait être 2, obtenu {dim['ecartes']}"))
-        elif dim["completude_pct"] is None:
-            echecs.append(("Dimension partiellement écartée", "completude_pct est None (devrait être 100.0)"))
-        elif abs(dim["completude_pct"] - 100.0) > 0.1:
-            echecs.append(("Dimension partiellement écartée", f"completude_pct devrait être 100%, obtenu {dim['completude_pct']:.2f}%"))
+            failures.append(("Partially discarded dimension", f"total should be 2 (kept), got {dim['total']}"))
+        elif dim["discarded"] != 2:
+            failures.append(("Partially discarded dimension", f"discarded should be 2, got {dim['discarded']}"))
+        elif dim["completeness_pct"] is None:
+            failures.append(("Partially discarded dimension", "completeness_pct is None (should be 100.0)"))
+        elif abs(dim["completeness_pct"] - 100.0) > 0.1:
+            failures.append(("Partially discarded dimension", f"completeness_pct should be 100%, got {dim['completeness_pct']:.2f}%"))
     except Exception as exc:
-        echecs.append(("Dimension partiellement écartée", f"Exception : {exc}"))
+        failures.append(("Partially discarded dimension", f"Exception: {exc}"))
 
-    # Cas 3 : criteres_total = retenus, criteres_total + criteres_ecartes = total référentiel
+    # Case 3: total_criteria = kept, total_criteria + discarded_criteria = reference total
     total += 1
     try:
-        criteres = [
-            {"id": "3.1", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": "✅ Point fort confirmé", "coefficient": 0, "provenance": "collecte"},
-            {"id": "3.2", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": "🚫 Non applicable", "coefficient": 0},
-            {"id": "3.3", "dimension": "🏢 3 — Infrastructure", "potentiel_max": 2.0, "reponse": None, "coefficient": None},
+        criteria = [
+            {"id": "3.1", "dimension": "🏢 3 — Infrastructure", "max_potential": 2.0, "answer": "✅ Confirmed strength", "coefficient": 0, "provenance": "collected"},
+            {"id": "3.2", "dimension": "🏢 3 — Infrastructure", "max_potential": 2.0, "answer": "🚫 Not applicable", "coefficient": 0},
+            {"id": "3.3", "dimension": "🏢 3 — Infrastructure", "max_potential": 2.0, "answer": None, "coefficient": None},
         ]
-        dimensions = compute_dimension_scores(criteres)
-        dim = next((d for d in dimensions if d["nom"] == "🏢 3 — Infrastructure"), None)
+        dimensions = compute_dimension_scores(criteria)
+        dim = next((d for d in dimensions if d["name"] == "🏢 3 — Infrastructure"), None)
 
         if not dim:
-            echecs.append(("criteres_total comptabilité", "dimension non trouvée"))
+            failures.append(("total_criteria accounting", "dimension not found"))
         elif dim["total"] != 2:
-            echecs.append(("criteres_total comptabilité", f"total (retenus) devrait être 2, obtenu {dim['total']}"))
-        elif dim["ecartes"] != 1:
-            echecs.append(("criteres_total comptabilité", f"ecartes devrait être 1, obtenu {dim['ecartes']}"))
-        elif dim["total"] + dim["ecartes"] != 3:
-            echecs.append(("criteres_total comptabilité", f"total + ecartes devrait être 3 (total référentiel), obtenu {dim['total'] + dim['ecartes']}"))
+            failures.append(("total_criteria accounting", f"total (kept) should be 2, got {dim['total']}"))
+        elif dim["discarded"] != 1:
+            failures.append(("total_criteria accounting", f"discarded should be 1, got {dim['discarded']}"))
+        elif dim["total"] + dim["discarded"] != 3:
+            failures.append(("total_criteria accounting", f"total + discarded should be 3 (reference total), got {dim['total'] + dim['discarded']}"))
     except Exception as exc:
-        echecs.append(("criteres_total comptabilité", f"Exception : {exc}"))
+        failures.append(("total_criteria accounting", f"Exception: {exc}"))
 
-    # Cas 4 : Aucun critère écarté = chiffres identiques à avant session 26, criteres_ecartes == 0
+    # Case 4: No discarded criterion = same numbers as before session 26, discarded_criteria == 0
     total += 1
     try:
-        criteres = [
-            {"id": "4.1", "dimension": "💾 4 — Stockage et données", "potentiel_max": 4.0, "reponse": "💡 Potentiel d'amélioration identifié", "coefficient": 0.5, "provenance": "collecte"},
-            {"id": "4.2", "dimension": "💾 4 — Stockage et données", "potentiel_max": 4.0, "reponse": "✅ Point fort confirmé", "coefficient": 0, "provenance": "collecte"},
+        criteria = [
+            {"id": "4.1", "dimension": "💾 4 — Storage and data", "max_potential": 4.0, "answer": "💡 Improvement potential identified", "coefficient": 0.5, "provenance": "collected"},
+            {"id": "4.2", "dimension": "💾 4 — Storage and data", "max_potential": 4.0, "answer": "✅ Confirmed strength", "coefficient": 0, "provenance": "collected"},
         ]
-        dimensions = compute_dimension_scores(criteres)
-        dim = next((d for d in dimensions if d["nom"] == "💾 4 — Stockage et données"), None)
+        dimensions = compute_dimension_scores(criteria)
+        dim = next((d for d in dimensions if d["name"] == "💾 4 — Storage and data"), None)
 
-        attendu = 25.0  # (0.5 * 4) / 8 = 25%
+        expected = 25.0  # (0.5 * 4) / 8 = 25%
         if not dim:
-            echecs.append(("Aucun critère écarté", "dimension non trouvée"))
-        elif dim["ecartes"] != 0:
-            echecs.append(("Aucun critère écarté", f"ecartes devrait être 0, obtenu {dim['ecartes']}"))
-        elif dim["potentiel_optimisation_pct"] is None:
-            echecs.append(("Aucun critère écarté", "potentiel_optimisation_pct est None (devrait être 25.0)"))
-        elif abs(dim["potentiel_optimisation_pct"] - attendu) > 0.1:
-            echecs.append(("Aucun critère écarté", f"potentiel_optimisation_pct attendu {attendu}%, obtenu {dim['potentiel_optimisation_pct']:.2f}%"))
+            failures.append(("No discarded criterion", "dimension not found"))
+        elif dim["discarded"] != 0:
+            failures.append(("No discarded criterion", f"discarded should be 0, got {dim['discarded']}"))
+        elif dim["optimization_potential_pct"] is None:
+            failures.append(("No discarded criterion", "optimization_potential_pct is None (should be 25.0)"))
+        elif abs(dim["optimization_potential_pct"] - expected) > 0.1:
+            failures.append(("No discarded criterion", f"optimization_potential_pct expected {expected}%, got {dim['optimization_potential_pct']:.2f}%"))
         elif dim["total"] != 2:
-            echecs.append(("Aucun critère écarté", f"total devrait être 2, obtenu {dim['total']}"))
-        elif dim["hors_perimetre"]:
-            echecs.append(("Aucun critère écarté", f"hors_perimetre devrait être False, obtenu {dim['hors_perimetre']}"))
+            failures.append(("No discarded criterion", f"total should be 2, got {dim['total']}"))
+        elif dim["out_of_scope"]:
+            failures.append(("No discarded criterion", f"out_of_scope should be False, got {dim['out_of_scope']}"))
     except Exception as exc:
-        echecs.append(("Aucun critère écarté", f"Exception : {exc}"))
+        failures.append(("No discarded criterion", f"Exception: {exc}"))
 
-    if echecs:
-        print(f"AUTOTEST EN ÉCHEC : {len(echecs)} cas sur {total}")
-        for libelle, erreur in echecs:
-            print(f"  - {libelle}")
-            print(f"      {erreur}")
+    if failures:
+        print(f"AUTOTEST FAILED: {len(failures)} case(s) out of {total}")
+        for label, error in failures:
+            print(f"  - {label}")
+            print(f"      {error}")
         return 1
 
-    print(f"Autotest : {total} cas passés.")
+    print(f"Autotest: {total} cases passed.")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("source_dir", nargs="?")
-    parser.add_argument("--domaine", default=None, help="Nom court utilisé pour eof-radar-<domaine>.svg (déduit du dossier sinon)")
-    parser.add_argument("--autotest", action="store_true", help="rejoue les cas de test embarqués et sort 1 si un cas échoue")
+    parser.add_argument("--domain", default=None, help="Short name used for eof-radar-<domain>.svg (derived from the directory otherwise)")
+    parser.add_argument("--autotest", action="store_true", help="replays the embedded test cases and exits 1 if a case fails")
     args = parser.parse_args()
 
     if args.autotest:
         sys.exit(autotest())
 
     if not args.source_dir:
-        parser.error("source_dir est requis (ou utiliser --autotest)")
+        parser.error("source_dir is required (or use --autotest)")
 
     source_dir = Path(args.source_dir).resolve()
 
-    source_dir = Path(args.source_dir).resolve()
-    domaine = args.domaine or source_dir.name
+    domain = args.domain or source_dir.name
 
-    if not REFERENTIEL_PATH.exists():
-        print(f"ERREUR : référentiel introuvable ({REFERENTIEL_PATH}). Lancer le skill eof d'abord.")
+    if not REFERENCE_PATH.exists():
+        print(f"ERROR: reference not found ({REFERENCE_PATH}). Run the eof skill first.")
         sys.exit(1)
-    referentiel = json.loads(REFERENTIEL_PATH.read_text(encoding="utf-8"))
+    reference = json.loads(REFERENCE_PATH.read_text(encoding="utf-8"))
 
     data = load_audit_data(source_dir)
-    # Clés de données réelles (exclut source_dir, qui est toujours non-None)
-    data_keys = ("env", "har", "coverage", "cwv", "headers", "wellknown", "htmlcss", "pages_publiques")
+    # Real data keys (excludes source_dir, which is always non-None)
+    data_keys = ("env", "har", "coverage", "cwv", "headers", "wellknown", "htmlcss", "public_pages")
     if not any(data[k] for k in data_keys):
-        print("⚠ Aucune donnée d'audit trouvée (env-data.json / har-analysis.json / coverage-analysis.json / "
+        print("⚠ No audit data found (env-data.json / har-analysis.json / coverage-analysis.json / "
               "cwv.json / security-headers-analysis.json / wellknown-scan.json / html-css-criteria.json / "
-              "pages-publiques-criteria.json) — tous les critères resteront 'je ne sais pas'.")
+              "public-pages-criteria.json) — all criteria will stay 'I don't know'.")
 
-    results = [evaluate_criterion(c, data) for c in referentiel["criteres"]]
+    results = [evaluate_criterion(c, data) for c in reference["criteria"]]
     results_by_id = {r["id"]: r for r in results}
     dimensions = compute_dimension_scores(results)
-    diag_rapide_apercu = build_diag_rapide_apercu(referentiel, data)
+    diag_overview = build_quick_diag_overview(reference, data)
 
-    # Identifier les critères écartés (convention critère écarté, section 2)
-    ecartes_global = [r for r in results if r["reponse"] == "🚫 Non applicable"]
-    criteres_ecartes = len(ecartes_global)
+    # Identify the discarded criteria (discarded-criterion convention, section 2)
+    discarded_global = [r for r in results if r["answer"] == "🚫 Not applicable"]
+    discarded_count = len(discarded_global)
 
-    # Les critères écartés sortent de tous les dénominateurs (convention 2.1)
-    results_retenus = [r for r in results if r["reponse"] != "🚫 Non applicable"]
+    # Discarded criteria leave all denameinators (convention 2.1)
+    kept_results = [r for r in results if r["answer"] != "🚫 Not applicable"]
 
-    auto_answered = [r for r in results_retenus if r["categorie"] == "automatisable" and r["reponse"] is not None]
-    all_answered = [r for r in results_retenus if r["reponse"] is not None]
-    partiel_with_context = [r for r in results_retenus if r["categorie"] == "partiel" and r["contexte"] is not None]
+    auto_answered = [r for r in kept_results if r["category"] == "automatable" and r["answer"] is not None]
+    all_answered = [r for r in kept_results if r["answer"] is not None]
+    partial_with_context = [r for r in kept_results if r["category"] == "partial" and r["context"] is not None]
 
-    # Calcul global : même formule que par dimension, appliquée aux critères RETENUS
-    # (les critères écartés sont retirés du dénominateur, convention 2.1)
-    total_potentiel_max_global = sum(r["potentiel_max"] for r in results_retenus) or None
-    potentiel_optimisation_global_pct = (
-        sum(r["coefficient"] * r["potentiel_max"] for r in all_answered) / total_potentiel_max_global * 100
-        if total_potentiel_max_global else None
+    # Global computation: same formula as per dimension, applied to the KEPT criteria
+    # (discarded criteria are removed from the denameinator, convention 2.1)
+    total_max_potential_global = sum(r["max_potential"] for r in kept_results) or None
+    optimization_potential_global_pct = (
+        sum(r["coefficient"] * r["max_potential"] for r in all_answered) / total_max_potential_global * 100
+        if total_max_potential_global else None
     )
-    completude_globale_pct = len(all_answered) / len(results_retenus) * 100 if results_retenus else 0
-    # Comptage par provenance global — mêmes 5 provenances qu'en compute_dimension_scores(),
-    # `suppose` comprise, sinon une réponse posée en `suppose` disparaîtrait du décompte.
-    repondus_par_provenance = {"collecte": 0, "estime": 0, "declare": 0, "precise": 0, "suppose": 0}
+    completeness_global_pct = len(all_answered) / len(kept_results) * 100 if kept_results else 0
+    # Global count by provenance — same 5 provenances as in compute_dimension_scores(),
+    # `assumed` included, otherwise an answer set in `assumed` would disappear from the count.
+    answered_by_provenance = {"collected": 0, "estimated": 0, "declared": 0, "stated": 0, "assumed": 0}
     for r in all_answered:
         prov = r.get("provenance")
-        if prov in repondus_par_provenance:
-            repondus_par_provenance[prov] += 1
+        if prov in answered_by_provenance:
+            answered_by_provenance[prov] += 1
 
-    # Un seul horodatage pour les deux artefacts : le fichier de lot et le résumé d'audit
-    # sortent du même passage, deux instants différents laisseraient croire le contraire.
-    genere_le = datetime.now(timezone.utc).isoformat()
+    # A single timestamp for both artifacts: the lot file and the audit summary
+    # come out of the same pass, two different instants would suggest the opposite.
+    generated_at = datetime.now(timezone.utc).isoformat()
 
     audit_results = {
-        "generated_at": genere_le,
-        "domaine": domaine,
-        "criteres_total": len(results_retenus),
-        "criteres_repondus": len(all_answered),
-        "criteres_ecartes": criteres_ecartes,
-        "criteres_avec_indice_partiel": len(partiel_with_context),
-        "completude_globale_pct": completude_globale_pct,
-        "potentiel_optimisation_global_pct": potentiel_optimisation_global_pct,
-        "repondus_par_provenance": repondus_par_provenance,
+        "generated_at": generated_at,
+        "domain": domain,
+        "total_criteria": len(kept_results),
+        "answered_criteria": len(all_answered),
+        "discarded_criteria": discarded_count,
+        "criteria_with_partial_evidence": len(partial_with_context),
+        "global_completeness_pct": completeness_global_pct,
+        "global_optimization_potential_pct": optimization_potential_global_pct,
+        "answered_by_provenance": answered_by_provenance,
         "dimensions": dimensions,
-        "diagnostic_rapide_apercu": {
-            "total_questions": len(referentiel["diagnostic_rapide"]),
+        "quick_diag_overview": {
+            "total_questions": len(reference["quick_diagnostic"]),
             "note": (
-                "Échelle 1 à 5, jamais remplie automatiquement — à évaluer humainement. "
-                "Exception : 0.16 (doublon exact de 3.3), cf. eof-analyse-minimisation-questions.md."
+                "1 to 5 scale, never filled automatically — to be assessed by a human. "
+                "Exception: 0.16 (exact duplicate of 3.3), cf. eof-question-minimization-analysis.md."
             ),
-            "questions": diag_rapide_apercu,
+            "questions": diag_overview,
         },
-        "criteres": results,
+        "criteria": results,
     }
 
     results_path = source_dir / "eof-audit-results.json"
     results_path.write_text(json.dumps(audit_results, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # Radar à deux couches, construit depuis le résultat d'audit lui-même et non
-    # depuis les variables locales de ce script : c'est le même point d'entrée que
-    # celui de `processus/fusionner_lots.py`, l'autre producteur du même fichier.
-    # Les deux tenaient déjà deux arithmétiques jumelles ; leur laisser deux façons
-    # de dessiner garantissait qu'un jour l'une montrerait autre chose que l'autre.
-    radar_path = source_dir / f"eof-radar-{domaine}.svg"
-    radar_path.write_text(build_radar_from_results(audit_results, domaine), encoding="utf-8")
+    # Two-layer radar, built from the audit result itself and not
+    # from this script's local variables: it is the same entry point as
+    # that of `process/merge_lots.py`, the other producer of the same file.
+    # Both already had twin arithmetics; leaving them two ways
+    # to draw guaranteed that one day one would show something different from the other.
+    radar_path = source_dir / f"eof-radar-{domain}.svg"
+    radar_path.write_text(build_radar_from_results(audit_results, domain), encoding="utf-8")
 
-    md_text = build_eof_rempli_md(referentiel, results_by_id, dimensions, diag_rapide_apercu)
-    md_path = source_dir / "eof-rempli.md"
+    md_text = build_eof_filled_md(reference, results_by_id, dimensions, diag_overview)
+    md_path = source_dir / "eof-filled.md"
     md_path.write_text(md_text, encoding="utf-8")
 
-    sortie_lot = build_sortie_lot(results, diag_rapide_apercu, data["fichiers_charges"], genere_le)
+    lot_output = build_lot_output(results, diag_overview, data["loaded_files"], generated_at)
     lot_dir = source_dir / "lots"
     lot_dir.mkdir(parents=True, exist_ok=True)
     lot_path = lot_dir / f"{LOT_ID}.json"
-    lot_path.write_text(json.dumps(sortie_lot, ensure_ascii=False, indent=2), encoding="utf-8")
+    lot_path.write_text(json.dumps(lot_output, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"eof-audit-results.json écrit : {results_path}")
-    print(f"eof-rempli.md écrit : {md_path}")
-    print(f"eof-radar-{domaine}.svg écrit : {radar_path}")
-    print(f"lots/{LOT_ID}.json écrit : {lot_path} ({len(sortie_lot['criteres'])} critères)")
-    # Le potentiel est rapporté à TOUS les critères, pas aux seuls répondus : sans la
-    # complétude affichée juste à côté, un chiffre bas se lit comme un service mature
-    # alors qu'il ne dit que "nous n'avons presque rien regardé".
-    print(f"Critères répondus automatiquement : {len(auto_answered)}/{len(referentiel['criteres'])}"
-          f" (complétude {completude_globale_pct:.1f} %)"
-          + (f" — potentiel d'optimisation global, rapporté aux {len(referentiel['criteres'])} critères :"
-             f" {potentiel_optimisation_global_pct:.2f} %" if potentiel_optimisation_global_pct is not None else ""))
+    print(f"eof-audit-results.json written: {results_path}")
+    print(f"eof-filled.md written: {md_path}")
+    print(f"eof-radar-{domain}.svg written: {radar_path}")
+    print(f"lots/{LOT_ID}.json written: {lot_path} ({len(lot_output['criteria'])} criteria)")
+    # The potential is reported against ALL criteria, not only the answered ones: without
+    # the completeness displayed right next to it, a low figure reads as a mature service
+    # when it only says "we hardly looked at anything".
+    print(f"Automatically answered criteria: {len(auto_answered)}/{len(reference['criteria'])}"
+          f" (completeness {completeness_global_pct:.1f} %)"
+          + (f" — global optimization potential, reported against the {len(reference['criteria'])} criteria:"
+             f" {optimization_potential_global_pct:.2f} %" if optimization_potential_global_pct is not None else ""))
 
 
 if __name__ == "__main__":

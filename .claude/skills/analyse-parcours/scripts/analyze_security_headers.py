@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Calcule un score de sécurité des en-têtes HTTP (type securityheaders.com),
-localement, sans appel à aucune API tierce — uniquement à partir des en-têtes
-de réponse déjà présents dans le .har capturé (aucun nouveau téléchargement).
+Computes an HTTP security-headers score (securityheaders.com style),
+locally, without calling any third-party API — only from the response
+headers already present in the captured .har (no new download).
 
-Analyse la réponse "document principal" (mimeType text/html) de chaque page
-listée dans env-data.json (ou, à défaut, chaque entrée HTML unique du HAR).
+Analyzes the "main document" response (mimeType text/html) of each page
+listed in env-data.json (or, failing that, each unique HTML entry of the HAR).
 
-Usage :
+Usage:
     python3 analyze_security_headers.py <source_dir>
 
-Écrit <source_dir>/security-headers-analysis.json.
+Writes <source_dir>/security-headers-analysis.json.
 """
 
 import argparse
@@ -19,11 +19,11 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-RAW_DATA_DIR = "donnees-brutes-potentiellement-sensibles"
+RAW_DATA_DIR = "raw-data-potentially-sensitive"
 
-# (nom d'en-tête, poids, validateur) — validateur reçoit la valeur brute (str),
-# retourne True si l'en-tête est considéré "correctement positionné".
-# Pondération inspirée de securityheaders.com (CSP et HSTS pèsent le plus).
+# (header name, weight, validator) — the validator receives the raw value (str),
+# returns True if the header is considered "properly set".
+# Weighting inspired by securityheaders.com (CSP and HSTS weigh the most).
 _HEADER_CHECKS = [
     ("content-security-policy", 25, lambda v: bool(v.strip())),
     ("strict-transport-security", 20, lambda v: "max-age=" in v.lower()),
@@ -50,7 +50,7 @@ def grade_for_score(score_pct):
 
 
 def score_headers(headers):
-    """headers : dict nom_minuscule -> valeur. Retourne (score_pct, detail[])."""
+    """headers: dict lowercase_name -> value. Returns (score_pct, detail[])."""
     detail = []
     obtained = 0
     for name, weight, is_ok in _HEADER_CHECKS:
@@ -60,7 +60,7 @@ def score_headers(headers):
             obtained += weight
         detail.append({
             "header": name, "present": value is not None,
-            "valide": ok, "valeur": value, "poids": weight,
+            "valid": ok, "value": value, "weight": weight,
         })
     score_pct = round(obtained / _TOTAL_WEIGHT * 100)
     return score_pct, detail
@@ -110,8 +110,8 @@ def analyze(har_path, target_urls=None):
     return {
         "pages": pages,
         "worst_page": {"url": worst["url"], "score_pct": worst["score_pct"], "grade": worst["grade"]},
-        "note": "Score calculé localement (pondération inspirée de securityheaders.com), "
-                "depuis les en-têtes déjà capturés dans le .har — aucun appel réseau.",
+        "note": "Score computed locally (weighting inspired by securityheaders.com), "
+                "from the headers already captured in the .har — no network call.",
     }
 
 
@@ -123,19 +123,19 @@ def main():
 
     har_path = find_har(source_dir)
     if not har_path:
-        print(f"Erreur : aucun .har trouvé dans {source_dir} (ni dans {RAW_DATA_DIR}/).")
+        print(f"Error: no .har found in {source_dir} (nor in {RAW_DATA_DIR}/).")
         sys.exit(1)
 
     target_urls = load_page_urls(source_dir)
     result = analyze(har_path, target_urls)
     if result is None:
-        print("Aucune réponse HTML trouvée dans le HAR — analyse impossible.")
+        print("No HTML response found in the HAR — analysis impossible.")
         sys.exit(1)
 
     out_path = source_dir / "security-headers-analysis.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"security-headers-analysis.json écrit : {out_path}")
-    print(f"Page la moins bien notée : {result['worst_page']['url']} "
+    print(f"security-headers-analysis.json written: {out_path}")
+    print(f"Lowest-scored page: {result['worst_page']['url']} "
           f"({result['worst_page']['score_pct']}%, grade {result['worst_page']['grade']})")
 
 

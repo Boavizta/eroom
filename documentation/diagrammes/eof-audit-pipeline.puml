@@ -1,5 +1,5 @@
 @startuml eof-audit-pipeline
-title Étape "eof-audit" (skill analyse-parcours) — Pipeline outils -> référentiel EOF
+title "eof-audit" step (skill analyse-parcours) — Tool pipeline -> EOF reference
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -18,86 +18,86 @@ skinparam PartitionBorderColor #5BA1BC
 
 start
 
-partition "**Sources déjà collectées** (parcours de base + e-footprint)" {
+partition "**Already collected sources** (base journey + e-footprint)" {
   :env-data.json
   (device_mix, servers[], traffic, tech_stack...);
   :audit/har-analysis.json
-  (domaines, http_codes, duplicate_urls);
+  (domains, http_codes, duplicate_urls);
   :audit/coverage-analysis.json
-  (JS/CSS inutilisé par page);
+  (unused JS/CSS per page);
   :cwv.json
-  (LCP/INP/CLS — CrUX ou PageSpeed lab);
+  (LCP/INP/CLS — CrUX or PageSpeed lab);
 }
 
 note right #C8E6C9
-  cwv.json étendu Phase 1 (2026-09-03) :
-  collect_cwv_pagespeed.py demande en plus
-  les catégories "accessibility" et
-  "best-practices" (même appel API PageSpeed,
-  aucun coût réseau additionnel) ->
+  cwv.json extended in Phase 1 (2026-09-03):
+  collect_cwv_pagespeed.py additionally requests
+  the "accessibility" and
+  "best-practices" categories (same PageSpeed API
+  call, no extra network cost) ->
   accessibility_score_pct / best_practices_score_pct
 end note
 
-partition "**Extracteurs Phase 1** (nouveaux, 2026-09-03)" {
+partition "**Phase 1 extractors** (new, 2026-09-03)" {
   :parse_html_criteria.py
-  re-fetch live des pages déjà auditées
-  (le .har capturé ne contient pas les
-  corps HTML/CSS — vérifié : 46/311 entrées
-  avec un body, aucune de page HTML/CSS)
+  live re-fetch of already audited pages
+  (the captured .har does not contain the
+  HTML/CSS bodies — verified: 46/311 entries
+  with a body, none of them HTML/CSS pages)
   -> html-css-criteria.json;
   :analyze_security_headers.py
-  score sécurité local (type securityheaders.com)
-  depuis les en-têtes déjà dans le .har
+  local security score (securityheaders.com type)
+  from the headers already in the .har
   -> security-headers-analysis.json;
   :scan_wellknown.py
-  fetch direct security.txt / robots.txt /
-  sitemap.xml (3 requêtes HTTP publiques)
+  direct fetch security.txt / robots.txt /
+  sitemap.xml (3 public HTTP requests)
   -> wellknown-scan.json;
 }
 
 note right
-  Piège rencontré et corrigé sur octo.com :
-  robots.txt ET sitemap.xml renvoyaient un
-  statut 200 mais le HTML de fallback de la
-  SPA (catch-all routing), pas la ressource
-  demandée -> détection ajoutée pour ne pas
-  compter un faux "présent".
+  Pitfall encountered and fixed on octo.com:
+  robots.txt AND sitemap.xml returned a
+  status 200 but the SPA fallback HTML
+  (catch-all routing), not the requested
+  resource -> detection added so a false
+  "present" is not counted.
 end note
 
-partition "**run_eof.py** (déterministe, aucun calcul LLM)" {
-  :Charger eof-referentiel.json
-  (54 critères + 16 Diagnostic rapide,
-  produit par le skill eof, JAMAIS régénéré ici);
-  :Charger les 7 sources ci-dessus
-  dans un dict data{} unique;
-  if (Règle "automatisable" tranche
-  sans ambiguïté ?) then (oui)
-    :Cocher une option du menu à 5
-    (dont "🤔 À évaluer" si zone ambiguë
-    — reste une réponse explicite, pas
-    un "je ne sais pas");
-  else (non / catégorie "partiel")
-    :Afficher un indice contextuel en annexe
-    (confidence low/medium, jamais coché);
+partition "**run_eof.py** (deterministic, no LLM calculation)" {
+  :Load eof-reference.json
+  (54 criteria + 16 Quick diagnostic,
+  produced by the eof skill, NEVER regenerated here);
+  :Load the 7 sources above
+  into a single data{} dict;
+  if (Rule "automatable" settles
+  without ambiguity ?) then (yes)
+    :Tick one option of the 5-choice
+    menu (including "🤔 To be assessed" if
+    ambiguous zone — still an explicit answer,
+    not an "I don't know");
+  else (no / category "partial")
+    :Display a contextual hint in the appendix
+    (confidence low/medium, never ticked);
   endif
-  :Calculer les scores par dimension
-  (moyenne pondérée sur les réponses réelles);
+  :Compute the scores per dimension
+  (weighted average over the real answers);
 }
 
 note right #C8E6C9
-  Politique anti-fabrication inchangée :
-  7 critères détaillés automatisables (était 4)
-  + 11 indices "partiel" (était 6) après Phase 1.
-  36 critères restent "je ne sais pas"
-  (questions organisationnelles/produit).
+  Anti-fabrication policy unchanged:
+  7 detailed automatable criteria (was 4)
+  + 11 "partial" hints (was 6) after Phase 1.
+  36 criteria remain "I don't know"
+  (organizational/product questions).
 end note
 
 :-> eof-audit-results.json
-(résumé, consommé par generate_report_html.py);
-:-> eof-rempli.md
-(référentiel complet, réponse/contexte + source);
-:-> eof-radar-<domaine>.svg
-(radar 6 dimensions, "N/A" si aucune réponse);
+(summary, consumed by generate_report_html.py);
+:-> eof-filled.md
+(full reference, answer/context + source);
+:-> eof-radar-<domain>.svg
+(6-dimension radar, "N/A" if no answer);
 
 stop
 

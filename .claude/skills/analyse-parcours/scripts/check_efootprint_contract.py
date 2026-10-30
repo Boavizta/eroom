@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
 """
-Filet de sécurité du refactoring e-footprint : contrôle de CONTRAT sur la sortie.
+Safety net for the e-footprint refactoring: CONTRACT check on the output.
 
-POURQUOI CE SCRIPT EXISTE
--------------------------
-Le rapport HTML lit `efootprint-synthese-python.json` clé par clé avec
-`.get()`. S'il manque une clé, il n'échoue pas : il affiche un trou, ou une
-valeur par défaut, SANS AUCUNE ERREUR. Un refactoring peut donc casser le
-rapport en silence.
+WHY THIS SCRIPT EXISTS
+----------------------
+The HTML report reads `efootprint-python-summary.json` key by key with
+`.get()`. If a key is missing, it does not fail: it shows a hole, or a
+default value, WITHOUT ANY ERROR. A refactoring can therefore break the
+report silently.
 
-Ce script compare une BASELINE figée à une sortie fraîche et signale :
-  - les chemins PERDUS            -> ERREUR (le rapport perdra de l'information)
-  - les chemins CHANGÉS DE TYPE   -> ERREUR (ex. un float devenu str)
-  - les chemins AJOUTÉS           -> information seulement (une addition est licite)
+This script compares a FROZEN BASELINE against a fresh output and reports:
+  - LOST paths            -> ERROR (the report will lose information)
+  - TYPE-CHANGED paths    -> ERROR (e.g. a float turned into str)
+  - ADDED paths           -> information only (an addition is legitimate)
 
-CE QU'IL NE FAIT PAS, ET C'EST IMPORTANT
-----------------------------------------
-Il ne vérifie PAS que les valeurs sont JUSTES. Un total qui passerait de 174 à
-300 kg avec toutes les clés en place ne serait pas détecté ici. C'est le rôle de
-l'option `--total`, à utiliser en complément et non à la place.
+WHAT IT DOES NOT DO, AND THAT MATTERS
+-------------------------------------
+It does NOT check that the values are CORRECT. A total going from 174 to
+300 kg with all keys in place would not be detected here. That is the role of
+the `--total` option, to be used in addition, not instead.
 
-Usage :
-    # 1. Figer la baseline AVANT de toucher au code (à faire une seule fois)
+Usage:
+    # 1. Freeze the baseline BEFORE touching the code (do once)
     python3 check_efootprint_contract.py --freeze audits/<site>
 
-    # 2. Après chaque modification : comparer
+    # 2. After each change: compare
     python3 check_efootprint_contract.py audits/<site>
 
-    # 3. Comparaison + vérification numérique du total
+    # 3. Comparison + numeric check of the total
     python3 check_efootprint_contract.py audits/<site> --total 174.076 --tol 1e-3
 
-Options utiles :
-    --baseline <chemin>   baseline explicite (défaut : tmp/baselines/<site>-efootprint-synthese-python.json)
-    --results <chemin>    sortie à contrôler (défaut : <source_dir>/efootprint-synthese-python.json)
-    --strict-added        traite aussi les chemins AJOUTÉS comme des erreurs
+Useful options:
+    --baseline <path>   explicit baseline (default: tmp/baselines/<site>-efootprint-python-summary.json)
+    --results <path>    output to check (default: <source_dir>/efootprint-python-summary.json)
+    --strict-added      also treat ADDED paths as errors
 
-Code de sortie : 0 si le contrat est tenu, 1 sinon. Prévu pour un enchaînement
-`&&` ou une vérification de fin de lot.
+Exit code: 0 if the contract holds, 1 otherwise. Meant for `&&` chaining
+or end-of-batch verification.
 
-Les baselines vivent dans `tmp/baselines/`, hors git (`tmp/` est dans .gitignore) :
-ce sont des artefacts de travail, pas des livrables, et elles contiennent les
-valeurs mesurées du cas de test.
+Baselines live in `tmp/baselines/`, outside git (`tmp/` is in .gitignore):
+they are work artifacts, not deliverables, and they contain the measured
+values of the test case.
 """
 
 import argparse
@@ -48,30 +48,30 @@ import json
 import sys
 from pathlib import Path
 
-# Racine du projet : ce script vit dans .claude/skills/analyse-parcours/scripts/
+# Project root: this script lives in .claude/skills/analyse-parcours/scripts/
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 BASELINE_DIR = PROJECT_ROOT / "tmp" / "baselines"
 
-SYNTHESE_FILENAME = "efootprint-synthese-python.json"
+SUMMARY_FILENAME = "efootprint-python-summary.json"
 
-# Chemins dont la valeur change à chaque exécution sans que rien ne soit cassé.
-# Comparer leur contenu n'aurait aucun sens ; leur PRÉSENCE et leur TYPE le sont
-# toujours, donc ils restent dans l'inventaire des chemins.
+# Paths whose value changes on every run without anything being broken.
+# Comparing their content would make no sense; their PRESENCE and TYPE still
+# do, so they stay in the path inventory.
 VOLATILE_PATHS = {
     "/generated_at",
 }
 
 
 # ---------------------------------------------------------------------------
-# Aplatissement en chemins typés
+# Flattening into typed paths
 # ---------------------------------------------------------------------------
 
 def flatten(obj, prefix=""):
-    """Aplatit un JSON en {chemin: nom_de_type}.
+    """Flattens a JSON into {path: type_name}.
 
-    Un dict vide et une liste sont des feuilles : on ne descend pas dedans. Les
-    listes changent de longueur d'un site à l'autre, et leur contenu n'est pas un
-    contrat stable. Le type `list` suffit à détecter une disparition.
+    An empty dict and a list are leaves: we do not descend into them. Lists
+    change length from one site to another, and their content is not a stable
+    contract. The `list` type alone is enough to detect a disappearance.
     """
     out = {}
     if isinstance(obj, dict):
@@ -87,14 +87,14 @@ def flatten(obj, prefix=""):
 
 
 def compatible(type_before, type_after):
-    """Un changement de type est-il acceptable ?
+    """Is a type change acceptable?
 
-    Deux tolérances, et pas une de plus :
-      - int <-> float : un arrondi ou une division peut basculer l'un dans l'autre
-        sans changer le sens de la valeur.
-      - NoneType -> autre chose : un champ qui valait null et qui porte enfin une
-        valeur est un GAIN. L'inverse (une valeur devenue null) est une PERTE et
-        reste signalée.
+    Two tolerances, and no more:
+      - int <-> float: rounding or division can flip one into the other
+        without changing the meaning of the value.
+      - NoneType -> something else: a field that was null and now carries a
+        value is a GAIN. The opposite (a value turned null) is a LOSS and
+        stays reported.
     """
     if type_before == type_after:
         return True
@@ -107,23 +107,23 @@ def compatible(type_before, type_after):
 
 
 # ---------------------------------------------------------------------------
-# Localisation des fichiers
+# File locations
 # ---------------------------------------------------------------------------
 
 def default_baseline_path(source_dir):
-    """tmp/baselines/<nom-du-cas-d-audit>-efootprint-synthese-python.json"""
-    return BASELINE_DIR / f"{source_dir.name}-{SYNTHESE_FILENAME}"
+    """tmp/baselines/<audit-case-name>-efootprint-python-summary.json"""
+    return BASELINE_DIR / f"{source_dir.name}-{SUMMARY_FILENAME}"
 
 
 def load_json(path, label):
     if not path.exists():
-        print(f"[erreur] {label} introuvable : {path}")
+        print(f"[error] {label} not found: {path}")
         return None
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as exc:
-        print(f"[erreur] {label} n'est pas un JSON valide : {path}")
+        print(f"[error] {label} is not valid JSON: {path}")
         print(f"         {exc}")
         return None
 
@@ -133,8 +133,8 @@ def load_json(path, label):
 # ---------------------------------------------------------------------------
 
 def freeze(source_dir, results_path, baseline_path):
-    """Copie la sortie actuelle comme référence."""
-    data = load_json(results_path, "fichier de résultats")
+    """Copies the current output as the reference."""
+    data = load_json(results_path, "results file")
     if data is None:
         return 1
 
@@ -143,17 +143,17 @@ def freeze(source_dir, results_path, baseline_path):
     with open(baseline_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f"[freeze] Baseline figée : {baseline_path}")
-    print(f"[freeze] {len(paths)} chemins sous contrat.")
+    print(f"[freeze] Baseline frozen: {baseline_path}")
+    print(f"[freeze] {len(paths)} paths under contract.")
     total = data.get("totals", {}).get("total_kg_co2e_per_year")
     if total is not None:
-        print(f"[freeze] Total de référence : {total} kg CO2e/an")
-        print(f"[freeze] Pour verrouiller aussi la valeur : --total {total}")
+        print(f"[freeze] Reference total: {total} kg CO2e/year")
+        print(f"[freeze] To also lock the value: --total {total}")
     return 0
 
 
 def compare(baseline, results, strict_added):
-    """Compare deux sorties. Retourne (nb_erreurs, nb_ajouts)."""
+    """Compares two outputs. Returns (nb_errors, nb_added)."""
     before = flatten(baseline)
     after = flatten(results)
 
@@ -165,52 +165,52 @@ def compare(baseline, results, strict_added):
         if not compatible(before[p], after[p])
     )
 
-    print(f"[contrat] {len(before)} chemins en baseline, {len(after)} dans la sortie.")
+    print(f"[contract] {len(before)} paths in baseline, {len(after)} in the output.")
     print()
 
     if lost:
-        print(f"[ERREUR] {len(lost)} chemin(s) PERDU(S) — le rapport perdra cette information :")
+        print(f"[ERROR] {len(lost)} LOST path(s) — the report will lose this information:")
         for path in lost:
-            print(f"    - {path}   (était {before[path]})")
+            print(f"    - {path}   (was {before[path]})")
         print()
     else:
-        print("[OK] 0 clé manquante.")
+        print("[OK] 0 missing keys.")
 
     if retyped:
-        print(f"[ERREUR] {len(retyped)} chemin(s) ayant CHANGÉ DE TYPE :")
+        print(f"[ERROR] {len(retyped)} path(s) that CHANGED TYPE:")
         for path, type_before, type_after in retyped:
             print(f"    - {path}   {type_before} -> {type_after}")
         print()
     else:
-        print("[OK] 0 changement de type incompatible.")
+        print("[OK] 0 incompatible type changes.")
 
     if added:
-        marker = "ERREUR" if strict_added else "info"
-        print(f"[{marker}] {len(added)} chemin(s) AJOUTÉ(S) :")
+        marker = "ERROR" if strict_added else "info"
+        print(f"[{marker}] {len(added)} ADDED path(s):")
         for path in added:
             print(f"    + {path}   ({after[path]})")
         print()
     else:
-        print("[info] 0 chemin ajouté.")
+        print("[info] 0 paths added.")
 
     errors = len(lost) + len(retyped) + (len(added) if strict_added else 0)
     return errors, len(added)
 
 
 def check_total(results, expected, tolerance):
-    """Vérifie le total annuel. Complète le contrôle de contrat, ne le remplace pas."""
+    """Checks the annual total. Complements the contract check, does not replace it."""
     actual = results.get("totals", {}).get("total_kg_co2e_per_year")
     if actual is None:
-        print("[ERREUR] /totals/total_kg_co2e_per_year absent : total invérifiable.")
+        print("[ERROR] /totals/total_kg_co2e_per_year missing: total cannot be verified.")
         return 1
 
     delta = abs(actual - expected)
     if delta <= tolerance:
-        print(f"[OK] Total {actual} kg CO2e/an (attendu {expected}, écart {delta:.2e}).")
+        print(f"[OK] Total {actual} kg CO2e/year (expected {expected}, delta {delta:.2e}).")
         return 0
 
-    print(f"[ERREUR] Total {actual} kg CO2e/an, attendu {expected} "
-          f"(écart {delta:.4f} > tolérance {tolerance}).")
+    print(f"[ERROR] Total {actual} kg CO2e/year, expected {expected} "
+           f"(delta {delta:.4f} > tolerance {tolerance}).")
     return 1
 
 
@@ -220,31 +220,31 @@ def check_total(results, expected, tolerance):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Contrôle de contrat sur efootprint-synthese-python.json "
-                    "(clés présentes et typées, pas valeurs justes).",
+        description="Contract check on efootprint-python-summary.json "
+                    "(keys present and typed, not correct values).",
     )
     parser.add_argument("source_dir", type=Path,
-                        help="Cas d'audit, ex. audits/octo.com")
+                        help="Audit case, e.g. audits/octo.com")
     parser.add_argument("--freeze", action="store_true",
-                        help="Fige la sortie actuelle comme baseline, puis s'arrête.")
+                        help="Freezes the current output as baseline, then stops.")
     parser.add_argument("--baseline", type=Path, default=None,
-                        help="Baseline explicite (défaut : tmp/baselines/<site>-...json).")
+                        help="Explicit baseline (default: tmp/baselines/<site>-...json).")
     parser.add_argument("--results", type=Path, default=None,
-                        help="Sortie à contrôler (défaut : <source_dir>/efootprint-synthese-python.json).")
+                        help="Output to check (default: <source_dir>/efootprint-python-summary.json).")
     parser.add_argument("--strict-added", action="store_true",
-                        help="Traite les chemins ajoutés comme des erreurs.")
+                        help="Treats added paths as errors.")
     parser.add_argument("--total", type=float, default=None,
-                        help="Total attendu en kg CO2e/an (vérification numérique).")
+                        help="Expected total in kg CO2e/year (numeric check).")
     parser.add_argument("--tol", type=float, default=1e-3,
-                        help="Tolérance sur --total (défaut : 1e-3).")
+                        help="Tolerance on --total (default: 1e-3).")
     args = parser.parse_args()
 
     source_dir = args.source_dir
     if not source_dir.is_dir():
-        print(f"[erreur] Cas d'audit introuvable : {source_dir}")
+        print(f"[error] Audit case not found: {source_dir}")
         return 1
 
-    results_path = args.results or (source_dir / SYNTHESE_FILENAME)
+    results_path = args.results or (source_dir / SUMMARY_FILENAME)
     baseline_path = args.baseline or default_baseline_path(source_dir)
 
     if args.freeze:
@@ -253,21 +253,21 @@ def main():
     baseline = load_json(baseline_path, "baseline")
     if baseline is None:
         print()
-        print("Aucune baseline. La figer d'abord, AVANT toute modification du code :")
+        print("No baseline. Freeze it first, BEFORE any code change:")
         print(f"    python3 {Path(__file__).name} {source_dir} --freeze")
         return 1
 
-    results = load_json(results_path, "fichier de résultats")
+    results = load_json(results_path, "results file")
     if results is None:
         print()
-        print("Générer la sortie d'abord :")
+        print("Generate the output first:")
         print(f"    python3 run_efootprint.py {source_dir}")
         return 1
 
     print("-" * 68)
-    print(f"  CONTRAT e-footprint — {source_dir.name}")
-    print(f"  baseline : {baseline_path}")
-    print(f"  sortie   : {results_path}")
+    print(f"  e-footprint CONTRACT — {source_dir.name}")
+    print(f"  baseline: {baseline_path}")
+    print(f"  output  : {results_path}")
     print("-" * 68)
     print()
 
@@ -278,12 +278,12 @@ def main():
         print()
 
     if errors:
-        print(f"[ÉCHEC] {errors} problème(s). Le contrat n'est pas tenu.")
+        print(f"[FAIL] {errors} problem(s). The contract does not hold.")
         return 1
 
-    print("[SUCCÈS] Contrat tenu.")
-    print("Rappel : les clés sont présentes et typées. Cela ne prouve PAS que les")
-    print("valeurs sont justes (sauf pour le total, si --total a été fourni).")
+    print("[SUCCESS] Contract holds.")
+    print("Reminder: the keys are present and typed. This does NOT prove that the")
+    print("values are correct (except for the total, if --total was provided).")
     return 0
 
 

@@ -1,37 +1,36 @@
 #!/usr/bin/env python3
-"""Inventaire des tiers DÉCLARÉS dans l'en-tête `Content-Security-Policy`.
+"""Inventory of third parties DECLARED in the `Content-Security-Policy` header.
 
-Pourquoi ce module : le CSP est la liste, écrite par l'équipe du site, de tous
-les domaines depuis lesquels le navigateur est autorisé à charger quelque
-chose. C'est donc un inventaire d'intention, structurellement **plus large**
-que le HAR, qui ne capte que ce qui a réellement été sollicité pendant le
-parcours enregistré.
+Why this module: the CSP is the list, written by the site's team, of all the
+domains from which the browser is allowed to load something. It is therefore
+an inventory of intent, structurally **wider** than the HAR, which only
+captures what was actually requested during the recorded journey.
 
-L'écart entre les deux est une information en soi. Cas vérifié sur octo.com
-(2026-09-03) : le CSP déclare toute la suite HubSpot et le pixel LinkedIn,
-mais le HAR de la capture n'en contient **aucune** trace (seuls
-`api.analytics.octo.tools`, `swetrix.org`, jsDelivr et Google Fonts).
-L'explication la plus probable est que la capture a été faite sans accepter
-le consentement (le site utilise Orejime), donc les traceurs marketing n'ont
-jamais démarré — exactement l'angle mort documenté dans la consigne de
-capture du projet. Le CSP permet de le voir malgré tout.
+The gap between the two is information in itself. Case verified on octo.com
+(2026-09-03): the CSP declares the whole HubSpot suite and the LinkedIn pixel,
+but the capture HAR contains **no** trace of them (only
+`api.analytics.octo.tools`, `swetrix.org`, jsDelivr and Google Fonts).
+The most likely explanation is that the capture was made without accepting
+consent (the site uses Orejime), so the marketing trackers never started —
+exactly the blind spot documented in the project's capture instructions. The
+CSP makes it visible anyway.
 
-Coût : **aucun appel réseau**. La valeur du CSP est déjà stockée dans
-`security-headers-analysis.json` (`pages[].detail[]` où
-`header == "content-security-policy"`), produit par `analyze_security_headers.py`
-depuis les en-têtes du `.har`.
+Cost: **no network call**. The CSP value is already stored in
+`security-headers-analysis.json` (`pages[].detail[]` where
+`header == "content-security-policy"`), produced by `analyze_security_headers.py`
+from the `.har` headers.
 
-Limite structurelle à ne jamais oublier : un domaine autorisé par le CSP
-**n'est pas** un domaine utilisé. Une autorisation peut être un reliquat, une
-préparation, ou concerner une autre partie du site que celle auditée. Ce
-module ne produit donc jamais de verdict : il produit un inventaire classé,
-que les règles EOF croisent avec ce qui est réellement chargé.
+Structural limit never to forget: a domain allowed by the CSP is **not** a
+domain used. An authorization can be a leftover, a preparation, or concern
+another part of the site than the one audited. This module therefore never
+produces a verdict: it produces a classified inventory, which the EOF rules
+cross-reference with what is actually loaded.
 
-Usage comme module :
+Usage as a module:
     from csp_inventory import inventory_from_headers_analysis
     inv = inventory_from_headers_analysis(headers_analysis_dict)
 
-Usage en ligne de commande (inspection) :
+Command-line usage (inspection):
     python3 csp_inventory.py <source_dir>
 """
 
@@ -41,7 +40,7 @@ import re
 import sys
 from pathlib import Path
 
-# Mots-clés CSP qui ne sont pas des domaines (à écarter de l'inventaire).
+# CSP keywords that are not domains (to exclude from the inventory).
 _CSP_KEYWORDS = {
     "'self'", "'none'", "'unsafe-inline'", "'unsafe-eval'", "'strict-dynamic'",
     "'unsafe-hashes'", "'report-sample'", "'wasm-unsafe-eval'",
@@ -49,8 +48,8 @@ _CSP_KEYWORDS = {
     "*",
 }
 
-# Directives qui déclarent un chargement de ressource. `report-uri`,
-# `report-to`, `upgrade-insecure-requests`, `sandbox`... n'en déclarent pas.
+# Directives that declare a resource load. `report-uri`,
+# `report-to`, `upgrade-insecure-requests`, `sandbox`... do not.
 _RESOURCE_DIRECTIVES = {
     "default-src", "script-src", "script-src-elem", "script-src-attr",
     "style-src", "style-src-elem", "style-src-attr", "img-src", "font-src",
@@ -58,14 +57,14 @@ _RESOURCE_DIRECTIVES = {
     "object-src", "manifest-src", "prefetch-src", "form-action",
 }
 
-# Familles de tiers. Ordre significatif : le premier motif qui matche gagne,
-# donc les familles les plus spécifiques doivent précéder les plus génériques
-# (ex. `hs-analytics` avant un éventuel motif large sur "analytics").
+# Third-party families. Order matters: the first matching pattern wins,
+# so the most specific families must come before the more generic ones
+# (e.g. `hs-analytics` before any broad pattern on "analytics").
 #
-# Le découpage sépare volontairement l'analytics SOBRE (sans cookie, sans
-# profilage publicitaire, souvent auto-hébergeable) du reste : c'est
-# exactement la distinction que le critère EOF 1.12 suppose, et qu'un simple
-# "une techno Analytics est détectée" ne fait pas.
+# The split deliberately separates sober analytics (no cookie, no advertising
+# profile, often self-hostable) from the rest: that is exactly the distinction
+# EOF criterion 1.12 assumes, and a plain "an Analytics tech is detected"
+# does not make.
 _FAMILIES = [
     ("analytics_sobre", [
         r"\bswetrix\b", r"\bplausible\b", r"\bmatomo\b", r"\bpiwik\b",
@@ -87,7 +86,7 @@ _FAMILIES = [
         r"\bbat\.bing\b", r"clarity\.ms", r"\bads-twitter\b", r"\bt\.co\b",
         r"\badnxs\b", r"rubiconproject", r"pubmatic", r"\badform\b",
     ]),
-    ("analytics_comportemental", [
+    ("behavioral_analytics", [
         r"google-analytics", r"googletagmanager", r"analytics\.google",
         r"\bomniture\b", r"\bdemdex\b", r"\b2o7\.net\b", r"adobedtm",
         r"\bsegment\.(io|com)\b", r"\bmixpanel\b", r"\bamplitude\b",
@@ -132,16 +131,16 @@ _FAMILIES = [
     ]),
 ]
 
-# Familles considérées comme du pistage non essentiel au fonctionnement du
-# service, au sens du critère EOF 1.12. L'analytics sobre en est volontairement
-# exclu : c'est la mesure d'audience minimale, pas du pistage.
+# Families considered non-essential tracking for the service, in the sense of
+# EOF criterion 1.12. Sober analytics is deliberately excluded: it is the
+# minimal audience measurement, not tracking.
 TRACKING_FAMILIES = (
-    "marketing_crm", "pixels_publicitaires_sociaux", "analytics_comportemental",
+    "marketing_crm", "pixels_publicitaires_sociaux", "behavioral_analytics",
 )
 
 
 def parse_csp(csp_value):
-    """Découpe un CSP en {directive: [sources]}. Tolérant aux CSP mal formés."""
+    """Splits a CSP into {directive: [sources]}. Tolerant of malformed CSPs."""
     directives = {}
     if not csp_value:
         return directives
@@ -153,28 +152,28 @@ def parse_csp(csp_value):
     return directives
 
 
-def _normalise_host(source):
+def _normalize_host(source):
     """'*.hs-scripts.com' -> 'hs-scripts.com' ; 'https://a.b/c' -> 'a.b'.
 
-    Retourne None si la source n'est pas un domaine (mot-clé CSP, schéma nu,
-    hash/nonce inline).
+    Returns None if the source is not a domain (CSP keyword, bare scheme,
+    inline hash/nonce).
     """
     s = source.strip()
     if not s or s.lower() in _CSP_KEYWORDS:
         return None
-    if s.startswith("'"):  # 'nonce-...', 'sha256-...', autres mots-clés quotés
+    if s.startswith("'"):  # 'nonce-...', 'sha256-...', other quoted keywords
         return None
     s = re.sub(r"^[a-z][a-z0-9+.-]*://", "", s, flags=re.IGNORECASE)
     s = s.split("/")[0]
     s = s.lstrip("*.")
-    s = s.split(":")[0]  # retire un éventuel port
+    s = s.split(":")[0]  # strip any port
     if not s or "." not in s:
         return None
     return s.lower()
 
 
 def classify_host(host):
-    """Retourne la famille d'un domaine, ou 'non_classe' si aucun motif ne matche."""
+    """Returns the family of a domain, or 'non_classe' if no pattern matches."""
     for family, patterns in _FAMILIES:
         for pattern in patterns:
             if re.search(pattern, host, re.IGNORECASE):
@@ -183,19 +182,19 @@ def classify_host(host):
 
 
 def extract_csp_value(headers_analysis):
-    """Récupère la valeur du CSP depuis security-headers-analysis.json.
+    """Retrieves the CSP value from security-headers-analysis.json.
 
-    Prend le CSP de la première page qui en déclare un. Si plusieurs pages ont
-    des CSP différents, l'union serait trompeuse (on ne saurait plus quelle
-    page autorise quoi) : on préfère la valeur d'une page réelle, et on signale
-    le nombre de pages concernées.
+    Takes the CSP of the first page that declares one. If several pages have
+    different CSPs, the union would be misleading (we could no longer tell
+    which page allows what): we prefer the value from one real page, and we
+    report the number of pages concerned.
     """
     pages = (headers_analysis or {}).get("pages") or []
     values = []
     for page in pages:
         for item in page.get("detail") or []:
-            if item.get("header") == "content-security-policy" and item.get("valeur"):
-                values.append((page.get("url"), item["valeur"]))
+            if item.get("header") == "content-security-policy" and item.get("value"):
+                values.append((page.get("url"), item["value"]))
                 break
     if not values:
         return None, 0, None
@@ -204,7 +203,7 @@ def extract_csp_value(headers_analysis):
 
 
 def inventory_from_headers_analysis(headers_analysis):
-    """Inventaire classé des tiers déclarés. None si aucun CSP disponible."""
+    """Classified inventory of declared third parties. None if no CSP available."""
     csp_value, pages_with_csp, source_url = extract_csp_value(headers_analysis)
     if not csp_value:
         return None
@@ -217,7 +216,7 @@ def inventory_from_headers_analysis(headers_analysis):
             continue
         hosts = set()
         for source in sources:
-            host = _normalise_host(source)
+            host = _normalize_host(source)
             if host:
                 hosts.add(host)
         if hosts:
@@ -229,25 +228,25 @@ def inventory_from_headers_analysis(headers_analysis):
         families.setdefault(classify_host(host), []).append(host)
 
     return {
-        "source": "security-headers-analysis.json (en-tête Content-Security-Policy)",
+        "source": "security-headers-analysis.json (Content-Security-Policy header)",
         "page_source": source_url,
-        "pages_avec_csp": pages_with_csp,
+        "pages_with_csp": pages_with_csp,
         "hosts_declares": sorted(all_hosts),
-        "familles": families,
+        "families": families,
         "par_directive": hosts_by_directive,
         "note": (
-            "Inventaire DÉCLARÉ, pas observé : un domaine autorisé par le CSP "
-            "n'est pas nécessairement sollicité. À croiser avec le HAR pour "
-            "distinguer 'prévu' de 'réellement chargé'."
+            "DECLARED inventory, not observed: a domain allowed by the CSP "
+            "is not necessarily requested. Cross-reference with the HAR to "
+            "distinguish 'planned' from 'actually loaded'."
         ),
     }
 
 
 def loaded_hosts_from_har_analysis(har_analysis):
-    """Domaines réellement sollicités, d'après har-analysis.json.
+    """Domains actually requested, according to har-analysis.json.
 
-    Retourne None (et non un ensemble vide) si l'information est absente :
-    un ensemble vide signifierait à tort "aucun tiers chargé".
+    Returns None (and not an empty set) if the information is missing:
+    an empty set would wrongly mean "no third party loaded".
     """
     domains = (har_analysis or {}).get("domains") or {}
     first = domains.get("first_party") or []
@@ -258,23 +257,23 @@ def loaded_hosts_from_har_analysis(har_analysis):
 
 
 def _host_matches(host, loaded):
-    """Un domaine CSP est considéré chargé si lui-même ou un sous-domaine l'est."""
+    """A CSP domain is considered loaded if itself or a subdomain of it is."""
     return any(h == host or h.endswith("." + host) for h in loaded)
 
 
 def tracking_summary(inventory, har_analysis):
-    """Croise l'inventaire déclaré et les domaines réellement chargés.
+    """Cross-references the declared inventory and the domains actually loaded.
 
-    Retourne un dict décrivant les traceurs par famille, en distinguant
-    déclarés-et-chargés / déclarés-seulement. Ne rend aucun verdict.
+    Returns a dict describing trackers by family, distinguishing
+    declared-and-loaded / declared-only. Renders no verdict.
     """
     if not inventory:
         return None
     loaded = loaded_hosts_from_har_analysis(har_analysis)
-    familles = inventory["familles"]
+    families = inventory["families"]
 
     tracking_declared, sober_declared = [], []
-    for family, hosts in familles.items():
+    for family, hosts in families.items():
         if family in TRACKING_FAMILIES:
             tracking_declared.extend(hosts)
         elif family == "analytics_sobre":
@@ -283,20 +282,20 @@ def tracking_summary(inventory, har_analysis):
     def split(hosts):
         if loaded is None:
             return sorted(hosts), []
-        charges = sorted(h for h in hosts if _host_matches(h, loaded))
-        declares_seulement = sorted(h for h in hosts if not _host_matches(h, loaded))
-        return charges, declares_seulement
+        loaded_hosts = sorted(h for h in hosts if _host_matches(h, loaded))
+        declared_only = sorted(h for h in hosts if not _host_matches(h, loaded))
+        return loaded_hosts, declared_only
 
     tracking_loaded, tracking_only_declared = split(tracking_declared)
     sober_loaded, sober_only_declared = split(sober_declared)
 
     return {
         "loaded_connu": loaded is not None,
-        "pistage_charge": tracking_loaded,
-        "pistage_declare_non_charge": tracking_only_declared,
+        "load_tracking": tracking_loaded,
+        "declared_not_loaded": tracking_only_declared,
         "analytics_sobre_charge": sober_loaded,
-        "analytics_sobre_declare_non_charge": sober_only_declared,
-        "familles_pistage_retenues": list(TRACKING_FAMILIES),
+        "sober_analytics_declared_not_loaded": sober_only_declared,
+        "retained_tracking_families": list(TRACKING_FAMILIES),
     }
 
 
@@ -308,14 +307,14 @@ def main():
 
     headers_path = source_dir / "security-headers-analysis.json"
     if not headers_path.exists():
-        print(f"Erreur : {headers_path} absent. Lancer analyze_security_headers.py d'abord.")
+        print(f"Error: {headers_path} absent. Run analyze_security_headers.py first.")
         sys.exit(1)
     headers_analysis = json.loads(headers_path.read_text(encoding="utf-8"))
 
     inv = inventory_from_headers_analysis(headers_analysis)
     if inv is None:
-        print("Aucun en-tête Content-Security-Policy dans les pages analysées : "
-              "aucun inventaire de tiers déclarés possible.")
+        print("No Content-Security-Policy header in the analyzed pages: "
+              "no declared third-party inventory possible.")
         sys.exit(0)
 
     har_analysis = None
@@ -324,20 +323,20 @@ def main():
             har_analysis = json.loads(candidate.read_text(encoding="utf-8"))
             break
 
-    print(f"CSP lu sur : {inv['page_source']} ({inv['pages_avec_csp']} page(s) avec CSP)")
-    print(f"{len(inv['hosts_declares'])} domaine(s) déclaré(s), par famille :")
-    for family, hosts in sorted(inv["familles"].items()):
+    print(f"CSP read on: {inv['page_source']} ({inv['pages_with_csp']} page(s) with CSP)")
+    print(f"{len(inv['hosts_declares'])} declared domain(s), by family:")
+    for family, hosts in sorted(inv["families"].items()):
         print(f"  - {family} ({len(hosts)}) : {', '.join(hosts)}")
 
     summary = tracking_summary(inv, har_analysis)
     if summary:
-        print("\nCroisement avec les domaines réellement chargés (har-analysis.json) :")
+        print("\nCross-reference with the domains actually loaded (har-analysis.json):")
         if not summary["loaded_connu"]:
-            print("  har-analysis.json indisponible : impossible de distinguer déclaré/chargé.")
+            print("  har-analysis.json unavailable: cannot distinguish declared/loaded.")
         else:
-            print(f"  pistage effectivement chargé      : {summary['pistage_charge'] or 'aucun'}")
-            print(f"  pistage déclaré mais NON chargé    : {summary['pistage_declare_non_charge'] or 'aucun'}")
-            print(f"  analytics sobre chargé             : {summary['analytics_sobre_charge'] or 'aucun'}")
+            print(f"  tracking actually loaded      : {summary['load_tracking'] or 'none'}")
+            print(f"  tracking declared but NOT loaded: {summary['declared_not_loaded'] or 'none'}")
+            print(f"  sober analytics loaded          : {summary['analytics_sobre_charge'] or 'none'}")
 
 
 if __name__ == "__main__":

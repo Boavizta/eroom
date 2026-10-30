@@ -1,40 +1,41 @@
 #!/usr/bin/env python3
 """
-Simulation de l'effet cumulatif de recommandations retenues sur un `SiteSpec`.
+Simulation of the cumulative effect of retained recommendations on a
+`SiteSpec`.
 
-CE QUE CE MODULE FAIT, ET NE FAIT PAS
+WHAT THIS MODULE DOES, AND DOES NOT DO
 --------------------------------------
-Il calcule, pour chaque recommandation retenue (JS mort, CSS mort, ressources
-en double, Brotli non activé), combien d'octets `data_transferred` seraient
-retranchés d'un `JobSpec` si elle était appliquée - puis il applique ce cumul,
-palier par palier, pour produire une NOUVELLE `SiteSpec`. Il ne recalcule PAS
-le `System` e-footprint qui en résulte (pas de kg CO2e ici) : c'est le rôle du
-code appelant, via `build_system()` sur la `SiteSpec` transformée.
+It computes, for each retained recommendation (dead JS, dead CSS, duplicate
+resources, Brotli not enabled), how many `data_transferred` bytes would be
+removed from a `JobSpec` if it were applied - then it applies this cumulative
+sum, tier by tier, to produce a NEW `SiteSpec`. It does NOT recalculate the
+resulting e-footprint `System` (no kg CO2e here): that is the calling code's
+job, via `build_system()` on the transformed `SiteSpec`.
 
-ZÉRO import e-footprint ici, comme `from_har.py` et `compose.py` : ce module
-ne construit que des dataclasses de `spec.py`. `archetypes/dynamique_bdd.py`
-suit la même règle (`from ..spec import ...` sans jamais toucher la
-bibliothèque e-footprint elle-même) ; ce module l'importe en `from .spec`
-puisqu'il vit au même niveau que `spec.py`, pas dans un sous-dossier.
+ZERO e-footprint import here, like `from_har.py` and `compose.py`: this module
+only builds `spec.py` dataclasses. `archetypes/dynamic_db.py` follows the same
+rule (`from ..spec import ...` without ever touching the e-footprint library
+itself); this module imports it as `from .spec` since it lives at the same
+level as `spec.py`, not in a subfolder.
 
-POURQUOI UN `Reduction` INTERMÉDIAIRE
---------------------------------------
-Chaque fonction de calcul (`dead_code_reductions`, `duplicate_reductions`,
-`brotli_reductions`) produit une liste de `Reduction` plutôt que de modifier
-directement le `SiteSpec`. Deux raisons : `apply_recommendations()` doit
-pouvoir cumuler PLUSIEURS recommandations sur le même traitement avant de
-retrancher une seule fois son `data_transferred` (retrancher recommandation
-par recommandation ferait dépendre le résultat de l'ordre d'application) ; et
-le code appelant a besoin de la liste à plat pour exposer chaque `Traced` en
-annexe du rapport, recommandation par recommandation.
+WHY AN INTERMEDIATE `Reduction`
+--------------------------------
+Each calculation function (`dead_code_reductions`, `duplicate_reductions`,
+`brotli_reductions`) produces a list of `Reduction` rather than modifying the
+`SiteSpec` directly. Two reasons: `apply_recommendations()` must be able to
+cumulate SEVERAL recommendations on the same job before removing its
+`data_transferred` once (removing recommendation by recommendation would make
+the result depend on the application order); and the calling code needs the
+flat list to expose each `Traced` in a report appendix, recommendation by
+recommendation.
 
-TOUT CE QUI EST CALCULÉ ICI EST "ESTIMÉ", JAMAIS "MESURÉ"
------------------------------------------------------------
-Une réduction d'octets est toujours une INFÉRENCE à partir d'une donnée
-collectée (un pourcentage de code mort mesuré par Coverage, une occurrence de
-requête comptée dans le HAR, une recompression Brotli réelle mais partielle) :
-jamais une pure hypothèse externe. D'où l'usage exclusif de `estimated()`
-(cf. `spec.py`), jamais `assumed()`, dans ce module.
+EVERYTHING COMPUTED HERE IS "ESTIMATED", NEVER "MEASURED"
+---------------------------------------------------------
+A byte reduction is always an INFERENCE from a collected datum (a dead-code
+percentage measured by Coverage, a request occurrence counted in the HAR, a
+real but partial Brotli recompression): never a pure external hypothesis.
+Hence the exclusive use of `estimated()` (cf. `spec.py`), never `assumed()`,
+in this module.
 """
 
 import base64
@@ -44,15 +45,15 @@ from typing import Dict, List, Optional
 
 from .spec import JobSpec, SiteSpec, Traced, estimated
 
-# Préfixe littéral posé par `from_har.py::spec_from_env_data()` sur le label
-# de chaque Job "page" (ligne 629 : `label=f"Chargement {url}"`). Les Job
-# d'appel IA générative (`_ai_job_specs_for_step()`) portent un autre label
-# ("Appel IA (...)") et ne sont donc jamais retenus par `_job_url()` : aucune
-# des recommandations de ce module ne les concerne, ils ne portent pas de
-# poids de page HTML/JS/CSS.
-_CHARGEMENT_PREFIX = "Chargement "
+# Literal prefix set by `from_har.py::spec_from_env_data()` on the label of
+# each "page" Job (`label=f"Loading {url}"`). Generative AI call
+# Jobs (`_ai_job_specs_for_step()`) carry another label
+# ("AI call (...)") and are therefore never picked up by `_job_url()`: none
+# of this module's recommendations concern them, they carry no HTML/JS/CSS
+# page weight.
+_LOADING_PREFIX = "Loading "
 
-# Les trois paliers cumulatifs acceptés par `apply_recommendations()`.
+# The three cumulative tiers accepted by `apply_recommendations()`.
 _TIER_SETS = {
     "prio1": frozenset({"prio1"}),
     "prio1_2": frozenset({"prio1", "prio2"}),
@@ -62,13 +63,14 @@ _TIER_SETS = {
 
 @dataclass
 class Reduction:
-    """Une réduction d'octets calculée pour UN Job, par UNE recommandation.
+    """A byte reduction computed for ONE Job, by ONE recommendation.
 
-    `traced` porte la provenance complète (valeur, source, confiance,
-    commentaire des limites) : c'est ce que l'appelant exposera en annexe.
-    Pas de champ dédupliqué ici : plusieurs `Reduction` peuvent viser le même
-    `job_key` (une recommandation JS mort et une recommandation doublons sur
-    le même Job, par exemple) ; le cumul est le travail d'`apply_recommendations()`.
+    `traced` carries the full provenance (value, source, confidence, comment
+    of the limits): this is what the caller will expose in an appendix. No
+    deduplicated field here: several `Reduction`s can target the same
+    `job_key` (a dead-JS recommendation and a duplicates recommendation on
+    the same Job, for example); the cumulation is `apply_recommendations()`'s
+    work.
     """
 
     job_key: str
@@ -82,22 +84,22 @@ class Reduction:
 
 
 # ---------------------------------------------------------------------------
-# Aides partagées : décodage du label de Job, octets réseau réels d'une entry
+# Shared helpers: Job label decoding, real network bytes of an entry
 # ---------------------------------------------------------------------------
 
 def _job_url(job: JobSpec) -> Optional[str]:
-    """URL de page portée par ce Job, ou None si ce n'est pas un Job "page"
-    (ex. un Job d'appel IA générative, cf. `_CHARGEMENT_PREFIX`)."""
-    if not job.label.startswith(_CHARGEMENT_PREFIX):
+    """Page URL carried by this Job, or None if it is not a "page" Job
+    (e.g. a generative AI call Job, cf. `_LOADING_PREFIX`)."""
+    if not job.label.startswith(_LOADING_PREFIX):
         return None
-    return job.label[len(_CHARGEMENT_PREFIX):]
+    return job.label[len(_LOADING_PREFIX):]
 
 
 def _url_to_job_key(site_spec: SiteSpec) -> Dict[str, str]:
-    """Index URL de page -> clé du Job qui la porte, à partir des labels déjà
-    posés par `spec_from_env_data()`. Ne dépend d'aucun recalcul de
-    `job_key = f"job_{step_index}"` : on part du `SiteSpec` déjà construit,
-    comme demandé (l'index par step_index n'est pas reproduit ici)."""
+    """Index page URL -> key of the Job carrying it, from the labels already
+    set by `spec_from_env_data()`. Does not depend on any recalculation of
+    `job_key = f"job_{step_index}"`: we start from the already-built
+    `SiteSpec`, as requested (the step_index index is not reproduced here)."""
     mapping: Dict[str, str] = {}
     for job in site_spec.jobs:
         url = _job_url(job)
@@ -107,24 +109,24 @@ def _url_to_job_key(site_spec: SiteSpec) -> Dict[str, str]:
 
 
 def _job_key_to_url(site_spec: SiteSpec) -> Dict[str, str]:
-    """Inverse de `_url_to_job_key` : clé du Job -> URL de page qu'il porte.
+    """Inverse of `_url_to_job_key`: Job key -> page URL it carries.
 
-    Injectif par construction (`_job_url()` ne retient qu'un Job "page" par
-    URL) : utile pour reconstituer `page_url` sur une `Reduction` construite à
-    partir d'un `job_key` (doublons, Brotli) plutôt que d'une URL directe.
+    Injective by construction (`_job_url()` keeps only one "page" Job per
+    URL): useful to rebuild `page_url` on a `Reduction` built from a
+    `job_key` (duplicates, Brotli) rather than from a direct URL.
     """
     return {job_key: url for url, job_key in _url_to_job_key(site_spec).items()}
 
 
 def _entry_transfer_bytes(entry: dict) -> float:
-    """Octets réseau RÉELS (compressés) d'une entrée HAR.
+    """REAL network bytes (compressed) of a HAR entry.
 
-    Copie volontaire de `collect_env_data.py::_entry_transfer_bytes()`
-    (et de son équivalent `from_har.py::_entry_bytes()`) : reproduire ces
-    quelques lignes évite une dépendance circulaire vers `collect_env_data.py`
-    (qui, lui, importe des choses de plus haut niveau dans le pipeline).
-    Même chaîne de repli : _transferSize (mesure directe), puis
-    bodySize+headersSize, puis content.size (décompressé, dernier recours).
+    Deliberate copy of `collect_env_data.py::_entry_transfer_bytes()`
+    (and of its equivalent `from_har.py::_entry_bytes()`): reproducing these
+    few lines avoids a circular dependency towards `collect_env_data.py`
+    (which itself imports higher-level things in the pipeline).
+    Same fallback chain: _transferSize (direct measurement), then
+    bodySize+headersSize, then content.size (decompressed, last resort).
     """
     resp = entry.get("response", {})
     transfer_size = resp.get("_transferSize")
@@ -138,8 +140,8 @@ def _entry_transfer_bytes(entry: dict) -> float:
 
 
 def _pageref_to_url(har: dict) -> Dict[str, str]:
-    """Index pageref (id de page HAR) -> URL de page (titre HAR), pour
-    résoudre à quelle page appartient une entry (via `entry["pageref"]`)."""
+    """Index pageref (HAR page id) -> page URL (HAR title), to resolve which
+    page an entry belongs to (via `entry["pageref"]`)."""
     return {
         page["id"]: page.get("title", "")
         for page in har.get("log", {}).get("pages", [])
@@ -153,28 +155,29 @@ def _load_har(har_path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 1. Code mort JS / CSS
+# 1. Dead JS / CSS code
 # ---------------------------------------------------------------------------
 
 _DEAD_CODE_COMMENT = (
-    "Approximation : le pourcentage de code mort est mesuré sur le poids "
-    "DÉCOMPRESSÉ (Coverage), appliqué tel quel au poids TRANSFÉRÉ/compressé de "
-    "la page - ratio supposé comparable, non mesuré directement sur le réseau."
+    "Approximation: the dead-code percentage is measured on the "
+    "DECOMPRESSED weight (Coverage), applied as-is to the TRANSFERRED/compressed "
+    "weight of the page - ratio assumed comparable, not directly measured on "
+    "the network."
 )
 
 
 def _best_env_page_by_url(env_data: dict) -> Dict[str, dict]:
-    """Page `env_data["pages"]` la plus lourde en octets transférés, par URL.
+    """The `env_data["pages"]` page heaviest in transferred bytes, per URL.
 
-    `env_data["pages"]` (collect_env_data.py::extract_har_data()) contient UNE
-    entrée par page HAR (par pageref), PAS dédupliquée par URL : plusieurs
-    rechargements de la même URL y figurent. `spec_from_env_data()` retient
-    pour chaque URL la répétition la PLUS LOURDE en octets transférés comme
-    page canonique (celle qui porte le `data_transferred` du Job). Reproduire
-    ce même choix ici est nécessaire : sans lui, on peut apparier un Job à un
-    rechargement quasi vide (ex. une répétition à 0 octet) plutôt qu'à la
-    capture réellement comptée, et fabriquer un breakdown JS/CSS incohérent
-    avec le poids du Job.
+    `env_data["pages"]` (collect_env_data.py::extract_har_data()) contains ONE
+    entry per HAR page (per pageref), NOT deduplicated by URL: several
+    reloads of the same URL appear there. `spec_from_env_data()` retains for
+    each URL the heaviest repetition in transferred bytes as the canonical
+    page (the one carrying the Job's `data_transferred`). Reproducing this
+    same choice here is necessary: without it, a Job could be matched to an
+    almost-empty reload (e.g. a 0-byte repetition) instead of the actually
+    counted capture, and produce a JS/CSS breakdown incoherent with the Job's
+    weight.
     """
     best: Dict[str, dict] = {}
     for page in env_data.get("pages") or []:
@@ -187,17 +190,18 @@ def _best_env_page_by_url(env_data: dict) -> Dict[str, dict]:
 
 
 def _page_weight_by_type_transfer_bytes(page: dict) -> dict:
-    """Octets transférés par type de ressource pour une page `env_data`.
+    """Transferred bytes by resource type for an `env_data` page.
 
-    Champ attendu au premier niveau : `weight_by_type_transfer_bytes`. Dans
-    `env_data["pages"]` tel qu'écrit aujourd'hui par
-    `collect_env_data.py::extract_har_data()`, ce détail vit en réalité sous
-    `page["breakdown"]["by_type_transfer_bytes"]` (le nom
-    `weight_by_type_transfer_bytes` n'apparaît, lui, que dans l'agrégat
-    `env_data["job"]["efootprint"]`, pour la seule page la plus lourde du
-    site). On essaie donc le nom au premier niveau, avec repli sur
-    `breakdown.by_type_transfer_bytes` - ce qui couvre le schéma actuel sans
-    rien changer si un futur format expose directement le premier nom.
+    Expected field at the top level: `weight_by_type_transfer_bytes`. In
+    `env_data["pages"]` as currently written by
+    `collect_env_data.py::extract_har_data()`, this detail actually lives
+    under `page["breakdown"]["by_type_transfer_bytes"]` (the name
+    `weight_by_type_transfer_bytes` only appears, itself, in the aggregate
+    `env_data["job"]["efootprint"]`, for the single heaviest page of the
+    site). So we try the top-level name first, with a fallback to
+    `breakdown.by_type_transfer_bytes` - which covers the current schema
+    without changing anything if a future format exposes the first name
+    directly.
     """
     direct = page.get("weight_by_type_transfer_bytes")
     if direct is not None:
@@ -206,13 +210,13 @@ def _page_weight_by_type_transfer_bytes(page: dict) -> dict:
 
 
 def _page_weight_by_type_bytes(page: dict) -> dict:
-    """Octets DÉCOMPRESSÉS par type de ressource pour une page `env_data`.
+    """DECOMPRESSED bytes by resource type for an `env_data` page.
 
-    Même repli que `_page_weight_by_type_transfer_bytes` : direct au premier
-    niveau (`weight_by_type_bytes`), sinon `breakdown.by_type_bytes`
-    (`collect_env_data.py::_page_breakdown()`, lignes 601/622). Contrairement
-    au poids transféré, ce calcul est DIRECT (pas de transposition) : Coverage
-    mesure déjà le code mort sur le poids décompressé.
+    Same fallback as `_page_weight_by_type_transfer_bytes`: top level
+    (`weight_by_type_bytes`), otherwise `breakdown.by_type_bytes`
+    (`collect_env_data.py::_page_breakdown()`, lines 601/622). Unlike the
+    transferred weight, this calculation is DIRECT (no transposition):
+    Coverage already measures dead code on the decompressed weight.
     """
     direct = page.get("weight_by_type_bytes")
     if direct is not None:
@@ -221,23 +225,23 @@ def _page_weight_by_type_bytes(page: dict) -> dict:
 
 
 def _entry_decompressed_bytes(entry: dict) -> float:
-    """Octets DÉCOMPRESSÉS d'une entrée HAR (`content.size`, jamais transposé)."""
+    """DECOMPRESSED bytes of a HAR entry (`content.size`, never transposed)."""
     return entry.get("response", {}).get("content", {}).get("size", 0) or 0
 
 
 def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                           coverage_pages: List[dict]) -> List[Reduction]:
-    """Réduction de `data_transferred` liée au JS et au CSS mort, par page.
+    """`data_transferred` reduction linked to dead JS and CSS, per page.
 
-    Seuils repris tels quels de `generate_report_html.py::_section_recommandations()` :
-      - JS mort  : > 70 % -> palier "prio1" ; entre 50 % (exclu) et 70 % (inclus)
-        -> "prio2" ; <= 50 % -> aucune réduction.
-      - CSS mort : > 80 % -> palier "prio2" (jamais de palier prio1 pour le CSS,
-        c'est la règle exacte du rapport) ; <= 80 % -> aucune réduction.
+    Thresholds taken as-is from `generate_report_html.py::_section_recommandations()`:
+      - dead JS  : > 70 % -> tier "prio1" ; between 50 % (excluded) and
+        70 % (included) -> "prio2" ; <= 50 % -> no reduction.
+      - dead CSS : > 80 % -> tier "prio2" (never a prio1 tier for CSS, that
+        is the report's exact rule) ; <= 80 % -> no reduction.
 
-    Un Job sans page `env_data` correspondante ou sans page `coverage_pages`
-    correspondante (même URL exacte) est silencieusement ignoré : pas toutes
-    les pages capturées ont forcément une mesure Coverage.
+    A Job without a matching `env_data` page or without a matching
+    `coverage_pages` page (same exact URL) is silently skipped: not all
+    captured pages necessarily have a Coverage measurement.
     """
     best_env_page = _best_env_page_by_url(env_data)
     coverage_by_url: Dict[str, dict] = {}
@@ -260,10 +264,10 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
         js_bytes = weight_by_type.get("js", 0) or 0
         css_bytes = weight_by_type.get("css", 0) or 0
 
-        # Poids DÉCOMPRESSÉ : même page canonique `env_page` (choisie sur le
-        # critère transféré par `_best_env_page_by_url()`), lue une seconde
-        # fois sous son angle décompressé - une seule répétition canonique
-        # pour les deux poids, pas une sélection séparée.
+        # DECOMPRESSED weight: same canonical `env_page` (chosen on the
+        # transferred criterion by `_best_env_page_by_url()`), read a second
+        # time under its decompressed angle - a single canonical repetition
+        # for both weights, not a separate selection.
         weight_by_type_decompressed = _page_weight_by_type_bytes(env_page)
         js_bytes_decompressed = weight_by_type_decompressed.get("js", 0) or 0
         css_bytes_decompressed = weight_by_type_decompressed.get("css", 0) or 0
@@ -286,12 +290,12 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                     bytes_removed=removed,
                     traced=estimated(
                         removed, "B",
-                        "code mort JS (Coverage Chrome DevTools)",
+                        "dead JS code (Chrome DevTools Coverage)",
                         comment=_DEAD_CODE_COMMENT,
                     ),
                     page_url=url,
-                    # Calcul DIRECT (pas de transposition) : Coverage mesure
-                    # déjà le code mort sur le poids décompressé.
+                    # DIRECT calculation (no transposition): Coverage already
+                    # measures dead code on the decompressed weight.
                     bytes_removed_decompressed=js_bytes_decompressed * (js_pct / 100.0),
                 ))
 
@@ -305,7 +309,7 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
                     bytes_removed=removed,
                     traced=estimated(
                         removed, "B",
-                        "code mort CSS (Coverage Chrome DevTools)",
+                        "dead CSS code (Chrome DevTools Coverage)",
                         comment=_DEAD_CODE_COMMENT,
                     ),
                     page_url=url,
@@ -316,31 +320,31 @@ def dead_code_reductions(site_spec: SiteSpec, env_data: dict,
 
 
 # ---------------------------------------------------------------------------
-# 2. Ressources en double
+# 2. Duplicate resources
 # ---------------------------------------------------------------------------
 
 def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
-    """Réduction de `data_transferred` liée aux ressources chargées en double.
+    """`data_transferred` reduction linked to resources loaded twice.
 
-    Palier "prio2" inconditionnel dès qu'au moins un doublon est trouvé (règle
-    exacte de `_section_recommandations()`). Calcul NOUVEAU : ni
-    `analyze_har.py::compute_duplicate_urls()` (ne donne ni taille ni page) ni
-    aucun autre code existant n'est réutilisé.
+    Tier "prio2" unconditional as soon as at least one duplicate is found
+    (exact rule of `_section_recommandations()`). NEW calculation: neither
+    `analyze_har.py::compute_duplicate_urls()` (gives neither size nor page)
+    nor any other existing code is reused.
 
-    Pour chaque URL de requête HAR, la PREMIÈRE occurrence rencontrée (ordre
-    des entries) est jugée nécessaire. Chaque occurrence SUIVANTE est un
-    doublon, dont les octets transférés sont attribués au Job de la page où
-    elle est survenue - si cette page ne correspond à aucun Job du modèle
-    (page non canonique ou hors périmètre 1st-party), ses octets sont ignorés :
-    ce calcul est volontairement un PLANCHER, pas un total exhaustif.
+    For each HAR request URL, the FIRST occurrence encountered (entry order)
+    is judged necessary. Each SUBSEQUENT occurrence is a duplicate, whose
+    transferred bytes are attributed to the Job of the page where it
+    occurred - if this page matches no Job of the model (non-canonical page
+    or outside the 1st-party scope), its bytes are ignored: this calculation
+    is deliberately a FLOOR, not an exhaustive total.
 
-    `bytes_removed` (octets TRANSFÉRÉS) compte TOUTES les occurrences 2e+,
-    y compris les revalidations HTTP 304 (coût réseau réel, mais minime :
-    seulement les en-têtes). `bytes_removed_decompressed`, lui, EXCLUT les
-    304 : leur corps n'est jamais retransféré ni redécodé (le navigateur
-    réutilise le contenu déjà en cache), donc leur poids décompressé compte
-    déjà dans le poids EcoIndex de la page qu'on retire le doublon ou pas -
-    seul un vrai re-téléchargement complet (200) libère ce poids.
+    `bytes_removed` (TRANSFERRED bytes) counts ALL 2nd+ occurrences, including
+    HTTP 304 revalidations (real network cost, but minimal: headers only).
+    `bytes_removed_decompressed`, on the other hand, EXCLUDES the 304s: their
+    body is never re-transferred nor re-decoded (the browser reuses the
+    cached content), so their decompressed weight already counts in the
+    EcoIndex weight of the page whether the duplicate is removed or not -
+    only a real full re-download (200) frees this weight.
     """
     har = _load_har(har_path)
     log = har.get("log", {})
@@ -365,15 +369,15 @@ def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
             continue
 
         totals[job_key] = totals.get(job_key, 0.0) + _entry_transfer_bytes(entry)
-        # Une revalidation 304 ne redécode jamais le corps de la ressource :
-        # son poids DÉCOMPRESSÉ compte déjà dans le poids EcoIndex de la page
-        # (le navigateur réutilise le contenu déjà en cache) - le retirer ne
-        # l'enlève pas réellement. Seul un vrai re-téléchargement complet
-        # (200) libère ce poids. Les octets TRANSFÉRÉS (déjà minimes pour une
-        # 304) et le compte de requêtes, eux, restent inchangés : la requête
-        # de revalidation elle-même disparaîtrait bien avec un cache plus
-        # long (Cache-Control max-age), et son coût réseau réel est déjà
-        # correctement compté ci-dessus.
+        # A 304 revalidation never re-decodes the resource body: its
+        # DECOMPRESSED weight already counts in the page's EcoIndex weight
+        # (the browser reuses the already-cached content) - removing it does
+        # not really remove it. Only a real full re-download (200) frees this
+        # weight. The TRANSFERRED bytes (already minimal for a 304) and the
+        # request count, though, stay unchanged: the revalidation request
+        # itself would indeed disappear with a longer cache (Cache-Control
+        # max-age), and its real network cost is already correctly counted
+        # above.
         if (entry.get("response", {}) or {}).get("status") != 304:
             decompressed_totals[job_key] = (
                 decompressed_totals.get(job_key, 0.0) + _entry_decompressed_bytes(entry)
@@ -391,53 +395,53 @@ def duplicate_reductions(site_spec: SiteSpec, har_path) -> List[Reduction]:
             bytes_removed=total,
             traced=estimated(
                 total, "B",
-                "calcul doublons HAR (nouveau, pas de code existant réutilisé)",
+                "HAR duplicate calculation (new, no existing code reused)",
                 comment=(
-                    "Octets des occurrences 2e+ d'une même URL dans le HAR, "
-                    "attribués à la page où elles sont survenues ; les occurrences "
-                    "sur une page non retenue comme canonique (repli 1st-party ou "
-                    "dédup HAR) sont ignorées - ce chiffre est un plancher, pas un "
-                    "total exhaustif des doublons."
+                    "Bytes of the 2nd+ occurrences of the same URL in the HAR, "
+                    "attributed to the page where they occurred; occurrences on "
+                    "a page not retained as canonical (1st-party fallback or "
+                    "HAR dedup) are ignored - this figure is a floor, not an "
+                    "exhaustive total of duplicates."
                 ),
             ),
             page_url=job_key_to_url.get(job_key),
             bytes_removed_decompressed=decompressed_totals.get(job_key, 0.0),
-            # Seule des 3 fonctions de réduction où une requête entière
-            # disparaît (JS/CSS mort et Brotli ne suppriment jamais une
-            # requête, seulement la taille d'une requête déjà comptée).
+            # The only one of the 3 reduction functions where a whole request
+            # disappears (dead JS/CSS and Brotli never remove a request, only
+            # the size of an already-counted request).
             requests_removed=counts.get(job_key, 0),
         ))
     return reductions
 
 
 # ---------------------------------------------------------------------------
-# 3. Brotli non activé
+# 3. Brotli not enabled
 # ---------------------------------------------------------------------------
 
 def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
                        quality: int = 11) -> List[Reduction]:
-    """Réduction de `data_transferred` liée à l'absence de compression Brotli.
+    """`data_transferred` reduction linked to the absence of Brotli
+    compression.
 
-    Palier "prio3" inconditionnel (toujours déclenché dans
-    `_section_recommandations()`). C'est une MESURE RÉELLE, mais partielle :
-    seules les entries HAR dont le corps de réponse a été capturé peuvent être
-    recompressées pour de vrai ; le reste est EXTRAPOLÉ à partir du ratio
-    d'économie observé sur l'échantillon mesurable de la même page. Aucune
-    extrapolation n'est produite pour une page sans aucune entry mesurable
-    (pas de ratio par défaut inventé).
+    Tier "prio3" unconditional (always triggered in
+    `_section_recommandations()`). It is a REAL measurement, but partial:
+    only the HAR entries whose response body was captured can really be
+    recompressed; the rest is EXTRAPOLATED from the saving ratio observed on
+    the measurable sample of the same page. No extrapolation is produced for a
+    page without any measurable entry (no invented default ratio).
 
-    `env_data` n'est actuellement pas utilisé par ce calcul : le poids actuel
-    de chaque entry et sa recompressibilité viennent entièrement du HAR
-    (nécessaire pour accéder au corps de réponse capturé, absent d'env-data.json).
-    Le paramètre est conservé pour une signature homogène avec les deux autres
-    fonctions de réduction et un usage futur éventuel.
+    `env_data` is currently not used by this calculation: each entry's
+    current weight and its recompressibility come entirely from the HAR
+    (necessary to access the captured response body, absent from
+    env-data.json). The parameter is kept for a homogeneous signature with the
+    two other reduction functions and a possible future use.
     """
     try:
         import brotli
     except ImportError as exc:
         raise ImportError(
-            "brotli_reductions() nécessite le paquet Python 'brotli' "
-            "(pip install brotli), introuvable dans l'environnement courant."
+            "brotli_reductions() requires the Python package 'brotli' "
+            "(pip install brotli), not found in the current environment."
         ) from exc
 
     har = _load_har(har_path)
@@ -446,9 +450,9 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
     url_to_job = _url_to_job_key(site_spec)
     job_key_to_url = _job_key_to_url(site_spec)
 
-    measured_bytes: Dict[str, float] = {}   # octets actuels, entries mesurées
-    saved_bytes: Dict[str, float] = {}      # octets économisés, entries mesurées
-    unsampled_bytes: Dict[str, float] = {}  # octets actuels, entries hors échantillon
+    measured_bytes: Dict[str, float] = {}   # current bytes, measured entries
+    saved_bytes: Dict[str, float] = {}      # saved bytes, measured entries
+    unsampled_bytes: Dict[str, float] = {}  # current bytes, entries outside the sample
 
     for entry in log.get("entries", []):
         resp = entry.get("response", {}) or {}
@@ -490,31 +494,31 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
         saved_bytes[job_key] = saved_bytes.get(job_key, 0.0) + saved
 
     reductions: List[Reduction] = []
-    for job_key, mesures in measured_bytes.items():
-        if mesures <= 0:
+    for job_key, measured_total in measured_bytes.items():
+        if measured_total <= 0:
             continue
-        economise = saved_bytes.get(job_key, 0.0)
-        hors_echantillon = unsampled_bytes.get(job_key, 0.0)
-        ratio = economise / mesures
-        extrapole = hors_echantillon * ratio
-        total = economise + extrapole
+        saved = saved_bytes.get(job_key, 0.0)
+        unsampled = unsampled_bytes.get(job_key, 0.0)
+        ratio = saved / measured_total
+        extrapolated = unsampled * ratio
+        total = saved + extrapolated
         if total <= 0:
             continue
 
-        if hors_echantillon > 0:
+        if unsampled > 0:
             comment = (
-                f"Mesuré réellement sur {mesures:.0f} octets JS/CSS non-Brotli dont "
-                f"le corps était capturé dans le HAR (ratio observé {ratio:.1%}) ; "
-                f"extrapolé sur {hors_echantillon:.0f} octets restants dont le corps "
-                "n'était pas capturé - PAS mesuré sur cette partie, c'est une "
-                "extrapolation du ratio observé, pas un calcul indépendant."
+                f"Really measured on {measured_total:.0f} bytes of non-Brotli JS/CSS whose "
+                f"body was captured in the HAR (observed ratio {ratio:.1%}); "
+                f"extrapolated to the remaining {unsampled:.0f} bytes whose body "
+                "was not captured - NOT measured on this part, it is an "
+                "extrapolation of the observed ratio, not an independent calculation."
             )
         else:
             comment = (
-                f"Mesuré réellement sur {mesures:.0f} octets JS/CSS non-Brotli dont "
-                f"le corps était capturé dans le HAR (ratio observé {ratio:.1%}) ; "
-                "aucune extrapolation : la totalité des ressources JS/CSS non-Brotli "
-                "de cette page avait un corps capturé."
+                f"Really measured on {measured_total:.0f} bytes of non-Brotli JS/CSS whose "
+                f"body was captured in the HAR (observed ratio {ratio:.1%}); "
+                "no extrapolation: all the non-Brotli JS/CSS resources of this "
+                "page had a captured body."
             )
 
         reductions.append(Reduction(
@@ -524,13 +528,13 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
             bytes_removed=total,
             traced=estimated(
                 total, "B",
-                "recompression Brotli réelle (bibliothèque brotli, quality=11) sur "
-                "l'échantillon capturé, extrapolée au reste",
+                "actual Brotli recompression (brotli library, quality=11) on the "
+                "captured sample, extrapolated to the rest",
                 comment=comment,
             ),
             page_url=job_key_to_url.get(job_key),
-            # Zéro EXACT, pas une approximation : Brotli ne change jamais
-            # `content.size` (poids décompressé) ni le nombre de requêtes.
+            # EXACT zero, not an approximation: Brotli never changes
+            # `content.size` (decompressed weight) nor the request count.
             bytes_removed_decompressed=0.0,
             requests_removed=0,
         ))
@@ -538,34 +542,34 @@ def brotli_reductions(site_spec: SiteSpec, env_data: dict, har_path,
 
 
 # ---------------------------------------------------------------------------
-# 4. Application cumulative à un palier
+# 4. Cumulative application to a tier
 # ---------------------------------------------------------------------------
 
 def apply_recommendations(site_spec: SiteSpec, reductions: List[Reduction],
-                           palier: str) -> SiteSpec:
-    """Retourne une NOUVELLE `SiteSpec` où `data_transferred` de chaque Job
-    concerné est réduit du cumul des `Reduction` dont le palier appartient à
-    l'ensemble de paliers désigné par `palier` ("prio1" -> {prio1} ;
-    "prio1_2" -> {prio1, prio2} ; "prio1_2_3" -> {prio1, prio2, prio3}).
+                          tier: str) -> SiteSpec:
+    """Returns a NEW `SiteSpec` where each affected Job's `data_transferred`
+    is reduced by the cumulative sum of the `Reduction`s whose tier belongs to
+    the tier set designated by `tier` ("prio1" -> {prio1} ; "prio1_2" ->
+    {prio1, prio2} ; "prio1_2_3" -> {prio1, prio2, prio3}).
 
-    SIMPLIFICATION ASSUMÉE : les réductions de recommandations différentes ne
-    sont pas dédupliquées entre elles (un fichier dupliqué peut aussi contenir
-    du code mort compté séparément) : le cumul peut légèrement surestimer le
-    gain réel.
+    ASSUMED SIMPLIFICATION: reductions from different recommendations are not
+    deduplicated against each other (a duplicated file can also contain dead
+    code counted separately): the cumulative sum may slightly overestimate the
+    real gain.
 
-    Un Job sans `data_transferred` est ignoré (rien à réduire). Les Jobs sans
-    réduction calculée pour ce palier restent inchangés.
+    A Job without `data_transferred` is skipped (nothing to reduce). Jobs
+    without a calculated reduction for this tier stay unchanged.
     """
-    tiers = _TIER_SETS.get(palier)
-    if tiers is None:
+    tier_set = _TIER_SETS.get(tier)
+    if tier_set is None:
         raise ValueError(
-            f"palier inconnu : {palier!r}. Attendu un de "
+            f"unknown tier: {tier!r}. Expected one of "
             f"{sorted(_TIER_SETS)}."
         )
 
     totals: Dict[str, float] = {}
     for reduction in reductions:
-        if reduction.tier in tiers:
+        if reduction.tier in tier_set:
             totals[reduction.job_key] = (
                 totals.get(reduction.job_key, 0.0) + reduction.bytes_removed
             )
@@ -581,11 +585,11 @@ def apply_recommendations(site_spec: SiteSpec, reductions: List[Reduction],
         new_bytes = max(0.0, original_bytes - total_reduction)
         new_traced = estimated(
             new_bytes, job.data_transferred.unit,
-            f"palier {palier} : recommandations appliquées",
+            f"tier {tier}: applied recommendations",
             comment=(
-                f"Poids transféré original {original_bytes:.0f} B réduit de "
-                f"{original_bytes - new_bytes:.0f} B par l'application "
-                "cumulative des recommandations retenues pour ce palier."
+                f"Original transferred weight {original_bytes:.0f} B reduced by "
+                f"{original_bytes - new_bytes:.0f} B through the cumulative "
+                "application of the recommendations retained for this tier."
             ),
         )
         new_jobs.append(replace(job, data_transferred=new_traced))

@@ -1,5 +1,5 @@
 @startuml eof-pipeline-outils
-title Skill EOF (EROOM Optimization Framework) — Pipeline outils
+title EOF skill (EROOM Optimization Framework) — Tool pipeline
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -18,68 +18,68 @@ skinparam PartitionBorderColor #5BA1BC
 
 start
 
-:Source — Google Sheet publique
+:Source — public Google Sheet
 "EOF-V.1.1 (EROOM Optimization Framework)"
-9 onglets, 1 gid par onglet;
+9 tabs, 1 gid per tab;
 
 note right
-  Endpoints d'export classiques (CSV/XLSX)
-  échouent ici : redirection 307 vers une URL
-  signée à usage unique, invalide en appel séparé.
-  Seule la voie gviz fonctionne, un onglet à la fois.
+  Classic export endpoints (CSV/XLSX)
+  fail here: 307 redirect to a
+  single-use signed URL, invalid in a separate call.
+  Only the gviz path works, one tab at a time.
 end note
 
-partition "**Bloc 1 — Récupération** (9 appels, un par onglet)" {
+partition "**Block 1 — Retrieval** (9 calls, one per tab)" {
   :curl gviz/tq?tqx=out:json&gid=<gid>
-  x9 (À LIRE, Diagnostic rapide,
-  6 piliers, Synthèse)
+  x9 (TO READ, Quick diagnostic,
+  6 pillars, Synthesis)
   -> tmp/eof-gviz/*.json;
 }
 
 note right #C8E6C9
-  Champ "f" (formaté) préféré à "v" (brut) :
-  contourne un bug de mise en forme du Sheet
-  source (IDs de critère stockés comme des
-  dates sur 3 onglets, ex. 3.1 -> Date(2025,0,3)).
+  "f" field (formatted) preferred over "v" (raw):
+  works around a formatting bug of the
+  source Sheet (criterion IDs stored as
+  dates on 3 tabs, ex. 3.1 -> Date(2025,0,3)).
 end note
 
-partition "**Bloc 2 — build_template.py** (déterministe, aucun calcul LLM)" {
-  :Parser les 9 JSON;
-  :Onglet 0 — Diagnostic rapide
-  Évaluation = échelle 1 à 5
-  (5 crans texte par critère);
-  :Onglets 1 à 5 — Produit, Architecture,
-  Infrastructure, Stockage, Algo & Code
-  Évaluation = 5 choix catégoriels
-  (Point fort / Potentiel identifié /
-  Non applicable / À évaluer / En cours);
-  :Onglet 6 — Facilité de changement
-  Évaluation = 3 choix DIFFÉRENTS
-  (Facile / Effort modéré / Difficile);
-  :Injecter 3 liens hypertexte + 2 logos
-  (récupérés une fois depuis l'Excel fourni,
-  gviz seul ne les fournit pas);
-  :Générer le sommaire + la section Synthèse
-  (formule de score documentée en texte,
-  aucun score chiffré : template vierge);
-  -> EOF-V.1.1 ... Référentiel complet.md;
+partition "**Block 2 — build_template.py** (deterministic, no LLM calculation)" {
+  :Parse the 9 JSON;
+  :Tab 0 — Quick diagnostic
+  Evaluation = 1 to 5 scale
+  (5 text rungs per criterion);
+  :Tabs 1 to 5 — Product, Architecture,
+  Infrastructure, Storage, Algo & Code
+  Evaluation = 5 categorical choices
+  (Strength / Potential identified /
+  Not applicable / To be assessed / In progress);
+  :Tab 6 — Ease of change
+  Evaluation = 3 DIFFERENT choices
+  (Easy / Moderate effort / Hard);
+  :Inject 3 hyperlinks + 2 logos
+  (retrieved once from the provided Excel,
+  gviz alone does not provide them);
+  :Generate the table of contents + the Synthesis section
+  (score formula documented in text,
+  no numeric score: blank template);
+  -> EOF-V.1.1 ... Full reference.md;
 }
 
 note right
-  Aucune case n'est pré-cochée.
-  Seul "Niveau d'impact" affiche la valeur
-  fixe du référentiel (donnée, pas une
-  réponse à donner).
+  No box is pre-ticked.
+  Only "Impact level" displays the fixed
+  value from the reference (data, not an
+  answer to give).
 end note
 
-:livrer le template Markdown vierge;
+:deliver the blank Markdown template;
 
 stop
 
 @enduml
 
 @startuml eof-radar-svg
-title Skill EOF — generate_radar_svg.py (indépendant du Bloc 2)
+title EOF skill — generate_radar_svg.py (independent of Block 2)
 
 skinparam backgroundColor #FFFFFF
 skinparam activity {
@@ -96,30 +96,30 @@ skinparam PartitionBorderColor #5BA1BC
 
 start
 
-:Entrée : liste (catégorie, valeur 0-100)
-— fictive pour un test, réelle une fois
-un audit rempli (ex. octo.com, à venir);
+:Input: list (category, value 0-100)
+— fictitious for a test, real once
+an audit is filled in (ex. octo.com, upcoming);
 
 partition "**generate_radar_svg.py::radar_svg()**" {
-  :Calculer les coordonnées par trigonométrie
-  (cos/sin, 1 axe tous les 360°/n);
-  :Dessiner la grille — vrais cercles
-  0/25/50/75/100 % (pas des hexagones);
-  :Dessiner le polygone de données
-  (lignes droites entre les points,
-  bleu marine #2D4675, contraste ~9,35:1);
-  :Échapper le texte (xml.sax.saxutils.escape)
-  — un "&" brut casse le rendu SVG;
+  :Compute the coordinates by trigonameetry
+  (cos/sin, 1 axis every 360°/n);
+  :Draw the grid — real circles
+  0/25/50/75/100 % (not hexagons);
+  :Draw the data polygon
+  (straight lines between the points,
+  navy blue #2D4675, contrast ~9.35:1);
+  :Escape the text (xml.sax.saxutils.escape)
+  — a raw "&" breaks the SVG rendering;
 }
 
 note right #C8E6C9
-  Bug trouvé et corrigé en cours de route :
-  "Stockage & Données" non échappé cassait
-  le parsing XML, tronquant tout le rendu
-  après ce label dans certains navigateurs.
+  Bug found and fixed along the way:
+  unescaped "Storage & Data" broke
+  the XML parsing, truncating the whole rendering
+  after this label in some browsers.
 end note
 
-:-> fichier .svg;
+:-> .svg file;
 
 stop
 

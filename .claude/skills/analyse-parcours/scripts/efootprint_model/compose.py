@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-Fusion et validation de spécifications. ZÉRO import e-footprint.
+Merging and validation of specifications. ZERO e-footprint import.
 
-TROIS RESPONSABILITÉS, ET RIEN D'AUTRE
---------------------------------------
-1. `compose()`   : fusionner plusieurs fragments de spécification en un site.
-2. `validate_spec()` : vérifier la cohérence des renvois entre clés.
-3. `collect_sources()` : rassembler toutes les provenances pour le rapport.
+THREE RESPONSIBILITIES, AND NOTHING ELSE
+-----------------------------------------
+1. `compose()`   : merge several specification fragments into one site.
+2. `validate_spec()` : check the consistency of key references.
+3. `collect_sources()` : gather all provenances for the report.
 
-La construction du modèle e-footprint n'est PAS ici. Ce fichier reste du Python
-pur, donc exécutable et testable sans la librairie installée.
+The e-footprint model construction is NOT here. This file stays pure Python,
+so executable and testable without the library installed.
 
-POURQUOI LA FUSION EST UN MODULE À PART
----------------------------------------
-Un vrai site est rarement un archétype pur : un site vitrine avec une boutique
-et un agent conversationnel, c'est trois archétypes combinés. Chaque archétype
-est une transformation qui produit un fragment ; `compose()` les réunit. Le
-point délicat est la collision de clés : deux fragments qui nomment tous deux
-leur serveur "web" doivent produire une ERREUR, jamais un écrasement silencieux.
-Un écrasement fait disparaître un serveur du modèle sans rien signaler, et le
-total baisse pour une raison introuvable.
+WHY MERGING IS A SEPARATE MODULE
+--------------------------------
+A real site is rarely a pure archetype: a showcase site with a shop and a
+conversational agent is three combined archetypes. Each archetype is a
+transformation that produces a fragment; `compose()` reunites them. The
+delicate point is key collision: two fragments that both name their server
+"web" must produce an ERROR, never a silent overwrite. An overwrite makes a
+server disappear from the model without any signal, and the total drops for
+a reason that cannot be found.
 """
 
 from dataclasses import replace
@@ -37,54 +37,57 @@ from .spec import (
 )
 
 # ---------------------------------------------------------------------------
-# Fusion
+# Merging
 # ---------------------------------------------------------------------------
 
-# Les collections fusionnées, avec le nom lisible utilisé dans les messages
-# d'erreur. L'ordre n'a pas d'importance fonctionnelle.
+# The merged collections, with the readable name used in error messages.
+# The order has no functional importance.
 _MERGED = (
-    ("servers", "serveur"),
-    ("jobs", "traitement"),
-    ("steps", "étape"),
-    ("journeys", "parcours"),
+    ("servers", "server"),
+    ("jobs", "job"),
+    ("steps", "step"),
+    ("journeys", "journey"),
 )
 
 
 def compose(*fragments, name=None, audience=None, journeys=None,
             third_party_hosts=None, notes=()):
-    """Fusionne des fragments de spécification en un seul `SiteSpec`.
+    """Merges specification fragments into a single `SiteSpec`.
 
-    fragments : des SiteSpec, typiquement produits par des archétypes.
-    name      : nom du site résultant. Par défaut celui du premier fragment.
-    audience  : audience du site. Si aucun fragment n'en porte et qu'aucune n'est
-                fournie, le résultat n'en a pas ; c'est au constructeur du modèle
-                de dire s'il peut s'en passer, pas à la fusion.
-    journeys  : remplace les parcours des fragments. Un archétype décrit des
-                étapes ; l'enchaînement réel est une décision de l'audit, pas de
-                l'archétype.
-    third_party_hosts : hôtes tiers observés, comptés en réseau seulement.
+    fragments : SiteSpecs, typically produced by archetypes.
+    name      : name of the resulting site. Defaults to the first fragment's.
+    audience  : audience of the site. If no fragment carries one and none is
+                given, the result has none; it is up to the model builder to
+                say whether it can do without, not up to the merge.
+    journeys  : replaces the fragments' journeys. An archetype describes
+                steps; the real sequence is an audit decision, not an
+                archetype's.
+    third_party_hosts : observed third-party hosts, counted on the network
+                only.
 
-    COLLISIONS : deux fragments qui déclarent la même clé lèvent SpecError, avec
-    UNE exception. Deux ServerSpec de même clé dont l'`evidence` désigne la même
-    infrastructure sont MUTUALISÉS : c'est le cas normal quand deux archétypes
-    s'appliquent au même serveur web. Sans cette règle, il faudrait dupliquer le
-    serveur et son empreinte de fabrication serait comptée deux fois.
+    COLLISIONS: two fragments declaring the same key raise SpecError, with
+    ONE exception. Two ServerSpecs with the same key whose `evidence` points
+    to the same infrastructure are MERGED: that is the normal case when two
+    archetypes apply to the same web server. Without this rule, the server
+    would have to be duplicated and its manufacturing footprint would be
+    counted twice.
 
-    Deux ServerSpec de même clé dont l'evidence DIFFÈRE restent une erreur : ce
-    sont deux machines qui se disputent un nom.
+    Two ServerSpecs with the same key whose evidence DIFFERS stay an error:
+    they are two machines fighting over a name.
     """
     fragments = [f for f in fragments if f is not None]
     for fragment in fragments:
         if not isinstance(fragment, SiteSpec):
             raise SpecError(
-                "compose() attend des SiteSpec, reçu "
-                f"{type(fragment).__name__}. Un archétype doit retourner une "
-                "spécification complète, pas un fragment d'objet."
+                "compose() expects SiteSpec fragments, got "
+                f"{type(fragment).__name__}. An archetype must return a "
+                "complete specification, not an object fragment."
             )
 
     if not fragments and name is None:
-        raise SpecError("compose() sans fragment ni nom : rien à composer. "
-                        "Fournir au moins `name` pour construire un site vide.")
+        raise SpecError("compose() with no fragment and no name: nothing to "
+                        "compose. Provide at least `name` to build an empty "
+                        "site.")
 
     resolved_name = name or fragments[0].name
 
@@ -105,25 +108,26 @@ def compose(*fragments, name=None, audience=None, journeys=None,
                     merged[attr][merged[attr].index(previous)] = fused
                     continue
                 raise SpecError(
-                    f"collision de clé sur le {label} \"{item.key}\" entre deux "
-                    f"fragments de \"{resolved_name}\". Renommer l'un des deux "
-                    "avec un préfixe distinct. La fusion ne choisit jamais à "
-                    "votre place : écraser en silence ferait disparaître un "
-                    f"{label} du modèle."
+                    f"key collision on the {label} \"{item.key}\" between two "
+                    f"fragments of \"{resolved_name}\". Rename one of the two "
+                    "with a distinct prefix. Merging never chooses for you: "
+                    "silently overwriting would make a "
+                    f"{label} disappear from the model."
                 )
 
-    # L'audience explicite l'emporte. Sinon on prend celle des fragments, à
-    # condition qu'ils n'en portent pas deux différentes : le trafic d'un site
-    # est unique, deux audiences signalent une erreur de composition.
+    # The explicit audience wins. Otherwise take the fragments', provided
+    # they do not carry two different ones: a site's traffic is unique, two
+    # audiences signal a composition error.
     resolved_audience = audience
     if resolved_audience is None:
         candidates = [f.audience for f in fragments if f.audience is not None]
         distinct = {a.key: a for a in candidates}
         if len(distinct) > 1:
             raise SpecError(
-                f"\"{resolved_name}\" : {len(distinct)} audiences différentes "
-                f"dans les fragments ({', '.join(sorted(distinct))}). Un site a "
-                "un seul trafic. Passer l'audience retenue à compose(audience=...)."
+                f"\"{resolved_name}\": {len(distinct)} different audiences "
+                f"in the fragments ({', '.join(sorted(distinct))}). A site has "
+                "a single traffic. Pass the chosen audience to "
+                "compose(audience=...)."
             )
         resolved_audience = candidates[0] if candidates else None
 
@@ -161,12 +165,12 @@ def compose(*fragments, name=None, audience=None, journeys=None,
 
 
 def _same_infrastructure(server_a, server_b):
-    """Deux ServerSpec décrivent-ils la même machine ?
+    """Do two ServerSpecs describe the same machine?
 
-    Exige que les DEUX portent une preuve, et que les preuves concordent. Sans
-    preuve, on ne conclut pas : mutualiser sur la seule égalité des clés
-    fusionnerait deux serveurs distincts qu'un archétype aurait nommés
-    identiquement par défaut.
+    Requires that BOTH carry evidence, and that the evidence agrees. Without
+    evidence, no conclusion: merging on key equality alone would fuse two
+    distinct servers that an archetype happened to name identically by
+    default.
     """
     if server_a.evidence is None or server_b.evidence is None:
         return False
@@ -174,12 +178,12 @@ def _same_infrastructure(server_a, server_b):
 
 
 def _fuse_servers(base, other):
-    """Complète `base` avec les champs que seul `other` renseigne.
+    """Completes `base` with the fields that only `other` fills in.
 
-    Ne remplace JAMAIS une valeur déjà présente : le premier fragment garde la
-    main. Un champ renseigné différemment par les deux est signalé, parce que
-    c'est un désaccord de modélisation sur la même machine, pas un détail à
-    arbitrer en silence.
+    NEVER replaces a value already present: the first fragment keeps the
+    upper hand. A field filled in differently by both is reported, because
+    it is a modeling disagreement about the same machine, not a detail to
+    arbitrate silently.
     """
     updates = {}
     for field_name in ("server_type", "country", "carbon_intensity", "provider",
@@ -194,10 +198,10 @@ def _fuse_servers(base, other):
             continue
         if mine.value != theirs.value:
             raise SpecError(
-                f"le serveur \"{base.key}\" reçoit deux valeurs de "
-                f"\"{field_name}\" : {mine.value!r} et {theirs.value!r}. Les "
-                "deux fragments désignent la même infrastructure mais ne sont "
-                "pas d'accord. Trancher explicitement avant la composition."
+                f"server \"{base.key}\" receives two different values for "
+                f"\"{field_name}\": {mine.value!r} and {theirs.value!r}. The "
+                "two fragments point to the same infrastructure but disagree. "
+                "Decide explicitly before composing."
             )
 
     notes = list(base.notes) + [n for n in other.notes if n not in base.notes]
@@ -206,10 +210,10 @@ def _fuse_servers(base, other):
 
 
 def _merge_third_party(fragments):
-    """Réunit les hôtes tiers des fragments, un seul enregistrement par hôte.
+    """Reunites the fragments' third-party hosts, one record per host.
 
-    Le premier vu gagne : les comptages viennent du même HAR, les réunir par
-    addition les compterait deux fois.
+    The first one seen wins: the counts come from the same HAR, adding them
+    up would count them twice.
     """
     merged = {}
     for fragment in fragments:
@@ -219,21 +223,21 @@ def _merge_third_party(fragments):
 
 
 # ---------------------------------------------------------------------------
-# Validation des renvois entre clés
+# Validation of key references
 # ---------------------------------------------------------------------------
 
 def validate_spec(spec):
-    """Vérifie qu'aucune clé ne renvoie dans le vide et qu'aucune n'est doublée.
+    """Checks that no key points into the void and none is duplicated.
 
-    Ces contrôles ne peuvent pas vivre dans les dataclasses : une `StepSpec` ne
-    connaît que des clés de traitement, elle n'a aucun moyen de savoir si le
-    traitement existe. Seul le site entier le sait.
+    These checks cannot live in the dataclasses: a `StepSpec` only knows job
+    keys, it has no way to know whether the job exists. Only the whole site
+    knows.
 
-    Lève SpecError au premier problème. Retourne le site inchangé, pour pouvoir
-    écrire `spec = validate_spec(spec)`.
+    Raises SpecError on the first problem. Returns the site unchanged, so
+    `spec = validate_spec(spec)` can be written.
     """
     if not isinstance(spec, SiteSpec):
-        raise SpecError(f"validate_spec() attend un SiteSpec, reçu "
+        raise SpecError(f"validate_spec() expects a SiteSpec, got "
                         f"{type(spec).__name__}.")
 
     owner = f"SiteSpec[{spec.name}]"
@@ -250,75 +254,77 @@ def validate_spec(spec):
     for job in spec.jobs:
         if job.server_key not in server_keys:
             raise SpecError(
-                f"{owner} : le traitement \"{job.key}\" est attribué au serveur "
-                f"\"{job.server_key}\", qui n'existe pas. "
-                f"Serveurs déclarés : {_listing(server_keys)}."
+                f"{owner}: job \"{job.key}\" is assigned to server "
+                f"\"{job.server_key}\", which does not exist. "
+                f"Declared servers: {_listing(server_keys)}."
             )
 
     for step in spec.steps:
         for job_key in step.jobs:
             if job_key not in job_keys:
                 raise SpecError(
-                    f"{owner} : l'étape \"{step.key}\" déclenche le traitement "
-                    f"\"{job_key}\", qui n'existe pas. "
-                    f"Traitements déclarés : {_listing(job_keys)}."
+                    f"{owner}: step \"{step.key}\" triggers job "
+                    f"\"{job_key}\", which does not exist. "
+                    f"Declared jobs: {_listing(job_keys)}."
                 )
 
     for journey in spec.journeys:
         for step_key in journey.steps:
             if step_key not in step_keys:
                 raise SpecError(
-                    f"{owner} : le parcours \"{journey.key}\" passe par l'étape "
-                    f"\"{step_key}\", qui n'existe pas. "
-                    f"Étapes déclarées : {_listing(step_keys)}."
+                    f"{owner}: journey \"{journey.key}\" goes through step "
+                    f"\"{step_key}\", which does not exist. "
+                    f"Declared steps: {_listing(step_keys)}."
                 )
 
     if spec.audience is not None and spec.audience.journey_key is not None:
         if spec.audience.journey_key not in journey_keys:
             raise SpecError(
-                f"{owner} : l'audience \"{spec.audience.key}\" renvoie au "
-                f"parcours \"{spec.audience.journey_key}\", qui n'existe pas. "
-                f"Parcours déclarés : {_listing(journey_keys)}."
+                f"{owner}: audience \"{spec.audience.key}\" refers to "
+                f"journey \"{spec.audience.journey_key}\", which does not exist. "
+                f"Declared journeys: {_listing(journey_keys)}."
             )
 
-    # Les étapes hors parcours ne sont PAS traitées ici : voir orphan_steps() et
-    # require_calculable() juste en dessous, ainsi que la note qui les précède.
+    # Steps outside any journey are NOT handled here: see orphan_steps() and
+    # require_calculable() right below, as well as the note that precedes them.
     return spec
 
 
 # ---------------------------------------------------------------------------
-# Réserves : ce qui n'empêche pas de décrire, mais empêche de publier
+# Reserves: what does not prevent describing, but prevents publishing
 # ---------------------------------------------------------------------------
-# Une étape rattachée à aucun parcours n'est visitée par personne : son empreinte
-# n'entre dans aucun total. Le modèle se construit quand même et le chiffre est
-# simplement plus bas, sans rien indiquer.
+# A step attached to no journey is visited by nobody: its footprint enters
+# no total. The model still builds and the number is simply lower, without
+# saying anything.
 #
-# Le refus a donc bien lieu, mais PAS au même moment que les autres : décrire un
-# site par morceaux (les pages d'abord, les parcours ensuite) est un usage
-# légitime, et bloquer dès la description l'interdirait. Le risque, lui, n'existe
-# qu'à partir du moment où un chiffre est calculé, donc publiable.
+# The refusal therefore does happen, but NOT at the same time as the others:
+# describing a site in pieces (the pages first, the journeys later) is a
+# legitimate use, and blocking at description time would forbid it. The
+# risk, however, only exists once a number is calculated, hence publishable.
 #
-# D'où la séparation :
-#   validate_spec()      -> ne dit rien, la description reste libre
-#   orphan_steps()       -> liste les réserves, pour les afficher
-#   require_calculable() -> refuse, à l'entrée du calcul
+# Hence the separation:
+#   validate_spec()      -> says nothing, the description stays free
+#   orphan_steps()       -> lists the reserves, to display them
+#   require_calculable() -> refuses, at the entrance of the calculation
 #
-# Décision de l'utilisatrice, à respecter en aval : au moment du calcul, la
-# personne qui lance l'audit doit pouvoir ARBITRER en direct (rattacher l'étape,
-# la retirer, ou passer outre en connaissance de cause) plutôt que subir un
-# refus sec. Deux contraintes sur cette interaction :
-#   - sans réponse possible (exécution automatique, sans clavier), le défaut est
-#     le REFUS. Un choix par défaut favorable publierait un total incomplet.
-#   - l'arbitrage retenu doit être TRACÉ dans le rapport (bloc model.decisions),
-#     sinon c'est un correctif silencieux, exactement ce qu'on veut éviter.
+# Decision of the user running the audit, to be respected downstream: at
+# calculation time, the person launching the audit must be able to ARBITRATE
+# live (attach the step, remove it, or proceed knowingly) rather than suffer
+# a hard refusal. Two constraints on this interaction:
+#   - with no possible answer (automatic execution, no keyboard), the default
+#     is the REFUSAL. A favorable default would publish an incomplete total.
+#   - the retained arbitration must be TRACED in the report (block
+#     model.decisions), otherwise it is a silent fix, exactly what we want to
+#     avoid.
 
 
 def orphan_steps(spec):
-    """Étapes déclarées qu'aucun parcours ne traverse.
+    """Declared steps that no journey traverses.
 
-    Vide si le site ne déclare encore aucun parcours : à ce stade rien n'est
-    orphelin, la description est simplement en cours. Distinguer les deux
-    importe, sinon un site en travaux afficherait toutes ses étapes en réserve.
+    Empty if the site declares no journey yet: at that stage nothing is
+    orphan, the description is simply in progress. Distinguishing the two
+    matters, otherwise a site under construction would show all its steps as
+    reserves.
     """
     if not spec.journeys:
         return ()
@@ -327,84 +333,84 @@ def orphan_steps(spec):
 
 
 def unused_jobs(spec):
-    """Traitements déclarés mais déclenchés par aucune étape.
+    """Declared jobs triggered by no step.
 
-    Ne fausse aucun total, contrairement à une étape orpheline : c'est seulement
-    du poids mort dans le modèle. À signaler, jamais à refuser.
+    Unlike an orphan step, it distorts no total: it is only dead weight in
+    the model. To be reported, never to be refused.
     """
     triggered = {job_key for step in spec.steps for job_key in step.jobs}
     return tuple(sorted(set(spec.job_keys) - triggered))
 
 
-# Tous les codes de réserve existants, énumérés une fois. Source de vérité pour
-# le contrôle "toute réserve propose une issue" : le déduire d'une spécification
-# d'exemple ne marcherait pas, aucune spécification ne déclenchant les quatre à
-# la fois (une spécification vide n'a pas d'étape, donc pas d'étape orpheline).
+# All existing reserve codes, enumerated once. Source of truth for the
+# "every reserve offers an exit" check: deriving it from an example
+# specification would not work, no specification triggering all four at once
+# (an empty specification has no step, hence no orphan step).
 RESERVE_CODES = (
-    "steps_hors_parcours",
-    "aucun_parcours",
-    "aucune_etape",
-    "aucune_audience",
+    "steps_outside_journey",
+    "no_journey",
+    "no_step",
+    "no_audience",
 )
 
 
 def calculation_reserves(spec):
-    """Réserves qui rendent un chiffre publié faux, en (code, message).
+    """Reserves that make a published number false, as (code, message).
 
-    Ce que la fonction NE renvoie pas est aussi important : un traitement non
-    déclenché n'y figure pas, parce qu'il ne change aucun total.
+    What the function does NOT return is just as important: an untriggered
+    job is not in there, because it changes no total.
 
-    Retourner des codes plutôt que du texte seul permet à l'appelant de proposer
-    l'arbitrage adapté à chaque réserve, au lieu d'un message unique.
+    Returning codes rather than text alone lets the caller offer the
+    arbitration adapted to each reserve, instead of a single message.
     """
     reserves = []
 
     orphans = orphan_steps(spec)
     if orphans:
         reserves.append((
-            "steps_hors_parcours",
-            f"{len(orphans)} étape(s) ne figurent dans aucun parcours : "
-            f"{_listing(orphans)}. Elles ne seront visitées par personne, donc "
-            "leur empreinte n'entrera pas dans le total. Le chiffre publié "
-            "serait plus bas que la réalité décrite."
+            "steps_outside_journey",
+            f"{len(orphans)} step(s) appear in no journey: "
+            f"{_listing(orphans)}. They will be visited by nobody, so "
+            "their footprint will not enter the total. The published "
+            "number would be lower than the described reality."
         ))
 
     if not spec.journeys:
         reserves.append((
-            "aucun_parcours",
-            "aucun parcours n'est déclaré. Sans parcours, aucune étape n'est "
-            "visitée et le total serait vide de tout usage."
+            "no_journey",
+            "no journey is declared. Without a journey, no step is "
+            "visited and the total would be empty of any usage."
         ))
 
     if not spec.steps:
         reserves.append((
-            "aucune_etape",
-            "aucune étape n'est déclarée. Le modèle n'aurait aucun usage à "
-            "calculer."
+            "no_step",
+            "no step is declared. The model would have no usage to "
+            "calculate."
         ))
 
     if spec.audience is None:
         reserves.append((
-            "aucune_audience",
-            "aucune audience n'est déclarée. Sans volume de trafic, il n'y a "
-            "rien à multiplier : le total serait nul."
+            "no_audience",
+            "no audience is declared. Without a traffic volume, there is "
+            "nothing to multiply: the total would be zero."
         ))
 
     return tuple(reserves)
 
 
 def require_calculable(spec, *, accepted_reserves=()):
-    """Porte d'entrée du calcul : refuse une spécification qui produirait un
-    chiffre faux, sauf réserves EXPLICITEMENT acceptées.
+    """Entrance gate of the calculation: refuses a specification that would
+    produce a false number, except EXPLICITLY accepted reserves.
 
-    accepted_reserves : codes de réserve que la personne qui lance l'audit a
-    choisi d'assumer. L'acceptation est un acte volontaire, jamais un défaut :
-    appeler cette fonction sans rien passer refuse toute réserve.
+    accepted_reserves : reserve codes that the person launching the audit
+    chose to assume. Acceptance is a voluntary act, never a default: calling
+    this function without passing anything refuses every reserve.
 
-    Retourne les réserves acceptées, en (code, message), pour que l'appelant les
-    inscrive dans le rapport. Les rendre plutôt que les taire est le point
-    important : une réserve assumée doit rester lisible dans le livrable, sinon
-    l'arbitrage disparaît et le chiffre paraît sans réserve.
+    Returns the accepted reserves, as (code, message), so the caller can
+    write them into the report. Returning them rather than hiding them is the
+    important point: an assumed reserve must stay visible in the deliverable,
+    otherwise the arbitration disappears and the number looks reserve-free.
     """
     validate_spec(spec)
 
@@ -413,13 +419,13 @@ def require_calculable(spec, *, accepted_reserves=()):
 
     unknown = accepted_codes - {code for code, _ in reserves}
     if unknown:
-        # Accepter une réserve qui ne s'applique pas est presque toujours un
-        # code recopié de travers. Le signaler évite qu'une acceptation traîne
-        # dans une commande et couvre plus tard une réserve réelle.
+        # Accepting a reserve that does not apply is almost always a code
+        # copied by mistake. Reporting it prevents an acceptance from lingering
+        # in a command and later covering a real reserve.
         raise SpecError(
-            f"réserve(s) acceptée(s) qui ne s'appliquent pas à "
-            f"\"{spec.name}\" : {_listing(unknown)}. "
-            f"Réserves en cours : {_listing(code for code, _ in reserves)}."
+            f"accepted reserve(s) that do not apply to "
+            f"\"{spec.name}\": {_listing(unknown)}. "
+            f"Current reserves: {_listing(code for code, _ in reserves)}."
         )
 
     blocking = [(code, message) for code, message in reserves
@@ -427,62 +433,64 @@ def require_calculable(spec, *, accepted_reserves=()):
     if blocking:
         details = "\n".join(f"  - [{code}] {message}" for code, message in blocking)
         raise SpecError(
-            f"SiteSpec[{spec.name}] : {len(blocking)} réserve(s) empêchent un "
-            f"calcul publiable :\n{details}\n"
-            "Corriger la spécification, ou assumer la réserve en passant son "
-            "code à accepted_reserves — auquel cas elle sera écrite dans le "
-            "rapport, pas passée sous silence."
+            f"SiteSpec[{spec.name}]: {len(blocking)} reserve(s) prevent a "
+            f"publishable calculation:\n{details}\n"
+            "Fix the specification, or assume the reserve by passing its "
+            "code to accepted_reserves — in which case it will be written in "
+            "the report, not passed in silence."
         )
 
     return tuple((code, message) for code, message in reserves
                  if code in accepted_codes)
 
 
-# Arbitrages proposables pour chaque réserve, dans l'ordre où les présenter.
-# Ces libellés vivent ici, à côté de la définition des réserves, pour qu'ajouter
-# une réserve sans proposer d'issue soit visible tout de suite : une réserve
-# bloquante sans arbitrage ne laisse à la personne qu'un refus sans porte.
+# Proposable arbitrations for each reserve, in the order to present them.
+# These labels live here, next to the reserve definitions, so that adding a
+# reserve without proposing an exit is visible right away: a blocking
+# reserve without arbitration leaves the person with a refusal without a
+# door.
 #
-# La ligne de commande y puisera pour poser la question en direct (lot 5). Le
-# dernier choix de chaque liste est l'acceptation, jamais le premier : l'ordre
-# d'affichage suggère une préférence, et corriger vaut mieux qu'assumer.
+# The command line will draw on them to ask the question live (lot 5). The
+# last choice of each list is the acceptance, never the first: the display
+# order suggests a preference, and correcting is better than assuming.
 RESERVE_ARBITRATIONS = {
-    "steps_hors_parcours": (
-        "rattacher ces étapes à un parcours (le total les comptera)",
-        "les retirer de la spécification (elles ne décrivent pas ce site)",
-        "calculer sans elles, en l'assumant (le total sera plus bas, et le "
-        "rapport le dira)",
+    "steps_outside_journey": (
+        "attach these steps to a journey (the total will count them)",
+        "remove them from the specification (they do not describe this site)",
+        "calculate without them, assuming it (the total will be lower, and "
+        "the report will say so)",
     ),
-    "aucun_parcours": (
-        "déclarer le parcours suivi par les visiteurs",
-        "renoncer au calcul pour l'instant",
+    "no_journey": (
+        "declare the journey followed by the visitors",
+        "give up on the calculation for now",
     ),
-    "aucune_etape": (
-        "décrire au moins une page visitée",
-        "renoncer au calcul pour l'instant",
+    "no_step": (
+        "describe at least one visited page",
+        "give up on the calculation for now",
     ),
-    "aucune_audience": (
-        "renseigner le trafic annuel, même approximatif et signalé comme tel",
-        "renoncer au calcul pour l'instant",
+    "no_audience": (
+        "fill in the annual traffic, even approximate and flagged as such",
+        "give up on the calculation for now",
     ),
 }
 
 
 def arbitrations_for(code):
-    """Issues proposables pour une réserve, ou () si la réserve n'en propose pas.
+    """Proposable exits for a reserve, or () if the reserve proposes none.
 
-    Retourne un tuple vide plutôt que de lever : une réserve sans arbitrage
-    reste bloquante et c'est le comportement sûr. Mais elle doit être repérable,
-    d'où `reserves_without_arbitration()`.
+    Returns an empty tuple rather than raising: a reserve without arbitration
+    stays blocking and that is the safe behavior. But it must be detectable,
+    hence `reserves_without_arbitration()`.
     """
     return RESERVE_ARBITRATIONS.get(code, ())
 
 
 def reserves_without_arbitration():
-    """Codes de réserve qu'aucun arbitrage ne couvre.
+    """Reserve codes that no arbitration covers.
 
-    Sert de contrôle : une réserve ajoutée sans issue proposée place la personne
-    devant un refus sans solution. Vérifié par check_efootprint_spec.py.
+    Serves as a check: a reserve added without a proposed exit leaves the
+    person facing a refusal without a solution. Checked by
+    check_efootprint_spec.py.
     """
     return tuple(sorted(set(RESERVE_CODES) - set(RESERVE_ARBITRATIONS)))
 
@@ -491,8 +499,8 @@ def _check_unique_keys(items, owner, label):
     seen = set()
     for item in items:
         if item.key in seen:
-            raise SpecError(f"{owner} : le {label} \"{item.key}\" est déclaré "
-                            "deux fois.")
+            raise SpecError(f"{owner}: the {label} \"{item.key}\" is declared "
+                            "twice.")
         seen.add(item.key)
 
 
@@ -500,28 +508,28 @@ def _check_unique_hosts(hosts, owner):
     seen = set()
     for host in hosts:
         if host.host in seen:
-            raise SpecError(f"{owner} : l'hôte tiers \"{host.host}\" est "
-                            "déclaré deux fois.")
+            raise SpecError(f"{owner}: the third-party host \"{host.host}\" is "
+                            "declared twice.")
         seen.add(host.host)
 
 
 def _listing(keys):
-    """Liste triée et lisible, ou une mention explicite quand il n'y a rien.
+    """Sorted, readable list, or an explicit mention when there is nothing.
 
-    "aucun" plutôt qu'une liste vide : sur une erreur de clé, savoir que RIEN
-    n'est déclaré oriente vers une cause différente qu'une faute de frappe.
+    "none" rather than an empty list: on a key error, knowing that NOTHING is
+    declared points to a different cause than a typo.
     """
     keys = sorted(keys)
-    return ", ".join(f"\"{k}\"" for k in keys) if keys else "aucun"
+    return ", ".join(f"\"{k}\"" for k in keys) if keys else "none"
 
 
 # ---------------------------------------------------------------------------
-# Collecte des provenances
+# Provenance collection
 # ---------------------------------------------------------------------------
 
-# Où chercher des Traced, et sous quel chemin les annoncer. Le chemin sert à
-# retrouver la valeur dans le modèle depuis le rapport : "server:web.storage_gb"
-# se lit sans documentation.
+# Where to look for Traced, and under which path to announce them. The path
+# serves to find the value back in the model from the report:
+# "server:web.storage_gb" reads without documentation.
 _TRACED_SCOPES = (
     ("servers", "server"),
     ("jobs", "job"),
@@ -530,11 +538,11 @@ _TRACED_SCOPES = (
 
 
 def iter_traced(spec):
-    """Parcourt tous les `Traced` du site, en (chemin, champ, traced).
+    """Walks all `Traced` of the site, as (path, field, traced).
 
-    Parcourt la SPÉCIFICATION, pas le modèle construit : donc utilisable sans
-    e-footprint et sans avoir lancé le moindre calcul. C'est ce qui permet de
-    contrôler la traçabilité AVANT de produire un chiffre.
+    Walks the SPECIFICATION, not the built model: so usable without
+    e-footprint and without having launched any calculation. This is what
+    allows checking traceability BEFORE producing a number.
     """
     for attr, prefix in _TRACED_SCOPES:
         for item in getattr(spec, attr):
@@ -549,11 +557,11 @@ def iter_traced(spec):
 
 
 def collect_sources(spec):
-    """Rassemble les provenances pour le bloc `sources` du JSON de résultats.
+    """Gathers the provenances for the `sources` block of the results JSON.
 
-    Une entrée par (chemin, champ), dans l'ordre de parcours. Pas de
-    déduplication par source : le rapport doit pouvoir dire quel PARAMÈTRE vient
-    de quelle source, et regrouper par source perdrait précisément ce lien.
+    One entry per (path, field), in walk order. No deduplication by source:
+    the report must be able to say which PARAMETER comes from which source,
+    and grouping by source would lose exactly that link.
     """
     entries = []
     for path, field_name, traced in iter_traced(spec):
@@ -564,12 +572,12 @@ def collect_sources(spec):
 
 
 def untraced_fields(spec):
-    """Champs portant une valeur sans provenance, en (chemin, champ, valeur).
+    """Fields carrying a value without provenance, as (path, field, value).
 
-    Le garde-fou des dataclasses couvre les champs CRITIQUES. Cette fonction
-    couvre le reste : elle ne bloque pas, elle rend visible. Sans elle, on ne
-    saurait pas combien de valeurs non tracées un modèle contient, et le rapport
-    afficherait des badges "défaut" sans qu'on sache lesquels sont évitables.
+    The dataclass guard-rail covers CRITICAL fields. This function covers the
+    rest: it does not block, it makes visible. Without it, we would not know
+    how many untraced values a model contains, and the report would show
+    "default" badges without knowing which are avoidable.
     """
     return tuple(
         (path, field_name, traced.value)
@@ -579,12 +587,12 @@ def untraced_fields(spec):
 
 
 def confidence_summary(spec):
-    """Compte les Traced par niveau de confiance.
+    """Counts the Traced per confidence level.
 
-    Donne en une ligne la solidité globale d'un modèle. Utile comme repère de
-    non-régression : un refactoring qui fait glisser des valeurs de "high" vers
-    "default" a perdu de la traçabilité en route, ce qu'aucun total en kilos ne
-    révélerait.
+    Gives in one line the global solidity of a model. Useful as a
+    non-regression marker: a refactoring that shifts values from "high" to
+    "default" has lost traceability along the way, which no total in kilos
+    would reveal.
     """
     counts = {}
     for _, _, traced in iter_traced(spec):
@@ -593,28 +601,28 @@ def confidence_summary(spec):
 
 
 # ---------------------------------------------------------------------------
-# Serveur principal
+# Primary server
 # ---------------------------------------------------------------------------
 
 def primary_server(spec):
-    """Le serveur qui alimente les clés scalaires historiques du JSON.
+    """The server that feeds the historical singular keys of the JSON.
 
-    Le fichier de résultats porte depuis l'origine des clés au singulier
-    (provider, instance_type, storage_gb). Quand le modèle contient plusieurs
-    serveurs, il faut décider LEQUEL elles décrivent, sans quoi le rapport
-    afficherait un serveur arbitraire, changeant d'une exécution à l'autre.
+    The results file has carried singular keys since the beginning
+    (provider, instance_type, storage_gb). When the model contains several
+    servers, one must decide WHICH one they describe, otherwise the report
+    would show an arbitrary server, changing from one run to the next.
 
-    Critère : le plus d'octets transférés, mesuré dans le HAR. C'est le serveur
-    qui porte le trafic, donc celui qu'on décrirait spontanément comme "le"
-    serveur du site.
+    Criterion: the most transferred bytes, measured in the HAR. That is the
+    server carrying the traffic, hence the one spontaneously described as
+    "the" site's server.
 
-    Départage explicite quand les octets sont inconnus ou à égalité : le nombre
-    de requêtes, puis l'ordre alphabétique de la clé. L'ordre alphabétique n'a
-    aucun sens physique, mais il est STABLE, et c'est tout ce qu'on lui demande :
-    à égalité, mieux vaut un choix arbitraire reproductible qu'un choix
-    dépendant de l'ordre de lecture du HAR.
+    Explicit tie-break when bytes are unknown or equal: the number of
+    requests, then the alphabetical order of the key. Alphabetical order has
+    no physical meaning, but it is STABLE, and that is all we ask of it: on
+    a tie, an arbitrary but reproducible choice is better than a choice
+    depending on the HAR read order.
 
-    Retourne None si le site n'a aucun serveur.
+    Returns None if the site has no server.
     """
     if not spec.servers:
         return None
@@ -629,20 +637,20 @@ def primary_server(spec):
 
 
 def servers_note(spec):
-    """Phrase à écrire dans le JSON quand le modèle contient plusieurs serveurs.
+    """Sentence to write in the JSON when the model contains several servers.
 
-    Sans elle, un lecteur voit `provider` et `instance_type` au singulier et en
-    conclut que le site tient sur une machine. La note dit ce que ces clés
-    décrivent réellement et ce qu'elles laissent de côté.
+    Without it, a reader sees `provider` and `instance_type` in the singular
+    and concludes the site fits on one machine. The note says what these keys
+    really describe and what they leave out.
     """
     if len(spec.servers) <= 1:
         return None
     main = primary_server(spec)
     others = [s.key for s in spec.servers if s.key != main.key]
     return (
-        f"Le modèle contient {len(spec.servers)} serveurs. Les clés au "
-        f"singulier ci-dessus décrivent le serveur principal "
-        f"(\"{main.key}\", celui qui porte le plus d'octets). Les autres "
-        f"({_listing(others)}) sont modélisés à part et figurent dans le bloc "
-        "\"model\", avec leur propre empreinte."
+        f"The model contains {len(spec.servers)} servers. The singular keys "
+        f"above describe the primary server "
+        f"(\"{main.key}\", the one carrying the most bytes). The others "
+        f"({_listing(others)}) are modeled separately and appear in the "
+        "\"model\" block, with their own footprint."
     )

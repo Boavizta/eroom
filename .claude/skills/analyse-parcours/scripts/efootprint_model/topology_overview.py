@@ -1,68 +1,66 @@
 #!/usr/bin/env python3
 """
-Vue d'ensemble de la topologie détectée, à présenter à l'utilisateur AVANT
-tout calcul CO2e (Étape 25 du skill efootprint).
+Overview of the detected topology, to present to the user BEFORE any CO2e
+calculation (Step 25 of the efootprint skill).
 
-ZÉRO import e-footprint ici (comme le reste de efootprint_model/) : ce module
-ne fait que de la LECTURE croisée entre une `SiteSpec` déjà construite et le
-résultat de `detect_tech.detect_from_har()` (détection heuristique HAR, hors
-e-footprint). Il ne construit ni ne modifie aucun objet e-footprint.
+ZERO e-footprint import here (like the rest of efootprint_model/): this
+module only does cross-reading between an already-built `SiteSpec` and the
+result of `detect_tech.detect_from_har()` (heuristic HAR detection, outside
+e-footprint). It builds nor modifies no e-footprint object.
 
-POURQUOI UN MODULE SÉPARÉ, PLUTÔT QUE D'ENRICHIR from_har.py :
-from_har.py construit la SiteSpec qui pilote le calcul CO2e (contrat vérifié
-numériquement par check_efootprint_contract.py) et porte l'historique de
-pièges déjà corrigés (attribution par octets réels, pas par nom de page). Ce
-module-ci ne pilote AUCUN chiffre : il produit une PRÉSENTATION dérivée
-(annotations de suspicion, résumé texte), jamais consommée par build.py.
-Séparer les deux garantit que cette étape de présentation ne peut jamais,
-même par erreur future, faire dévier un total CO2e publié.
+WHY A SEPARATE MODULE, RATHER THAN ENRICHING from_har.py:
+from_har.py builds the SiteSpec that drives the CO2e calculation (contract
+numerically checked by check_efootprint_contract.py) and carries the history
+of already-fixed pitfalls (attribution by real bytes, not by page name).
+This module drives NO number: it produces a DERIVED PRESENTATION (suspicion
+annotations, text summary), never consumed by build.py. Separating the two
+guarantees that this presentation step can never, even through a future
+mistake, deflect a published CO2e total.
 
-VOCABULAIRE : "suspecté", jamais "détecté" au sens ferme — sauf pour un
-provider IA/BaaS reconnu par nom de domaine EXACT (signal quasi certain), où
-le texte peut dire "identifié". Une absence de signal ne prouve JAMAIS
-l'absence de la technologie : une base de données auto-hébergée derrière le
-serveur applicatif n'émet aucun signal réseau visible côté client, elle est
-structurellement invisible depuis le seul trafic capturé.
+VOCABULARY: "suspected", never "detected" in the firm sense — except for an
+AI/BaaS provider recognized by EXACT domain name (near-certain signal), where
+the text may say "identified". An absence of signal NEVER proves the absence
+of the technology: a self-hosted database behind the application server
+emits no visible network signal on the client side, it is structurally
+invisible from the captured traffic alone.
 """
 
 from dataclasses import replace
 
-# Catégories issues de detect_tech.py routées vers une note ThirdPartyHost.
-# Table de correspondance, pas une redécouverte de règles : ce module ne fait
-# QUE router un résultat déjà produit par detect_tech.py, jamais sa propre
-# détection.
+# Categories from detect_tech.py routed to a ThirdPartyHost note. A mapping
+# table, not a re-discovery of rules: this module ONLY routes a result already
+# produced by detect_tech.py, never its own detection. The KEYS must stay
+# byte-identical to the category strings emitted by detect_tech.py.
 _SUSPICION_LABELS = {
-    "IA générative (tiers)": "IA générative tierce (identifié par domaine)",
-    "Streaming média": "streaming média (suspecté)",
-    "Backend-as-a-Service / BDD (tiers)": "BDD/BaaS tiers (identifié par domaine)",
+    "Generative AI (third-party)": "third-party generative AI (identified by domain)",
+    "Media streaming": "media streaming (suspected)",
+    "Backend-as-a-Service / DB (third-party)": "third-party DB/BaaS (identified by domain)",
 }
 
 _SUSPICION_CATEGORIES = tuple(_SUSPICION_LABELS)
 
 
 def _spec_hosts(spec):
-    """Les hosts tiers de la spec, pour le routage evidence->host ci-dessous."""
+    """The spec's third-party hosts, for the evidence->host routing below."""
     return tuple(h.host for h in spec.third_party_hosts)
 
 
 def annotate_third_party_hosts(spec, tech_result):
-    """Retourne une COPIE de `spec` dont les `ThirdPartyHost` portent une
-    `note` de suspicion quand `tech_result` (detect_tech.detect_from_har())
-    a rattaché ce host à une des catégories suivies.
+    """Returns a COPY of `spec` whose `ThirdPartyHost`s carry a `note` of
+    suspicion when `tech_result` (detect_tech.detect_from_har()) attached
+    this host to one of the followed categories.
 
-    Ne modifie jamais `spec` en place (cohérent avec le reste de la
-    bibliothèque : une transformation en retourne une nouvelle plutôt que de
-    modifier celle qu'on lui passe). Si `tech_result` est None (HAR absent,
-    illisible, ou module detect_tech indisponible), retourne `spec`
-    inchangée.
+    Never modifies `spec` in place (consistent with the rest of the library: a
+    transformation returns a new one rather than modifying the one it is
+    given). If `tech_result` is None (HAR absent, unreadable, or the
+    detect_tech module unavailable), returns `spec` unchanged.
 
-    LIMITE CONNUE : le routage host<-evidence est BEST-EFFORT. `evidence` est
-    un texte tronqué à 60 caractères construit par detect_tech.py pour
-    l'affichage humain, pas pour un ré-appariement programmatique garanti à
-    100 % (host tronqué ou requête sans host reconnaissable dans l'evidence
-    ne sera pas routé). Accepté pour ce lot : mieux vaut un routage partiel
-    honnête qu'un contrat de sortie élargi sur detect_tech.detect() pour un
-    gain marginal.
+    KNOWN LIMIT: the host<-evidence routing is BEST-EFFORT. `evidence` is a
+    text truncated to 60 characters built by detect_tech.py for human
+    display, not for a guaranteed 100% programmatic re-matching (a truncated
+    host or a request without a recognizable host in the evidence will not be
+    routed). Accepted for this lot: an honest partial routing is better than
+    an enlarged output contract on detect_tech.detect() for a marginal gain.
     """
     if not tech_result:
         return spec
@@ -90,15 +88,16 @@ def annotate_third_party_hosts(spec, tech_result):
 
 
 def overview_text(spec, tech_result):
-    """Résumé texte de la topologie détectée, pour l'Étape 25 (avant calcul).
+    """Text summary of the detected topology, for Step 25 (before
+    calculation).
 
-    Combine : nombre de serveurs 1st-party (spec.servers, déjà fiable —
-    cf. from_har.py::detect_infrastructures()), technologies détectées
-    groupées par catégorie suivie (BDD/BaaS, streaming, IA), et le rappel
-    honnête qu'une BDD auto-hébergée reste invisible depuis le HAR.
+    Combines: the number of 1st-party servers (spec.servers, already
+    reliable — cf. from_har.py::detect_infrastructures()), the detected
+    technologies grouped by followed category (DB/BaaS, streaming, AI), and
+    the honest reminder that a self-hosted DB stays invisible from the HAR.
     """
     lines = []
-    lines.append(f"Serveurs 1st-party détectés : {len(spec.servers)}")
+    lines.append(f"Detected 1st-party servers: {len(spec.servers)}")
     for server in spec.servers:
         lines.append(f"  - {server.label}")
 
@@ -107,13 +106,12 @@ def overview_text(spec, tech_result):
         for cat in _SUSPICION_CATEGORIES:
             names = categories.get(cat) or []
             if names:
-                lines.append(f"{cat} suspecté(s) : {', '.join(names)}")
+                lines.append(f"{cat} suspected: {', '.join(names)}")
 
     lines.append(
-        "Note : une base de données ou un service auto-hébergé DERRIÈRE le "
-        "serveur applicatif n'émet aucun signal visible depuis le trafic "
-        "réseau capturé. Cette section ne peut donc JAMAIS conclure à son "
-        "absence — seulement signaler les services tiers directement "
-        "exposés au navigateur."
+        "Note: a database or a self-hosted service BEHIND the application "
+        "server emits no visible signal from the captured network traffic. "
+        "This section can therefore NEVER conclude to its absence — only "
+        "report the third-party services directly exposed to the browser."
     )
     return "\n".join(lines)

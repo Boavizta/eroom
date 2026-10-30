@@ -1,113 +1,113 @@
-# Étape 37 — CWV via Lighthouse ou PageSpeed Insights
+# Step 37 — CWV via Lighthouse or PageSpeed Insights
 
-**Quand :** après l'étape 35, avant l'étape 40.
+**When:** after step 35, before step 40.
 
-## Choix de la source CWV
+## Choosing the CWV source
 
-| Source | Commande | Données | Avantages |
+| Source | Command | Data | Advantages |
 |--------|----------|---------|-----------|
-| PageSpeed + CrUX | `collect_cwv_pagespeed.py` | Terrain P75 réels | Reflète les vrais utilisateurs ; nécessite `GOOGLE_API_KEY` |
-| Lighthouse (fallback) | `run_lighthouse.sh` | Lab (simulation) | Fonctionne sans clé API, même sur pages auth |
+| PageSpeed + CrUX | `collect_cwv_pagespeed.py` | Real field P75 | Reflects real users; requires `GOOGLE_API_KEY` |
+| Lighthouse (fallback) | `run_lighthouse.sh` | Lab (simulation) | Works without an API key, even on auth pages |
 
-`collect_cwv_pagespeed.py` est le point d'entrée principal. Il déclenche automatiquement le fallback Lighthouse dans deux cas :
-- `GOOGLE_API_KEY` absente du `.env`
-- Aucune métrique collectée via l'API (quota dépassé, réseau, URLs inconnues de CrUX)
+`collect_cwv_pagespeed.py` is the main entry point. It automatically triggers the Lighthouse fallback in two cases:
+- `GOOGLE_API_KEY` absent from `.env`
+- No metric collected via the API (quota exceeded, network, URLs unknown to CrUX)
 
 -----
 
 ---
 
-## Flux automatique
+## Automatic flow
 
-### Cas 1 : cwv.json absent
+### Case 1: cwv.json absent
 
-1. Lancer le script sans URLs : il extrait lui-même toutes les URLs uniques depuis le HAR.
+1. Run the script without URLs: it extracts all unique URLs from the HAR itself.
 
 ```bash
-bash .claude/skills/analyse-parcours/scripts/run_lighthouse.sh <dossier-audit>
+bash .claude/skills/analyse-parcours/scripts/run_lighthouse.sh <audit-dir>
 ```
 
-Le script déduplique les URLs (`log.pages[].title`) avant de lancer Lighthouse, donc chaque page n'est analysée qu'une seule fois même si elle apparaît plusieurs fois dans le parcours.
+The script deduplicates URLs (`log.pages[].title`) before launching Lighthouse, so each page is analyzed only once even if it appears several times in the journey.
 
-3. Afficher la progression :
+3. Display progress:
 ```
-[Étape 37] Lighthouse CWV — analyse de N page(s) via npx...
+[Step 37] Lighthouse CWV — analyzing N page(s) via npx...
   -> page_1 : https://...
   -> page_2 : https://...
-[Étape 37] cwv.json généré.
+[Step 37] cwv.json generated.
 ```
 
-4. Continuer vers l'étape 40.
+4. Continue to step 40.
 
-### Cas 2 : cwv.json déjà présent
+### Case 2: cwv.json already present
 
-Afficher :
+Display:
 ```
-[Étape 37] cwv.json déjà présent — Lighthouse skippé.
+[Step 37] cwv.json already present — Lighthouse skipped.
 ```
-Passer directement à l'étape 40.
+Go directly to step 40.
 
-### Cas 3 : l'utilisateur demande "relance Lighthouse"
+### Case 3: the user asks "re-run Lighthouse"
 
-Supprimer `cwv.json` du dossier d'audit, puis reprendre depuis le Cas 1.
+Delete `cwv.json` from the audit folder, then resume from Case 1.
 
 ---
 
-## Si Lighthouse échoue
+## If Lighthouse fails
 
-Afficher un warning et continuer sans CWV :
+Display a warning and continue without CWV:
 ```
-[Étape 37] Lighthouse indisponible (npx absent ou pages inaccessibles).
-Le rapport continuera sans CWV. Pour relancer : "relance Lighthouse".
+[Step 37] Lighthouse unavailable (npx missing or pages unreachable).
+The report will continue without CWV. To retry: "re-run Lighthouse".
 ```
 
-Causes possibles :
-- `npx` absent (Node.js non installé)
-- Pages derrière authentification (Chrome headless sans session)
-- Réseau bloqué
+Possible causes:
+- `npx` missing (Node.js not installed)
+- Pages behind authentication (headless Chrome without a session)
+- Blocked network
 
 ---
 
-## Limites
+## Limitations
 
-- Mesures "lab" (simulation réseau), pas données terrain réelles
-- Pages derrière login non supportées
-- Résultats peuvent différer du terrain selon la connexion
+- "Lab" measurements (network simulation), not real field data
+- Pages behind a login are not supported
+- Results may differ from the field depending on the connection
 
-Pour des données terrain réelles, utiliser `collect_cwv_pagespeed.py` (voir section ci-dessus) ou fournir un `cwv.json` manuel (voir docs/capturer-har-et-coverage.md).
+For real field data, use `collect_cwv_pagespeed.py` (see section above) or provide a manual `cwv.json` (see docs/capture-har-and-coverage.md).
 
 -----
 
-## PageSpeed Insights + CrUX (données terrain)
+## PageSpeed Insights + CrUX (field data)
 
-### Prérequis
+### Prerequisites
 
-- `GOOGLE_API_KEY` dans `.env` à la racine du projet (voir `documentation/setup/setup_api_keys.md`)
-- APIs activées sur Google Cloud : PageSpeed Insights API + Chrome UX Report API
+- `GOOGLE_API_KEY` in `.env` at the project root (see `documentation/setup/setup_api_keys.md`)
+- APIs enabled on Google Cloud: PageSpeed Insights API + Chrome UX Report API
 
-### Vérifier la clé API
-
-```bash
-.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit> --check
-```
-
-### Collecter les CWV
+### Check the API key
 
 ```bash
-.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <dossier-audit>
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <audit-dir> --check
 ```
 
-Par défaut (`--strategy both`) : collecte **mobile ET desktop** en une seule commande, conservés côte à côte dans `cwv.json` (une entrée par couple url/stratégie). Restreindre au besoin avec `--strategy mobile` ou `--strategy desktop`.
+### Collect the CWVs
 
-### Résultats dans cwv.json
+```bash
+.venv/bin/python3 .claude/skills/analyse-parcours/scripts/collect_cwv_pagespeed.py <audit-dir>
+```
 
-- `"strategy"` : `"mobile"` ou `"desktop"` (une entrée par appareil, plus d'écrasement entre passages)
-- `"source": "crux"` : données terrain CrUX P75 (réels utilisateurs) - prioritaire
-- `"source": "pagespeed_lab"` : données lab Lighthouse via API (si CrUX absent pour cette URL)
-- `"crux_category"` : `"FAST"` / `"AVERAGE"` / `"SLOW"` (classification globale CrUX)
+By default (`--strategy both`): collects **both mobile AND desktop** in a single command, kept side by side in `cwv.json` (one entry per url/strategy pair). Restrict if needed with `--strategy mobile` or `--strategy desktop`.
 
-Le rapport affiche mobile et desktop séparément, avec un badge de source (terrain / lab / lab local).
+### Results in cwv.json
 
-### Note méthodologique
+- `"strategy"` : `"mobile"` or `"desktop"` (one entry per device, no more overwriting between passes)
+- `"source": "crux"` : CrUX P75 field data (real users) - priority
+- `"source": "pagespeed_lab"` : Lighthouse lab data via API (if CrUX is absent for this URL)
+- `"crux_category"` : `"FAST"` / `"AVERAGE"` / `"SLOW"` (overall CrUX classification)
 
-Les données CrUX sont des percentiles P75 sur les 28 derniers jours d'utilisation réelle. Elles ne sont disponibles que pour les URLs avec suffisamment de trafic dans la base CrUX Google. Pour les pages peu visitées ou les pages derrière authentification, le script retombe automatiquement sur les données lab.
+The report displays mobile and desktop separately, with a source badge (field / lab / local lab).
+
+### Methodological note
+
+CrUX data are P75 percentiles over the last 28 days of real usage. They are only available for URLs with enough traffic in Google's CrUX database. For rarely visited pages or pages behind authentication, the script automatically falls back to lab data.
