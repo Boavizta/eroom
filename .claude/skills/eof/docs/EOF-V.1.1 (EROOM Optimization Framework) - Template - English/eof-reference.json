@@ -3,9 +3,9 @@
     {
       "id": "1.1",
       "pillar": "🛖 1 — Product",
-      "criterion": "Is there a simple way to perform this action?",
-      "explanation": "If there is already a way to do it, does the digital approach bring added value to the user?",
-      "method": "The criterion is met if:\nThe team has identified a simpler non-digital or existing solution and shown that the digital version clearly adds value compared to it (time savings, accessibility, reduced hardware impact).",
+      "criterion": "Is there a low tech way exist to achieve this action ?",
+      "explanation": "If there's already a way to do it, does a digital way add value to the user ?",
+      "method": "The criterion is validated if:\nThe team has identified a simpler non-digital or existing solution and demonstrated that the digital version clearly adds value compared to it (time saved, accessibility, reduced material impact).",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -26,9 +26,9 @@
     {
       "id": "1.2",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are the target users — with their business needs, typical devices, and ergonameics expectations — well known?",
-      "explanation": "The product risks being poorly designed if the target users are not well known, or better still, involved in the project. For example, user journeys could be cumbersome or the compatibility strategy inadequate.",
-      "method": "The criterion is met if:\nUser needs and contexts are documented using personas, interviews, and usage analyses, and common devices are well known and taken into account in the design.",
+      "criterion": "Are the target users, with there business needs, typical devices and ergonomy expectations, well known ?",
+      "explanation": "The product may not be well designed if the target users are not well known, or better, involved in the projet. For instance, the user journeys might be cumbersome or the compatibility strategy might be inadequate.",
+      "method": "The criterion is validated if:\nUser needs and contexts are documented through personas, interviews, usage analytics, and typical devices are well known and considered in the design.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -49,9 +49,9 @@
     {
       "id": "1.3",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are updates of new features mandatory on all devices, regardless of operating system or browser?",
-      "explanation": "New features weigh down the application. On older devices, users may prefer to keep a simpler, more performant, less resource-hungry product.",
-      "method": "The criterion is met if:\nTests show that the update does not degrade performance on older or modest devices, and that the product offers optional or lightweight modes when needed.",
+      "criterion": "Are the new features updates mandatory for all devices, with no relation to their operating system or browser ?",
+      "explanation": "New features makes the application heavier. On older devices, users may prefer to keep the product simpler, with better performances and less resources used.",
+      "method": "The criterion is validated if:\nTests show that the update does not degrade performance on older or modest devices, and the product offers optional or lighter modes when needed.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -72,9 +72,9 @@
     {
       "id": "1.4",
       "pillar": "🛖 1 — Product",
-      "criterion": "Does the design include custom components rather than native ones?",
-      "explanation": "System components (buttons, menus, forms, etc.) are almost always more efficient than custom-built ones — not to mention their accessibility and compatibility.",
-      "method": "The criterion is met if:\nNative components are preferred or justified; custom components are used only when necessary and offer performance and accessibility equivalent or superior to native components.",
+      "criterion": "Does the design include custom made components instead of native ones ?",
+      "explanation": "System components (buttons, menu, forms, ...) are almost always more efficient than custom made ones. Not to mention accessible and compatible.",
+      "method": "The criterion is validated if:\nNative components are preferred or justified; custom components are used only when necessary and show equal or better performance and accessibility than native ones.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -95,9 +95,9 @@
     {
       "id": "1.5",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are there animations, videos, sounds, maps (...) that play automatically?",
-      "explanation": "Playing this kind of content without any user action is disruptive and uses resources such as bandwidth and the graphics processor.",
-      "method": "The criterion is met if:\nNo media plays without user action, or autoplay is technically necessary and optimized (lightweight, disabled by default, user-controlled).",
+      "criterion": "Is there animations, videos, sounds, maps (…) that are played automatically ?",
+      "explanation": "Playing this type of content without any user action is annoying and uses resources like bandwidth and gpu.",
+      "method": "The criterion is validated if:\nNo media is launched without user action, or auto-play is technically required and optimised (lightweight, muted by default, user-controlled).",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -118,9 +118,9 @@
     {
       "id": "1.6",
       "pillar": "🛖 1 — Product",
-      "criterion": "Can the resources used by the application be adapted to the user's hardware configuration?",
-      "explanation": "Not everyone has a device capable of running resource-intensive content (such as multimedia, etc.).\nWhat happens when a user tries to run resource-intensive content on an unsuitable device? Ideally, the service should not block access and should run the basic functions.",
-      "method": "The criterion is met if:\nThe application detects limited hardware conditions and automatically switches to lighter behaviors (reduced quality, simplified rendering, heavy processes disabled).",
+      "criterion": "Is it possible to adapt the resources used by the application to the user's hardware configuration ?",
+      "explanation": "Not everyone has a device capable of running computationally intensive content (like multimedia content, etc.).\nWhat happens if a user tries to run computationally intensive content on an inappropriate device? In this case, ideally, the service should not be blocking and should perform basic functions.",
+      "method": "The criterion is validated if:\nThe application detects limited hardware conditions and automatically switches to lighter behaviours (reduced quality, simplified rendering, disabled heavy processes).",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -141,9 +141,9 @@
     {
       "id": "1.7",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are all features useful, usable, and used?",
-      "explanation": "Simplifying the product by removing unused features will reduce resource consumption.",
-      "method": "The criterion is met if:\nUsage data (analytics, logs, comments) shows that each feature is actually used and provides obvious added value, and that unused or redundant features are identified and removed to reduce resource consumption.",
+      "criterion": "Are all features useful, usable and used ?",
+      "explanation": "Simplifying the product by removing unused features will result in less resources used.",
+      "method": "The criterion is validated if:\nUsage data (analytics, logs, feedback) shows that each feature is actually used and provides clear value, and unused or redundant features are identified and removed to reduce resource consumption.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -164,9 +164,9 @@
     {
       "id": "1.8",
       "pillar": "🛖 1 — Product",
-      "criterion": "Is application support poor on the oldest targeted devices?",
-      "explanation": "Most of the impact of digital services is felt on client devices. It is very important not to push these devices into obsolescence by breaking their compatibility.",
-      "method": "The criterion is met if:\nThe application works correctly on the oldest devices in the target group, without imposing unnecessary upgrades or causing performance issues that accelerate obsolescence.",
+      "criterion": "Is the application support poor on the oldest devices targeted ?",
+      "explanation": "Most of the impacts of digital services are on the client devices side. Not pushing these devices to obsolescence by breaking compatibility is very important.",
+      "method": "The criterion is validated if:\nThe application runs correctly on the oldest devices in the target group, without forcing unnecessary upgrades or causing performance issues that accelerate obsolescence.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -187,9 +187,9 @@
     {
       "id": "1.9",
       "pillar": "🛖 1 — Product",
-      "criterion": "Does using the application require a high-speed network?",
-      "explanation": "High bandwidth implies significant resource use. This indicates that optimizations are possible to reduce the number and/or size of requests.",
-      "method": "The criterion is met if:\nThe application remains usable on low-bandwidth connections, through optimized requests, reduced multimedia file sizes, caching strategies, or a lightweight mode.",
+      "criterion": "Is a high bandwidth network required to use the application ?",
+      "explanation": "Requiring high bandwidth means that there's a lot resource use. It indicates that some optimisations are possible to reduce the number and/or the size of requets.",
+      "method": "The criterion is validated if:\nThe application remains usable on low-bandwidth connections, with optimised requests, reduced media sizes, caching strategies or a lightweight mode.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -210,9 +210,9 @@
     {
       "id": "1.10",
       "pillar": "🛖 1 — Product",
-      "criterion": "Does the product use manipulative designs (UX dark patterns) that increase resource use?",
-      "explanation": "Bad user-experience practices include infinite scrolling, pre-checked subscriptions, difficulty unsubscribing, etc.",
-      "method": "The criterion is met if:\nNo deceptive pattern is present and the design avoids mechanisms such as infinite scrolling, forced autoplay, or hidden unsubscribe flows that artificially increase page load and data use.",
+      "criterion": "Does the product uses UX dark patterns that increase resource use ?",
+      "explanation": "UX dark patterns includes infinite scroll, prechecked subscriptions, making unsuscribtion difficult, etc.",
+      "method": "The criterion is validated if:\nNo dark patterns are present, and the design avoids mechanisms like infinite scroll, forced autoplay, or hidden unsubscribe flows that artificially increase page loads and data usage.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -233,9 +233,9 @@
     {
       "id": "1.11",
       "pillar": "🛖 1 — Product",
-      "criterion": "Can the default values (number of items displayed, quality, refresh rate, etc.) be changed to reduce resource use?",
-      "explanation": "Users generally do not change default values. Setting more frugal defaults can reduce resource consumption.",
-      "method": "The criterion is met if:\nDefault values are set to resource-efficient options, and users can easily adjust settings (quality, number of displays, frequency) to more demanding modes only if necessary.",
+      "criterion": "Is it possible to change default values (number of elements displayed, quality, refresh frequency, ...) to reduce resource use ?",
+      "explanation": "Users usually don't change the default values. Setting more sober default may result in less resources used.",
+      "method": "The criterion is validated if:\nDefault values are set to sober, resource-efficient options, and users can easily adjust parameters (quality, display count, frequency) toward more demanding modes only if needed.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -256,9 +256,9 @@
     {
       "id": "1.12",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are there many trackers on the product?",
-      "explanation": "Marketing analytics and tracking tools are often responsible for more than a third of requests on websites. Limiting the number of tools and partners would reduce resource use and improve privacy.",
-      "method": "The criterion is met if:\nTracking is strictly limited to what is necessary, the number of trackers/tools is kept to a minimum, and each tracking request is justified. Removing unnecessary trackers reduces network load and improves privacy.",
+      "criterion": "Is there a lot of tracking on the product ?",
+      "explanation": "Analytics and marketing tracking tools are often responsible of more than a third of the requests on websites. Limiting the number of tools and partner would result in less resources use and improve privacy.",
+      "method": "The criterion is validated if:\nTracking is strictly limited to what is necessary, the number of trackers/tools is minimised, and each tracking request is justified. Removing unnecessary trackers reduces network load and improves privacy.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -279,9 +279,9 @@
     {
       "id": "1.13",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are the main user journeys optimized to be smooth and efficient?",
-      "explanation": "Efficient user journeys with few screens reduce resource use and improve user satisfaction and productivity.",
-      "method": "The criterion is met if:\nThe main workflows require a minimal number of steps/screens, without redundant navigation, which improves efficiency and reduces the number of server or client requests.",
+      "criterion": "Are the main user jouneys optimised to be smooth and efficient ?",
+      "explanation": "Having efficient user journeys with few screens reduces resources use and improves user satisfaction and productivity.",
+      "method": "The criterion is validated if:\nThe main workflows require a minimal number of steps/screens, with no redundant navigation, improving efficiency and reducing the number of server or client requests.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -302,9 +302,9 @@
     {
       "id": "1.14",
       "pillar": "🛖 1 — Product",
-      "criterion": "Are the main screens clear and well designed?",
-      "explanation": "The most-used screens must be light in terms of displayed information and media, in order to reduce resource use.",
-      "method": "The criterion is met if:\nThe most frequently used screens contain only the necessary information, use lightweight media, and avoid heavy scripts or components that increase rendering cost.",
+      "criterion": "Are the main screens light and well designed ?",
+      "explanation": "The most used screens must be light in terms of displayed information and media to reduce resources use.",
+      "method": "The criterion is validated if:\nThe most frequently used screens contain only necessary information, use lightweight media, and avoid heavy scripts or components that increase rendering cost.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -325,9 +325,9 @@
     {
       "id": "1.15",
       "pillar": "🛖 1 — Product",
-      "criterion": "Is this service used frequently?",
-      "explanation": "A rarely used service that runs continuously can have an unnecessary environmental impact.\nConversely, a frequently used service justifies its resource consumption.\nUnderstanding usage frequency helps assess whether the service should stay as is, be simplified, be partially decommissioned, or move to on-demand execution.",
-      "method": "The criterion is met if the service shows regular, significant usage, in line with its resource footprint.",
+      "criterion": "Is the service frequently used?",
+      "explanation": "A service that is rarely used but continuously running may represent unnecessary environmental impact.\nConversely, a service used frequently justifies its resource consumption.\nUnderstanding usage frequency helps evaluate whether the service should remain as-is, be simplified, be partially decommissioned, or switch to on-demand execution.",
+      "method": "The criterion is validated if the service shows regular, meaningful usage aligned with its resource footprint.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -349,8 +349,8 @@
       "id": "1.16",
       "pillar": "🛖 1 — Product",
       "criterion": "Volume (number of users)",
-      "explanation": "Knowing the number of active users helps put the environmental impact into context and determine whether the scale of the service matches its actual audience.\nA large infrastructure serving a small population may indicate over-provisioning, while high usage can fully justify the allocated resources.",
-      "method": "The criterion is met if the product's user volume justifies its resource use and architecture.",
+      "explanation": "Knowing the number of active users helps contextualise the environmental impact and determine whether the service’s scale matches its actual audience.\nA large infrastructure serving a small population may indicate overprovisioning, while high usage may fully justify the allocated resources.",
+      "method": "The criterion is validated if the product’s user volume justifies its resource usage and architecture.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -371,9 +371,9 @@
     {
       "id": "2.1",
       "pillar": "🗺️ 2 — Architecture",
-      "criterion": "Does the product use resource-hungry technologies?",
-      "explanation": "If the product uses heavyweight technologies such as generative AI or blockchain, it may be possible to replace them or use more efficient implementations.",
-      "method": "The criterion is met if the project's technical stack contains no heavyweight elements (such as LLM or proof-based blockchain) that could be replaced by lighter alternatives.",
+      "criterion": "Does the product uses greedy technologies ?",
+      "explanation": "If the products uses heavy technologes like generative IA or blockchain, it may be possible to replace it or use more efficient implementations",
+      "method": "The criterion is validated if the project's technical stack does not include heavy parts (like  LLM or proof based blockchain) that can be replaced with lighter alternatives.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -394,9 +394,9 @@
     {
       "id": "2.2",
       "pillar": "🗺️ 2 — Architecture",
-      "criterion": "There is no compatibility strategy.",
-      "explanation": "The service must be compatible with all the devices users have, to avoid making those devices obsolete.",
-      "method": "Improvement potential exists if the project does not use elasticity tools and the load is not constant.\n The service is not compatible with all targeted devices, or the list of targeted devices is not known.",
+      "criterion": "There is no compatibility strategy",
+      "explanation": "The service should be compatible with all devices it's users may have to avoid pushing theses devices to obsolescence.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the service is not compatible with all it's targeted devices or the list of targeted devices is not known.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -417,9 +417,9 @@
     {
       "id": "2.3",
       "pillar": "🗺️ 2 — Architecture",
-      "criterion": "Can the separation and communication between components be optimized?",
-      "explanation": "Architectural choices can enable an efficient scaling strategy that reduces resource use, but can also add overhead if component separation and coupling are not well optimized.",
-      "method": "Improvement potential exists if components depend too much on each other, or if their communication causes slowdowns, errors, or unnecessary complexity.",
+      "criterion": "Is it possible to optimise the components separation and communication ?",
+      "explanation": "The architecture choices may allow an efficient scaling strategy that reduces ressources use, but also lead to some overhead if the components separation et coupling is not well optimised.",
+      "method": "An improvement potential exists if components depend too much on each other or if their communication creates slowdowns, errors, or unnecessary complexity.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -440,9 +440,9 @@
     {
       "id": "2.4",
       "pillar": "🗺️ 2 — Architecture",
-      "criterion": "Can the load peak be smoothed over a period of time?",
-      "explanation": "Shifting tasks over time using batch processing or message brokers smooths the load and lightens the infrastructure, because the peak load is lower.",
-      "method": "Improvement potential exists if the project does not use elasticity tools and the load is not constant.\nThe application has load peaks and the tasks do not need to be executed immediately (it is not, for example, about displaying pages).",
+      "criterion": "Can the peak load be smoothed over a time scale ?",
+      "explanation": "Moving tasks in time using batching or message brokers allow to smooth the load and have a lighter infrastructure, since the peak load is lower.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\nthe application has peak loads and the tasks do not need to be executed right away (not pages displayed for instance)",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -463,9 +463,9 @@
     {
       "id": "2.5",
       "pillar": "🗺️ 2 — Architecture",
-      "criterion": "Are there heavy calculations or queries whose results could be cached?",
-      "explanation": "If, within the system, some heavy calculations or queries return the same results several times, they may be cacheable. This saves resources and improves performance.",
-      "method": "Improvement potential exists if the project does not use elastic tools (auto-scaling mechanisms) and the load is not constant.\n the application performs heavy calculations whose result is used several times.",
+      "criterion": "Is there heavy computations or requests which results can be cached ?",
+      "explanation": "If within the system some heavy computations and requests returns the same results several times, it may be possible to cache them. This will save resources and improve performance.",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the application does some heavy computations, the result of which is used several times.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -486,9 +486,9 @@
     {
       "id": "3.1",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Can the bill be reduced?",
-      "explanation": "Deploying a FinOps/GreenOps strategy will let the product use fewer resources.\nAlmost all FinOps practices (locating underused components, using spot instances, right-sizing components, using managed services, etc.) reduce resource use and therefore environmental impact. A strategy aimed at reducing environmental impact is called GreenOps.",
-      "method": "Confirmed strength if a strategy is in place; otherwise, there is improvement potential.",
+      "criterion": "Can the invoice be reduced ?",
+      "explanation": "Deploying a FinOps/GreenOps strategy will allow the product to use less resources.\nAlmost all FinOps practices (localise underused components, use spot instances, adjust components sizes, use managed services, …) allow the reduction of resources use and consequently of environnemental impacts. A strategy aiming a reduction of environnemental impacts is called GreenOps.",
+      "method": "The strength is confirmed if a strategy is in place, otherwise an improvement potential exists.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -509,9 +509,9 @@
     {
       "id": "3.2",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "There is no environmental impact monitoring system.",
-      "explanation": "Monitoring carbon emissions and carbon intensity? Do you know the PUE and WUE of your data center? Are you considering moving to greener sites?",
-      "method": "Confirmed strength if satisfactory monitoring is in place; otherwise, there is improvement potential.",
+      "criterion": "There is no environnement impact tracking in place.",
+      "explanation": "Monitoring Carbon Emission and the Carbon Intensity? Do you know the PUE,WUE of your datacenter? Are you considering moving to greener locations?",
+      "method": "The strength is confirmed if a stisfying monitoring is in place, otherwise an improvement potential exists.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -532,9 +532,32 @@
     {
       "id": "3.3",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Is the service hosted in a region where the electricity mix has a significant impact?",
-      "explanation": "The local electricity mix matters a great deal: choosing the right region has a considerable effect on the impacts of using the service.",
-      "method": "Improvement potential exists if the service is not hosted in France (or in another country whose electricity mix has a low impact).",
+      "criterion": "Is the service hosted in a region where the electricity mix has a high impact ?",
+      "explanation": "The local electrity mix mix very important : choosing the right region has a drastic effect on the impacts of the usage of the service.",
+      "method": "An improvement potential exists if the service is not hosted in France (or another country with a low impact electricity mix)",
+      "impact_level": "Significant",
+      "max_potential": 1.5,
+      "evaluation_options": [
+        "✅ Confirmed strength",
+        "💡 Improvement potential identified",
+        "🚫 Not applicable",
+        "🤔 To be assessed",
+        "⌛️ Assessment in progress"
+      ],
+      "evaluation_coefficient_options": {
+        "✅ Confirmed strength": 0,
+        "💡 Improvement potential identified": 1,
+        "🚫 Not applicable": 0,
+        "🤔 To be assessed": 0,
+        "⌛️ Assessment in progress": 0.5
+      }
+    },
+    {
+      "id": "3.4",
+      "pillar": "🏢 3 — Infrastructure",
+      "criterion": "Can the infrastructure be mutualized ?",
+      "explanation": "Using mutualized hosting (though VM, containers, managed services, *aaS) allow the reduction of resource use since it's shared with other products.",
+      "method": "An improvement potential exists if failed if the project's infrastructure is not, or not entirely, mutualised.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -555,9 +578,9 @@
     {
       "id": "3.5",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Can the infrastructure be shared?",
-      "explanation": "Using shared hosting (via VMs, containers, managed services, *aaS) reduces resource use, because resources are shared with other products.",
-      "method": "Improvement potential exists if the project's infrastructure is not, or not fully, shared.",
+      "criterion": "Are the deployment components (VM, server, containers) oversized ?",
+      "explanation": "Use observability tools/methodologies to check the VM/servers load (CPU/RAM). It should be at least 70%.",
+      "method": "An improvement potential exists if some components have a load (CPU or RAM) below 70%.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -578,9 +601,9 @@
     {
       "id": "3.6",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Are the deployment components (VM, server, containers) oversized?",
-      "explanation": "Use observability tools/methodologies to check the load of virtual machines/servers (CPU/RAM). It must be at least 70%.",
-      "method": "Improvement potential exists if some components have a load (CPU or RAM) below 70%.",
+      "criterion": "Can elasticity/scalability tools and strategies be deployed to reduce the infrastructure size ?",
+      "explanation": "With tools like cron jobs, orchestrators, containers, or functions as a service, it is possible to adjust the number of components deployed. \nSo if the load is low, the number of components is low.",
+      "method": "An improvement potential exists if the project does not use controlled  (i.e., not in open bar mode, but with reasonable limit) elasticity tools and the load is not constant.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -601,9 +624,9 @@
     {
       "id": "3.7",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Can elasticity/auto-scaling tools and strategies be deployed to reduce the size of the infrastructure?",
-      "explanation": "With tools such as cron jobs, orchestrators, containers, or functions as a service, the number of deployed components can be adjusted.\nSo if the load is low, the number of components is low.",
-      "method": "Improvement potential exists if the project does not use controlled auto-scaling tools (i.e. not in free-for-all mode, but with a reasonable limit) and the load is not constant.",
+      "criterion": "Are all the environnements always on ?",
+      "explanation": "Environnements that are not used (for instance non produciton ones at night or weekends) can be swicthed off.",
+      "method": "An improvement potential exists if the product has running environnements that are not used for some significant amount of time (like night or weekends)",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -624,32 +647,9 @@
     {
       "id": "3.8",
       "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Are all environments always switched on?",
-      "explanation": "Environments that are not used (e.g. those not in production at night or on weekends) can be switched off.",
-      "method": "Improvement potential exists if the product has runtime environments that are unused for a significant period (such as at night or on weekends).",
-      "impact_level": "Significant",
-      "max_potential": 1.5,
-      "evaluation_options": [
-        "✅ Confirmed strength",
-        "💡 Improvement potential identified",
-        "🚫 Not applicable",
-        "🤔 To be assessed",
-        "⌛️ Assessment in progress"
-      ],
-      "evaluation_coefficient_options": {
-        "✅ Confirmed strength": 0,
-        "💡 Improvement potential identified": 1,
-        "🚫 Not applicable": 0,
-        "🤔 To be assessed": 0,
-        "⌛️ Assessment in progress": 0.5
-      }
-    },
-    {
-      "id": "3.9",
-      "pillar": "🏢 3 — Infrastructure",
-      "criterion": "Are test environments as big as production environments?",
-      "explanation": "It is generally not necessary to have as many components (VMs, containers) in test environments, except for load testing.",
-      "method": "Improvement potential exists if some test environments are as big as production environments.",
+      "criterion": "Are the test environnements as big as the production ones ?",
+      "explanation": "It's usually not necessary to have as many components (VM, containers) in tests environnements, except for load testing.",
+      "method": "An improvement potential exists if some tests environnements are as big as the production ones.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -670,9 +670,9 @@
     {
       "id": "4.1",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Are deletion and archiving mechanisms in place?",
-      "explanation": "Without automated deletion or archiving, data accumulates unnecessarily and takes up more storage space. Retention rules and archiving policies limit data growth and reduce environmental impact.",
-      "method": "The criterion is met if automatic deletion and archiving mechanisms exist and are actually applied.",
+      "criterion": "Are deletion and archiving mechanisms implemented?",
+      "explanation": "Without automated deletion or archiving, data accumulates unnecessarily and increases storage usage. Retention rules and archiving policies limit data growth and reduce environmental impact.",
+      "method": "The criterion is validated if automatic deletion and archiving mechanisms exist and are effectively applied.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -693,9 +693,9 @@
     {
       "id": "4.2",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Are database best practices in place?",
-      "explanation": "An unoptimized database needs more CPU, memory, or I/O resources to deliver the same level of service, which increases energy consumption. Proper indexing, good data modeling, and regular maintenance help reduce unnecessary resource use.",
-      "method": "The criterion is met if a strategy is applied to optimize database performance.",
+      "criterion": "Are the best practices for database in place ?",
+      "explanation": "An unoptimised database requires more CPU, memory or I/O to deliver the same level of service, which increases energy consumption. Proper indexing, good data modelling and regular maintenance help reduce unnecessary resource usage.",
+      "method": "The criterion is validated if a strategy is applied to optimise the database’s performance.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -716,9 +716,9 @@
     {
       "id": "4.3",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Does the product use database/storage technologies suited to the intended uses?",
-      "explanation": "If the product's storage needs are large, it may be worth specializing storage technologies:\n- PG/MYSQL/Oracle/SQLServer or object-relational\n- MongoDB for document-oriented use.\n- Column-oriented database for analytics.\n- Specialized database (vector, time series).",
-      "method": "Improvement potential exists if the project does not use elasticity tools (auto-scaling) and the load is not constant.\nThe project has specific storage needs that would be better served by another storage system, and the volume is large (> several hundred GB).",
+      "criterion": "Does the product use the right database/storage technologies for the right usages ?",
+      "explanation": "If the product storage needs are large, it may be beneficial to specialize the storage technologies : \n- PG/MYSQL/Oracle/SQLServer or object relation\n- MongoDB for document oriented.\n- Columnar db for analytics.\n- Specialized database (vector, times series).",
+      "method": "An improvement potential exists if the project does not use elasticity tools and the load is not constant.\n the projects has some specific storage needs that would be better saved by another storage system, and the volume is significant (> hundreds of go).",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -739,9 +739,9 @@
     {
       "id": "4.4",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Are test databases as large as production databases?",
-      "explanation": "In general, there is no need to have as much data in test environments as in production.",
-      "method": "Improvement potential exists if some test databases are as large as production databases.",
+      "criterion": "Are the tests databases as big as the production ones ?",
+      "explanation": "Usually it's not necessary to have as much data in tests environnements than in production.",
+      "method": "An improvement potential exists if some tests databases are as big as the production ones.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -762,9 +762,9 @@
     {
       "id": "4.5",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Is there duplicated data?",
-      "explanation": "If data is duplicated and this is not part of the product's high-availability strategy, it generally indicates an optimization opportunity — unless the duplication results from intentional denormalization for performance reasons.",
-      "method": "The criterion is met if the team has identified duplicated data and determined whether it is justified or not.",
+      "criterion": "Is there data duplications ?",
+      "explanation": "If data is duplicated and this is not part of product strategy as High Availability, this usually indicates an optimisation opportunity, except when the duplication results from intentional performance-driven denormalisation.",
+      "method": "The criterion is validated if the team has identified duplicated data and determined whether it is justified or not.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -785,9 +785,9 @@
     {
       "id": "4.6",
       "pillar": "💾 4 — Storage and data",
-      "criterion": "Is there data that is very rarely used in the service and could be moved to cold storage?",
-      "explanation": "Rarely accessed data can be moved to a more energy-efficient but slower storage tier (\"cold storage\").\nFor example, transactions more than three months old in a banking service can be removed from the main database and archived.\nThe user can still retrieve them, but through a slower process, which is acceptable given their infrequent use.\nFor example: SSDs have a carbon impact 2 to 3 times higher than mechanical hard drives (HDDs) of equivalent capacity",
-      "method": "The criterion is met if rarely accessed data has already been moved to suitable cold or tiered storage.",
+      "criterion": "Is there data that is very seldom used in the service, and that could be moved to cold storage?",
+      "explanation": "Data that is rarely accessed can be moved to a more energy-efficient but slower storage tier (“cold storage”).\nFor example, transactions older than three months in a banking service can be removed from the main database and archived.\nThe user can still retrieve them, but through a slower process, which is acceptable given their infrequent use.\nFor example: SSD got a 2x to 3x higher embodied carbon impact.",
+      "method": "The criterion is validated if data that is rarely accessed has already been moved to an appropriate cold or tiered storage.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -808,9 +808,9 @@
     {
       "id": "5.1",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Are there statistical analysis tools in place to highlight potential efficiency improvements?",
-      "explanation": "Static analysis helps identify performance and efficiency issues.\nIt also helps improve quality and makes products easier to change.",
-      "method": "An improvement is identified if the statistical analysis tools in place have revealed potential efficiency gains.",
+      "criterion": "Is there statical analysis tools in place, revealing potential efficiency improvements  ?",
+      "explanation": "Static analysis helps identify performance and efficiency issues.\nStatic analysis also helps improve quality, making product modification easier.",
+      "method": "Improvement is identified if the statical analysis tools in place have revealed potentiel efficiency improvements.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -831,9 +831,9 @@
     {
       "id": "5.2",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Has a load or stress testing campaign revealed efficiency problems?",
-      "explanation": "If a load or stress testing campaign has revealed efficiency problems, it may be possible to improve the product.",
-      "method": "An improvement is identified if a load or stress testing campaign has revealed efficiency problems.",
+      "criterion": "Has a campaign of load or stress tests revealed efficiency problems ?",
+      "explanation": "If a load or stress test campaign has revealed efficiency problems, it may be possible to improve the product.",
+      "method": "Improvement is identified if a campaign of load or stress tests revealed efficiency problems",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -854,9 +854,9 @@
     {
       "id": "5.3",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Has the team identified areas for improvement in terms of performance/efficiency and added them to the backlog?",
-      "explanation": "An improvement is identified if the team has identified efficiency gains.",
-      "method": "The criterion is met if the tasks identified by the team (issues, tickets, etc.) include points that improve performance/efficiency.",
+      "criterion": "Have any areas for improvement in terms of performance/efficiency been identified by the team and put in the backlog?",
+      "explanation": "Improvement is identified if the team has indentified efficicency improvements.",
+      "method": "The criterion is validated if in the tasks identified by the team (issues, tickets, etc.) points for improving performance/efficiency are present.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -877,9 +877,9 @@
     {
       "id": "5.4",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Are the performance indicators poor?",
-      "explanation": "Poor performance implies optimization potential. Performance indicators include latency, requests per second, Core Web Vitals metrics, etc.",
-      "method": "An improvement is identified if the performance indicators do not match the project's ambition (e.g. more than 2 seconds to display a web page).",
+      "criterion": "Are the performance metrics poor ?",
+      "explanation": "Poor performance implies an optimisation potential. Performance metrics include latency, requests per seconds, Core Web Vitals, etc.",
+      "method": "Improvement is identified if the performance metrics do not match the ambition of the project (for example, more thant 2s to display a web page)",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -900,9 +900,9 @@
     {
       "id": "5.5",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Are the most critical use cases (most frequent user journeys) optimized?",
-      "explanation": "The most frequent user journeys account for all the resources used by the application. Applying optimizations to these code paths should yield good results.",
-      "method": "An improvement is identified if no study has been conducted to improve the performance/efficiency of the most used code paths.",
+      "criterion": "Are the most critical use cases (most used user journeys) optimized ?",
+      "explanation": "The most used user journeys are critical to the overall resources used by the application. Applying optimisations on these code path will likely result in good results.",
+      "method": "Improvement is identified if no study has been done to improve the performance/efficiency of the most used code paths.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -923,9 +923,9 @@
     {
       "id": "5.6",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Is the technical stack (Java, JS, Python, PHP, etc.) out of date?",
-      "explanation": "Updating tools (such as the Java virtual machine) improves performance and efficiency at lower cost.",
-      "method": "An improvement is identified if the project's technical base is not up to date, at least up to the latest LTS version.",
+      "criterion": "Is the technical stack (Java, JS, python, php, ...) not up to date ?",
+      "explanation": "Updating the tools (like the Java Virtual Machine) allow almost free performance and efficiency improvements.",
+      "method": "Improvement is identified if the technical base of the project is not up to date to the last LTS at least.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -946,9 +946,9 @@
     {
       "id": "5.7",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Can the components be tuned to improve efficiency?",
-      "explanation": "Optimization components (such as the Java virtual machine) improve performance and efficiency.",
-      "method": "An improvement is identified if no study has been conducted to check whether the efficiency of the deployed components could be improved by changing their configuration.",
+      "criterion": "Can the components be tuned to improve efficiency ?",
+      "explanation": "Tuning components (like the  Java Virtual Machine) allow performance an efficiency improvements",
+      "method": "Improvement is identified if no study has been done to check if the efficicency of the deployed components could be improved by modifying their configuration.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -969,9 +969,9 @@
     {
       "id": "5.8",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Are the project's dependencies up to date?",
-      "explanation": "Updating the project's dependencies (e.g. the Spring Framework in Java) can improve performance and efficiency.",
-      "method": "An improvement is identified if the project's main dependencies are not up to date with the latest stable version.",
+      "criterion": "Are the dependencies of the project up to date ?",
+      "explanation": "Updating the project dependencies (like the the Spring Framwork in java) may allow performance and efficiency improvements.",
+      "method": "Improvement is identified if the project's main dependencies are not up to date to the last stable release.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -992,9 +992,9 @@
     {
       "id": "5.9",
       "pillar": "👨‍💻 5 — Algorithms & code",
-      "criterion": "Have compatibility issues been identified for the targeted devices?",
-      "explanation": "The service must be compatible with all the devices users have, to avoid making those devices obsolete.",
-      "method": "An improvement is identified if the team has detected compatibility issues.",
+      "criterion": "Is there compatibility problems identified for targeted devices ?",
+      "explanation": "The service should be compatible with all devices it's users may have to avoid pushing theses devices to obsolescence.",
+      "method": "Improvement is identified if the team has identified compatibility problems.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -1015,9 +1015,9 @@
     {
       "id": "6.1",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Is there an effective observability setup for the product?",
-      "explanation": "Without a minimum of knowledge about the product's runtime behavior, it is difficult to identify possible optimizations. Lack of monitoring implies low optimization potential.",
-      "method": "The criterion is met if observability tools are in place.",
+      "criterion": "Is there an efficient observability system in place for the product ?",
+      "explanation": "Without a minimum of knowledge about the runtime behaviour of the product, it's difficult to identify optimisations. No monitoring implies low optimisatin potential.",
+      "method": "The criterion is validated if observability tools are in place.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -1034,9 +1034,9 @@
     {
       "id": "6.2",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Are there code reviews and/or pair programming?",
-      "explanation": "Code reviews and pair programming guarantee a minimum level of shared knowledge about the codebase and a minimum quality.",
-      "method": "The criterion is met if code reviews and pair programming are carried out on most of the project's code.",
+      "criterion": "Is there code reviews and/or pair programming in place ?",
+      "explanation": "Code reviews and pair programmaing enforce minimum shared knowledge about the code base and minimum quality.",
+      "method": "The criterion is validated if code reviews and pair programming are performed on most of the project's code.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -1053,9 +1053,9 @@
     {
       "id": "6.3",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Is there an effective CI/CD process?",
-      "explanation": "Having a CI/CD is a good indicator of how easily the team will be able to work on the application with confidence.",
-      "method": "The criterion is met if projects are regularly built and tested automatically via a CI/CD tool.",
+      "criterion": "Is there an effective CI/CD in place ?",
+      "explanation": "The presence of a CI/CD is a good indicator of how easy it will be to work on the application with confidence.",
+      "method": "The criterion is validated if the projects is regularily built and tested automatically via a CI/CD tool.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -1072,9 +1072,9 @@
     {
       "id": "6.4",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Are there non-regression tests (unit tests, integration tests, end-to-end tests)?",
-      "explanation": "Having non-regression tests lets developers change the software while being assured that their work causes no problems.",
-      "method": "The criterion is met if the project has a complete set of automated tests covering the most important parts of the source code.",
+      "criterion": "Is there non regression tests in place (unit tests, integration tests, end to end tests) ?",
+      "explanation": "The presence of non regression tests allow the programmers to change the software while beeing confident in the absence of problems indeuced by their work.",
+      "method": "The criterion is validated if the project has a large set of automated tests, covering the most important parts of the code base.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -1091,9 +1091,9 @@
     {
       "id": "6.5",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Is there strong decoupling between the business domain and the technical integration?",
-      "explanation": "Decoupling practices such as dependency injection or hexagonal/clean/onion architecture enable more effective and ambitious technical changes.\nThis is the \"D\" (dependency inversion) of the 5 fundamental SOLID principles.",
-      "method": "The criterion is met if the product's technical aspects can be changed without changing the functional code.",
+      "criterion": "Is there a strong decloupling between business domain & technical integration ?",
+      "explanation": "Decoupling practives like dependency injection or Hexagonal/Clean/Onion Architecture allow more effective and ambitious technical changes.\nit's 'D' (Dependency Inversion) from 5 Solid principles",
+      "method": "The criterion is validated if it is possible to change technical aspects of the product without modifying the functionnal code.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -1110,9 +1110,9 @@
     {
       "id": "6.6",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Are there indicators for tracking software quality?",
-      "explanation": "Such as code coverage, cyclomatic complexity, number of issues, number of deployment issues, number of rollbacks, lead time for changes, deployment frequency, change failure rate, recovery time after a failed deployment.",
-      "method": "The criterion is met if software quality metrics are in place.",
+      "criterion": "Is there metrics to follow the software quality ?",
+      "explanation": "Like code coverage, cyclomatic complexity, number of issues, number of delivery problems, number of rollbacks, change lead time, deployment frequency, change fail percentage, failed deployment recovery time",
+      "method": "The criterion is validated if there are software quality metrics in place.",
       "impact_level": "Decisive",
       "max_potential": 2.0,
       "evaluation_options": [
@@ -1129,9 +1129,9 @@
     {
       "id": "6.7",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Is there comprehensive documentation?",
-      "explanation": "Relevant documentation makes more ambitious changes possible.",
-      "method": "The criterion is met if the project has clear, usable documentation.",
+      "criterion": "Is there an extensive documentation ?",
+      "explanation": "The presence of a relevant documentation allow more ambitious changes.",
+      "method": "The criterion is validated if the project has a clear, usable documentation.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -1148,9 +1148,9 @@
     {
       "id": "6.8",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Is there duplicated code in the application?",
-      "explanation": "Duplicated code can be removed to simplify product maintenance.",
-      "method": "The criterion is met if there is no unjustified duplicated code in the project.",
+      "criterion": "Is there duplicated code in the application ?",
+      "explanation": "Duplicated code can be removed to simplify the products maintenance.",
+      "method": "The criterion is validated if there is no unjustified duplicated code in the project.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -1167,9 +1167,9 @@
     {
       "id": "6.9",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Does the team have enough autonamey to deploy the tools it needs to observe, measure, or optimize the system?",
-      "explanation": "Ease of change increases when teams can rely on the tools they need to monitor performance, measure impact, or analyze behavior.\nThis autonamey can come from being able to install custom tools, or from relying on comprehensive built-in tools provided by the platform.\nWhat matters is not where the infrastructure is hosted, but the team's ability to use it effectively to support optimization.",
-      "method": "The criterion is met if the team can use or deploy the tools it needs to observe, measure, and optimize the system.",
+      "criterion": "Does the team have sufficient autonomy to deploy the tools it needs to observe, measure or optimise the system?",
+      "explanation": "Ease of change increases when teams can rely on the tools they need to monitor performance, measure impact, or analyse behaviour.\nThis autonomy may come from the ability to install custom tools, or from relying on comprehensive built-in tooling provided by the platform.\nWhat matters is not where the infrastructure is hosted, but whether the team can instrument it effectively to support optimisation.",
+      "method": "The criterion is validated if the team can use or deploy the tools it needs to observe, measure and optimise the system.",
       "impact_level": "Moderate",
       "max_potential": 1.0,
       "evaluation_options": [
@@ -1186,9 +1186,9 @@
     {
       "id": "6.10",
       "pillar": "🛠 6 — Ease of change",
-      "criterion": "Are the main components subject to high-availability constraints?",
-      "explanation": "High-availability requirements can reduce the team's ability to modify, migrate, or optimize components.\nServices that must maintain strict availability leave fewer opportunities for maintenance windows, architectural changes, or resource optimization.\nUnderstanding these constraints helps assess how easily the system can evolve toward a lower environmental impact.",
-      "method": "The criterion is met if the system's availability constraints still allow the team to modify or optimize the components without major difficulty.",
+      "criterion": "Do main components got high availability constraints?",
+      "explanation": "High availability requirements can reduce the team’s ability to modify, migrate or optimise components.\nServices that must maintain strict uptime leave fewer opportunities for maintenance windows, architectural changes or resource optimisation.\nUnderstanding these constraints helps assess how easily the system can evolve toward lower environmental impact.",
+      "method": "The criterion is validated if the system’s availability constraints still allow the team to modify or optimise components without major difficulty.",
       "impact_level": "Significant",
       "max_potential": 1.5,
       "evaluation_options": [
@@ -1206,81 +1206,81 @@
   "quick_diagnostic": [
     {
       "id": "0.1",
-      "criterion": "Would the disappearance of the digital service have a significant impact?",
+      "criterion": "Would it have a high impact if the digital service were to disapear ?",
       "screens": [
         "1 - No or negligible impact",
         "2 - Limited impact on a small group of users or processes",
-        "3 - Moderate impact, but workarounds exist",
+        "3 - Moderate impact but workarounds exist",
         "4 - Significant impact on core activities",
-        "5 - Critical impact (operations blocked, major risk to the company or IT infrastructure)"
+        "5 - Critical impact (operations blocked, major business or SI risk)"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.2",
-      "criterion": "Are there redundant features or duplicate applications in the system?",
+      "criterion": "Are there redondant features or duplicate applications among the system ?",
       "screens": [
         "1 - Something very similar already exists elsewhere (same feature or same code).",
-        "2 - Something already exists elsewhere.",
-        "3 - There are minor similarities, but nothing major.",
-        "4 - Almost no similarity with other products or codebases.",
-        "5 - Totally unique; nothing similar exists."
+        "2 - Part of it already exists elsewhere.",
+        "3 - Small similarities exist, but nothing major.",
+        "4 - Almost no similarity with other products or code.",
+        "5 - Completely unique; nothing similar exists."
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.3",
-      "criterion": "Are the main components subject to high-availability constraints?",
+      "criterion": "Do main components got high availability constraints?",
       "screens": [
-        "1 - 7 days a week, 24 hours a day - 99.99% - International coverage",
-        "2 - 7 days a week, 24 hours a day - 99%",
-        "3 - Some SLAs.",
-        "4 - 5 days a week, 8 hours a day - No SLA - No Disaster Recovery Plan (DRP)",
+        "1 - 7/7 24/24 - 99.99% - International coverage",
+        "2 - 7/7 24/24 - 99%",
+        "3 - Some SLA.",
+        "4 - 5/7 8/24 - No SLA - No DRP",
         "5 - No SLA/SLO"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.4",
-      "criterion": "Dependencies: how many technical links to other systems are in place?",
+      "criterion": "Dependencies: How many technical links to other systems are in place?",
       "screens": [
-        "1 - The product is not connected to any other system",
-        "2 - The product is connected to a few other systems",
-        "3 - The product is connected to some other systems and the connection matters (business value and/or technical coupling)",
-        "4 - The product is connected to many other systems",
-        "5 - The product is connected to most other IS systems (e.g. authentication and authorization)"
+        "1 - The product is not connected to any other systems",
+        "2 - The product is connected to a few of the other systems",
+        "3 - The product is connected to some other systems and the connection is important (business value and/or technical coupling)",
+        "4 - The product is connected to many of the other systems",
+        "5 - The product is connected to most of the other systems in the IS (eg : authentication and authorization)"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.5",
-      "criterion": "Is the project's source code fully or partially accessible to the team?",
+      "criterion": "Is the source code of the project fully or partially available to the team?",
       "screens": [
-        "1 - The source code is fully available (open source or fully accessible to the organization).",
-        "2 - The source code is mostly available (accessible internally, but not publicly).",
+        "1 - The source code is fully available (open source or fully accessible to the organization)",
+        "2 - The source code is mainly available (code accessible internally, but not to the public).",
         "3 - The source code is partially available (some components or modules are accessible).",
-        "4 - Access is limited to a very small group or to the vendor only.",
+        "4 - Access is restricted to a very small group or the supplier only.",
         "5 - No, the source code is not available / I don't know."
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.6",
-      "criterion": "Are the skills needed to update the service available?",
+      "criterion": "Are skills available to update the service?",
       "screens": [
-        "1 - The team has a solid command of the functional and technical design of the project and can work with full confidence.",
-        "2 - The team knows most of the project and can work on it with caution.",
-        "3 - Knowledge of the project is insufficient.",
-        "4 - Some people have partial knowledge of the project.",
-        "5 - No one knows the project."
+        "1 - The team is well versed in the functional and technical design of the projet and can work confidently",
+        "2 - The team knows most of the project and can work on it with caution",
+        "3 - The knowledge about the project is poor",
+        "4 - Some people know a bit about the project",
+        "5 - No one knows the project"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.7",
-      "criterion": "Is the architecture highly complex?",
+      "criterion": "Is it possible to simplify the architecture?",
       "screens": [
-        "1 - Very complex / I don't know",
+        "1 - Very Complex / I don't know",
         "2 - Complex",
         "3 - Medium",
         "4 - Simple",
@@ -1290,101 +1290,101 @@
     },
     {
       "id": "0.8",
-      "criterion": "Is the infrastructure (number and size of components such as virtual machines and containers) very large?",
+      "criterion": "Is the infrastructure (number and size of the compenents like VM and containers) very large ?",
       "screens": [
-        "1 - One of the organization's largest infrastructures",
+        "1 - One of the largest infrastructures in the organisation",
         "2 - Larger than most services",
-        "3 - Comparable to the organization's average",
-        "4 - Smaller than most services",
-        "5 - Very small (e.g. a few VMs or containers)"
+        "3- Comparable to the organisational average",
+        "4- Smaller than most services",
+        "5- Very small (e.g. a few VMs or containers)"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.9",
-      "criterion": "Is a large volume of data stored?",
+      "criterion": "Is an important volume of data stored?",
       "screens": [
-        "1 - The product has one of the largest data storage volumes in the IS / I don't know.",
-        "2 - The product stores a large amount of data in the IS compared to most systems.",
-        "3 - The product stores an average amount of data compared to the rest of the IS.",
-        "4 - The product stores a limited amount of data.",
-        "5 - The product stores very little data."
+        "1 - The product has among the largest data storage volumes in the IS / I don't know",
+        "2 - The product stores a large volume of data in the IS compared to most systems",
+        "3 - The product stores an average amount of data compared to the rest of the IS",
+        "4 - The product stores a limited amount of data",
+        "5 - The product stores very little data"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.10",
-      "criterion": "Is the functional complexity high?",
+      "criterion": "Is there a high functional complexity?",
       "screens": [
-        "1 - Very complex / I don't know",
+        "1 - Very Complex / I don't know",
         "2 - Complex",
         "3 - Medium",
         "4 - Simple",
-        "5 - Easy"
+        "5 - light"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.11",
-      "criterion": "\"Are user journeys smooth, intuitive, and free of UX/UI friction that could be improved?\"",
+      "criterion": "Are user journeys smooth, intuitive, and free of UX/UI friction that could be improved?",
       "screens": [
-        "1 - The UX/UI is very poor, users complain and/or there are pending items to fix it / I don't know",
-        "2 - The UX/UI has recurring friction points or usability issues",
-        "3 - The UX/UI is functional, but some aspects could be improved",
-        "4 - The UX/UI is clear and pleasant to use; only minor improvements were identified",
-        "5 - The UX/UI is well designed, user-tested, and offers a smooth, consistent experience"
+        "1 - The UX/UI is very poor, users complain and/or there are items in the backlog to change it / I don't know",
+        "2 - The UX/UI shows recurring friction points or usability issues",
+        "3 - The UX/UI is functional but a few aspects could be improved",
+        "4 - The UX/UI is clear and pleasant to use, only minor improvements identified",
+        "5 - The UX/UI is well polished, user-tested, and provides a smooth, consistent experience"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.12",
-      "criterion": "Is the product compatible with the oldest hardware in the target fleet, and does it offer a smooth experience on it?",
+      "criterion": "Is the product compatible with the oldest hardware of the target fleet and provides a seamless experience on them?",
       "screens": [
         "1 - Incompatible or unknown",
         "2 - Compatible but with significant degradation (irritating or frustrating for the user)",
-        "3 - Compatible and usable but not comfortable (noticeable slowdown)",
-        "4 - Compatible and generally smooth (minor slowdowns)",
-        "5 - Compatible and smooth (comfortable and responsive even on old hardware)"
+        "3 - Compatible and usable but not comfortable (noticeable slowness)",
+        "4 - Compatible and mostly smooth (minor slowdowns)",
+        "5 - Compatible and seamless (comfortable and responsive even on older hardware)"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.13",
-      "criterion": "Does the product backlog contain performance problems and improvements?",
+      "criterion": "Does the product backlog contain performance issues and improvements?",
       "screens": [
-        "1 - In the backlog and a recurring topic",
-        "3 - Some improvements are possible",
-        "5 - No performance issue identified"
+        "1 - In the backlog & recurring discussion",
+        "3 - A few improvements are possible",
+        "5 - No performance problem identified"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.14",
-      "criterion": "Are the main features optimized and efficient?",
+      "criterion": "Are the main features optimised and efficient?",
       "screens": [
-        "1 - Not optimized enough / don't know",
-        "2 - Some core features are ineffective or redundant",
-        "3 - Core features work but could be optimized",
-        "4 - Most core features are well implemented and work efficiently",
-        "5 - All core features are fully effective, streamlined, and regularly reviewed for optimization"
+        "1 - Not optimized enough / don’t know",
+        "2 - Some main features are inefficient or redundant",
+        "3 - The main features are functional but show room for optimisation",
+        "4 - Most main features are well implemented and perform efficiently",
+        "5 - All main features are fully efficient, streamlined, and regularly reviewed for optimisation"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.15",
-      "criterion": "Is there a policy on data deletion and archiving?",
+      "criterion": "Is there a policy for data deletion and archiving?",
       "screens": [
-        "1 - No policy / don't know",
+        "1 - No policy / don’t know",
         "2 - Informal or ad-hoc deletion and archiving practices",
-        "3 - A policy exists but is not applied consistently",
-        "4 - A clear, partially automated policy is in place",
-        "5 - A strict, enforced, regularly audited data deletion and archiving policy"
+        "3 - A policy exists but is not consistently applied",
+        "4 - A clear policy is in place and partially automated",
+        "5 - A strict, applied, and regularly audited policy for data deletion and archiving"
       ],
       "impact_level": "Decisive"
     },
     {
       "id": "0.16",
-      "criterion": "Is the service hosted in a country whose electricity mix has a significant impact? (depending on location)",
+      "criterion": "Is the service hosted in a country with an impactful electricity mix? (location based)",
       "screens": [
         "1 - > 750 gCO2e / kWh",
         "2- < 500 gCO2e / kWh",

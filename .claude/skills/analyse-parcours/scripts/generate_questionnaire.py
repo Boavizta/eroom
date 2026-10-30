@@ -1932,8 +1932,8 @@ def autotest():
 
             ref_data = {
                 "criteria": [
-                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
-                    {"id": "3.9", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
+                    {"id": "3.7", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}},
+                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0}}
                 ],
                 "quick_diagnostic": []
             }
@@ -1950,7 +1950,7 @@ def autotest():
                         "title": "Test environment",
                         "interviewee": "the person who operates the infrastructure",
                         "type": "filter",
-                        "criteria": ["3.8", "3.9"],
+                        "criteria": ["3.7", "3.8"],
                         "question": "Do you have test environments?",
                         "discarded_label": "No",
                         "applicable_label": "Yes"
@@ -1963,8 +1963,8 @@ def autotest():
             # 3.8 has a non-decisive answer: the filter must be printed
             audit_data = {
                 "criteria": [
-                    {"id": "3.8", "answer": "🤔 To be assessed", "coefficient": 0},
-                    {"id": "3.9", "answer": None}
+                    {"id": "3.7", "answer": "🤔 To be assessed", "coefficient": 0},
+                    {"id": "3.8", "answer": None}
                 ],
                 "quick_diag_overview": {"questions": []}
             }
@@ -2150,8 +2150,8 @@ def autotest():
 
             ref_data = {
                 "criteria": [
+                    {"id": "3.7", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
                     {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
-                    {"id": "3.9", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
                     {"id": "4.4", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
                 "quick_diagnostic": []
@@ -2169,7 +2169,7 @@ def autotest():
                         "title": "Test environments",
                         "interviewee": "the person who operates the infrastructure",
                         "type": "filter",
-                        "criteria": ["3.8", "3.9"],
+                        "criteria": ["3.7", "3.8"],
                         "question": "Question env?",
                         "discarded_label": "No",
                         "applicable_label": "Yes"
@@ -2195,7 +2195,7 @@ def autotest():
                         "type": "composite",
                         "question": "Question composite?",
                         "options": [
-                            {"label": "Option A", "answers": {"3.9": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
+                            {"label": "Option A", "answers": {"3.8": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
                         ]
                     }
                 ]
@@ -2205,8 +2205,8 @@ def autotest():
 
             audit_data = {
                 "criteria": [
+                    {"id": "3.7", "answer": None},
                     {"id": "3.8", "answer": None},
-                    {"id": "3.9", "answer": None},
                     {"id": "4.4", "answer": None}
                 ],
                 "quick_diag_overview": {"questions": []}
@@ -2314,7 +2314,7 @@ def autotest():
 
             ref_data = {
                 "criteria": [
-                    {"id": "3.9", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
+                    {"id": "3.8", "max_potential": 1.5, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}},
                     {"id": "4.4", "max_potential": 2.0, "evaluation_options": ["✅ Confirmed strength", "🚫 Not applicable"], "evaluation_coefficient_options": {"✅ Confirmed strength": 0, "🚫 Not applicable": 0}}
                 ],
                 "quick_diagnostic": []
@@ -2344,7 +2344,7 @@ def autotest():
                         "title": "Test environments",
                         "interviewee": "the person who operates the infrastructure",
                         "type": "filter",
-                        "criteria": ["3.9"],
+                        "criteria": ["3.8"],
                         "question": "Question env?",
                         "discarded_label": "No, no distinct pre-production environment (all tests run locally or in production)",
                         "applicable_label": "Yes"
@@ -2358,7 +2358,7 @@ def autotest():
                         "type": "composite",
                         "question": "Question composite?",
                         "options": [
-                            {"label": "Option A", "answers": {"3.9": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
+                            {"label": "Option A", "answers": {"3.8": "✅ Confirmed strength", "4.4": "✅ Confirmed strength"}}
                         ]
                     }
                 ]
@@ -2368,7 +2368,7 @@ def autotest():
 
             audit_data = {
                 "criteria": [
-                    {"id": "3.9", "answer": None},
+                    {"id": "3.8", "answer": None},
                     {"id": "4.4", "answer": None}
                 ],
                 "quick_diag_overview": {"questions": []}

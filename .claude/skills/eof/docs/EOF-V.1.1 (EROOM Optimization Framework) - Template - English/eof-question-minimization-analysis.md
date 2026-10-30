@@ -8,6 +8,9 @@
 >
 > Intermediate analysis file: not consumed by any code.
 >
+> Note: criterion ids below follow the **old French sheet numbering** (dimension 3 ran
+> 3.1–3.3 then 3.5–3.9). Current English sheet ids: subtract one from any id in 3.5–3.9.
+>
 > Method of this v2: real probes run on `octo.com` on
 > 2026-09-03 (DNS, HTTP, headers, CSS, JS, third-party APIs). Each lead is
 > labeled **verified for real**, **not verified**, or **discarded after testing**.
@@ -103,7 +106,7 @@ from "no data" to a plausible level, not to a certainty.
 ### 3.b Two other artifacts, same logic
 
 - **Detailed cloud bill or IaC export (Terraform/CloudFormation)** →
-  cluster A almost entirely (`3.1`, `3.5`, `3.6`, `3.7`, `3.8`, `3.9`) + `4.3`,
+  cluster A almost entirely (`3.1`, `3.4`, `3.5`, `3.6`, `3.7`, `3.8`) + `4.3`,
   `4.4`. About 13.5 of weight for one request. The IaC gives the real
   sizing, which corrects the known black spot (`instance_type`
   / `storage_gb` of e-footprint are only script defaults).
@@ -114,7 +117,7 @@ from "no data" to a plausible level, not to a certainty.
 
 ## 4. New automatic sources: what the 2026-09-03 probes yield
 
-### 4.a VERIFIED FOR REAL — non-production environments exposed (`3.8`, `3.9`)
+### 4.a VERIFIED FOR REAL — non-production environments exposed (`3.7`, `3.8`)
 
 ```
 dig +short staging.octo.com  ->  d3cowsu17vt1rf.cloudfront.net / 3.164.163.68
@@ -128,10 +131,10 @@ ETag and last-modified **different** from prod's: it is not a
 wildcard alias, it is really a distinct environment, served publicly, with
 content almost identical in volume to prod's.
 
-- `3.8` "Are all environments always switched on?" →
+- `3.7` "Are all environments always switched on?" →
   **automatable** (💡 Improvement potential: a non-production env
   answers permanently).
-- `3.9` "Are test environments as big as prod's?" →
+- `3.8` "Are test environments as big as prod's?" →
   **clue** (comparable content volume, but HTML volume says nothing
   about the sizing of the infra behind it).
 
@@ -170,8 +173,8 @@ this whole analysis.
 Possible uses:
 - `2.3` separation/communication of components → `*.herokuapp.com` reveals
   an application platform distinct from the static site → **clue**.
-- `3.5` sharing → PaaS (Heroku) + shared CDN → **clue**.
-- `3.7` elasticity → Heroku dynos / CloudFront are elastic by nature →
+- `3.4` sharing → PaaS (Heroku) + shared CDN → **clue**.
+- `3.6` elasticity → Heroku dynos / CloudFront are elastic by nature →
   **clue** (never proof that elasticity is configured).
 - `1.12` trackers → **fixes a substantive error**, cf. 5.a.
 
@@ -223,7 +226,7 @@ Decisive) remains to be covered by the repository (3.a).
 
 `api.thegreenwebfoundation.org/api/v3/greencheck/octo.com` → `green: false`
 (verified). The framework has **no** "renewable hosting" criterion
-(the numbering jumps from `3.3` to `3.5`, cf. section 6). Usable only
+(the numbering jumps from `3.3` to `3.4`, cf. section 6). Usable only
 to corroborate `3.3`, already answered. Gain: 0. Mentioned to close the lead.
 
 -----
@@ -300,7 +303,7 @@ optional), without urgency.
 ## 6. Point to raise on the framework itself
 
 The criteria numbering **skips `3.4`** (`3.1`, `3.2`, `3.3`, then
-`3.5`...). The total is indeed 54 (16+5+8+6+9+10), so nothing is "lost"
+`3.4`...). The total is indeed 54 (16+5+8+6+9+10), so nothing is "lost"
 compared to the expected count, but a numbering gap can signal either a
 criterion removed on the Google Sheet side, or a row skipped at export. To be checked
 at the next synchronization of the `eof` skill: if a "3.4" criterion

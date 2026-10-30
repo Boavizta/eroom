@@ -165,7 +165,7 @@ MAPPING = {
         "max_provenance": "collected",
         "note": "The carbon_intensity data (ipinfo + carbon table) is already provenance 'collected' at source; it only covers servers identified from the HAR, never invisible infra (self-hosted DB/service behind the application).",
     },
-    "3.5": {
+    "3.4": {
         "short_criterion": "Can the infrastructure be shared/mutualized?",
         "category": "partial",
         "data_field": "security-headers-analysis.json: Content-Security-Policy (families paas_backend, cdn_bibliotheques, infra_cloud_generique)",
@@ -173,7 +173,7 @@ MAPPING = {
         "max_provenance": "assumed",
         "note": "Declared inventory (CSP), not observed. An allowed cloud domain is not necessarily contacted. Structural blind spot: a self-hosted infra behind a 1st-party reverse proxy is invisible here.",
     },
-    "3.7": {
+    "3.6": {
         "short_criterion": "Can elasticity/auto-scaling tools and strategies be deployed to reduce the size of the infrastructure?",
         "category": "partial",
         "data_field": "security-headers-analysis.json: Content-Security-Policy (paas_backend family)",

@@ -70,7 +70,7 @@ The reference framework does not ask its questions in a single way. Counting on 
 | `🤔 To be assessed` | 0 |
 | `⌛️ Assessment in progress` | 0,5 |
 
-The ids concerned: 1.1 to 1.16, 2.1 to 2.5, 3.1, 3.2, 3.3, 3.5 to 3.9, 4.1 to 4.6, 5.1 to 5.9.
+The ids concerned: 1.1 to 1.16, 2.1 to 2.5, 3.1 to 3.8, 4.1 to 4.6, 5.1 to 5.9.
 
 **The 10 criteria of dimension 6** have a completely different vocabulary, and **only
 three options**:
@@ -91,10 +91,11 @@ coefficient**. They therefore weigh nothing in the optimization potential. The l
 contract requires it anyway: an answer given on a `0.x` question must go out **without** a
 `coefficient` key, while a detailed criterion requires one.
 
-## 1.2 Criterion 3.4 does not exist
+## 1.2 Dimension 3 numbering
 
-Dimension 3 goes from `3.1` to `3.9` but counts only **8 criteria**: `3.4` is absent from the
-source. It is not a data loss on our side, it is a numbering gap at EROOM's.
+Dimension 3 runs continuously from `3.1` to `3.8` — **8 criteria, no gap**. (The previous French
+sheet skipped `3.4` and ran to `3.9`; the current English sheet renumbered 3.5–3.9 as 3.4–3.8.
+If you rely on old ids from earlier audits, subtract one from any id in 3.5–3.9.)
 All the other dimensions are complete.
 
 Practical consequence: never generate a list of ids by looping over a range. Always
@@ -243,7 +244,7 @@ method : Improvement potential exists if the project does not use elasticity too
  The service is not compatible with all targeted devices, or the list of targeted devices is not known.
 ```
 
-The first sentence talks about **elasticity and load**, which is the subject of `2.4` and `3.7`,
+The first sentence talks about **elasticity and load**, which is the subject of `2.4` and `3.6`,
 and has nothing to do with a compatibility strategy. The second sentence, however, matches the
 label well.
 

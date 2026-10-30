@@ -451,7 +451,7 @@ def context_6_1(data):
     return f"HTTP security headers score: {worst['score_pct']}% (grade {worst['grade']}) on {worst['url']} - one indicator among others of production maturity"
 
 
-def context_3_5(data):
+def context_3_4(data):
     """Hint of shared infrastructure (PaaS/CDN/cloud declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
@@ -467,7 +467,7 @@ def context_3_5(data):
     return f"Your service uses {len(all_shared)} external infrastructure service(s) (hosting, content delivery, cloud): {', '.join(all_shared[:5])}{'...' if len(all_shared) > 5 else ''}"
 
 
-def context_3_7(data):
+def context_3_6(data):
     """Hint of a platform supporting elasticity (PaaS declared in the CSP)."""
     headers = data["headers"]
     inv = inventory_from_headers_analysis(headers)
@@ -597,7 +597,7 @@ CONTEXTS = {
     "1.15": context_1_15, "1.16": context_1_15,  # same traffic field
     "5.5": context_5_5, "2.3": context_2_3, "2.5": context_2_5,
     "3.2": context_3_2,
-    "3.5": context_3_5, "3.7": context_3_7,
+    "3.4": context_3_4, "3.6": context_3_6,
     "1.4": context_1_4, "1.11": context_1_11,
     "6.1": context_6_1, "6.3": context_6_3, "6.6": context_6_6, "6.8": context_6_8,
 }

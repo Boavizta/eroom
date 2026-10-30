@@ -309,7 +309,7 @@
       "owned_criteria": {"id_prefix": "3.", "except_lots": ["automatic-judgment"]},
       "replayable_alone": true,
       "expected_output": "a single confirmation line",
-      "note": "The reference numbering skips from 3.3 to 3.5: the dimension counts 8 criteria, there is no criterion 3.4."
+      "note": "The reference numbering for dimension 3 is continuous from 3.1 to 3.8: 8 criteria, no gap."
     },
     {
       "id": "dimension-4-judgment",

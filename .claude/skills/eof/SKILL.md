@@ -20,7 +20,7 @@ EOF-V.1.1 is a self-assessment framework for the optimization maturity
 of a digital service (9 tabs: presentation, a quick diagnostic with 16
 criteria, 6 detailed pillars totaling 54 criteria, a synthesis). It
 exists as a **public Google Sheet**, the source of truth:
-https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/edit
+https://docs.google.com/spreadsheets/d/1_fymJEyXxKjqy3jFlyO8MHhfmLZduUsLyloMeU2kSRM/edit
 
 This skill produces a **blank Markdown template** of this framework, so that
 answers can be entered directly in a text file rather than in
@@ -74,7 +74,7 @@ mandatory, the classic CSV and XLSX exports fail on a one-time-token redirect. T
 recipe, for the record:
 
 ```bash
-BASE="https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/gviz/tq?tqx=out:json"
+BASE="https://docs.google.com/spreadsheets/d/1_fymJEyXxKjqy3jFlyO8MHhfmLZduUsLyloMeU2kSRM/gviz/tq?tqx=out:json"
 curl -sL -A "Mozilla/5.0" "${BASE}&gid=1677462955" -o .claude/skills/eof/docs/source-sheet/read-me.json
 curl -sL -A "Mozilla/5.0" "${BASE}&gid=296916801"  -o .claude/skills/eof/docs/source-sheet/quick-diag.json
 curl -sL -A "Mozilla/5.0" "${BASE}&gid=2022239731" -o .claude/skills/eof/docs/source-sheet/product.json

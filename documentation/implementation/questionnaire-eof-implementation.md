@@ -336,7 +336,7 @@ in the air.
 
 | | Count | Identifiers |
 |---|---|---|
-| Detailed criteria with a non-empty `context` and no answer | 16 | `1.4, 1.9, 1.11, 1.14, 1.15, 1.16, 2.3, 2.5, 3.2, 3.5, 3.7, 5.5, 6.1, 6.3, 6.6, 6.8` |
+| Detailed criteria with a non-empty `context` and no answer | 16 | `1.4, 1.9, 1.11, 1.14, 1.15, 1.16, 2.3, 2.5, 3.2, 3.4, 3.6, 5.5, 6.1, 6.3, 6.6, 6.8` |
 | Quick diagnostic questions with a non-empty `context_index` and no answer | 1 | `0.4` |
 | Criteria with a `context` but **already** answered, hence no question asked | 0 | - |
 
@@ -630,7 +630,7 @@ The three delivered filters:
 |---|---|---|
 | No human user interface | 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.14, 5.9 | 12.5 |
 | No persistent data of its own | 4.1 to 4.6 | 8.0 |
-| No separate test environment | 3.8, 3.9 | 4.5 |
+| No separate test environment | 3.7, 3.8 | 4.5 |
 
 4.4 is deliberately left to the "persistent data" filter alone:
 `validate_questionnaire_blocks.py` forbids overlap between two filters, whereas it tolerates

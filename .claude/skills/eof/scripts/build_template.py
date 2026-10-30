@@ -342,7 +342,7 @@ def main():
     parts.append("# EOF-V.1.1 (EROOM Optimization Framework) — Full reference\n")
     parts.append(
         "> Generated from the source Google Sheet: "
-        "https://docs.google.com/spreadsheets/d/1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0/edit\n"
+        "https://docs.google.com/spreadsheets/d/1_fymJEyXxKjqy3jFlyO8MHhfmLZduUsLyloMeU2kSRM/edit\n"
         ">\n"
         "> **Blank template** — no answer is pre-filled. The Excel file provided "
         "as a complement was only used for two things that the Sheet's data "

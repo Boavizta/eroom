@@ -34,28 +34,28 @@
         {
           "label": "24/7 availability, with a 99.99% commitment and international coverage",
           "answers": {
-            "0.3": "1 - 7 days a week, 24 hours a day - 99.99% - International coverage",
+            "0.3": "1 - 7/7 24/24 - 99.99% - International coverage",
             "6.10": "🔴 Hard to change"
           }
         },
         {
           "label": "24/7 availability, with a 99% commitment",
           "answers": {
-            "0.3": "2 - 7 days a week, 24 hours a day - 99%",
+            "0.3": "2 - 7/7 24/24 - 99%",
             "6.10": "🔴 Hard to change"
           }
         },
         {
           "label": "Some service commitments, no permanent availability requirement",
           "answers": {
-            "0.3": "3 - Some SLAs.",
+            "0.3": "3 - Some SLA.",
             "6.10": "🟡 Moderate effort"
           }
         },
         {
           "label": "Business-hours availability only, no service commitment, no disaster recovery plan",
           "answers": {
-            "0.3": "4 - 5 days a week, 8 hours a day - No SLA - No Disaster Recovery Plan (DRP)",
+            "0.3": "4 - 5/7 8/24 - No SLA - No DRP",
             "6.10": "🟢 Easy to change"
           }
         },
@@ -363,35 +363,35 @@
         {
           "label": "Reduced infrastructure AND reduced databases",
           "answers": {
-            "3.9": "✅ Confirmed strength",
+            "3.8": "✅ Confirmed strength",
             "4.4": "✅ Confirmed strength"
           }
         },
         {
           "label": "Reduced infrastructure BUT databases as large as in production",
           "answers": {
-            "3.9": "✅ Confirmed strength",
+            "3.8": "✅ Confirmed strength",
             "4.4": "💡 Improvement potential identified"
           }
         },
         {
           "label": "Infrastructure identical to production BUT reduced databases",
           "answers": {
-            "3.9": "💡 Improvement potential identified",
+            "3.8": "💡 Improvement potential identified",
             "4.4": "✅ Confirmed strength"
           }
         },
         {
           "label": "Infrastructure AND databases identical to production",
           "answers": {
-            "3.9": "💡 Improvement potential identified",
+            "3.8": "💡 Improvement potential identified",
             "4.4": "💡 Improvement potential identified"
           }
         },
         {
           "label": "We have no test environments",
           "answers": {
-            "3.9": "🚫 Not applicable",
+            "3.8": "🚫 Not applicable",
             "4.4": "🚫 Not applicable"
           }
         }
@@ -673,13 +673,13 @@
       "help": "Regions where electricity is decarbonized, such as France, Norway or Iceland, have a much lower impact."
     },
     {
-      "id": "detail-dim3-3.5",
+      "id": "detail-dim3-3.4",
       "file": "technical",
       "phase": "detail",
       "title": "Shared infrastructure",
       "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "criterion": "3.5",
+      "criterion": "3.4",
       "question": "Is your infrastructure shared?",
       "help": "For example: virtual machines, containers, or managed services that share resources with other projects."
     },
@@ -694,29 +694,29 @@
         {
           "label": "Our components run at at least 70% CPU or RAM load, and bounded auto-scaling is in place (or load is constant)",
           "answers": {
-            "3.6": "✅ Confirmed strength",
-            "3.7": "✅ Confirmed strength"
+            "3.5": "✅ Confirmed strength",
+            "3.6": "✅ Confirmed strength"
           }
         },
         {
           "label": "Our components run at at least 70% load, but there is no auto-scaling while load varies",
           "answers": {
-            "3.6": "✅ Confirmed strength",
-            "3.7": "💡 Improvement potential identified"
+            "3.5": "✅ Confirmed strength",
+            "3.6": "💡 Improvement potential identified"
           }
         },
         {
           "label": "Our components run below 70% load, but bounded auto-scaling is in place (or load is constant)",
           "answers": {
-            "3.6": "💡 Improvement potential identified",
-            "3.7": "✅ Confirmed strength"
+            "3.5": "💡 Improvement potential identified",
+            "3.6": "✅ Confirmed strength"
           }
         },
         {
           "label": "Our components run below 70% load, and there is no auto-scaling while load varies",
           "answers": {
-            "3.6": "💡 Improvement potential identified",
-            "3.7": "💡 Improvement potential identified"
+            "3.5": "💡 Improvement potential identified",
+            "3.6": "💡 Improvement potential identified"
           }
         }
       ],
@@ -724,13 +724,13 @@
       "help": "Look at the CPU or memory load of your servers and containers. Automatic scaling must have an upper bound to avoid runaway costs."
     },
     {
-      "id": "detail-dim3-3.8",
+      "id": "detail-dim3-3.7",
       "file": "technical",
       "phase": "detail",
       "title": "Shutting down environments",
       "interviewee": "the person who operates the infrastructure",
       "type": "direct",
-      "criterion": "3.8",
+      "criterion": "3.7",
       "question": "Do you shut down your non-production environments when nobody is using them?",
       "help": "For example: development or test environments switched off at night, on weekends, or between test campaigns."
     },
@@ -966,7 +966,7 @@
       "title": "Test environments",
       "interviewee": "the person who operates the infrastructure",
       "type": "filter",
-      "criteria": ["3.8", "3.9"],
+      "criteria": ["3.7", "3.8"],
       "question": "Do you have test or development environments separate from production?",
       "discarded_label": "No, we do not have a separate test environment",
       "applicable_label": "Yes, we have test or development environments",

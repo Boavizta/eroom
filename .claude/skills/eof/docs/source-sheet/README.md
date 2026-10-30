@@ -82,7 +82,9 @@ Total **54 criteria** detailed, sums of `max_potential` per dimension
 
 Two pitfalls of the framework, visible in these files:
 
-- The **`3.4` criterion does not exist**, the numbering jumps from 3.3 to 3.5. It is normal.
+- Dimension 3 numbering is continuous (`3.1` to `3.8`, 8 criteria, no gap) in the current
+  English sheet. Older French-sheet audits used 3.1–3.3 then 3.5–3.9: subtract one from any
+  id in 3.5–3.9 to get the current id.
 - **Two answer vocabularies**: 44 criteria in `✅ / 💡 / 🚫 / 🤔 / ⌛️`, and the 10
   criteria of dimension 6 in `🟢 / 🟡 / 🔴`, **without a "To be assessed" option**. Always read
   the criterion's `evaluation_options`, never hardcode these labels.

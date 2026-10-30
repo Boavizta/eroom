@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-SHEET_ID="1zJkT_5Ck9WKyxHZ7Uf5f03PmsaLh_SUB7LzKToPlcZ0"
+SHEET_ID="1_fymJEyXxKjqy3jFlyO8MHhfmLZduUsLyloMeU2kSRM"
 BASE="https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json"
 
 # Repository root, derived from this script's location, so it can be run

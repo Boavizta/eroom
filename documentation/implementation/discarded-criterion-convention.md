@@ -169,7 +169,7 @@ IGNORE if you answered "No" to question 1 (Service data storage).
 ```
 
 - The condition is a **conjunction**, never a disjunction. A block is ignorable only if
-  **each** of its criteria is discarded. The block covering 4.4 and 3.9 falls under two
+  **each** of its criteria is discarded. The block covering 4.4 and 3.8 falls under two
   different filters: it is ignored only if both answered "this does not apply", so the
   mention says `to question 1 AND to question 3`.
 - A **partially** governed block carries **no** mention. It remains to be filled in, since
@@ -225,12 +225,12 @@ offer `🚫 Not applicable`.
 |---|---|---|
 | No human user interface | 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.14, 5.9 | 12.5 |
 | No persistent data of its own | 4.1 to 4.6 | 8.0 |
-| No separate test environment | 3.8, 3.9, 4.4 | 4.5 |
+| No separate test environment | 3.7, 3.8, 4.4 | 4.5 |
 
 ⚠️ 4.4 appears in two filters. Since a filter only pours `🚫 Not applicable` and both
 pour the same thing, the overlap is harmless; but validator rule 4.4 forbids overlap
 between filters. **4.4 is therefore carried by the "persistent data" filter alone**, and
-the "test environment" filter cites only 3.8 and 3.9.
+the "test environment" filter cites only 3.7 and 3.8.
 
 ### 5.1 What these filters cost and bring
 
